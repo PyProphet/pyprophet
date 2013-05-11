@@ -40,25 +40,20 @@ def fdr_statistics(p_values, cut_off, lambda_ = 0.4):
 
     # now broadcasting works eg p_values <= cut_off !!!!!!!!!!!!!!!
 
-
     # estimated nulls
     num_null = 1.0 / (1.0-lambda_) * (p_values >= lambda_).sum()
     # fdr
     num_positive = (p_values <= cut_off).sum(axis=0)
     num_null_positive = num_null * cut_off
     fdr = secure_divide(num_null_positive, num_positive, 0).flatten()
-
-
     # sensitivity
     num_total = len(p_values)
     num_alternative = num_total - num_null
     num_alternative_positive = num_positive - num_null_positive
-
     if num_alternative == 0:
         sens = numpy.zeros_like(num_alternative_positive).flatten()
     else:
         sens = num_alternative_positive.flatten() / num_alternative
-
     # more stat
     num_negative = num_total - num_positive
     num_null_negative= num_null - num_null_positive
@@ -80,19 +75,3 @@ def fdr_statistics(p_values, cut_off, lambda_ = 0.4):
                  num_alternative_negative = conv(num_alternative_negative),
                  fdr = conv(fdr),
                  sens = conv(sens))
-
-
-
-def main():
-
-    p_values = numpy.random.randn(100000)
-
-    print fdr_statistics(p_values, 0.0).fdr
-    print fdr_statistics(p_values, numpy.array([0.0, 0.5, 1.0])).fdr
-
-
-if __name__ == "__main__":
-    main()
-
-
-
