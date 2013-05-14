@@ -1,25 +1,7 @@
 import numpy as np
 import pandas as pd
-import scipy.special
 
-from   util import Bunch
-
-def _as_one_dim_array(values, as_type=None):
-    # converst list or flattnes n-dim array to 1-dim array if possible
-    if isinstance(values, (list, tuple)):
-        values = np.array(values)
-    values = values.flatten()
-    assert values.ndim == 1, "values has wrong dimension"
-    if as_type is not None:
-        return values.astype(as_type)
-    return values
-
-
-def pnorm(pvalues, mu, sigma):
-    # [P(X>pi, mu, sigma) for pi in pvalues] for normal distr P
-    pvalues = _as_one_dim_array(pvalues)
-    args = (pvalues - mu) / sigma
-    return 0.5 * ( 1.0 + scipy.special.erf(args / np.sqrt(2.0)))
+import util
 
 
 def secure_divide(denom, nom, replace_zero_division_by=0):
@@ -37,7 +19,7 @@ def secure_divide(denom, nom, replace_zero_division_by=0):
 
 def estimate_num_null(p_values, lambda_):
     # storeys method
-    p_values = _as_one_dim_array(p_values)
+    p_values = util.as_one_dim_array(p_values)
     num_null = 1.0 / (1.0-lambda_) * (p_values >= lambda_).sum()
     return num_null
 
@@ -91,7 +73,7 @@ def fdr_statistics(p_values, cut_off, lambda_ = 0.5):
     else:
         conv = lambda a: a
 
-    return Bunch(num_total = conv(num_total),
+    return util.Bunch(num_total = conv(num_total),
                  num_null  = conv(num_null),
                  num_alternative = conv(num_alternative),
                  num_positive = conv(num_positive),
@@ -106,7 +88,7 @@ def fdr_statistics(p_values, cut_off, lambda_ = 0.5):
 
 def get_error_table_from_pvalues_new(p_values, lambda_=0.4):
 
-    p_values = np.sort(_as_one_dim_array(p_values))[::-1] # descending
+    p_values = np.sort(util.as_one_dim_array(p_values))[::-1] # descending
 
     # estimate FDR, et al:
     num_null = estimate_num_null(p_values, lambda_)
@@ -156,7 +138,7 @@ def get_error_table_from_pvalues_new(p_values, lambda_=0.4):
     error_stat["qvalue"] = error_stat.FDR.cummin()
     error_stat["svalue"] = error_stat.sens[::-1].cummax()[::-1]
 
-    return Bunch(df=error_stat,
+    return util.Bunch(df=error_stat,
                  num=num,
                  num_null=num_null,
                  num_alternative=num-num_null)
@@ -166,8 +148,8 @@ def get_error_stat_from_null(scores, is_decoy, lambda_=0.4):
     # takes list of scores (eg master score)
     # and list of truth values in is_decoy for indicating negative class
 
-    scores = _as_one_dim_array(scores)
-    is_decoy = _as_one_dim_array(is_decoy, np.bool)
+    scores = util.as_one_dim_array(scores)
+    is_decoy = util.as_one_dim_array(is_decoy, np.bool)
     assert len(is_decoy) == len(scores)
 
     pos_scores = scores[~is_decoy]
@@ -179,7 +161,7 @@ def get_error_stat_from_null(scores, is_decoy, lambda_=0.4):
     mu = np.mean(neg_scores)
     nu = np.std(neg_scores, ddof=1)
 
-    target_pvalues = 1.0 - pnorm(pos_scores, mu, nu)
+    target_pvalues = 1.0 - util.pnorm(pos_scores, mu, nu)
 
     result = get_error_table_from_pvalues_new(target_pvalues, lambda_)
     result["target_pvalues"] = target_pvalues
