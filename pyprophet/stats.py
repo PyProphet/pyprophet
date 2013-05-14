@@ -14,7 +14,7 @@ def secure_divide(denom, nom, replace_zero_division_by=0):
     return result
 
 
-def fdr_statistics(p_values, cut_off, lambda_ = 0.4):
+def fdr_statistics(p_values, cut_off, lambda_ = 0.5):
 
     # cast p-values to column vector without nan values
 

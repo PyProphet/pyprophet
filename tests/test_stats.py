@@ -13,7 +13,7 @@ def test_fdr_statistics():
     p_values = numpy.random.randn(100000)
 
     # simple cut off value: test i/o type conformance for single cut_off param
-    stats = pyprophet.stats.fdr_statistics(p_values, 0.0)
+    stats = pyprophet.stats.fdr_statistics(p_values, 0.0, lambda_ = 0.4)
     assert_is_instance(stats.sens, float)
     assert_almost_equals(stats.sens, 1.172823, 6)
     assert_is_instance(stats.fdr, float)
@@ -21,12 +21,12 @@ def test_fdr_statistics():
 
     # simple cut off value: test i/o type conformance for mulit cut_off params
     cut_offs = [0.0, 0.5, 1.0]
-    stats = pyprophet.stats.fdr_statistics(p_values, cut_offs)
+    stats = pyprophet.stats.fdr_statistics(p_values, cut_offs, lambda_ = 0.4)
     assert_equals(stats.fdr.shape, (3,))
     assert_equals(stats.sens.shape, (3,))
 
     # regression test on results
-    stats = pyprophet.stats.fdr_statistics(p_values, 0.2)
+    stats = pyprophet.stats.fdr_statistics(p_values, 0.2, lambda_ = 0.4)
 
     tobe = {'fdr': 0.19832039114178893,
             'num_alternative': 42536.666666666664,
