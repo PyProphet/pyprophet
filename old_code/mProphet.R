@@ -731,6 +731,7 @@ t.l_ini[["separation_column"]] <- NA         # set after parsing input
 t.l_ini[["classification_columns"]] <- NA    # set after parsing input
 t.l_ini[["ds_column"]] <- t.c_ds             # name of the discriminant score column
 
+
 # ITERATION
 t.l_it <- list()
 t.l_it[["type"]] <- "iteration"             # general type of settings
@@ -748,7 +749,6 @@ t.l_it[["absolute"]] <- t.min_num_in_class  # used with t_type <- absolute/auto
 t.l_it[["separation_column"]] <- t.c_ds     # use discriminant score of last iteration
 t.l_it[["classification_columns"]] <- NA    # set after parsing input
 t.l_it[["ds_column"]] <- t.c_ds             # name of the discriminant score column
-
 
 #-------------------------------------------
 # final table with classification statistics
@@ -1341,7 +1341,8 @@ if ( USE.CLASSIFIER ) {
 	} else {
 		cat( paste( "  repeating two fold cross validation ", t.num_xval, " times...\n", sep="" ), file=iostream )
 	}
-	
+
+
 	#	df_all_xval_summed=t.df_all_xval_summed, # this is empty if not debug
 	#	last_df=t.df_clfd_pg,
 	#	last_result=t.l_result,
@@ -1387,10 +1388,17 @@ if ( USE.CLASSIFIER ) {
 		write.table( t.l_ssl_result[["df_all_classifier"]], file=t.all_cl_table_name, sep="\t", row.names=F, quote=F, na="NA" )
 	}
 
+# ONLY FOR DEBUG:
 	t.df_xval_summed <- t.l_ssl_result[["df_all_xval_summed"]]
 	
+# KLAR:
 	t.final_classifier <- t.l_ssl_result[["average_classifier"]]
 	
+# LISTE, element pro x-eval: tablle mit spalten d_sore, decoy, test
+#        d_score: nomralized fisher score
+#        decoy: TRUE/FALSE
+#        test: 0/1
+#   
 	t.l_df_top_cl_pg <- t.l_ssl_result[["l_df_top_cl_pg"]]
 }
 

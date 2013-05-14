@@ -1049,15 +1049,10 @@ semi.supervised.classify.and.cross.validate <- function(
 		#-------------------------------------------
 		# sum up classifier
 		#-------------------------------------------
-
-        # GEWICHTE VECTOR
 		t.v_classifier <- as.vector( t.l_result[["classifier"]][["scaling"]] )
-        # FEATURE NAMES
 		t.c_classifier <- names( t.l_result[["classifier"]][["scaling"]][,1] )
 		t.df_all_classifier <- rbind( t.df_all_classifier, t.v_classifier )
 		names( t.df_all_classifier ) <- t.c_classifier
-
-        # ALSO: ZEILENWEISE Gewichtevektoren der LDA-Gewichte
 		
 		# new: this will be used
 		t.l_all_classifiers[[xval_iter]] <- t.l_result[["classifier"]]
@@ -1082,8 +1077,6 @@ semi.supervised.classify.and.cross.validate <- function(
 			
 		} else { # normalize the scores using a mixture model
 
-            // UNUSED BRANCh
-			
 			t.init_type <- "coor"
 			t.max_it <- 50
 			t.convergence <- 0.00001
@@ -1207,30 +1200,12 @@ semi.supervised.classify <- function(
 	t.df[,"test"] <- 0
 	t.df[ t.l_vtt[["train"]], "train" ] <- 1
 	t.df[ t.l_vtt[["test"]], "test" ] <- 1
-	
-	if ( LOG.DURING.CLASSIFICATION ) {
-		cat( paste( "training data set:\n" ), file=iostream )
-		cat( paste( "  ", t.l_vtt[["prec_rec_kf_train"]], " decoy and ", 
-						t.l_vtt[["prec_rec_unknown_train"]], " target transition group records\n", 
-						sep="" ), file=iostream )
-		cat( paste( "  ", t.l_vtt[["peak_group_kf_train"]], " decoy and ", 
-						t.l_vtt[["peak_group_unknown_train"]], " target peak groups\n", 
-						sep="" ), file=iostream )
-		cat( paste( "test data set:\n" ), file=iostream )
-		cat( paste( "  ", t.l_vtt[["prec_rec_kf_test"]], " decoy and ", 
-						t.l_vtt[["prec_rec_unknown_test"]], " target transition group records\n", 
-						sep="" ), file=iostream )
-		cat( paste( "  ", t.l_vtt[["peak_group_kf_test"]], " decoy and ", 
-						t.l_vtt[["peak_group_unknown_test"]], " target peak groups\n", 
-						sep="" ), file=iostream )
-		cat( paste( "\n" ), file=iostream )
-	}
+
+    # ergo: neue spalten train / test mit ENTWEDER 0/1 oder 1/0!
 	
 	#-------------------------------------------
 	# initialize
 	#-------------------------------------------
-	if ( LOG.DURING.CLASSIFICATION )
-		cat( paste( "initialize...\n" ), file=iostream )
 	t.df_learn <- t.df[ t.l_vtt[["train"]], ]
 	t.l_ini_result <- select.train.and.semi.supervised.learn( 
 			t.df_learn, 
@@ -1834,9 +1809,9 @@ get.true.training.data.set.indices <- function(
 	
 	# short versions
 	t.c_sep_score <- t.l_train_and_apply[["separation_column"]]
-	t.mm_fdr <- t.l_train_and_apply[["mm_fdr"]]
+	t.mm_fdr <- t.l_train_and_apply[["mm_fdr"]]  
 	t.kfdist_fdr <- t.l_train_and_apply[["kfdist_fdr"]]
-	
+
 	# selection of the true for training
 	t.lambda_parameterize_null <- t.l_train_and_apply[["lambda_parameterize_null"]]
 	t.num_cutoffs_for_error_table <- t.l_train_and_apply[["num_cutoff"]]
@@ -2000,8 +1975,8 @@ get.true.training.data.set.indices <- function(
 		# FIX:         uses a fixed lambda
 		
 		t.l_lambda <- list(
-				TYPE=t.l_train_and_apply[["t_type"]],
-				LAMBDA=t.l_train_and_apply[["lambda_parameterize_null"]]
+				TYPE=t.l_train_and_apply[["t_type"]],                   # FIX
+				LAMBDA=t.l_train_and_apply[["lambda_parameterize_null"]] # 0.4
 				)
 		#	v_target_pvalue=t.v_target_pvalue,
 		#	num_total=t.l[["num"]],
@@ -3536,8 +3511,8 @@ get.error.stat.from.null <- function(
 	
 	t.df_error <- data.frame()
 	
-	t.v_null <- t.v_score[ t.v_b_null ]        # scores klasse "0"
-	t.v_target <- t.v_score[ !t.v_b_null ]     # scores klasse "target" = 1 ?
+	t.v_null <- t.v_score[ t.v_b_null ]        # scores klasse H0 = decoy
+	t.v_target <- t.v_score[ !t.v_b_null ]     # scores klasse "target" = 1
 	t.num_total <- length( t.v_score )
 	
 	# get the error table for the test data set
@@ -3545,6 +3520,8 @@ get.error.stat.from.null <- function(
 	# remove NA's and sort the scores such that the p-values will be
 	# decreasing (going from 1 to 0)
 	t.v_target <- sort( t.v_target[ !is.na(t.v_target) ], decreasing = FALSE )
+
+    # p-values target anhand mu/sigma von v_null:
 	t.v_target_pvalue <- get.pvalue.from.norm.null.dist( t.v_null, t.v_target )
 	
 	#	num=t.num,

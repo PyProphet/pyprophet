@@ -89,7 +89,15 @@ semi.supervised.classify.and.cross.validate(
         t.c_tgr = "transition_group_record"
 
     )
-     
+
+    # t.df_peak_groups:=
+    #   transition_group_record, decoy, main_var_..., var_...
+    #   peak_group_rank_ peak_group_id
+
+    #   transition_group_record setzt sich zusammen aus:
+    #     transition_group_id decoy run_id (und decoy_algorithm ?)
+
+
     t.c_ds = "LD1"  # scoreing LDA ?
     # x-times cross validation for error stat
     # and: apply mean weights to data
@@ -149,7 +157,15 @@ split.into.learn.and.test:
 
           bei den decoys wohl die ganze group
 
+
           unknown_train: analog
+
+          t.l["train"][:peak_group_kf_train] -> decoy records for train
+          t.l["train"][peak_group_kf_train:] -> unknown records for train
+
+          t.l["test"][:peak_group_kf_test] -> decoy records for train
+          t.l["test"][peak_group_kf_test:] -> unknown records for train
+
 
           -> t.l["train"] = known_false_train + unkown_train
              known false: 1 .. peak_group_kf_train
@@ -187,3 +203,175 @@ also pro peak group der beste main score
 
 Klasse 0: DECOY
 Klasse 1: TARGET
+
+-------
+
+INI:
+
+$type [1] "initialize"
+$t_type [1] "FIX"
+# $mm_fdr [1] 0.05
+# $kfdist_fdr [1] 0.15
+$lambda_parameterize_null [1] 0.4
+$num_cutoff [1] 41
+# $mm_corr_weight [1] TRUE
+$fraction [1] 0.05
+$absolute [1] 2
+$separation_column "main_var_xx_swath_prelim_score"
+
+$classification_columns 
+ [1] "var_bseries_score"             "var_elution_model_fit_score"  
+ [3] "var_intensity_score"           "var_isotope_correlation_score"
+ [5] "var_isotope_overlap_score"     "var_library_corr"             
+ [7] "var_library_rmsd"              "var_log_sn_score"             
+ [9] "var_massdev_score"             "var_massdev_score_weighted"   
+[11] "var_norm_rt_score"             "var_xcorr_coelution"          
+[13] "var_xcorr_coelution_weighted"  "var_xcorr_shape"              
+[15] "var_xcorr_shape_weighted"      "var_yseries_score"            
+
+$ds_column [1] "LD1"
+
+-------
+
+
+$type [1] "iteration"
+$max_iter [1] 6
+# $convergence [1] 0.05
+$t_type [1] "FIX" 
+$mm_fdr [1] 0.09 
+$kfdist_fdr [1] 0.02 
+$lambda_parameterize_null [1] 0.4 
+$num_cutoff [1] 41 
+$mm_corr_weight [1] TRUE 
+$fraction [1] 0.08 
+$absolute [1] 2 
+$separation_column [1] "LD1" 
+$classification_columns [1] NA 
+ [1] "main_var_xx_swath_prelim_score" "var_bseries_score"             
+ [3] "var_elution_model_fit_score"    "var_intensity_score"           
+ [5] "var_isotope_correlation_score"  "var_isotope_overlap_score"     
+ [7] "var_library_corr"               "var_library_rmsd"              
+ [9] "var_log_sn_score"               "var_massdev_score"             
+[11] "var_massdev_score_weighted"     "var_norm_rt_score"             
+[13] "var_xcorr_coelution"            "var_xcorr_coelution_weighted"  
+[15] "var_xcorr_shape"                "var_xcorr_shape_weighted"      
+[17] "var_yseries_score"             
+$ds_column [1] "LD1" 
+
+---> bei ini andere separation_column als während der iterationen !
+     nach ini ist main_score auch ein feature !
+
+t.df_peak_groups: names:
+
+ [1] "transition_group_record"        "decoy"                         
+ [3] "main_var_xx_swath_prelim_score" "var_bseries_score"             
+ [5] "var_elution_model_fit_score"    "var_intensity_score"           
+ [7] "var_isotope_correlation_score"  "var_isotope_overlap_score"     
+ [9] "var_library_corr"               "var_library_rmsd"              
+[11] "var_log_sn_score"               "var_massdev_score"             
+[13] "var_massdev_score_weighted"     "var_norm_rt_score"             
+[15] "var_xcorr_coelution"            "var_xcorr_coelution_weighted"  
+[17] "var_xcorr_shape"                "var_xcorr_shape_weighted"      
+[19] "var_yseries_score"              "peak_group_rank"               
+[21] "peak_group_id"                 
+
+
+peak_group_id: transition_group_record + laufende nummer innherhalb group
+
+NORMALIZATION.TYPE = 1
+t.c_norm_ds_score = "d_score"
+
+t.l_train_test:  type="fraction", fraction=0.5, max_train=150
+
+
+NACH XVAL:
+
+# ONLY FOR DEBUG:
+	t.df_xval_summed <- t.l_ssl_result[["df_all_xval_summed"]]
+	
+# KLAR:
+	t.final_classifier <- t.l_ssl_result[["average_classifier"]]
+	
+# LISTE, element pro x-eval: tablle mit spalten d_sore, decoy, test
+#        d_score: nomralized fisher score
+#        decoy: TRUE/FALSE
+#        test: 0/1
+#   
+	t.l_df_top_cl_pg <- t.l_ssl_result[["l_df_top_cl_pg"]]
+
+
+
+
+get.frac.train: -> returns 0.5
+
+--------------------------------------------------------------------------
+
+POSTITIVE EXAMPLES: Zeilen 1973 - 2000
+
+     err_table = get_error_stat_from_null 
+     df_stat convert_to_specific_q_value_stat(err_table, q=kfdist_fdr (config), 8)
+     # finde zeile mit q_value ~ kfdist_fdr: cutoff ist wert in der zeile !
+     cutoff = df_stat[1, "cutoff"]
+
+     true: main_score >= cutoff und kein decoy
+
+
+def get_error_stat_from_null(main_score, is_decoy, lam=0.5):
+
+     main_score_null = main_scores[is_decoy]
+     main_score_target = main_socres[!is_decoy]
+     n = len(main_score)
+     main_score_target = sorted(main_score_target[main_score_target != nan])
+
+     mu = mean(main_score_null)
+     nu = std(main_score_null)
+     p_values_target = 1-pnorm(main_score_target, mu, nu)
+
+     err_ = get_error_table_from_pvalues_new(p_values_target, lam)
+
+     return   v_target_pvalue = p_values_target,
+              num_total = errt["num"]
+              num_alternative = errt["num_alternative"]
+              num_null = errt["num_null"]
+              df_error = errt["df"] + spalte "cutoff" = main_score_target
+                                             ^^^^^^^:w
+
+
+def get_error_table_from_pvalues_new(p_values, la=0.5):
+
+    num, num_null, num_alternative = estimate_num_null(p_values, la) # storeys method !
+
+    p_values = sorted(p_values, decreasing)
+
+    for i, pi in enumerate(p_values):
+        num_positives[i] = sum(p_values <= pi)
+        num_negatives[i] = num - num_positives[i]
+        pp[i] = num_positives[i] / num # falls num > 0 else: 0
+        true_positives[i] = num_positives[i] - num_null * pi
+        false_positives[i] = num_null * pi
+        true_negatives[i] = num_null * (1-pi)
+        false_negatives[i] = num_negatives[i] - true_negatives[i]
+
+        fdr[i] = false_positives[i] / num_positives[i] or 0
+        fdr[i] = min(max(fdr, 0), 1) # restrict to 0...1
+        sens[i] = true_positives[i] / num_alternative
+        sens[i] = min(max(sens, 0), 1) # restrict to 0...1
+
+        q[i] = min(fdr[1:i], na.rm=T) or 1
+
+        fpr[i] = false_positives[i] / num_null
+        + cutoff (0,1)
+
+    for i, pi in enumerate(reverse(p_values)):
+        svalue[i] = max(reversed(sens)[1:i], na.rm=T)
+
+    svalue[i] = reverse(svalues]
+
+
+def convert_to_specific_q_value_stat(err_table, q=kfdist_fdr (config), 8):
+
+
+
+
+
+
