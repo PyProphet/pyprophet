@@ -5,6 +5,13 @@ class Bunch(dict):
     """A Bunch is a dictionary where keys can be used as attributes"""
     __getattr__ = dict.__getitem__
 
+def bunchify(nested_dict):
+    assert isinstance(nested_dict, dict)
+    for k, v in nested_dict.items():
+        if isinstance(v, dict):
+            nested_dict[k] = bunchify(v)
+    return Bunch(nested_dict)
+
 
 def as_one_dim_array(values, as_type=None):
     # converst list or flattnes n-dim array to 1-dim array if possible
