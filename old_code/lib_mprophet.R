@@ -1065,50 +1065,63 @@ semi.supervised.classify.and.cross.validate <- function(
         # t.c_pgr ==1 : top  main_sore in peak group 
         #************
 
+        #
+        # t.df_clfd_pg ist der volle datensatz !!!
+#
+
 		t.df_norm_clfd_top_pg <- subset( t.df_clfd_pg, t.df_clfd_pg[ , t.c_pgr ] == 1 )
+
+        # allte top peaks:
+        print(nrow(t.df_norm_clfd_top_pg))
 		if ( NORMALIZATION.TYPE == 0 ) { # use only the known false for the normalization
 			
+            # alle decoys im ganzen datensatz !
 			t.v_st <- t.df_norm_clfd_top_pg[ which( t.df_norm_clfd_top_pg[ , t.c_known_false ] == 1 ), t.c_ds ]
 			t.v_all <- t.df_clfd_pg[,t.c_ds]
             # mean, std from knwon false scores,
             # aber alle scores damit normalisieren !
 			t.v_norm <- normalize.ds.from.known.false( t.v_st=t.v_st, t.v_all=t.v_all )
+            #q()
 			t.df_clfd_pg[,t.c_norm_ds_score] <- t.v_norm
+
+            #print(t.v_norm)
 			
 		} else { # normalize the scores using a mixture model
 
-			t.init_type <- "coor"
-			t.max_it <- 50
-			t.convergence <- 0.00001
-			t.l_lt <- normalize.ds.from.mixture.model( 
-					t.v_class=t.df_norm_clfd_top_pg[,t.c_known_false],
-					t.v_ds=t.df_norm_clfd_top_pg[,t.c_ds],
-					t.init_type=t.init_type,
-					t.max_it=t.max_it,
-					t.convergence=t.convergence
-			)
-			# convert in main table
-			t.df_clfd_pg[,t.c_norm_ds_score] <- t.df_clfd_pg[,t.c_ds] * t.l_lt[["a"]] + t.l_lt[["b"]]
-			
 		}
+
+        #
 		
 		#-------------------------------------------
 		# sum up important information of repetitions
 		#-------------------------------------------
-		if ( DEBUG.ON ) {
-			t.df_all_xval_summed <- rbind( t.df_all_xval_summed, cbind( t.df_clfd_pg, xval_iter ) )
-		}
+        print(nrow(t.df_clfd_pg))
+        print(mean(t.df_clfd_pg$d_score))
+        print(sd(t.df_clfd_pg$d_score))
+
+        # BIS HIERHER IN PY RICHTIG
 		
 		# only top ranked
 		t.v_pg_rank <- get.group.rank.vector( t.df_clfd_pg[ , t.c_tgr ], t.df_clfd_pg[ , t.c_norm_ds_score ], t.decreasing=T )
 		t.df_top_clfd_pg <- t.df_clfd_pg[ which( t.v_pg_rank == 1 ), ]
+        print(nrow(t.df_top_clfd_pg))
+        print(mean(t.df_top_clfd_pg$d_score))
+        print(sd(t.df_top_clfd_pg$d_score))
+
+        
 		
 		# summarize data
 		t.v_ds <- t.df_top_clfd_pg[,t.c_norm_ds_score]
 		t.v_kf <- t.df_top_clfd_pg[,t.c_known_false]
 		t.v_test <- t.df_top_clfd_pg[,"test"]
+
 		t.df_top_cl_pg <- data.frame( t.v_ds, t.v_kf, t.v_test, stringsAsFactors=F )
 		names(t.df_top_cl_pg) <- c( t.c_norm_ds_score, t.c_known_false, "test" )
+        print(nrow(t.df_top_cl_pg))
+        print(mean(t.df_top_cl_pg$d_score))
+        print(sd(t.df_top_cl_pg$d_score))
+
+
 		t.l_df_top_cl_pg[[as.character( xval_iter )]] <- t.df_top_cl_pg
 		
 		if ( LOG.DURING.CLASSIFICATION | LOG.EXTENSIVELY.DURING.CLASSIFICATION ) {
@@ -1207,6 +1220,7 @@ semi.supervised.classify <- function(
 	# initialize
 	#-------------------------------------------
 	t.df_learn <- t.df[ t.l_vtt[["train"]], ]
+
 	t.l_ini_result <- select.train.and.semi.supervised.learn( 
 			t.df_learn, 
 			t.c_known_false=t.c_known_false,
@@ -1242,6 +1256,7 @@ semi.supervised.classify <- function(
 		cat( row.names( t.classifier[["scaling"]] ), "\n", file=iostream )
 		cat( t.classifier[["scaling"]], "\n", file=iostream )
 	}
+    cat( t.classifier[["scaling"]], "\n")
 	
 	# update the ranking of the peak groups within the transition group records
 	t.c_ds <- t.l_ini[["ds_column"]]
@@ -1253,10 +1268,27 @@ semi.supervised.classify <- function(
 	if ( LOG.EXTENSIVELY.DURING.CLASSIFICATION ) {
 		print.rerank.stat( t.df_learn[ , t.c_known_false ], t.df_learn[ , t.c_group_rank ], t.v_rank, iostream )
 	}
+
+    #print(summary(t.df_learn))
+
+    scores <- (t.df_learn[, t.c_ds])
+    #scores <- scores - mean(scores)
+    #t.df_learn[, t.c_ds] <- scores
+    print(sd(scores))
+    #scores <- scores / sd(scores)
+    #print(sort(scores))
+    #q()
 	
 	# rerank the peak groups
 	t.df_learn[ , t.c_group_rank ] <- t.v_rank
-	
+    #print(head(t.df_learn))
+    #cat("\n...\n")
+    #print(tail(t.df_learn))
+    ##print(t.df_learn)
+    #q()
+
+	# tops <- subset( t.df_learn, t.df_learn[ , t.c_group_rank ] == 1 )
+
 	# keep track of the discriminant scores
 	t.df_ds <- rbind( t.df_ds, cbind( t.v_ds ) )
 	
@@ -1302,6 +1334,7 @@ semi.supervised.classify <- function(
 				t.file_name_add=t.file_name_add,
 				iostream=iostream
 		)
+        #q()
 		
 		t.df_learn <- t.l_iterate[["df_apply"]]
 		t.classifier <- t.l_iterate[["classifier_apply"]]
@@ -1322,6 +1355,9 @@ semi.supervised.classify <- function(
 		t.df_learn[ , t.c_group_rank ] <- t.v_rank
 		
 		ld1 <- t.df_learn[ , t.c_ds ]
+        print(head(t.df_learn))
+        cat("\n...\n")
+        print(tail(t.df_learn))
 		
 		# store the discriminant score of the progress
 		t.df_ds <- cbind( t.df_ds, ld1 )
@@ -1337,6 +1373,8 @@ semi.supervised.classify <- function(
 	# classify the complete data set
 	#-------------------------------------------
 	t.classifier <- t.l_iterate[["classifier_apply"]]
+    
+
 	t.l_apply <- apply.classifier( t.classifier, t.classifier_type, t.df, t.c_ds )
 	t.df <- t.l_apply[["df"]]
 	t.classification <- t.l_apply[["classification"]]
@@ -1397,8 +1435,16 @@ apply.classifier <- function(
 	if ( t.classifier_type == "LinearDiscriminantAnalysis" ) {
 		
 		# prediction for the training data set
+        print("apply w=")
+        print(t.classifier[["scaling"]])
 		t.classification <- predict( t.classifier, t.df )
+
+        t.classification$x <- t.classification$x - mean(t.classification$x);
+
 		t.df[ , t.c_ds ] <- as.vector( t.classification$x )
+        #print(head(t.df))
+        #print(tail(t.df))
+        #q()
 		
 	} else if ( t.classifier_type == "WeightsLinearCombination" ) {
 		
@@ -1502,6 +1548,13 @@ split.into.learn.and.test <- function(
 	t.ind_kf <- which( t.df[ , t.c_known_false ] == TRUE )
 	t.v_kf_groups <- unique( as.character( t.df[ t.ind_kf, t.c_group_id ] ) )
 	t.v_shuffled_kf_groups <- sample( t.v_kf_groups, length( t.v_kf_groups ), replace=F )
+
+
+    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	t.v_shuffled_kf_groups <- sort(t.v_kf_groups)
+    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
 	t.num_kf_groups_train <- round( length(t.v_kf_groups) * t.frac, 0 )
 	
 	t.v_train_kf_groups <- t.v_shuffled_kf_groups[1:t.num_kf_groups_train]
@@ -1513,7 +1566,17 @@ split.into.learn.and.test <- function(
 	# select the target
 	t.ind_unknown <- which( t.df[ ,t.c_known_false ] == FALSE )
 	t.v_unknown_groups <- unique( as.character( t.df[ t.ind_unknown, t.c_group_id ] ) )
+
+
 	t.v_shuffled_unknown_groups <- sample( t.v_unknown_groups, length( t.v_unknown_groups ), replace=F )
+
+
+    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	t.v_shuffled_unknown_groups <- sort(t.v_unknown_groups)
+    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
 	t.num_unknown_groups_train <- round( length(t.v_unknown_groups) * t.frac, 0 )
 	
 	t.v_train_unknown_groups <- t.v_shuffled_unknown_groups[1:t.num_unknown_groups_train]
@@ -1618,7 +1681,8 @@ select.train.and.semi.supervised.learn <- function(
 		
 		# top peak groups
 		t.df_top_pg <- subset( t.df, t.df[ , t.c_group_rank ] == 1 )
-		
+        #print(head(t.df_top_pg))
+        #q()
 		# determine class "true" for the training
 		# indices are relative to t.df_top_pg
 		t.v_ind_true_train <- get.true.training.data.set.indices(
@@ -1639,17 +1703,21 @@ select.train.and.semi.supervised.learn <- function(
 				iostream=iostream
 		)
 		t.v_ind_false_train <- which( t.df_top_pg[ , t.c_known_false ] == TRUE )
-		
+
 		# not enough data points
 		if ( length(t.v_ind_true_train) < t.l_train_and_apply[["absolute"]] )
 			cat( paste( "only ", length(t.v_ind_true_train), " true for training!\n", sep="" ), file=iostream )
 		if ( length(t.v_ind_false_train) < t.l_train_and_apply[["absolute"]] )
 			cat( paste( "only ", length(t.v_ind_false_train), " false for training!\n", sep="" ), file=iostream )
+
 		
 		# add the temporary class
 		t.df_top_pg[ , t.c_tmp_class ] <- NA
 		t.df_top_pg[ t.v_ind_true_train, t.c_tmp_class ] <- 1
 		t.df_top_pg[ t.v_ind_false_train, t.c_tmp_class ] <- 0
+		#t.df_train <- t.df_top_pg[ c( t.v_ind_true_train, t.v_ind_false_train ), ]
+		t.df_train <- t.df_top_pg[ t.v_ind_false_train,  ]
+        #print(head(t.df_train, 10))
 		t.df_train <- t.df_top_pg[ c( t.v_ind_true_train, t.v_ind_false_train ), ]
 	}
 	
@@ -1702,14 +1770,32 @@ train.and.apply <- function(
 	t.df_apply[ , t.c_ds ] <- NA
 	t.classifier <- NA
 	t.classification <- NA
+
+    t.df_train <- t.df_train[order(t.df_train$decoy, t.df_train$transition_group_record),]
 	
 	t.df_train_raw <- t.df_train[ , c( t.c_class, t.v_c_classify ) ]	
 	t.formula <- as.formula( paste( t.c_class, " ~ .", sep="" ) )
-	
+
 	if ( t.classifier_type == "LinearDiscriminantAnalysis" ) {
 		
 		# train the classifier
+        #print(names(t.df_train_raw))
+        cat("============================================================")
+        cat("TRAIN AND APPLY\n")
+        cat("============================================================")
+        cat(names(t.df_train))
+        print(head(t.df_train[, c("transition_group_record", "decoy", "peak_group_rank", t.v_c_classify, "LD1")],5))
+        print(tail(t.df_train[, c("transition_group_record", "decoy", "peak_group_rank", t.v_c_classify, "LD1")],5))
+        #print(sort(t.df_train_raw$elution_model_fit_score))
+        print(head(t.df_train_raw))
+
+        print(tail(t.df_train_raw))
 		t.classifier <- lda( t.formula, data=t.df_train_raw, na.action=na.omit )
+        cat("w=")
+        print(length(as.vector(t.classifier[["scaling"]])))
+        print(t.classifier[["scaling"]])
+        cat("============================================================\n\n")
+
 		
 		# prediction for the training data set
 		# TODO predict throws warning message e.g. with the human data set:
@@ -1721,6 +1807,24 @@ train.and.apply <- function(
 		# prediction for the apply data set
 		t.classification <- predict( t.classifier, t.df_apply )
 		t.df_apply[ , t.c_ds ] <- as.vector( t.classification$x )
+        scores <- t.df_apply[,t.c_ds]
+        scores <- scores - mean(scores)
+        cat("============================================================\n\n")
+        cat("APPLIED:\n")
+        cat("============================================================\n\n")
+        t.df_apply[,t.c_ds] <- scores
+        print(head(t.df_apply[, c("transition_group_record", "decoy", "peak_group_rank", t.v_c_classify, "LD1")],5))
+        cat("\n....\n")
+        print(tail(t.df_apply[, c("transition_group_record", "decoy", "peak_group_rank", t.v_c_classify, "LD1")],5))
+        print(nrow(t.df_apply))
+        cat("std dev scores: ")
+        print(sd(scores))
+        cat("============================================================\n\n")
+        cat("============================================================\n\n")
+        #print(sort(t.df_train_raw$elution_model_fit_score))
+        #print(length(scores))
+        #print(mean(scores))
+        #print(sd(scores))
 		
 	} else if ( t.classifier_type == "RandomForest" ) {
 		
@@ -1983,6 +2087,11 @@ get.true.training.data.set.indices <- function(
 		#	num_alternative=t.l[["num_alternative"]],
 		#	num_null=t.l[["num_null"]],
 		#	df_error=t.df_error
+
+        
+        #print("nrow=")
+        #print(nrow(t.df))
+        #print(t.c_sep_score)
 		t.l_ee <- get.error.stat.from.null(
 				t.df[,t.c_sep_score],
 				t.df[,t.c_known_false],
@@ -1994,17 +2103,23 @@ get.true.training.data.set.indices <- function(
 		
 		# extract data for specific qvalue
 		t.df_stat <- convert.to.specific.qvalue.stat( t.df_full_error_table, t.v_qvalue, t.round_error_table )
+        #print(head(t.df_full_error_table))
+        #print(tail(t.df_full_error_table))
+        #print(t.v_qvalue)
+        print(t.df_stat)
+        #q()
 		t.cutoff <- t.df_stat[1,"cutoff"]
+        cat("fdr=")
+        print(t.kfdist_fdr)
+        cat("cutoff= ")
+        print(t.cutoff)
+        #q()
 		
 		# this is returned
 		t.v_ind_true <- which( t.df[,t.c_sep_score] >= t.cutoff & t.df[,t.c_known_false] == 0 )
 		
 		if ( length( t.v_ind_true ) < t.abs ) {
 			if ( length(t.v_frac_ind_true) > t.abs ) {
-				if ( LOG.EXTENSIVELY.DURING.CLASSIFICATION ) {
-					cat( "CONVERGENCE | FIX not enough data points: fraction used!\n", file=iostream )
-				}
-				t.v_ind_true <- t.v_frac_ind_true
 			} else {
 				if ( LOG.EXTENSIVELY.DURING.CLASSIFICATION ) {
 					cat( "CONVERGENCE | FIX not enough data points: absolute used\n", file=iostream )
@@ -2316,7 +2431,7 @@ many.mixed.barplot <- function(
 		t.df_class_value_class_name=NULL,
 		t.num_bin=10,
 		t.v_col=NULL,
-		t.beside=F,
+		t.beside=T,
 		t.v_main=rep("",length(t.v_c_x)),
 		t.v_xlab=rep("",length(t.v_c_x)),
 		t.num_plot_row=1,
@@ -2338,7 +2453,7 @@ many.mixed.barplot <- function(
 	t.i <- 0
 	for ( t.c in t.v_c_x ) {
 		t.i <- t.i + 1
-		
+
 		t.l <- mixed.barplot( 
 				t.v=t.df[ , t.c ],
 				t.v_class=t.df[ , t.c_class ],
@@ -2386,7 +2501,7 @@ mixed.barplot <- function(
 		t.df_class_value_class_name=NULL, # 1st column the class value, 2nd column the class name
 		t.num_bin=10,
 		t.v_col=NULL,
-		t.beside=F,
+		t.beside=T,
 		t.count_mult=1,
 		ADD.LEGEND=TRUE,
 		t.legend_pos="top",
@@ -2958,6 +3073,7 @@ transfer.error.table.using.percentile.positives <- function(
 		t.round=6,
 		t.num_cutoffs=101
 ) {
+
 	
 	# total number of data points in the new data set
 	t.num <- length(t.v)
@@ -3055,12 +3171,18 @@ transfer.error.table.using.percentile.positives.new <- function(
 		t.v=c(),
 		t.num_null=0
 ) {
+    print(names(t.df))
+    print(nrow(t.df))
+    print(head(t.df))
 	
 	# total number of data points in the new data set
 	t.num <- length(t.v)
 	t.num_alternative <- t.num - t.num_null
 	
 	t.v <- sort( t.v, decreasing=F )
+    print(t.v[1:10])
+
+
 	
 	# elements of the 
 	t.alloc <- length(t.v)
@@ -3153,9 +3275,20 @@ get.pvalue.from.norm.null.dist <- function(
 	
 	t.null_mean <- mean( t.v_null, na.rm=T )
 	t.null_sd <- sd( t.v_null, na.rm=T )
+
+    #print(t.v_null)
+
+    print("mean")
+    print(t.null_mean)
+    print("std")
+    print(t.null_sd)
+
 	
 	# derive a p-value for the target using the distribution of the known false
 	t.v_pvalue <- 1 - pnorm( t.v, mean=t.null_mean, sd=t.null_sd )
+    #print#("pvalues")
+    #print(t.v_pvalue)
+          
 	
 	return( t.v_pvalue )
 }
@@ -3514,7 +3647,10 @@ get.error.stat.from.null <- function(
 	t.v_null <- t.v_score[ t.v_b_null ]        # scores klasse H0 = decoy
 	t.v_target <- t.v_score[ !t.v_b_null ]     # scores klasse "target" = 1
 	t.num_total <- length( t.v_score )
-	
+    cat("GET ERROR STST FROM NULL\n")
+    cat("LEN_NULL   =", length(t.v_null), "  MEAN_NULL   =", mean(t.v_null),   "  STD NULL  =", sd(t.v_null),"\n")
+    cat("LEN_TARGET =", length(t.v_target), "  MEAN_TARGET =", mean(t.v_target),   "  STD TARGET=", sd(t.v_target),"\n")
+
 	# get the error table for the test data set
 	
 	# remove NA's and sort the scores such that the p-values will be
@@ -3564,6 +3700,17 @@ normalize.ds.from.known.false <- function(
 	} else {
 		print("could not normalize discriminant scores!")
 	}
+    cat("\n>>>>>  NORMALIZE_DS_FROM_KNOWN_FALSE \n")
+    cat("   zeros:\n")
+    print(length(t.v_st))
+    print(mean(t.v_st))
+    print(sd(t.v_st))
+    cat("   applied:\n")
+    print(length(t.v_norm))
+    print(mean(t.v_norm))
+    print(sd(t.v_norm))
+    cat("<<<<<  NORMALIZE_DS_FROM_KNOWN_FALSE \n\n")
+    #q()
 	
 	return( t.v_norm )
 }

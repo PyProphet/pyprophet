@@ -85,6 +85,92 @@ def fdr_statistics(p_values, cut_off, lambda_ = 0.5):
                  fdr = conv(fdr),
                  sens = conv(sens))
 
+def get_error_table_using_percentile_positives_new(err_df,
+                                                   target_scores,
+                                                   num_null):
+    num = len(target_scores)
+    num_alternative = num - num_null
+    target_scores = np.sort(util.as_one_dim_array(target_scores)) # ascending
+
+    #target_scores = target_scores[:, None]
+    num_positives = (target_scores[:,None] >= target_scores[None,
+        :]).sum(axis=0).flatten()
+    num_negatives = num - num_positives
+    pp = 1.0 * num_positives / num
+
+    imax = np.abs(err_df.percentile_positive.values[:,None]-pp.T).argmin(axis=0)
+
+    qvalues = err_df.qvalue.iloc[imax].values
+    svalues = err_df.svalue.iloc[imax].values
+    fdr      = err_df.FDR.iloc[imax].values
+    fdr[fdr<0.0] = 0.0
+    fdr[fdr>1.0] = 1.0
+    fdr[num_positives==0] = 0.0
+
+    fp = fdr * num_positives
+    tp = num_positives - fp
+    tn = num_null -fp
+    fn = num_negatives - tn
+
+    sens =tp / num_alternative
+    if num_alternative == 0:
+        sens = np.zeros_like(tp)
+    sens[sens<0.0] = 0.0
+    sens[sens>1.0] = 1.0
+
+    df_error = pd.DataFrame(
+                  dict(qvalue=qvalues,
+                       svalue=svalues,
+                       TP=tp,
+                       FP=fp,
+                       TN=tn,
+                       FN=fn,
+                       FDR=fdr,
+                       sens=sens,
+                       cutoff=target_scores),
+                  columns="qvalue svalue TP FP TN FN FDR sens cutoff".split()
+                 )
+
+    return df_error
+
+
+
+def lookup_q_values_from_error_table(scores, df):
+    scores = util.as_one_dim_array(scores)
+    ix = np.abs(scores[None, :] - df.cutoff.values[:,None]).argmin(axis=0)
+    return df.qvalue.iloc[ix].values
+
+
+def final_err_table(df, num_cut_offs = 51):
+
+    cutoffs = df.cutoff.values
+    min_ = min(cutoffs)
+    max_ = max(cutoffs)
+    margin = (max_ - min_) * 0.05
+
+    sampled_cutoffs = np.linspace(min_ - margin, max_ + margin, num_cut_offs)
+    ix = np.abs(sampled_cutoffs[None, :] - df.cutoff.values[:,None]).argmin(axis=0)
+
+    sampled_df  = df.iloc[ix]
+    sampled_df.cutoff = sampled_cutoffs
+    sampled_df.reset_index(inplace=True, drop=True)
+
+    return sampled_df
+
+def summary_err_table(df, qvalues=[0, 0.01, 0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5]):
+    qvalues = util.as_one_dim_array(qvalues)
+    ix = np.abs(qvalues[None, :] - df.qvalue.values[:,None]).argmin(axis=0)
+    df_sub = df.iloc[ix]
+    for i_sub, (i0, i1) in enumerate(zip(ix, ix[1:])):
+        if i1 == i0:
+            df_sub.iloc[i_sub+1,:] = None
+    df_sub.qvalue = qvalues
+    df_sub.reset_index(inplace=True, drop=True)
+    return df_sub
+
+
+
+
 
 def get_error_table_from_pvalues_new(p_values, lambda_=0.4):
 
@@ -96,7 +182,6 @@ def get_error_table_from_pvalues_new(p_values, lambda_=0.4):
 
     p_values = p_values[:,None]
     num_positives = (p_values[:,None] <= p_values[None, :]).sum(axis=0)
-    pp = num_positives / num
     num_negatives = num - num_positives
     pp = 1.0 * num_positives / num
     true_positives = num_positives - num_null * p_values
@@ -114,7 +199,10 @@ def get_error_table_from_pvalues_new(p_values, lambda_=0.4):
     sens[sens<0.0] = 0.0
     sens[sens>1.0] = 1.0
 
-    fpr = false_positives/num_null
+    if num_null:
+        fpr = false_positives/num_null
+    else:
+        fpr = 0.0 * false_positives
 
     # assemble data frame
     error_stat = pd.DataFrame(
@@ -144,16 +232,11 @@ def get_error_table_from_pvalues_new(p_values, lambda_=0.4):
                  num_alternative=num-num_null)
 
 
-def get_error_stat_from_null(scores, is_decoy, lambda_=0.4):
+def get_error_stat_from_null(pos_scores, neg_scores, lambda_=0.4):
     # takes list of scores (eg master score)
     # and list of truth values in is_decoy for indicating negative class
-
-    scores = util.as_one_dim_array(scores)
-    is_decoy = util.as_one_dim_array(is_decoy, np.bool)
-    assert len(is_decoy) == len(scores)
-
-    pos_scores = scores[~is_decoy]
-    neg_scores = scores[is_decoy]
+    pos_scores = util.as_one_dim_array(pos_scores)
+    neg_scores = util.as_one_dim_array(neg_scores)
 
     pos_scores = np.sort(pos_scores[~np.isnan(pos_scores)])
 
@@ -161,12 +244,34 @@ def get_error_stat_from_null(scores, is_decoy, lambda_=0.4):
     mu = np.mean(neg_scores)
     nu = np.std(neg_scores, ddof=1)
 
+    print "GET_ERROR_STAT_FROM NULL"
+    print len(neg_scores), np.mean(neg_scores), np.std(neg_scores, ddof=1)
+    print len(pos_scores), np.mean(pos_scores), np.std(pos_scores, ddof=1)
+
+    #print mu, nu
+
     target_pvalues = 1.0 - util.pnorm(pos_scores, mu, nu)
+    #print target_pvalues[:10]
 
     result = get_error_table_from_pvalues_new(target_pvalues, lambda_)
     result["target_pvalues"] = target_pvalues
-    result["df_error"] = result["df"]
-    result["df_error"]["cutoff"] = pos_scores
-    del result["df"]
+    result["df_error"] = result.df
+    df = result.df_error
+    df["cutoff"] = pos_scores
+    #del result["df"]
 
     return result
+
+def find_cutoff(pos_scores, neg_scores, lambda_, fdr):
+
+    result = get_error_stat_from_null(pos_scores, neg_scores, lambda_)
+    error_table = result.df_error
+
+    error_table.FDR_DIST = (error_table.qvalue - fdr).abs()
+    i0 = error_table.FDR_DIST.argmin()  # finds first occurence of minimum
+    print error_table.iloc[i0]
+    cutoff = error_table.iloc[i0]["cutoff"]
+
+    return cutoff, error_table
+
+

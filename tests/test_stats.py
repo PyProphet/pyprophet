@@ -1,9 +1,13 @@
 from nose.tools import *
 
 import numpy as np
+import pandas as pd
 import pyprophet.stats
+import pyprophet.df_io
+import pyprophet.data_import
 
 from numpy.testing import *
+import os.path
 
 
 def test_fdr_statistics():
@@ -17,13 +21,13 @@ def test_fdr_statistics():
     assert_is_instance(stats.sens, float)
     assert_almost_equals(stats.sens, 1.172823, 6)
     assert_is_instance(stats.fdr, float)
-    assert_equals(stats.fdr, 0.0)  # must be exactly 0.0 as cutoff is 0.0 !!
+    eq_(stats.fdr, 0.0)  # must be exactly 0.0 as cutoff is 0.0 !!
 
     # simple cut off value: test i/o type conformance for mulit cut_off params
     cut_offs = [0.0, 0.5, 1.0]
     stats = pyprophet.stats.fdr_statistics(p_values, cut_offs, lambda_ = 0.4)
-    assert_equals(stats.fdr.shape, (3,))
-    assert_equals(stats.sens.shape, (3,))
+    eq_(stats.fdr.shape, (3,))
+    eq_(stats.sens.shape, (3,))
 
     # regression test on results
     stats = pyprophet.stats.fdr_statistics(p_values, 0.2, lambda_ = 0.4)
@@ -62,14 +66,17 @@ def test_get_error_table_from_pvalues_new():
     _check(result.df)
 
 def test_get_error_stat_from_null():
-    scores = np.arange(0.0, 5.01, 0.2)
+    scores = pd.Series(np.arange(0.0, 5.01, 0.2))
     scores[2], scores[3] = scores[3], scores[2]
-    is_decoy = [ 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1,
+    is_decoy = np.array([ 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1,
                  1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0,
-                 1, 1 ]
+                 1, 1 ], dtype=bool)
 
     # we use unusual lambda to get stats with variations
-    result = pyprophet.stats.get_error_stat_from_null(scores, is_decoy, 0.25)
+    pos_class_scores = scores[~is_decoy]
+    neg_class_scores = scores[is_decoy]
+    result = pyprophet.stats.get_error_stat_from_null(pos_class_scores,
+            neg_class_scores, 0.25)
     p_values_tobe = np.array([ 0.94068207,  0.92209926,  0.89940072,
                                0.87222123, 0.2005352 , 0.13091171,  0.0800891])
 
@@ -128,4 +135,44 @@ def _check(df):
                         0.89940072000000004, 0.87222122999999985, 0.2005352,
                         0.13091170999999999, 0.080089099999999996],
       rtol=1e-5)
+
+
+def data_path(fname):
+    here = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(here, "data", fname)
+
+
+def test_find_cutoff():
+
+    load_from = data_path("testfile.csv")
+    table = pyprophet.df_io.read_csv(load_from, sep="\t")
+    (var_columns,
+     df_orig, prepared) =  pyprophet.data_import.prepare_data_table(table)
+
+    pos_class_scores = prepared[~prepared.is_decoy].main_score
+    neg_class_scores = prepared[prepared.is_decoy].main_score
+
+    cutoff, __ = pyprophet.stats.find_cutoff(pos_class_scores, neg_class_scores, 0.4, 0.15)
+    assert_almost_equals(cutoff, 1.7901247)
+
+def test_find_cutoff2():
+
+    df = pd.read_csv(data_path("data_regression_test_err_stat.csv"),
+                     index_col=0)
+
+    pos_class_scores = df.pos_scores
+    neg_class_scores = df.neg_scores
+
+    df = df.drop(["pos_scores", "neg_scores"], axis=1)
+
+    cutoff, errt = pyprophet.stats.find_cutoff(pos_class_scores,
+                                               neg_class_scores, 0.1, .01)
+
+    assert_allclose(errt.values.flatten(), df.values.flatten())
+
+    assert_almost_equals(cutoff, 1.9839765033)
+
+
+
+
 

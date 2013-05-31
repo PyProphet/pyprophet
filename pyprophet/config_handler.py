@@ -2,20 +2,6 @@ import json
 
 from util import bunchify
 
-default_config = dict(
-        num_cross_eval = 5,
-        training_proportion = 0.5,
-        storey_lambda = 0.4,
-        init_run = dict(
-            select_positives_with_fdr = 0.15,
-        ),
-        iter_run = dict(
-            select_positives_with_fdr = 0.10,
-            )
-        )
-
-default_config = bunchify(default_config)
-
 def write_config(cf, path):
     with open(path, "w") as fp:
         json.dump(cf, fp, indent=4)

@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import scipy.special
 
 class Bunch(dict):
@@ -17,6 +18,8 @@ def as_one_dim_array(values, as_type=None):
     # converst list or flattnes n-dim array to 1-dim array if possible
     if isinstance(values, (list, tuple)):
         values = np.array(values)
+    elif isinstance(values, pd.Series):
+        values = values.values
     values = values.flatten()
     assert values.ndim == 1, "values has wrong dimension"
     if as_type is not None:

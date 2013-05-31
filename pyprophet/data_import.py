@@ -1,13 +1,20 @@
 import pandas as pd
 
-def prepare_data_table(table, tgid_name = "transition_group_id",
+try:
+    profile
+except:
+    profile = lambda x: x
+
+def prepare_data_table(table, tg_id_name = "transition_group_id",
                               decoy_name = "decoy",
                               main_score_name = None,
+                              **extra_args_to_dev_null
                               ):
 
     column_names = table.columns.values
+
     # check if given column names appear in table:
-    assert tgid_name in column_names, "colum %s not in table" % tgid_name
+    assert tg_id_name in column_names, "colum %s not in table" % tg_id_name
     assert decoy_name in column_names, "colum %s not in table" % decoy_name
     if main_score_name is not None:
         assert main_score_name in column_names,\
@@ -29,31 +36,34 @@ def prepare_data_table(table, tgid_name = "transition_group_id",
         raise Exception("no column with name var_* in table")
 
     # collect needed data:
-    column_names = "transition_group_id decoy main_score".split()
-    data = dict(transition_group_id = table[tgid_name].values,
-                decoy = table[decoy_name].values,
-                main_score = table[main_score_name].values
+    column_names = """tg_id is_decoy main_score peak_rank
+                        is_train global_peak_id tg_peak_id""".split()
+    N = len(table)
+    empty_col = [0] * N
+    empty_none_col = [None] * N
+
+    data = dict(tg_id = table[tg_id_name].values,
+                is_decoy = table[decoy_name].values.astype(bool),
+                main_score = table[main_score_name].values,
+                peak_rank = empty_col,
+                is_train = empty_none_col,
+                global_peak_id = empty_none_col,
+                tg_peak_id = empty_none_col,
                 )
     for i, v in enumerate(var_columns):
         col_name = "var_%d" % i
+        col_name = v
         data[col_name] = table[v].values
         column_names.append(col_name)
 
     # build data frame:
     df_orig = pd.DataFrame(data, columns=column_names)
-    df_orig["row_id"] = df_orig.index    # for reference with full table
+    df_orig["global_peak_id"] = df_orig.index  # for reference with full table
+
+    df_orig.sort(("tg_id", "main_score"), ascending=(True, False),
+            inplace=True)
 
     # for each transition group: enumerate peaks in this group, and
     # add peak_rank where increasing rank corresponds to decreasing main
     # score. peak_rank == 0 is peak with max main score
-    collected = []
-    for x, subdf in df_orig.groupby("transition_group_id"):
-        # drop means: forget existing index
-        subdf.reset_index(inplace=True, drop=True)
-        subdf["peak_id"] = subdf.index
-        subdf.sort("main_score", ascending=False, inplace=True)
-        subdf.reset_index(inplace=True, drop=True)
-        subdf["peak_rank"] = subdf.index
-        collected.append(subdf)
-
-    return var_columns, df_orig, pd.concat(collected)
+    return df_orig

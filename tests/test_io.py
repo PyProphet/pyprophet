@@ -12,7 +12,7 @@ def data_path(fname):
 def test_read():
     load_from = data_path("testfile.csv")
     table = pyprophet.io.read_csv(load_from, sep="\t")
-    assert_equals(len(table), 9165)
-    assert_equals(len(table.columns.values), 41)
+    eq_(len(table), 9165)
+    eq_(len(table.columns.values), 41)
 
 

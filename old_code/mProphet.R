@@ -735,7 +735,7 @@ t.l_ini[["ds_column"]] <- t.c_ds             # name of the discriminant score co
 # ITERATION
 t.l_it <- list()
 t.l_it[["type"]] <- "iteration"             # general type of settings
-t.l_it[["max_iter"]] <- 6                   # maximal number of iterations
+t.l_it[["max_iter"]] <- 2                   # maximal number of iterations
 t.l_it[["convergence"]] <- 0.05             # a convergence threshold, not currently used
 t.l_it[["t_type"]] <- t.fdr_estimation      # [CONVERGENCE,FIX,known_false,auto,mixture_model,fraction,absolute]
 t.l_it[["mm_fdr"]] <- 0.09                  # used with t_type -> mixture_model/auto
@@ -1009,6 +1009,18 @@ if ( !is.na( t.options["mquest"] ) | !is.na( t.options["file_dialogue"] ) ) {
 	)
 	
 }
+#print(names(t.df_peak_groups))
+
+
+ix <- order(t.df_peak_groups$transition_group_record, -t.df_peak_groups$main_var_xx_swath_prelim_score)
+t.df_peak_groups <- t.df_peak_groups[ix,]
+
+#print(head(t.df_peak_groups))
+
+#q()
+
+
+
 
 #-------------------------------------------
 # check the input
@@ -1178,7 +1190,7 @@ if ( t.num_kf_tgr < MIN.DECOY.TGR | t.num_uk_tgr < MIN.TARGET.TGR ) {
 	cat( paste( "  ", length(t.v_kf_tgr), " decoy transition group records found\n", sep="" ) )
 	cat( paste( "  ", length(t.v_uk_tgr), " target transition group records found\n", sep="" ) )
 	cat( "\n" )
-	quit()
+	#quit()
 }
 
 
@@ -1205,9 +1217,11 @@ t.l_data_stat <- print.summary.stat( t.df_peak_groups, t.c_known_false, t.c_tgr,
 #-------------------------------------------
 # checks the data for estimated number of true and separation between false and true
 # prints out a warning if critical values are estimated
-CRITICAL.DATASET <- pre.check.data.based.on.main.variable(
-		t.df_top_peak_groups[ , t.c_main ], t.df_top_peak_groups[ , t.c_known_false ], t.l_lambda, iostream=iostream
-)
+
+#CRITICAL.DATASET <- pre.check.data.based.on.main.variable(
+		#t.df_top_peak_groups[ , t.c_main ], t.df_top_peak_groups[ , t.c_known_false ], t.l_lambda, iostream=iostream
+#)
+CRITICAL.DATASET <- F
 
 
 #-------------------------------------------
@@ -1413,16 +1427,21 @@ if ( USE.CLASSIFIER ) {
 #-------------------------------------------
 # 1. classify data set
 #-------------------------------------------
-if ( DEBUG.ON ) {
-	cat( "\n" )
-	t.time_diff <- proc.time() - t.start_time
-	cat( "  used time:", t.time_diff[3], "s\n", file=iostream )
-	cat( paste( "  apply final classifier to data set...\n", sep="" ), file=iostream )
-}
-	
+#if ( DEBUG.ON ) {
+	#cat( "\n" )
+	#t.time_diff <- proc.time() - t.start_time
+	#cat( "  used time:", t.time_diff[3], "s\n", file=iostream )
+	#cat( paste( "  apply final classifier to data set...\n", sep="" ), file=iostream )
+#}
+	#
 # 1.1 apply classifier
+#print(nrow(t.df_peak_groups_full))
+#q()
+
 t.l_classified <- apply.classifier( t.final_classifier, t.classifier_type, t.df_peak_groups_full, t.c_ds )
 t.df_pg_cl <- t.l_classified[["df"]]
+
+#print(head(t.df_pg_cl))
 
 # 1.2 add rank
 if ( DEBUG.ON ) {
@@ -1441,12 +1460,27 @@ if ( DEBUG.ON ) {
 	cat( "  used time:", t.time_diff[3], "s\n", file=iostream )
 	cat( paste( "  normalize...\n", sep="" ), file=iostream )
 }
+
+# top ranked peaks
 t.df_top_pg_cl <- subset( t.df_pg_cl, t.df_pg_cl[,t.c_pgr] == 1 )
+
+# top ranked decoy peaks
 t.v_ds_kf <- t.df_top_pg_cl[ which( t.df_top_pg_cl[ , t.c_known_false ] == 1 ), t.c_ds ]
+
+# all scores
 t.v_ds_all <- t.df_pg_cl[ , t.c_ds ]
+
+# all scores normalized
 t.v_ds_norm <- normalize.ds.from.known.false( t.v_st=t.v_ds_kf, t.v_all=t.v_ds_all )
+print(length(t.v_ds_norm))
+print(mean(t.v_ds_norm))
+print(sd(t.v_ds_norm))
 t.df_pg_cl[,t.c_norm_ds_score] <- t.v_ds_norm
+
+# top ranked peaks mit normalized scores
 t.df_top_pg_cl <- subset( t.df_pg_cl, t.df_pg_cl[,t.c_pgr] == 1 )
+
+# top ranked decoy peaks
 t.df_top_target_pg_cl <- subset( t.df_top_pg_cl, t.df_top_pg_cl[,t.c_known_false] == 0 )
 
 #-------------------------------------------
@@ -1462,25 +1496,38 @@ if ( USE.CLASSIFIER ) {
 	for ( t.n in names( t.l_df_top_cl_pg ) ) {
 		t.df_top_cl_pg <- t.l_df_top_cl_pg[[t.n]]
 		t.df_test <- subset( t.df_top_cl_pg, t.df_top_cl_pg[,"test"] == 1 )
+        #print(nrow(t.df_top_cl_pg))
+		#print(sort(t.df_test[ , t.c_norm_ds_score ] ))
 		t.v_error_stat_scores <- c( t.v_error_stat_scores, t.df_test[ , t.c_norm_ds_score ] )
 		t.v_error_stat_labels <- c( t.v_error_stat_labels, t.df_test[ , t.c_known_false ] )
 	}
 }
+
+print(length(t.v_error_stat_scores))
+print(mean(t.v_error_stat_scores))
+print(sd(t.v_error_stat_scores))
 if ( DEBUG.ON ) {
 	cat( "\n" )
 	t.time_diff <- proc.time() - t.start_time
 	cat( "  used time:", t.time_diff[3], "s\n", file=iostream )
 	cat( paste( "  getting error stat...\n", sep="" ), file=iostream )
 }
+print("FINAL STAT")
+#print(sort(t.v_error_stat_scores))
 t.l_ee <- get.error.stat.from.null( t.v_error_stat_scores, t.v_error_stat_labels, t.l_lambda=t.l_lambda )
+#q()
 t.df_summed_test_error_table <- t.l_ee[["df_error"]]
 t.v_summed_test_target_pvalue <- t.l_ee[["v_target_pvalue"]]
 t.num_null_summed_test <- t.l_ee[["num_null"]]
 t.num_summed_test <- t.l_ee[["num_total"]]
 
+
 # estimated fraction of false peak groups among all (train and test) top peak groups.
 # used to transfer the error statistics to the final data set which is derived from the average classifier
 t.summed_test_fraction_null <- ifelse( t.num_summed_test == 0, 0, t.num_null_summed_test / t.num_summed_test )
+print(t.num_null_summed_test)
+print(t.num_summed_test)
+print(t.summed_test_fraction_null)
 
 cat( "\n", file=iostream )
 
@@ -1496,6 +1543,9 @@ if ( DEBUG.ON ) {
 t.num_top_target <- ifelse( is.na( nrow(t.df_top_target_pg_cl) ), 0, nrow(t.df_top_target_pg_cl) )
 t.num_null_top_target <- t.num_top_target * t.summed_test_fraction_null
 
+print(t.num_top_target)
+print(t.num_null_top_target)
+
 # the percentile positives is used to transfer the FDR/sens qvalue/svalue
 # as normalization uses the percentile of positives to transfer the error rates
 # pass only the target data points and not the decoy data points!
@@ -1504,6 +1554,9 @@ t.num_null_top_target <- t.num_top_target * t.summed_test_fraction_null
 # - FDR
 # - qvalue
 # - svalue
+
+
+################## !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 t.df_raw_stat <- transfer.error.table.using.percentile.positives.new( 
 		t.df_summed_test_error_table, 
 		t.df_top_target_pg_cl[,t.c_norm_ds_score], 
