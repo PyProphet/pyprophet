@@ -1,0 +1,86 @@
+try:
+    profile
+except:
+    profile = lambda x: x
+
+import sklearn.lda
+import numpy as np
+import pandas as pd
+import inspect
+
+from data_handling import Experiment
+
+
+class AbstractLearner(object):
+
+    @profile
+    def get_learning_data(self, decoy_peaks, target_peaks, use_main_score):
+        assert isinstance(decoy_peaks, pd.DataFrame)
+        assert isinstance(target_peaks, pd.DataFrame)
+
+    def learn(self, decoy_peaks, target_peaks, use_main_score=True):
+        raise NotImplementedError()
+
+    def score(self, peaks, use_main_score):
+        raise NotImplementedError()
+
+    def get_parameters(self):
+        raise NotImplementedError()
+
+    def set_parameters(self, param):
+        raise NotImplementedError()
+
+    @classmethod
+    def averaged_learner(clz, params):
+        raise NotImplementedError()
+
+
+class LinearLearner(AbstractLearner):
+
+    @profile
+    def score(self, peaks, use_main_score):
+        X = peaks.get_feature_matrix(use_main_score)
+        return np.dot(X, self.get_parameters())
+
+    @classmethod
+    def averaged_learner(clz, params):
+        assert LinearLearner in inspect.getmro(clz)
+        learner = clz()
+        avg_param = np.vstack(params).mean(axis=0)
+        learner.set_parameters(avg_param)
+        return learner
+
+
+class LDALearner(LinearLearner):
+
+    def __init__(self):
+        self.classifier = None
+        self.scalings = None
+
+    @profile
+    def learn(self, decoy_peaks, target_peaks, use_main_score=True):
+        assert isinstance(decoy_peaks, Experiment)
+        assert isinstance(target_peaks, Experiment)
+
+        X0 = decoy_peaks.get_feature_matrix(use_main_score)
+        X1 = target_peaks.get_feature_matrix(use_main_score)
+        X = np.vstack((X0, X1))
+        y = np.zeros((X.shape[0],))
+        y[X0.shape[0]:] = 1.0
+
+        classifier = sklearn.lda.LDA()
+        classifier.fit(X, y)
+        self.classifier = classifier
+        self.scalings = classifier.scalings_.flatten()
+        #scores = np.dot(X, self.scalings)
+        return self
+
+    def get_parameters(self):
+        return self.scalings
+
+    def set_parameters(self, w):
+        self.scalings = w
+        return self
+
+
+
