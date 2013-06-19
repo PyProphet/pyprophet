@@ -69,7 +69,6 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
         assert isinstance(inner_learner, AbstractLearner)
         self.inner_learner = inner_learner
 
-    @profile
     def select_train_peaks(self, train, sel_column, fdr, lambda_):
         assert isinstance(train, Experiment)
         assert isinstance(sel_column, basestring)
@@ -85,7 +84,6 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
         best_target_peaks = tt_peaks.filter_(tt_scores >= cutoff)
         return td_peaks, best_target_peaks
 
-    @profile
     def start_semi_supervised_learning(self, train, config):
         fdr = config.get("semi_supervised_learner.initial_fdr")
         lambda_ = config.get("semi_supervised_learner.initial_lambda")
@@ -97,7 +95,6 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
         clf_scores -= np.mean(clf_scores)
         return w, clf_scores
 
-    @profile
     def iter_semi_supervised_learning(self, train, config):
         fdr = config.get("semi_supervised_learner.iteration_fdr")
         lambda_ = config.get("semi_supervised_learner.iteration_lambda")
@@ -110,11 +107,9 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
         clf_scores = model.score(train, True)
         return w, clf_scores
 
-    @profile
     def averaged_learner(self, params):
         return self.inner_learner.averaged_learner(params)
 
-    @profile
     def score(self, df, params):
         self.inner_learner.set_parameters(params)
         return self.inner_learner.score(df, True)

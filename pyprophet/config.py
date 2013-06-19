@@ -2,7 +2,7 @@
 import multiprocessing
 
 def standard_config(n_cpus=1):
-    config = dict(is_test=True)
+    config = dict(is_test=1)
 
     lambda_ = 0.4
 

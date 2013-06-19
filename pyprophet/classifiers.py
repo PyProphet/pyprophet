@@ -5,18 +5,12 @@ except:
 
 import sklearn.lda
 import numpy as np
-import pandas as pd
 import inspect
 
 from data_handling import Experiment
 
 
 class AbstractLearner(object):
-
-    @profile
-    def get_learning_data(self, decoy_peaks, target_peaks, use_main_score):
-        assert isinstance(decoy_peaks, pd.DataFrame)
-        assert isinstance(target_peaks, pd.DataFrame)
 
     def learn(self, decoy_peaks, target_peaks, use_main_score=True):
         raise NotImplementedError()
@@ -37,7 +31,6 @@ class AbstractLearner(object):
 
 class LinearLearner(AbstractLearner):
 
-    @profile
     def score(self, peaks, use_main_score):
         X = peaks.get_feature_matrix(use_main_score)
         return np.dot(X, self.get_parameters())
@@ -57,7 +50,6 @@ class LDALearner(LinearLearner):
         self.classifier = None
         self.scalings = None
 
-    @profile
     def learn(self, decoy_peaks, target_peaks, use_main_score=True):
         assert isinstance(decoy_peaks, Experiment)
         assert isinstance(target_peaks, Experiment)

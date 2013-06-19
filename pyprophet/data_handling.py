@@ -80,72 +80,72 @@ def prepare_data_table(table, tg_id_name = "transition_group_id",
 
 
 class Experiment(object):
-    
+
     def __init__(self, df):
         self.df = df
 
-    
+
     def print_summary(self):
         print len(self.df), 'lines in input data'
         print len(self.df.tg_id.unique()), 'transition groups in input data'
         print len(self.df.columns.values) - 6, 'scores including main score'
 
-    
+
     def get_top_decoy_peaks(self):
         df = self.df[(self.df.is_decoy == False) & (self.df.is_top_peak == True)]
         return Experiment(df)
 
-    
+
     def __getitem__(self, name):
         return getattr(self.df, name)
 
-    
+
     def __setitem__(self, colname, values):
         self.df[colname] = values
 
-    
+
     def set_and_rerank(self, col_name, scores):
         self.df[col_name] = scores
         self.rank_by(col_name)
 
-    
+
     def rank_by(self, score_col_name):
         flags = find_top_ranked(self.df.tg_num_id.values, self.df[score_col_name].values)
         self.df.is_top_peak = flags
 
-    
+
     def get_top_test_peaks(self):
         df = self.df
         return Experiment(df[(df.is_train == False) & (df.is_top_peak == True)])
 
-    
+
     def get_decoy_peaks(self):
         return Experiment(self.df[self.df.is_decoy == True])
 
-    
+
     def get_target_peaks(self):
         return Experiment(self.df[self.df.is_decoy == False])
 
-    
+
     def get_top_decoy_peaks(self):
         ix_top = self.df.is_top_peak == True
         return Experiment(self.df[(self.df.is_decoy == True) & ix_top])
 
-    
+
     def get_top_target_peaks(self):
         ix_top = self.df.is_top_peak == True
         return Experiment(self.df[(self.df.is_decoy == False) & ix_top])
 
-    
+
     def get_feature_matrix(self, use_main_score):
         min_col = 5 if use_main_score else 6
         return self.df.iloc[:, min_col:-1].values
 
-    
+
     def filter_(self, idx):
         return Experiment(self.df[idx])
 
-    
+
     def split_for_xval(self, fraction):
         df = self.df
         decoy_ids = df[df.is_decoy == True].tg_id.unique()
@@ -158,7 +158,7 @@ class Experiment(object):
         df.is_train[~ix_learn] = False
 
     split_for_xval = profile(split_for_xval)
-    
+
     def get_train_peaks(self):
         df = self.df[self.df.is_train == True]
         return Experiment(df)

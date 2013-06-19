@@ -9,7 +9,6 @@ except:
 from optimized import find_nearest_matches
 import scipy.special
 
-@profile
 def to_one_dim_array(values, as_type=None):
     """ converst list or flattnes n-dim array to 1-dim array if possible"""
 
@@ -24,7 +23,6 @@ def to_one_dim_array(values, as_type=None):
     return values
 
 
-@profile
 def pnorm(pvalues, mu, sigma):
     """ [P(X>pi, mu, sigma) for pi in pvalues] for normal distributed P with
     expectation value mu and std deviation sigma """
@@ -34,12 +32,10 @@ def pnorm(pvalues, mu, sigma):
     return 0.5 * ( 1.0 + scipy.special.erf(args / np.sqrt(2.0)))
 
 
-@profile
 def mean_and_std_dev(values):
     return np.mean(values), np.std(values, ddof=1)
 
 
-@profile
 def get_error_table_using_percentile_positives_new(err_df,
                                                    target_scores,
                                                    num_null):
@@ -96,14 +92,12 @@ def get_error_table_using_percentile_positives_new(err_df,
     return df_error
 
 
-@profile
 def lookup_q_values_from_error_table(scores, err_df):
     """ find best matching q-value foe each score in 'scores' """
     ix = find_nearest_matches(err_df.cutoff, scores)
     return err_df.qvalue.iloc[ix].values
 
 
-@profile
 def final_err_table(df, num_cut_offs = 51):
     """ create artificial cutoff sample points from given range of cutoff
     values in df, number of sample points is 'num_cut_offs'"""
@@ -126,7 +120,6 @@ def final_err_table(df, num_cut_offs = 51):
 
     return sampled_df
 
-@profile
 def summary_err_table(df, qvalues=[0, 0.01, 0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5]):
     """ summary error table for some typical q-values """
 
@@ -147,7 +140,6 @@ def summary_err_table(df, qvalues=[0, 0.01, 0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5]
 
 
 
-@profile
 def get_error_table_from_pvalues_new(p_values, lambda_=0.4):
     """ estimate error table from p_values with method of storey for
     estimating fdrs and q-values """
@@ -212,7 +204,6 @@ def get_error_table_from_pvalues_new(p_values, lambda_=0.4):
     return error_stat, num_null, num
 
 
-@profile
 def get_error_stat_from_null(target_scores, decoy_scores, lambda_):
     """ takes list of decoy and master scores and creates error statistics
     for target values based on mean and std dev of decoy scores"""
@@ -231,7 +222,6 @@ def get_error_stat_from_null(target_scores, decoy_scores, lambda_):
     return df, num_null, num
 
 
-@profile
 def find_cutoff(target_scores, decoy_scores, lambda_, fdr):
     """ finds cut off target score for specified false discovery rate fdr """
 
@@ -241,7 +231,6 @@ def find_cutoff(target_scores, decoy_scores, lambda_, fdr):
     return cutoff
 
 
-@profile
 def calculate_final_statistics(all_top_target_scores,
                                test_target_scores,
                                test_decoy_scores,
