@@ -1,8 +1,14 @@
+#encoding: latin-1
+
+# openblas + multiprocessing crashes for OPENBLAS_NUM_THREADS > 1 !!!
+import os
+os.putenv("OPENBLAS_NUM_THREADS", "1")
+
 
 import multiprocessing
 
 def standard_config(n_cpus=1):
-    config = dict(is_test=1)
+    config = dict(is_test=0)
 
     lambda_ = 0.4
 
@@ -21,5 +27,11 @@ def standard_config(n_cpus=1):
     config["final_statistics.lambda"] =  lambda_
 
     config["xeval.num_processes"] = n_cpus
+
+    config["delim.in"] = ","
+    config["delim.out"] = ","
+
+    config["target.dir"] = None
+    config["target.overwrite"] = False
 
     return config

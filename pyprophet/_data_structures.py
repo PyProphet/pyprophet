@@ -1,3 +1,7 @@
+# openblas + multiprocessing crashes for OPENBLAS_NUM_THREADS > 1 !!!
+import os
+os.putenv("OPENBLAS_NUM_THREADS", "1")
+
 import pandas as pd
 import numpy as np
 import random

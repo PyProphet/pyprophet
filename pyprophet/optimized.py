@@ -1,3 +1,9 @@
+#encoding: latin-1
+
+# openblas + multiprocessing crashes for OPENBLAS_NUM_THREADS > 1 !!!
+import os
+os.putenv("OPENBLAS_NUM_THREADS", "1")
+
 from numba import jit, i8, f8
 import numpy as np
 

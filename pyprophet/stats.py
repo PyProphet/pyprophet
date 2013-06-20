@@ -1,3 +1,10 @@
+#encoding: latin-1
+
+# openblas + multiprocessing crashes for OPENBLAS_NUM_THREADS > 1 !!!
+import os
+os.putenv("OPENBLAS_NUM_THREADS", "1")
+
+
 import numpy as np
 import pandas as pd
 

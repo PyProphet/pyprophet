@@ -1,3 +1,9 @@
+#encoding: latin-1
+
+# openblas + multiprocessing crashes for OPENBLAS_NUM_THREADS > 1 !!!
+import os
+os.putenv("OPENBLAS_NUM_THREADS", "1")
+
 try:
     profile
 except:
@@ -17,11 +23,22 @@ from semi_supervised import (AbstractSemiSupervisedLearner, StandardSemiSupervis
 import multiprocessing
 
 
-def unwrap_self_for_multiprocessing((inst, name, args),):
-    return getattr(inst, name)(*args)
+def unwrap_self_for_multiprocessing((inst, method_name, args),):
+    """ You can not call methods with multiprocessing, but free functions,
+        If you want to call  inst.method(arg0, arg1),
+
+            unwrap_self_for_multiprocessing(inst, "method", (arg0, arg1))
+
+        does the trick.
+    """
+    return getattr(inst, method_name)(*args)
 
 
 class HolyGostQuery(object):
+
+    """ HolyGhostQuery assembles the unsupervised methods.
+        See below how PyProphet parameterises this class.
+    """
 
     def __init__(self, semi_supervised_learner):
         assert isinstance(semi_supervised_learner,
@@ -80,7 +97,8 @@ class HolyGostQuery(object):
                                      experiment,
                                      config,
                                      all_test_target_scores,
-                                     all_test_decoy_scores)
+                                     all_test_decoy_scores,
+                                     table)
 
     @profile
     def apply_classifier(self,
@@ -88,7 +106,8 @@ class HolyGostQuery(object):
                          experiment,
                          config,
                          all_test_target_scores,
-                         all_test_decoy_scores):
+                         all_test_decoy_scores,
+                         table):
 
         lambda_ = config.get("final_statistics.lambda")
 
@@ -102,13 +121,17 @@ class HolyGostQuery(object):
                                                  all_test_decoy_scores,
                                                  lambda_)
 
-        final_table = final_err_table(df_raw_stat)
-        summary_table = summary_err_table(df_raw_stat)
+        final_statistics = final_err_table(df_raw_stat)
+        summary_statistics = summary_err_table(df_raw_stat)
 
         q_values = lookup_q_values_from_error_table(experiment["classifier_score"], df_raw_stat)
-        experiment.q_values = q_values
+        experiment["q_values"] = q_values
 
-        return summary_table, final_table
+        # as experiment maybe permutated row wise, directly attaching q_values
+        # to table might result in wrong assignment:
+        scored_table = table.join(experiment[["d_score", "q_values"]])
+
+        return summary_statistics, final_statistics, scored_table
 
     @profile
     def assign_d_score(self, final_classifier, experiment):

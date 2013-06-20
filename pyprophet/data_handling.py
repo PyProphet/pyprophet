@@ -1,3 +1,9 @@
+#encoding: latin-1
+
+# openblas + multiprocessing crashes for OPENBLAS_NUM_THREADS > 1 !!!
+import os
+os.putenv("OPENBLAS_NUM_THREADS", "1")
+
 import pandas as pd
 import numpy as np
 from optimized import find_top_ranked
@@ -96,13 +102,16 @@ class Experiment(object):
         return Experiment(df)
 
 
-    def __getitem__(self, name):
-        return getattr(self.df, name)
+    def __getitem__(self, *args):
+        return self.df.__getitem__(*args)
 
+    def __setitem__(self, *args):
+        return self.df.__setitem__(*args)
 
-    def __setitem__(self, colname, values):
-        self.df[colname] = values
-
+    def __setattr__(self, name, value):
+        if name not in ["df", ]:
+            raise Exception("for setting table columns use '[...]' syntax")
+        object.__setattr__(self, name, value)
 
     def set_and_rerank(self, col_name, scores):
         self.df[col_name] = scores
