@@ -6,6 +6,7 @@ def regression_test():
     import numpy 
 
     config = pyprophet.config.standard_config()
+    config["is_test"] = True
     path = os.path.join(os.path.abspath(os.path.dirname(__file__)), "test_data.txt")
     res, __, tab = pyprophet.pyprophet.PyProphet().process_csv(path, "\t", config)
 
