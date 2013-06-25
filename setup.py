@@ -1,5 +1,4 @@
 from setuptools import setup, find_packages
-from distutils.core import setup
 from distutils.extension import Extension
 
 try:
@@ -10,7 +9,7 @@ except:
 
 import pyprophet.version
 
-ext_modules = [Extension("pyprophet._optimized", ["pyprophet/optimized.c"])]
+ext_modules = [Extension("pyprophet._optimized", ["pyprophet/_optimized.c"])]
 
 setup(name='pyprophet',
     version=pyprophet.version.version,
@@ -46,6 +45,5 @@ setup(name='pyprophet',
             "pyprophet=pyprophet.main:main",
             ]
         },
-    #cmdclass = { 'build_ext': build_ext },
     ext_modules = ext_modules,
 )
