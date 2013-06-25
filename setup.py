@@ -1,4 +1,7 @@
 from setuptools import setup, find_packages
+from distutils.core import setup
+from distutils.extension import Extension
+from Cython.Distutils import build_ext
 
 try:
     # this import fixes strange issues with nose testing !
@@ -6,10 +9,12 @@ try:
 except:
     pass
 
-version = '0.1'
+import pyprophet.version
+
+ext_modules = [Extension("pyprophet._optimized", ["pyprophet/optimized.pyx"])]
 
 setup(name='pyprophet',
-    version=version,
+    version=pyprophet.version.version,
     author="Uwe Schmitt",
     author_email="rocksportrocker@gmail.com",
     description="Python reimplementation of mProphet peak scoring",
@@ -32,7 +37,9 @@ setup(name='pyprophet',
         "numpy >= 1.7.0",
         "pandas >= 0.10.0",
         "scipy >= 0.9.0",
-        "numba >= 0.8",
+        #"numba >= 0.8",
+        "numexpr >= 2.1",
+        "scikit-learn >= 0.13",
         ],
     test_suite="nose.collector",
     tests_require="nose",
@@ -40,5 +47,7 @@ setup(name='pyprophet',
         'console_scripts' : [
             "pyprophet=pyprophet.main:main",
             ]
-        }
+        },
+    cmdclass = { 'build_ext': build_ext },
+    ext_modules = ext_modules,
 )
