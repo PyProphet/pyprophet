@@ -1,5 +1,4 @@
 from setuptools import setup, find_packages
-from distutils.core import setup
 from distutils.extension import Extension
 from Cython.Distutils import build_ext
 
@@ -11,7 +10,7 @@ except:
 
 import pyprophet.version
 
-ext_modules = [Extension("pyprophet._optimized", ["pyprophet/optimized.pyx"])]
+ext_modules = [Extension("pyprophet._optimized", ["pyprophet/_optimized.c"])]
 
 setup(name='pyprophet',
     version=pyprophet.version.version,
