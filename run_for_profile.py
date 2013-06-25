@@ -7,6 +7,7 @@ import os.path
 
 config = pyprophet.config.standard_config()
 path = os.path.join(os.path.abspath(os.path.dirname(__file__)), "tests", "test_data.txt")
-pyprophet.pyprophet.PyProphet().process_csv(path, "\t", config)
+a, b, c = pyprophet.pyprophet.PyProphet().process_csv(path, "\t", config)
+print a
 
 
