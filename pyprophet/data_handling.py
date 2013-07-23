@@ -4,6 +4,8 @@
 import os
 os.putenv("OPENBLAS_NUM_THREADS", "1")
 
+import random
+
 import pandas as pd
 import numpy as np
 from optimized import find_top_ranked
@@ -90,17 +92,14 @@ class Experiment(object):
     def __init__(self, df):
         self.df = df
 
-
     def print_summary(self):
         print len(self.df), 'lines in input data'
         print len(self.df.tg_id.unique()), 'transition groups in input data'
         print len(self.df.columns.values) - 6, 'scores including main score'
 
-
     def get_top_decoy_peaks(self):
         df = self.df[(self.df.is_decoy == False) & (self.df.is_top_peak == True)]
         return Experiment(df)
-
 
     def __getitem__(self, *args):
         return self.df.__getitem__(*args)
@@ -117,48 +116,48 @@ class Experiment(object):
         self.df[col_name] = scores
         self.rank_by(col_name)
 
-
     def rank_by(self, score_col_name):
         flags = find_top_ranked(self.df.tg_num_id.values, self.df[score_col_name].values)
         self.df.is_top_peak = flags
-
 
     def get_top_test_peaks(self):
         df = self.df
         return Experiment(df[(df.is_train == False) & (df.is_top_peak == True)])
 
-
     def get_decoy_peaks(self):
         return Experiment(self.df[self.df.is_decoy == True])
 
-
     def get_target_peaks(self):
         return Experiment(self.df[self.df.is_decoy == False])
-
 
     def get_top_decoy_peaks(self):
         ix_top = self.df.is_top_peak == True
         return Experiment(self.df[(self.df.is_decoy == True) & ix_top])
 
-
     def get_top_target_peaks(self):
         ix_top = self.df.is_top_peak == True
         return Experiment(self.df[(self.df.is_decoy == False) & ix_top])
-
 
     def get_feature_matrix(self, use_main_score):
         min_col = 5 if use_main_score else 6
         return self.df.iloc[:, min_col:-1].values
 
-
     def filter_(self, idx):
         return Experiment(self.df[idx])
 
-
-    def split_for_xval(self, fraction):
+    @profile
+    def split_for_xval(self, fraction, is_test):
         df = self.df
         decoy_ids = df[df.is_decoy == True].tg_id.unique()
         target_ids = df[df.is_decoy == False].tg_id.unique()
+
+        if not is_test:
+            random.shuffle(decoy_ids)
+            random.shuffle(target_ids)
+        else:
+            decoy_ids= sorted(decoy_ids)
+            target_ids= sorted(target_ids)
+
         decoy_ids = decoy_ids[:int(len(decoy_ids) * fraction) + 1]
         target_ids = target_ids[:int(len(target_ids) * fraction) + 1]
         learn_ids = np.concatenate((decoy_ids, target_ids))
@@ -166,10 +165,6 @@ class Experiment(object):
         df.is_train[ix_learn] = True
         df.is_train[~ix_learn] = False
 
-    split_for_xval = profile(split_for_xval)
-
     def get_train_peaks(self):
         df = self.df[self.df.is_train == True]
         return Experiment(df)
-
-

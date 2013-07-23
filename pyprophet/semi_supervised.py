@@ -30,14 +30,15 @@ class AbstractSemiSupervisedLearner(object):
         raise NotImplementedError()
 
     @profile
-    def learn(self, experiment, config):
+    def learn_randomized(self, experiment, config):
         assert isinstance(experiment, Experiment)
         assert isinstance(config, dict)
 
-        fraction = config.get("xeval.fraction")
-        num_xeval = config.get("xeval.num_iter")
+        num_iter = config.get("semi_supervised_learner.num_iter")
 
-        experiment.split_for_xval(fraction)
+        fraction = config.get("xeval.fraction")
+        is_test = config.get("is_test", False)
+        experiment.split_for_xval(fraction, is_test)
         train = experiment.get_train_peaks()
 
         train.rank_by("main_score")
@@ -46,7 +47,7 @@ class AbstractSemiSupervisedLearner(object):
 
         train.set_and_rerank("classifier_score", clf_scores)
         # semi supervised iteration:
-        for inner in range(num_xeval):
+        for inner in range(num_iter):
             params, clf_scores = self.iter_semi_supervised_learning(train, config)
             train.set_and_rerank("classifier_score", clf_scores)
 

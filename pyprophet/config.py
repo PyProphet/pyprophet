@@ -24,6 +24,8 @@ def standard_config(n_cpus=1):
     config["semi_supervised_learner.iteration_fdr"] = 0.02
     config["semi_supervised_learner.iteration_lambda"] =  lambda_
 
+    config["semi_supervised_learner.num_iter"] = 5
+
     config["final_statistics.lambda"] =  lambda_
 
     config["xeval.num_processes"] = n_cpus
@@ -32,6 +34,23 @@ def standard_config(n_cpus=1):
     config["delim.out"] = ","
 
     config["target.dir"] = None
-    config["target.overwrite"] = False
+    config["target.overwrite"] = 0
 
     return config
+
+def fix_config_types(dd):
+    for k in ["xeval.num_iter",
+              "semi_supervised_learner.num_iter",
+              "is_test",
+              "target.overwrite",
+              "xeval.num_processes"]:
+        dd[k] = int(dd[k])
+
+    for k in ["xeval.fraction",
+              "semi_supervised_learner.initial_fdr",
+              "semi_supervised_learner.initial_lambda",
+              "semi_supervised_learner.iteration_lambda",
+              "semi_supervised_learner.initial_fdr",
+              "semi_supervised_learner.iteration_fdr",
+              "final_statistics.lambda"]:
+        dd[k] = float(dd[k])

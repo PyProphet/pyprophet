@@ -1,3 +1,4 @@
+import pdb
 #encoding: latin-1
 
 # openblas + multiprocessing crashes for OPENBLAS_NUM_THREADS > 1 !!!
@@ -10,7 +11,6 @@ except:
     profile = lambda x: x
 
 import pandas as pd
-import random
 
 from stats import (lookup_q_values_from_error_table,
                    calculate_final_statistics, mean_and_std_dev,
@@ -61,19 +61,18 @@ class HolyGostQuery(object):
 
         if is_test: # for reliable results
             experiment.df.sort("tg_id", ascending=True, inplace=True)
-            random.seed(0)
 
         experiment.print_summary()
 
         all_test_target_scores = []
         all_test_decoy_scores = []
         ws = []
-        neval = 1
+        neval = config.get("xeval.num_iter")
         inst = self.semi_supervised_learner
         num_processes = config.get("xeval.num_processes")
         if num_processes == 1:
             for k in range(neval):
-                (ttt_scores, ttd_scores, w) = inst.learn(experiment, config)
+                (ttt_scores, ttd_scores, w) = inst.learn_randomized(experiment, config)
                 all_test_target_scores.extend(ttt_scores)
                 all_test_decoy_scores.extend(ttd_scores)
                 ws.append(w.flatten())
@@ -84,7 +83,7 @@ class HolyGostQuery(object):
                 remaining = max(0, neval-num_processes)
                 todo = neval-remaining
                 neval -= todo
-                args= ( (inst, "learn", (experiment, config)), ) * todo
+                args= ( (inst, "learn_randomized", (experiment, config)), ) * todo
                 res = pool.map(unwrap_self_for_multiprocessing, args)
                 top_test_target_scores = [ ti for r in res for ti in r[0]]
                 top_test_decoy_scores = [ ti for r in res for ti in r[1]]
@@ -115,7 +114,6 @@ class HolyGostQuery(object):
 
         all_tt_scores  = experiment.get_top_target_peaks()["d_score"]
 
-
         df_raw_stat = calculate_final_statistics(all_tt_scores,
                                                  all_test_target_scores,
                                                  all_test_decoy_scores,
@@ -124,7 +122,7 @@ class HolyGostQuery(object):
         final_statistics = final_err_table(df_raw_stat)
         summary_statistics = summary_err_table(df_raw_stat)
 
-        q_values = lookup_q_values_from_error_table(experiment["classifier_score"], df_raw_stat)
+        q_values = lookup_q_values_from_error_table(experiment["d_score"], df_raw_stat)
         experiment["q_values"] = q_values
 
         # as experiment maybe permutated row wise, directly attaching q_values

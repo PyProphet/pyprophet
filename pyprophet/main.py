@@ -4,17 +4,14 @@
 import os
 os.putenv("OPENBLAS_NUM_THREADS", "1")
 
-
 try:
     profile
 except:
     profile = lambda x: x
 
-
 from pyprophet import PyProphet
-from config    import standard_config
+from config    import standard_config, fix_config_types
 import sys
-
 
 def print_help():
     print
@@ -81,6 +78,7 @@ def main():
 
     config = standard_config()
     config.update(options)
+    fix_config_types(config)
     dump_config(config)
 
     dirname = config.get("target.dir", None)
@@ -122,6 +120,3 @@ def main():
     scored_table.to_csv(scored_table_path, sep=delim_out)
     print "WRITTEN: ", scored_table_path
     print
-
-
-
