@@ -33,11 +33,11 @@ def standard_config(n_cpus=1):
     info["xeval.num_processes"] = "[-1 means 'all available cpus']"
 
 
-    config["delim.in"] = ","
-    info["delim.in"] = r"""[you can use 'tab' or "\t" (with these quote marks)]"""
+    config["delim.in"] = "tab"
+    info["delim.in"] = r"""[you can eg use 'tab' or ',']"""
 
-    config["delim.out"] = ","
-    info["delim.out"] = r"""[you can use 'tab' or "\t" (with these quote marks)]"""
+    config["delim.out"] = "tab"
+    info["delim.out"] = r"""[you can eg use 'tab' or ',']"""
 
     config["target.dir"] = None
     config["target.overwrite"] = 0
@@ -60,3 +60,9 @@ def fix_config_types(dd):
               "semi_supervised_learner.iteration_fdr",
               "final_statistics.lambda"]:
         dd[k] = float(dd[k])
+
+    if dd["delim.in"] == "tab":
+        dd["delim.in"] = "\t"
+
+    if dd["delim.out"] == "tab":
+        dd["delim.out"] = "\t"

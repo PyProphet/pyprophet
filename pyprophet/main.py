@@ -29,7 +29,7 @@ def dump_config_info(config, info):
     print
     for k, v in sorted(config.items()):
         comment = info.get(k, "")
-        print "    --%-40s   default: %-5s %s" % (k,v, comment)
+        print "    --%-40s   default: %-5r %s" % (k,v, comment)
     print
 
 def dump_config(config):
@@ -37,7 +37,7 @@ def dump_config(config):
     print "used parameters:"
     print
     for k, v in sorted(config.items()):
-        print "    %-40s   : %s" % (k,v)
+        print "    %-40s   : %r" % (k,v)
     print
 
 def main():
@@ -65,13 +65,6 @@ def main():
                 raise Exception("duplicate input file argument")
             path = arg
 
-    delim_in = options.get("delim.in", ",")
-    if delim_in == "tab":
-        delim_in = "\t"
-
-    delim_out = options.get("delim.out", ",")
-    if delim_out == "tab":
-        delim_out = "\t"
 
     if path is None:
         print_help()
@@ -81,6 +74,9 @@ def main():
     config.update(options)
     fix_config_types(config)
     dump_config(config)
+
+    delim_in = config.get("delim.in", ",")
+    delim_out = config.get("delim.out", ",")
 
     dirname = config.get("target.dir", None)
     if dirname is None:
