@@ -11,7 +11,7 @@ except:
 
 from pyprophet import PyProphet
 from config    import standard_config, fix_config_types
-import sys
+import sys, time
 
 def print_help():
     print
@@ -103,9 +103,12 @@ def main():
             print
             return
 
+    start_at = time.time()
     summ_stat, final_stat, scored_table  = PyProphet().process_csv(path,
                                                                    delim_in,
                                                                    config)
+    needed = time.time() - start_at
+
     print
     print "="*78
     print
@@ -121,3 +124,17 @@ def main():
     scored_table.to_csv(scored_table_path, sep=delim_out)
     print "WRITTEN: ", scored_table_path
     print
+
+    seconds = int(needed)
+    msecs  =  int(1000*(needed-seconds))
+    minutes = int(needed/60.0)
+
+    print "NEEDED",
+    if minutes:
+        print minutes, "minutes and",
+
+    print "%d seconds and %d msecs wall time" % (seconds, msecs)
+    print
+
+
+
