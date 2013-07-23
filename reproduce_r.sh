@@ -7,7 +7,7 @@ pyprophet --xeval.num_processes=10 \
           --xeval.num_iter=$NUM_XVAL\
           --xeval.fraction=$NUM_FRACTION\
           --target.overwrite=1\
-          --delim.out=,\
+          #--delim.out=,\
           --semi_supervised_learner.num_iter=$NUM_SEMISV_ITER\
           --is_test=0\
           ../orig_r_code/testfile.csv
@@ -18,7 +18,7 @@ pyprophet --xeval.num_processes=1 \
           --xeval.num_iter=$NUM_XVAL\
           --xeval.fraction=$NUM_FRACTION\
           --target.overwrite=1\
-          --delim.out=,\
+          #--delim.out=,\
           --semi_supervised_learner.num_iter=$NUM_SEMISV_ITER\
           --is_test=0\
           ../orig_r_code/testfile.csv
