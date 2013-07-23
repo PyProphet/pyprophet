@@ -9,6 +9,7 @@ import multiprocessing
 
 def standard_config(n_cpus=1):
     config = dict(is_test=0)
+    info  = dict(is_test="[switches randomness off]")
 
     lambda_ = 0.4
 
@@ -29,14 +30,19 @@ def standard_config(n_cpus=1):
     config["final_statistics.lambda"] =  lambda_
 
     config["xeval.num_processes"] = n_cpus
+    info["xeval.num_processes"] = "[-1 means 'all available cpus']"
+
 
     config["delim.in"] = ","
+    info["delim.in"] = r"""[you can use 'tab' or "\t" (with these quote marks)]"""
+
     config["delim.out"] = ","
+    info["delim.out"] = r"""[you can use 'tab' or "\t" (with these quote marks)]"""
 
     config["target.dir"] = None
     config["target.overwrite"] = 0
 
-    return config
+    return config, info
 
 def fix_config_types(dd):
     for k in ["xeval.num_iter",

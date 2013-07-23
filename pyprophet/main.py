@@ -20,15 +20,16 @@ def print_help():
     print "       %s [options] input_file" % script
     print "   or "
     print "       %s --help" % script
-    config = standard_config()
-    dump_config_info(config)
+    config, info = standard_config()
+    dump_config_info(config, info)
 
-def dump_config_info(config):
+def dump_config_info(config, info):
     print
     print "parameters:"
     print
     for k, v in sorted(config.items()):
-        print "    --%-40s   default: %s" % (k,v)
+        comment = info.get(k, "")
+        print "    --%-40s   default: %-5s %s" % (k,v, comment)
     print
 
 def dump_config(config):
@@ -76,7 +77,7 @@ def main():
         print_help()
         raise Exception("no input file given")
 
-    config = standard_config()
+    config, info = standard_config()
     config.update(options)
     fix_config_types(config)
     dump_config(config)
