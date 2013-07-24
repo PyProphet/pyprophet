@@ -1,4 +1,3 @@
-import pdb
 #encoding: latin-1
 
 # openblas + multiprocessing crashes for OPENBLAS_NUM_THREADS > 1 !!!
@@ -11,6 +10,7 @@ except:
     profile = lambda x: x
 
 import pandas as pd
+import numpy as np
 
 from stats import (lookup_q_values_from_error_table,
                    calculate_final_statistics, mean_and_std_dev,
@@ -123,26 +123,26 @@ class HolyGostQuery(object):
         summary_statistics = summary_err_table(df_raw_stat)
 
         q_values = lookup_q_values_from_error_table(experiment["d_score"], df_raw_stat)
-        experiment["q_values"] = q_values
+        experiment["m_score"] = q_values
+
+        experiment.add_peak_group_rank()
 
         # as experiment maybe permutated row wise, directly attaching q_values
         # to table might result in wrong assignment:
-        scored_table = table.join(experiment[["d_score", "q_values"]])
+        scored_table = table.join(experiment[["d_score", "m_score", "peak_group_rank"]])
 
         return summary_statistics, final_statistics, scored_table
+
 
     @profile
     def assign_d_score(self, final_classifier, experiment):
 
         # with .values it's faster:
         final_score = final_classifier.score(experiment, True)
-
         experiment.set_and_rerank("classifier_score", final_score)
-
         td_scores = experiment.get_top_decoy_peaks()["classifier_score"]
         mu, nu = mean_and_std_dev(td_scores)
         experiment["d_score"] =(final_score - mu)/nu
-
 
 def PyProphet():
     return HolyGostQuery(StandardSemiSupervisedLearner(LDALearner()))

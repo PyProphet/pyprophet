@@ -1,5 +1,6 @@
 #encoding: latin-1
 cimport cython
+cimport libc.stdlib
 cimport numpy as np
 import  numpy as np
 
@@ -54,3 +55,40 @@ def find_top_ranked(np.int64_t[:] tg_ids, np.float64_t[:] scores):
             current_imax = i
     view[current_imax] = 1
     return flags
+
+cdef partial_rank(np.float64_t[:] v, int imin, int imax, np.int64_t[:] ranks):
+    """ imax is exclusive """
+    cdef int * ix = <int*> libc.stdlib.malloc((imax-imin)*sizeof(int))
+    cdef int i, j, pos
+    for i in range(imax-imin):
+        ix[i] = i+imin
+    for i in range(imax-imin-1):
+        pos = i
+        for j in range(i+1, imax-imin):
+            if v[ix[j]] > v[ix[pos]]:
+                pos = j
+        ix[i], ix[pos] = ix[pos], ix[i]
+
+    for j in range(imax-imin):
+        ranks[ix[j]] = j+1
+    libc.stdlib.free(ix)
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def rank(np.int64_t[:] tg_ids, np.float64_t[:] scores):
+    cdef int n = tg_ids.shape[0]
+    result = np.zeros((n,), dtype=int)
+    cdef np.int64_t[:] ranks = result
+    cdef int imin = 0
+    cdef int imax
+    cdef np.float64_t g0
+    while imin < n:
+        imax = imin+1
+        g0 = tg_ids[imin]
+        while imax < n and tg_ids[imax] == g0:
+            imax += 1
+        partial_rank(scores, imin, imax, ranks)
+        imin = imax
+    return result
+

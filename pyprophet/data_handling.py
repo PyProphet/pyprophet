@@ -8,7 +8,7 @@ import random
 
 import pandas as pd
 import numpy as np
-from optimized import find_top_ranked
+from optimized import find_top_ranked, rank
 
 try:
     profile
@@ -144,6 +144,13 @@ class Experiment(object):
 
     def filter_(self, idx):
         return Experiment(self.df[idx])
+
+    @profile
+    def add_peak_group_rank(self):
+        ids = self.df.tg_num_id.values
+        scores = self.df.d_score.values
+        peak_group_ranks = rank(ids, scores)
+        self.df["peak_group_rank"] = peak_group_ranks
 
     @profile
     def split_for_xval(self, fraction, is_test):
