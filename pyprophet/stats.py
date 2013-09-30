@@ -13,8 +13,31 @@ try:
 except:
     profile = lambda x: x
 
-from optimized import find_nearest_matches
+from optimized import find_nearest_matches as _find_nearest_matches
 import scipy.special
+import traceback
+import math
+
+from config import CONFIG
+
+import multiprocessing
+
+
+def _ff(a):
+    return _find_nearest_matches(*a)
+
+
+def find_nearest_matches(x, y):
+    num_processes = CONFIG.get("num_processes")
+    if num_processes > 1:
+        pool = multiprocessing.Pool(processes=num_processes)
+        batch_size = int(math.ceil(len(y) / num_processes))
+        parts = [(x, y[i:i + batch_size]) for i in range(0, len(y), batch_size)]
+        res = pool.map(_ff, parts)
+        res_par = np.hstack(res)
+        return res_par
+    return _find_nearest_matches(x, y)
+
 
 def to_one_dim_array(values, as_type=None):
     """ converst list or flattnes n-dim array to 1-dim array if possible"""
@@ -43,9 +66,8 @@ def mean_and_std_dev(values):
     return np.mean(values), np.std(values, ddof=1)
 
 
-def get_error_table_using_percentile_positives_new(err_df,
-                                                   target_scores,
-                                                   num_null):
+@profile
+def get_error_table_using_percentile_positives_new(err_df, target_scores, num_null):
     """ transfer error statistics in err_df for many target scores and given
     number of estimated null hypothesises 'num_null' """
 
@@ -56,8 +78,7 @@ def get_error_table_using_percentile_positives_new(err_df,
     # optimized with numpys broadcasting: comparing column vector with row
     # vectory yieds a matrix with pairwaise somparision results.  sum(axis=0)
     # sums up each column:
-    num_positives = (target_scores[:,None] >= target_scores[None,
-        :]).sum(axis=0) # .flatten()
+    num_positives = (target_scores[:,None] >= target_scores[None, :]).sum(axis=0)
 
     num_negatives = num - num_positives
     pp = num_positives.astype(float) / num
@@ -99,12 +120,14 @@ def get_error_table_using_percentile_positives_new(err_df,
     return df_error
 
 
+@profile
 def lookup_q_values_from_error_table(scores, err_df):
     """ find best matching q-value foe each score in 'scores' """
     ix = find_nearest_matches(err_df.cutoff, scores)
     return err_df.qvalue.iloc[ix].values
 
 
+@profile
 def final_err_table(df, num_cut_offs = 51):
     """ create artificial cutoff sample points from given range of cutoff
     values in df, number of sample points is 'num_cut_offs'"""
@@ -127,6 +150,7 @@ def final_err_table(df, num_cut_offs = 51):
 
     return sampled_df
 
+@profile
 def summary_err_table(df, qvalues=[0, 0.01, 0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5]):
     """ summary error table for some typical q-values """
 
@@ -223,8 +247,7 @@ def get_error_stat_from_null(target_scores, decoy_scores, lambda_):
 
     target_pvalues = 1.0 - pnorm(target_scores, mu, nu)
 
-    df, num_null, num  = get_error_table_from_pvalues_new(target_pvalues,
-                                                          lambda_)
+    df, num_null, num  = get_error_table_from_pvalues_new(target_pvalues, lambda_)
     df["cutoff"] = target_scores
     return df, num_null, num
 
@@ -247,8 +270,8 @@ def calculate_final_statistics(all_top_target_scores,
     'exp' """
 
     # estimate error statistics from given samples
-    df, num_null, num_total = get_error_stat_from_null(test_target_scores,
-            test_decoy_scores, lambda_)
+    df, num_null, num_total = get_error_stat_from_null(test_target_scores, test_decoy_scores,
+                                                       lambda_)
 
     # fraction of null hypothesises in sample values
     summed_test_fraction_null = float(num_null) / num_total

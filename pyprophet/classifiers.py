@@ -79,6 +79,3 @@ class LDALearner(LinearLearner):
     def set_parameters(self, w):
         self.scalings = w
         return self
-
-
-

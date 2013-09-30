@@ -1,4 +1,4 @@
-#encoding: latin-1
+# encoding: latin-1
 
 # openblas + multiprocessing crashes for OPENBLAS_NUM_THREADS > 1 !!!
 import os
@@ -18,11 +18,11 @@ except:
 
 
 @profile
-def prepare_data_table(table, tg_id_name = "transition_group_id",
-                              decoy_name = "decoy",
-                              main_score_name = None,
-                              **extra_args_to_dev_null
-                              ):
+def prepare_data_table(table, tg_id_name="transition_group_id",
+                       decoy_name="decoy",
+                       main_score_name=None,
+                       **extra_args_to_dev_null
+                       ):
 
     column_names = table.columns.values
 
@@ -30,8 +30,7 @@ def prepare_data_table(table, tg_id_name = "transition_group_id",
     assert tg_id_name in column_names, "colum %s not in table" % tg_id_name
     assert decoy_name in column_names, "colum %s not in table" % decoy_name
     if main_score_name is not None:
-        assert main_score_name in column_names,\
-                                      "colum %s not in table" % main_score_name
+        assert main_score_name in column_names, "colum %s not in table" % main_score_name
 
     # if no main_score_name provided, look for unique column with name
     # starting with "main_":
@@ -39,7 +38,7 @@ def prepare_data_table(table, tg_id_name = "transition_group_id",
         main_columns = [c for c in column_names if c.startswith("main_")]
         if not main_columns:
             raise Exception("no column with main_* in table")
-        if len(main_columns)>1:
+        if len(main_columns) > 1:
             raise Exception("multiple columns with name main_* in table")
         main_score_name = main_columns[0]
 
@@ -49,8 +48,7 @@ def prepare_data_table(table, tg_id_name = "transition_group_id",
         raise Exception("no column with name var_* in table")
 
     # collect needed data:
-    column_names = """tg_id tg_num_id is_decoy is_top_peak is_train
-                      main_score""".split()
+    column_names = "tg_id tg_num_id is_decoy is_top_peak is_train main_score".split()
     N = len(table)
     empty_col = [0] * N
     empty_none_col = [None] * N
@@ -60,14 +58,14 @@ def prepare_data_table(table, tg_id_name = "transition_group_id",
     tg_map = dict()
     for i, tg_id in enumerate(tg_ids.unique()):
         tg_map[tg_id] = i
-    tg_num_ids = [ tg_map[tg_id] for tg_id in tg_ids]
+    tg_num_ids = [tg_map[tg_id] for tg_id in tg_ids]
 
-    data = dict(tg_id = tg_ids.values,
-                tg_num_id = tg_num_ids,
-                is_decoy = table[decoy_name].values.astype(bool),
-                is_top_peak = empty_col,
-                is_train = empty_none_col,
-                main_score = table[main_score_name].values,
+    data = dict(tg_id=tg_ids.values,
+                tg_num_id=tg_num_ids,
+                is_decoy=table[decoy_name].values.astype(bool),
+                is_top_peak=empty_col,
+                is_train=empty_none_col,
+                main_score=table[main_score_name].values,
                 )
 
     for i, v in enumerate(var_columns):
@@ -162,8 +160,8 @@ class Experiment(object):
             random.shuffle(decoy_ids)
             random.shuffle(target_ids)
         else:
-            decoy_ids= sorted(decoy_ids)
-            target_ids= sorted(target_ids)
+            decoy_ids = sorted(decoy_ids)
+            target_ids = sorted(target_ids)
 
         decoy_ids = decoy_ids[:int(len(decoy_ids) * fraction) + 1]
         target_ids = target_ids[:int(len(target_ids) * fraction) + 1]

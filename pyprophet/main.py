@@ -1,4 +1,4 @@
-#encoding: latin-1
+# encoding: latin-1
 
 # openblas + multiprocessing crashes for OPENBLAS_NUM_THREADS > 1 !!!
 import os
@@ -10,8 +10,10 @@ except:
     profile = lambda x: x
 
 from pyprophet import PyProphet
-from config    import standard_config, fix_config_types
-import sys, time
+from config import standard_config, fix_config_types
+import sys
+import time
+
 
 def print_help():
     print
@@ -20,8 +22,9 @@ def print_help():
     print "       %s [options] input_file" % script
     print "   or "
     print "       %s --help" % script
-    config, info = standard_config()
-    dump_config_info(config, info)
+    CONFIG, info = standard_config()
+    dump_config_info(CONFIG, info)
+
 
 def dump_config_info(config, info):
     print
@@ -29,21 +32,22 @@ def dump_config_info(config, info):
     print
     for k, v in sorted(config.items()):
         comment = info.get(k, "")
-        print "    --%-40s   default: %-5r %s" % (k,v, comment)
+        print "    --%-40s   default: %-5r %s" % (k, v, comment)
     print
+
 
 def dump_config(config):
     print
     print "used parameters:"
     print
     for k, v in sorted(config.items()):
-        print "    %-40s   : %r" % (k,v)
+        print "    %-40s   : %r" % (k, v)
     print
+
 
 def main():
 
-    options = [ p for p in sys.argv[1:] if p.startswith("--")]
-    no_options = [ p for p in sys.argv[1:] if p not in options]
+    options = [p for p in sys.argv[1:] if p.startswith("--")]
 
     options = dict()
     path = None
@@ -65,29 +69,28 @@ def main():
                 raise Exception("duplicate input file argument")
             path = arg
 
-
     if path is None:
         print_help()
         raise Exception("no input file given")
 
-    config, info = standard_config()
-    config.update(options)
-    fix_config_types(config)
-    dump_config(config)
+    CONFIG, info = standard_config()
+    CONFIG.update(options)
+    fix_config_types(CONFIG)
+    dump_config(CONFIG)
 
-    delim_in = config.get("delim.in", ",")
-    delim_out = config.get("delim.out", ",")
+    delim_in = CONFIG.get("delim.in", ",")
+    delim_out = CONFIG.get("delim.out", ",")
 
-    dirname = config.get("target.dir", None)
+    dirname = CONFIG.get("target.dir", None)
     if dirname is None:
         dirname = os.path.dirname(path)
     prefix, __ = os.path.splitext(os.path.basename(path))
 
-    scored_table_path = os.path.join(dirname, prefix+"_with_dscore.csv")
-    final_stat_path = os.path.join(dirname, prefix+"_full_stat.csv")
-    summ_stat_path = os.path.join(dirname, prefix+"_summary_stat.csv")
+    scored_table_path = os.path.join(dirname, prefix + "_with_dscore.csv")
+    final_stat_path = os.path.join(dirname, prefix + "_full_stat.csv")
+    summ_stat_path = os.path.join(dirname, prefix + "_summary_stat.csv")
 
-    if not config.get("target.overwrite", False):
+    if not CONFIG.get("target.overwrite", False):
         found_exsiting_file = False
         for p in (scored_table_path, final_stat_path, summ_stat_path):
             if os.path.exists(p):
@@ -100,17 +103,15 @@ def main():
             return
 
     start_at = time.time()
-    summ_stat, final_stat, scored_table  = PyProphet().process_csv(path,
-                                                                   delim_in,
-                                                                   config)
+    summ_stat, final_stat, scored_table = PyProphet().process_csv(path, delim_in,)
     needed = time.time() - start_at
 
     print
-    print "="*78
+    print "=" * 78
     print
     print summ_stat
     print
-    print "="*78
+    print "=" * 78
 
     print
     summ_stat.to_csv(summ_stat_path, sep=delim_out)
@@ -122,8 +123,8 @@ def main():
     print
 
     seconds = int(needed)
-    msecs  =  int(1000*(needed-seconds))
-    minutes = int(needed/60.0)
+    msecs = int(1000 * (needed - seconds))
+    minutes = int(needed / 60.0)
 
     print "NEEDED",
     if minutes:
@@ -131,6 +132,3 @@ def main():
 
     print "%d seconds and %d msecs wall time" % (seconds, msecs)
     print
-
-
-

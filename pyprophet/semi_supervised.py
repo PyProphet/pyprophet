@@ -10,17 +10,19 @@ except:
     profile = lambda x: x
 
 from data_handling import Experiment
-from classifiers   import AbstractLearner
+from classifiers import AbstractLearner
+from config import CONFIG
 
 import numpy as np
-from  stats import mean_and_std_dev, find_cutoff
+from stats import mean_and_std_dev, find_cutoff
+
 
 class AbstractSemiSupervisedLearner(object):
 
-    def start_semi_supervised_learning(self, train, config):
+    def start_semi_supervised_learning(self, train):
         raise NotImplementedError()
 
-    def iter_semi_supervised_learning(self, train, config):
+    def iter_semi_supervised_learning(self, train):
         raise NotImplementedError()
 
     def averaged_learner(self, params):
@@ -30,25 +32,24 @@ class AbstractSemiSupervisedLearner(object):
         raise NotImplementedError()
 
     @profile
-    def learn_randomized(self, experiment, config):
+    def learn_randomized(self, experiment):
         assert isinstance(experiment, Experiment)
-        assert isinstance(config, dict)
 
-        num_iter = config.get("semi_supervised_learner.num_iter")
+        num_iter = CONFIG.get("semi_supervised_learner.num_iter")
 
-        fraction = config.get("xeval.fraction")
-        is_test = config.get("is_test", False)
+        fraction = CONFIG.get("xeval.fraction")
+        is_test = CONFIG.get("is_test", False)
         experiment.split_for_xval(fraction, is_test)
         train = experiment.get_train_peaks()
 
         train.rank_by("main_score")
 
-        params, clf_scores = self.start_semi_supervised_learning(train, config)
+        params, clf_scores = self.start_semi_supervised_learning(train)
 
         train.set_and_rerank("classifier_score", clf_scores)
         # semi supervised iteration:
         for inner in range(num_iter):
-            params, clf_scores = self.iter_semi_supervised_learning(train, config)
+            params, clf_scores = self.iter_semi_supervised_learning(train)
             train.set_and_rerank("classifier_score", clf_scores)
 
         # nach semi supervsised iter: classfiy full dataset
@@ -59,7 +60,7 @@ class AbstractSemiSupervisedLearner(object):
         td_scores = experiment.get_top_decoy_peaks()["classifier_score"]
 
         mu, nu = mean_and_std_dev(td_scores)
-        experiment["classifier_score"] = (experiment["classifier_score"] - mu ) / nu
+        experiment["classifier_score"] = (experiment["classifier_score"] - mu) / nu
         experiment.rank_by("classifier_score")
 
         top_test_peaks = experiment.get_top_test_peaks()
@@ -87,27 +88,24 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
         td_scores = td_peaks[sel_column]
 
         # find cutoff fdr from scores and only use best target peaks:
-        cutoff =  find_cutoff(tt_scores, td_scores, lambda_, fdr)
+        cutoff = find_cutoff(tt_scores, td_scores, lambda_, fdr)
         best_target_peaks = tt_peaks.filter_(tt_scores >= cutoff)
         return td_peaks, best_target_peaks
 
-    def start_semi_supervised_learning(self, train, config):
-        fdr = config.get("semi_supervised_learner.initial_fdr")
-        lambda_ = config.get("semi_supervised_learner.initial_lambda")
-        td_peaks, bt_peaks = self.select_train_peaks(train, "main_score", fdr,
-                lambda_)
+    def start_semi_supervised_learning(self, train):
+        fdr = CONFIG.get("semi_supervised_learner.initial_fdr")
+        lambda_ = CONFIG.get("semi_supervised_learner.initial_lambda")
+        td_peaks, bt_peaks = self.select_train_peaks(train, "main_score", fdr, lambda_)
         model = self.inner_learner.learn(td_peaks, bt_peaks, False)
         w = model.get_parameters()
         clf_scores = model.score(train, False)
         clf_scores -= np.mean(clf_scores)
         return w, clf_scores
 
-    def iter_semi_supervised_learning(self, train, config):
-        fdr = config.get("semi_supervised_learner.iteration_fdr")
-        lambda_ = config.get("semi_supervised_learner.iteration_lambda")
-        td_peaks, bt_peaks = self.select_train_peaks(train,
-                                                     "classifier_score",
-                                                     fdr, lambda_)
+    def iter_semi_supervised_learning(self, train):
+        fdr = CONFIG.get("semi_supervised_learner.iteration_fdr")
+        lambda_ = CONFIG.get("semi_supervised_learner.iteration_lambda")
+        td_peaks, bt_peaks = self.select_train_peaks(train, "classifier_score", fdr, lambda_)
 
         model = self.inner_learner.learn(td_peaks, bt_peaks, True)
         w = model.get_parameters()
@@ -120,5 +118,3 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
     def score(self, df, params):
         self.inner_learner.set_parameters(params)
         return self.inner_learner.score(df, True)
-
-
