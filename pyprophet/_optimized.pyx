@@ -28,7 +28,7 @@ def find_nearest_matches(np.float64_t[:] basis, np.float64_t[:] sample_points):
                     best_j = j
         elif sort_order == 1:
             low = 0
-            high = num_samples - 1
+            high = num_basis - 1
             best_j = -1
             if basis[low] == sp_i:
                 best_j = low
@@ -52,7 +52,7 @@ def find_nearest_matches(np.float64_t[:] basis, np.float64_t[:] sample_points):
 
         else:
             low = 0
-            high = num_samples - 1
+            high = num_basis - 1
             best_j = -1
             if basis[low] == sp_i:
                 best_j = low
