@@ -6,10 +6,10 @@ os.putenv("OPENBLAS_NUM_THREADS", "1")
 
 import multiprocessing
 
+CONFIG = dict(is_test=0)
 
 
 def standard_config(n_cpus=1):
-    CONFIG = dict(is_test=0)
     info = dict(is_test="[switches randomness off]")
 
     lambda_ = 0.4

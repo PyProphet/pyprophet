@@ -13,31 +13,9 @@ try:
 except:
     profile = lambda x: x
 
-from optimized import find_nearest_matches as _find_nearest_matches, count_num_positives
+from optimized import find_nearest_matches, count_num_positives
 import scipy.special
-import traceback
 import math
-
-from config import CONFIG
-
-import multiprocessing
-
-
-def _ff(a):
-    return _find_nearest_matches(*a)
-
-
-def find_nearest_matches(x, y):
-    num_processes = CONFIG.get("num_processes")
-    if num_processes > 1:
-        pool = multiprocessing.Pool(processes=num_processes)
-        batch_size = int(math.ceil(len(y) / num_processes))
-        parts = [(x, y[i:i + batch_size]) for i in range(0, len(y),
-                 batch_size)]
-        res = pool.map(_ff, parts)
-        res_par = np.hstack(res)
-        return res_par
-    return _find_nearest_matches(x, y)
 
 
 def to_one_dim_array(values, as_type=None):
@@ -76,7 +54,7 @@ def get_error_table_using_percentile_positives_new(err_df, target_scores, num_nu
     num_alternative = num - num_null
     target_scores = np.sort(to_one_dim_array(target_scores))  # ascending
 
-    # optimized 
+    # optimized
     num_positives = count_num_positives(target_scores)
 
     num_negatives = num - num_positives
