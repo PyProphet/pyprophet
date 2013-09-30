@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 from distutils.extension import Extension
 
 
-version = (0, 5, 3)
+version = (0, 5, 4)
 
 with open("pyprophet/version.py", "w") as fp:
     fp.write("version = %r" % (version,))
