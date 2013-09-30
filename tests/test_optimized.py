@@ -84,3 +84,11 @@ def test_find_neared_matches():
 
     # nearly constant sequence 4
     _test_match([1, 1, 1, 2])
+
+def test_count_num_positives():
+    assert list(o.count_num_positives(np.array((9.0, 8, 8, 7, 5)))) == [5, 4, 4, 2, 1]
+    assert list(o.count_num_positives(np.array((9.0, 8, 8, 7, 7)))) == [5, 4, 4, 2, 2]
+    assert list(o.count_num_positives(np.array((9.0, 8, 7, 6, 5)))) == [5, 4, 3, 2, 1]
+    assert list(o.count_num_positives(np.array((9.0, 9, 9, 9, 9)))) == [5, 5, 5, 5, 5]
+    assert list(o.count_num_positives(np.array((9.0,)))) == [1]
+    assert list(o.count_num_positives(np.array(()))) == []

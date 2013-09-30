@@ -13,7 +13,7 @@ try:
 except:
     profile = lambda x: x
 
-from optimized import find_nearest_matches as _find_nearest_matches
+from optimized import find_nearest_matches as _find_nearest_matches, count_num_positives
 import scipy.special
 import traceback
 import math
@@ -76,11 +76,8 @@ def get_error_table_using_percentile_positives_new(err_df, target_scores, num_nu
     num_alternative = num - num_null
     target_scores = np.sort(to_one_dim_array(target_scores))  # ascending
 
-    # optimized with numpys broadcasting: comparing column vector with row
-    # vectory yieds a matrix with pairwaise somparision results.  sum(axis=0)
-    # sums up each column:
-    num_positives = (
-        target_scores[:, None] >= target_scores[None, :]).sum(axis=0)
+    # optimized 
+    num_positives = count_num_positives(target_scores)
 
     num_negatives = num - num_positives
     pp = num_positives.astype(float) / num
@@ -189,7 +186,7 @@ def get_error_table_from_pvalues_new(p_values, lambda_=0.4):
     # optimized with numpys broadcasting: comparing column vector with row
     # vectory yieds a matrix with pairwaise somparision results.  sum(axis=0)
     # sums up each column:
-    num_positives = (p_values[:, None] <= p_values[None, :]).sum(axis=0)
+    num_positives = count_num_positives(p_values)
     num_negatives = num - num_positives
     pp = 1.0 * num_positives / num
     tp = num_positives - num_null * p_values
