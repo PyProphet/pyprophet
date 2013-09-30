@@ -1,4 +1,4 @@
-#encoding: latin-1
+# encoding: latin-1
 
 # openblas + multiprocessing crashes for OPENBLAS_NUM_THREADS > 1 !!!
 import os
@@ -32,7 +32,8 @@ def find_nearest_matches(x, y):
     if num_processes > 1:
         pool = multiprocessing.Pool(processes=num_processes)
         batch_size = int(math.ceil(len(y) / num_processes))
-        parts = [(x, y[i:i + batch_size]) for i in range(0, len(y), batch_size)]
+        parts = [(x, y[i:i + batch_size]) for i in range(0, len(y),
+                 batch_size)]
         res = pool.map(_ff, parts)
         res_par = np.hstack(res)
         return res_par
@@ -59,7 +60,7 @@ def pnorm(pvalues, mu, sigma):
 
     pvalues = to_one_dim_array(pvalues)
     args = (pvalues - mu) / sigma
-    return 0.5 * ( 1.0 + scipy.special.erf(args / np.sqrt(2.0)))
+    return 0.5 * (1.0 + scipy.special.erf(args / np.sqrt(2.0)))
 
 
 def mean_and_std_dev(values):
@@ -73,12 +74,13 @@ def get_error_table_using_percentile_positives_new(err_df, target_scores, num_nu
 
     num = len(target_scores)
     num_alternative = num - num_null
-    target_scores = np.sort(to_one_dim_array(target_scores)) # ascending
+    target_scores = np.sort(to_one_dim_array(target_scores))  # ascending
 
     # optimized with numpys broadcasting: comparing column vector with row
     # vectory yieds a matrix with pairwaise somparision results.  sum(axis=0)
     # sums up each column:
-    num_positives = (target_scores[:,None] >= target_scores[None, :]).sum(axis=0)
+    num_positives = (
+        target_scores[:, None] >= target_scores[None, :]).sum(axis=0)
 
     num_negatives = num - num_positives
     pp = num_positives.astype(float) / num
@@ -88,34 +90,34 @@ def get_error_table_using_percentile_positives_new(err_df, target_scores, num_nu
 
     qvalues = err_df.qvalue.iloc[imax].values
     svalues = err_df.svalue.iloc[imax].values
-    fdr      = err_df.FDR.iloc[imax].values
-    fdr[fdr<0.0] = 0.0
-    fdr[fdr>1.0] = 1.0
-    fdr[num_positives==0] = 0.0
+    fdr = err_df.FDR.iloc[imax].values
+    fdr[fdr < 0.0] = 0.0
+    fdr[fdr > 1.0] = 1.0
+    fdr[num_positives == 0] = 0.0
 
     fp = np.round(fdr * num_positives)
     tp = num_positives - fp
     tn = num_null - fp
     fn = num_negatives - tn
 
-    sens =tp / num_alternative
+    sens = tp / num_alternative
     if num_alternative == 0:
         sens = np.zeros_like(tp)
-    sens[sens<0.0] = 0.0
-    sens[sens>1.0] = 1.0
+    sens[sens < 0.0] = 0.0
+    sens[sens > 1.0] = 1.0
 
     df_error = pd.DataFrame(
-                  dict(qvalue=qvalues,
-                       svalue=svalues,
-                       TP=tp,
-                       FP=fp,
-                       TN=tn,
-                       FN=fn,
-                       FDR=fdr,
-                       sens=sens,
-                       cutoff=target_scores),
-                  columns="qvalue svalue TP FP TN FN FDR sens cutoff".split()
-                 )
+        dict(qvalue=qvalues,
+             svalue=svalues,
+             TP=tp,
+             FP=fp,
+             TN=tn,
+             FN=fn,
+             FDR=fdr,
+             sens=sens,
+             cutoff=target_scores),
+        columns="qvalue svalue TP FP TN FN FDR sens cutoff".split()
+    )
 
     return df_error
 
@@ -128,7 +130,7 @@ def lookup_q_values_from_error_table(scores, err_df):
 
 
 @profile
-def final_err_table(df, num_cut_offs = 51):
+def final_err_table(df, num_cut_offs=51):
     """ create artificial cutoff sample points from given range of cutoff
     values in df, number of sample points is 'num_cut_offs'"""
 
@@ -143,12 +145,13 @@ def final_err_table(df, num_cut_offs = 51):
     ix = find_nearest_matches(df.cutoff, sampled_cutoffs)
 
     # create sub dataframe:
-    sampled_df  = df.iloc[ix]
+    sampled_df = df.iloc[ix]
     sampled_df.cutoff = sampled_cutoffs
     # remove 'old' index from input df:
     sampled_df.reset_index(inplace=True, drop=True)
 
     return sampled_df
+
 
 @profile
 def summary_err_table(df, qvalues=[0, 0.01, 0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5]):
@@ -162,13 +165,12 @@ def summary_err_table(df, qvalues=[0, 0.01, 0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5]
     # remove duplicate hits, mark them with None / NAN:
     for i_sub, (i0, i1) in enumerate(zip(ix, ix[1:])):
         if i1 == i0:
-            df_sub.iloc[i_sub+1,:] = None
+            df_sub.iloc[i_sub + 1, :] = None
     # attach q values column
     df_sub.qvalue = qvalues
     # remove old index from original df:
     df_sub.reset_index(inplace=True, drop=True)
     return df_sub
-
 
 
 def get_error_table_from_pvalues_new(p_values, lambda_=0.4):
@@ -179,53 +181,53 @@ def get_error_table_from_pvalues_new(p_values, lambda_=0.4):
     p_values = np.sort(to_one_dim_array(p_values))[::-1]
 
     # estimate FDR with storeys method:
-    num_null = 1.0 / (1.0-lambda_) * (p_values >= lambda_).sum()
+    num_null = 1.0 / (1.0 - lambda_) * (p_values >= lambda_).sum()
     num = len(p_values)
 
-    #p_values = p_values[:,None]
+    # p_values = p_values[:,None]
 
     # optimized with numpys broadcasting: comparing column vector with row
     # vectory yieds a matrix with pairwaise somparision results.  sum(axis=0)
     # sums up each column:
-    num_positives = (p_values[:,None] <= p_values[None, :]).sum(axis=0)
+    num_positives = (p_values[:, None] <= p_values[None, :]).sum(axis=0)
     num_negatives = num - num_positives
     pp = 1.0 * num_positives / num
     tp = num_positives - num_null * p_values
     fp = num_null * p_values
-    tn = num_null* (1.0 - p_values)
-    fn = num_negatives - num_null* (1.0 - p_values)
+    tn = num_null * (1.0 - p_values)
+    fn = num_negatives - num_null * (1.0 - p_values)
 
     fdr = fp / num_positives
     # cut off values to range 0..1
-    fdr[fdr<0.0] = 0.0
-    fdr[fdr>1.0] = 1.0
+    fdr[fdr < 0.0] = 0.0
+    fdr[fdr > 1.0] = 1.0
 
     sens = tp / (num - num_null)
     # cut off values to range 0..1
-    sens[sens<0.0] = 0.0
-    sens[sens>1.0] = 1.0
+    sens[sens < 0.0] = 0.0
+    sens[sens > 1.0] = 1.0
 
     if num_null:
-        fpr = fp/num_null
+        fpr = fp / num_null
     else:
         fpr = 0.0 * fp
 
     # assemble statisteics as data frame
     error_stat = pd.DataFrame(
-            dict(pvalue = p_values.flatten(),
-                 percentile_positive = pp.flatten(),
-                 positive = num_positives.flatten(),
-                 negative = num_negatives.flatten(),
-                 TP = tp.flatten(),
-                 FP = fp.flatten(),
-                 TN = tn.flatten(),
-                 FN = fn.flatten(),
-                 FDR = fdr.flatten(),
-                 sens=sens.flatten(),
-                 FPR = fpr.flatten()),
-            columns = """pvalue percentile_positive positive negative TP FP
+        dict(pvalue=p_values.flatten(),
+             percentile_positive=pp.flatten(),
+             positive=num_positives.flatten(),
+             negative=num_negatives.flatten(),
+             TP=tp.flatten(),
+             FP=fp.flatten(),
+             TN=tn.flatten(),
+             FN=fn.flatten(),
+             FDR=fdr.flatten(),
+             sens=sens.flatten(),
+             FPR=fpr.flatten()),
+        columns="""pvalue percentile_positive positive negative TP FP
                         TN FN FDR sens FPR""".split()
-            )
+    )
 
     # cummin/cummax not available in numpy, so we create them from dataframe
     # here:
@@ -247,7 +249,8 @@ def get_error_stat_from_null(target_scores, decoy_scores, lambda_):
 
     target_pvalues = 1.0 - pnorm(target_scores, mu, nu)
 
-    df, num_null, num  = get_error_table_from_pvalues_new(target_pvalues, lambda_)
+    df, num_null, num = get_error_table_from_pvalues_new(
+        target_pvalues, lambda_)
     df["cutoff"] = target_scores
     return df, num_null, num
 
@@ -270,8 +273,9 @@ def calculate_final_statistics(all_top_target_scores,
     'exp' """
 
     # estimate error statistics from given samples
-    df, num_null, num_total = get_error_stat_from_null(test_target_scores, test_decoy_scores,
-                                                       lambda_)
+    df, num_null, num_total = get_error_stat_from_null(
+        test_target_scores, test_decoy_scores,
+        lambda_)
 
     # fraction of null hypothesises in sample values
     summed_test_fraction_null = float(num_null) / num_total
@@ -283,10 +287,8 @@ def calculate_final_statistics(all_top_target_scores,
     num_null_top_target = num_top_target * summed_test_fraction_null
 
     # now complete error stats based on num_null_top_target:
-    df_raw_stat = get_error_table_using_percentile_positives_new(df,
-                                                        all_top_target_scores,
-                                                        num_null_top_target)
+    df_raw_stat = get_error_table_using_percentile_positives_new(
+        df, all_top_target_scores,
+        num_null_top_target)
 
     return df_raw_stat
-
-
