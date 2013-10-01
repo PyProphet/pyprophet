@@ -65,7 +65,6 @@ class LDALearner(LinearLearner):
         X = np.vstack((X0, X1))
         y = np.zeros((X.shape[0],))
         y[X0.shape[0]:] = 1.0
-
         classifier = sklearn.lda.LDA()
         classifier.fit(X, y)
         self.classifier = classifier

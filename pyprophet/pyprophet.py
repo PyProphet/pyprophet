@@ -22,6 +22,10 @@ from semi_supervised import (AbstractSemiSupervisedLearner, StandardSemiSupervis
 
 import multiprocessing
 
+import logging
+
+import time
+
 
 def unwrap_self_for_multiprocessing((inst, method_name, args),):
     """ You can not call methods with multiprocessing, but free functions,
@@ -47,8 +51,24 @@ class HolyGostQuery(object):
 
     @profile
     def process_csv(self, path, delim=","):
+        start_at = time.time()
+
+        logging.info("read %s" % path)
         table = pd.read_csv(path, delim)
-        return self.learn_and_apply_classifier(table)
+
+        logging.info("process %s" % path)
+        result_tables = self.learn_and_apply_classifier(table)
+        logging.info("processing %s finished" % path)
+
+        needed = time.time() - start_at
+        hours = int(needed / 3600)
+        needed -= hours * 3600
+
+        minutes = int(needed / 60)
+        needed -= minutes * 60
+
+        logging.info("time needed: %02d:%02d:%.1f" % (hours, minutes, needed))
+        return result_tables
 
     @profile
     def learn_and_apply_classifier(self, table):
@@ -60,7 +80,7 @@ class HolyGostQuery(object):
         if is_test:  # for reliable results
             experiment.df.sort("tg_id", ascending=True, inplace=True)
 
-        experiment.print_summary()
+        experiment.log_summary()
 
         all_test_target_scores = []
         all_test_decoy_scores = []
@@ -68,6 +88,7 @@ class HolyGostQuery(object):
         neval = CONFIG.get("xeval.num_iter")
         inst = self.semi_supervised_learner
         num_processes = CONFIG.get("num_processes")
+        logging.info("start %d cross evals using %d processes" % (neval, num_processes))
         if num_processes == 1:
             for k in range(neval):
                 (ttt_scores, ttd_scores, w) = inst.learn_randomized(experiment)
@@ -75,7 +96,6 @@ class HolyGostQuery(object):
                 all_test_decoy_scores.extend(ttd_scores)
                 ws.append(w.flatten())
         else:
-
             pool = multiprocessing.Pool(processes=num_processes)
             while neval:
                 remaining = max(0, neval - num_processes)
@@ -89,9 +109,13 @@ class HolyGostQuery(object):
                 all_test_target_scores.extend(top_test_target_scores)
                 all_test_decoy_scores.extend(top_test_decoy_scores)
 
+        logging.info("finished cross evals")
         final_classifier = self.semi_supervised_learner.averaged_learner(ws)
-        return self.apply_classifier(final_classifier, experiment, all_test_target_scores,
-                                     all_test_decoy_scores, table)
+
+        result = self.apply_classifier(final_classifier, experiment, all_test_target_scores,
+                                       all_test_decoy_scores, table)
+        logging.info("calculated scoring and statistics")
+        return result
 
     @profile
     def apply_classifier(self,

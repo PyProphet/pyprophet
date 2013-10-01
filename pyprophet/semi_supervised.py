@@ -1,4 +1,4 @@
-#encoding: latin-1
+# encoding: latin-1
 
 # openblas + multiprocessing crashes for OPENBLAS_NUM_THREADS > 1 !!!
 import os
@@ -15,6 +15,9 @@ from config import CONFIG
 
 import numpy as np
 from stats import mean_and_std_dev, find_cutoff
+
+
+import logging
 
 
 class AbstractSemiSupervisedLearner(object):
@@ -36,6 +39,7 @@ class AbstractSemiSupervisedLearner(object):
         assert isinstance(experiment, Experiment)
 
         num_iter = CONFIG.get("semi_supervised_learner.num_iter")
+        logging.info("start learn_randomized")
 
         fraction = CONFIG.get("xeval.fraction")
         is_test = CONFIG.get("is_test", False)
@@ -68,6 +72,8 @@ class AbstractSemiSupervisedLearner(object):
         top_test_target_scores = top_test_peaks.get_target_peaks()["classifier_score"]
         top_test_decoy_scores = top_test_peaks.get_decoy_peaks()["classifier_score"]
 
+        logging.info("end learn_randomized")
+
         return top_test_target_scores, top_test_decoy_scores, params
 
 
@@ -95,17 +101,19 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
     def start_semi_supervised_learning(self, train):
         fdr = CONFIG.get("semi_supervised_learner.initial_fdr")
         lambda_ = CONFIG.get("semi_supervised_learner.initial_lambda")
-        td_peaks, bt_peaks = self.select_train_peaks(train, "main_score", fdr, lambda_)
+        td_peaks, bt_peaks = self.select_train_peaks(
+            train, "main_score", fdr, lambda_)
         model = self.inner_learner.learn(td_peaks, bt_peaks, False)
         w = model.get_parameters()
         clf_scores = model.score(train, False)
         clf_scores -= np.mean(clf_scores)
         return w, clf_scores
 
+    @profile
     def iter_semi_supervised_learning(self, train):
         fdr = CONFIG.get("semi_supervised_learner.iteration_fdr")
         lambda_ = CONFIG.get("semi_supervised_learner.iteration_lambda")
-        td_peaks, bt_peaks = self.select_train_peaks(train, "classifier_score", fdr, lambda_)
+        td_peaks, bt_peaks = self.select_train_peaks( train, "classifier_score", fdr, lambda_)
 
         model = self.inner_learner.learn(td_peaks, bt_peaks, True)
         w = model.get_parameters()

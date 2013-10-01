@@ -13,6 +13,8 @@ from pyprophet import PyProphet
 from config import standard_config, fix_config_types
 import sys
 import time
+import warnings
+import logging
 
 
 def print_help():
@@ -102,8 +104,15 @@ def main():
             print
             return
 
+    format_ = "%(levelname)s -- [pid=%(process)s] : %(asctime)s: %(message)s"
+    logging.basicConfig(level=logging.INFO, format=format_)
+    logging.info("config settings:")
+    for k, v in sorted(CONFIG.items()):
+        logging.info("    %s: %s" % (k, v))
     start_at = time.time()
-    summ_stat, final_stat, scored_table = PyProphet().process_csv(path, delim_in,)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore") 
+        summ_stat, final_stat, scored_table = PyProphet().process_csv(path, delim_in,)
     needed = time.time() - start_at
 
     print

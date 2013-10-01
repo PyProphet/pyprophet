@@ -13,8 +13,9 @@ from optimized import find_top_ranked, rank
 try:
     profile
 except:
-    def profile(x):
-        return x
+    profile = lambda x: x
+
+import logging
 
 
 @profile
@@ -87,13 +88,15 @@ def prepare_data_table(table, tg_id_name="transition_group_id",
 
 class Experiment(object):
 
+    @profile
     def __init__(self, df):
         self.df = df
 
-    def print_summary(self):
-        print len(self.df), 'lines in input data'
-        print len(self.df.tg_id.unique()), 'transition groups in input data'
-        print len(self.df.columns.values) - 6, 'scores including main score'
+    def log_summary(self):
+	logging.info("summary input file:")
+	logging.info("   %d lines" % len(self.df))
+        logging.info("   %d transition groups" %  len(self.df.tg_id.unique()))
+        logging.info("   %d scores including main score" %  (len(self.df.columns.values) - 6))
 
     def get_top_decoy_peaks(self):
         df = self.df[(self.df.is_decoy == False) & (self.df.is_top_peak == True)]

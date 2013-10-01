@@ -13,9 +13,31 @@ try:
 except:
     profile = lambda x: x
 
-from optimized import find_nearest_matches, count_num_positives
+from optimized import find_nearest_matches as _find_nearest_matches, count_num_positives
 import scipy.special
+import traceback
 import math
+
+from config import CONFIG
+
+import multiprocessing
+
+
+def _ff(a):
+    return _find_nearest_matches(*a)
+
+
+def find_nearest_matches(x, y):
+    num_processes = CONFIG.get("num_processes")
+    if num_processes > 1:
+        pool = multiprocessing.Pool(processes=num_processes)
+        batch_size = int(math.ceil(len(y) / num_processes))
+        parts = [(x, y[i:i + batch_size]) for i in range(0, len(y),
+                 batch_size)]
+        res = pool.map(_ff, parts)
+        res_par = np.hstack(res)
+        return res_par
+    return _find_nearest_matches(x, y)
 
 
 def to_one_dim_array(values, as_type=None):
@@ -45,7 +67,6 @@ def mean_and_std_dev(values):
     return np.mean(values), np.std(values, ddof=1)
 
 
-@profile
 def get_error_table_using_percentile_positives_new(err_df, target_scores, num_null):
     """ transfer error statistics in err_df for many target scores and given
     number of estimated null hypothesises 'num_null' """
@@ -54,7 +75,7 @@ def get_error_table_using_percentile_positives_new(err_df, target_scores, num_nu
     num_alternative = num - num_null
     target_scores = np.sort(to_one_dim_array(target_scores))  # ascending
 
-    # optimized
+    # optimized 
     num_positives = count_num_positives(target_scores)
 
     num_negatives = num - num_positives
@@ -148,6 +169,8 @@ def summary_err_table(df, qvalues=[0, 0.01, 0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5]
     return df_sub
 
 
+
+@profile
 def get_error_table_from_pvalues_new(p_values, lambda_=0.4):
     """ estimate error table from p_values with method of storey for
     estimating fdrs and q-values """
@@ -212,6 +235,7 @@ def get_error_table_from_pvalues_new(p_values, lambda_=0.4):
     return error_stat, num_null, num
 
 
+@profile
 def get_error_stat_from_null(target_scores, decoy_scores, lambda_):
     """ takes list of decoy and master scores and creates error statistics
     for target values based on mean and std dev of decoy scores"""
@@ -239,6 +263,7 @@ def find_cutoff(target_scores, decoy_scores, lambda_, fdr):
     return cutoff
 
 
+@profile
 def calculate_final_statistics(all_top_target_scores,
                                test_target_scores,
                                test_decoy_scores,
