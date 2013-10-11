@@ -38,6 +38,7 @@ def _test_match(values):
     assert [values2[i] for i in ix] == [values2[i] for i in ix2]
 
 
+
 def test_find_neared_matches():
 
     ix = o.find_nearest_matches(np.arange(4.0), np.arange(2.0))
@@ -92,3 +93,63 @@ def test_count_num_positives():
     assert list(o.count_num_positives(np.array((9.0, 9, 9, 9, 9)))) == [5, 5, 5, 5, 5]
     assert list(o.count_num_positives(np.array((9.0,)))) == [1]
     assert list(o.count_num_positives(np.array(()))) == []
+
+
+def _test_find_neared_matches_fuzzy():
+    for l in range(1, 100):
+        for i in range(100):
+
+            basis = np.random.random((l,))
+            basis.sort()
+
+            search = np.random.random((l,))
+
+            tobe = o.find_nearest_matches(basis, search, 0)
+            optim = o.find_nearest_matches(basis, search)
+            assert np.all(tobe == optim)
+
+            basis = basis[::-1]
+
+            tobe = o.find_nearest_matches(basis, search, 0)
+            optim = o.find_nearest_matches(basis, search)
+            assert np.all(tobe == optim)
+
+            search = basis
+
+            tobe = o.find_nearest_matches(basis, search, 0)
+            optim = o.find_nearest_matches(basis, search)
+            assert np.all(tobe == optim)
+
+            basis = basis[::-1]
+
+            tobe = o.find_nearest_matches(basis, search, 0)
+            optim = o.find_nearest_matches(basis, search)
+            assert np.all(tobe == optim)
+
+            # introduct dupplicates
+            basis = np.hstack((basis, basis))
+            basis.sort()
+            search = np.random.random((l,))
+            search = basis
+            tobe = o.find_nearest_matches(basis, search, 0)
+            optim = o.find_nearest_matches(basis, search)
+            assert np.all(tobe == optim)
+
+            basis = basis[::-1]
+            tobe = o.find_nearest_matches(basis, search, 0)
+            optim = o.find_nearest_matches(basis, search)
+            assert np.all(tobe == optim)
+
+            # introduct more dupplicates
+            basis = np.hstack((basis, basis))
+            basis.sort()
+            search = np.random.random((l,))
+            search = basis
+            tobe = o.find_nearest_matches(basis, search, 0)
+            optim = o.find_nearest_matches(basis, search)
+            assert np.all(tobe == optim)
+
+            basis = basis[::-1]
+            tobe = o.find_nearest_matches(basis, search, 0)
+            optim = o.find_nearest_matches(basis, search)
+            assert np.all(tobe == optim)
