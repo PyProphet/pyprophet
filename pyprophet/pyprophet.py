@@ -12,8 +12,8 @@ except:
 import pandas as pd
 import numpy as np
 
-from stats import (lookup_q_values_from_error_table, calculate_final_statistics, mean_and_std_dev,
-                   final_err_table, summary_err_table)
+from stats import (lookup_s_and_q_values_from_error_table, calculate_final_statistics,
+                   mean_and_std_dev, final_err_table, summary_err_table)
 from config import CONFIG
 
 from data_handling import (prepare_data_table, Experiment)
@@ -131,21 +131,33 @@ class HolyGostQuery(object):
 
         final_score = final_classifier.score(experiment, True)
         experiment["d_score"] = (final_score - mu) / nu
-        q_values = lookup_q_values_from_error_table(experiment["d_score"], df_raw_stat)
+
+        scored_table = self.enrich_table_with_results(table, experiment, df_raw_stat)
+
+        return (None, None, scored_table), None
+
+    @profile
+    def enrich_table_with_results(self, table, experiment, df_raw_stat):
+        s_values, q_values = lookup_s_and_q_values_from_error_table(experiment["d_score"],
+                                                                    df_raw_stat)
         experiment["m_score"] = q_values
-        logging.info("mean m_score = %e, std_dev m_sore = %e" % (np.mean(q_values),
+        experiment["s_value"] = s_values
+        logging.info("mean m_score = %e, std_dev m_score = %e" % (np.mean(q_values),
                      np.std(q_values, ddof=1)))
+        logging.info("mean s_value = %e, std_dev s_value = %e" % (np.mean(s_values),
+                     np.std(s_values, ddof=1)))
         experiment.add_peak_group_rank()
 
         scored_table = table.join(experiment[["d_score", "m_score", "peak_group_rank"]])
-        return (None, None, scored_table), None
+        return scored_table
 
     @profile
     def apply_classifier(self, final_classifier, experiment, all_test_target_scores,
                          all_test_decoy_scores, table):
 
         lambda_ = CONFIG.get("final_statistics.lambda")
-        mu, nu, final_score = self.assign_d_score(final_classifier, experiment)
+
+        mu, nu, final_score = self.calculate_params_for_d_score(final_classifier, experiment)
         experiment["d_score"] = (final_score - mu) / nu
 
         all_tt_scores = experiment.get_top_target_peaks()["d_score"]
@@ -153,31 +165,22 @@ class HolyGostQuery(object):
         df_raw_stat = calculate_final_statistics(all_tt_scores, all_test_target_scores,
                                                  all_test_decoy_scores, lambda_)
 
-        q_values = lookup_q_values_from_error_table(experiment["d_score"], df_raw_stat)
-        experiment["m_score"] = q_values
-
-        logging.info("mean m_score = %e, std_dev m_sore = %e" % (np.mean(q_values),
-                     np.std(q_values, ddof=1)))
-
-        experiment.add_peak_group_rank()
-
-        # as experiment maybe permutated row wise, directly attaching q_values
-        # to table might result in wrong assignment:
-        scored_table = table.join(experiment[["d_score", "m_score", "peak_group_rank"]])
+        scored_table = self.enrich_table_with_results(table, experiment, df_raw_stat)
 
         final_statistics = final_err_table(df_raw_stat)
         summary_statistics = summary_err_table(df_raw_stat)
 
-        needed_to_persist = (final_classifier, mu, nu, df_raw_stat.loc[:, ["qvalue", "cutoff"]])
+        needed_to_persist = (final_classifier, mu, nu,
+                             df_raw_stat.loc[:, ["svalue", "qvalue", "cutoff"]])
         return (summary_statistics, final_statistics, scored_table), needed_to_persist
 
     @profile
-    def assign_d_score(self, final_classifier, experiment):
-        final_score = final_classifier.score(experiment, True)
-        experiment.set_and_rerank("classifier_score", final_score)
+    def calculate_params_for_d_score(self, classifier, experiment):
+        score = classifier.score(experiment, True)
+        experiment.set_and_rerank("classifier_score", score)
         td_scores = experiment.get_top_decoy_peaks()["classifier_score"]
         mu, nu = mean_and_std_dev(td_scores)
-        return mu, nu, final_score
+        return mu, nu, score
 
 
 @profile
