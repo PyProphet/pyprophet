@@ -5,15 +5,15 @@ import os
 os.putenv("OPENBLAS_NUM_THREADS", "1")
 
 try:
-    profile
+    profile  # ignore
 except:
     profile = lambda x: x
 
 import pandas as pd
+import numpy as np
 
 from stats import (lookup_q_values_from_error_table, calculate_final_statistics, mean_and_std_dev,
                    final_err_table, summary_err_table)
-
 from config import CONFIG
 
 from data_handling import (prepare_data_table, Experiment)
@@ -50,14 +50,19 @@ class HolyGostQuery(object):
         self.semi_supervised_learner = semi_supervised_learner
 
     @profile
-    def process_csv(self, path, delim=","):
+    def process_csv(self, path, delim=",", loaded_scorer=None):
         start_at = time.time()
 
         logging.info("read %s" % path)
         table = pd.read_csv(path, delim)
 
-        logging.info("process %s" % path)
-        result_tables = self.learn_and_apply_classifier(table)
+        if loaded_scorer is not None:
+            logging.info("apply scorer to  %s" % path)
+            result_tables, data_for_persistence = self.apply_loaded_scorer(table, loaded_scorer)
+            data_for_persistence = None
+        else:
+            logging.info("learn and apply scorer to %s" % path)
+            result_tables, data_for_persistence = self.learn_and_apply_classifier(table)
         logging.info("processing %s finished" % path)
 
         needed = time.time() - start_at
@@ -68,7 +73,7 @@ class HolyGostQuery(object):
         needed -= minutes * 60
 
         logging.info("time needed: %02d:%02d:%.1f" % (hours, minutes, needed))
-        return result_tables
+        return result_tables, data_for_persistence
 
     @profile
     def learn_and_apply_classifier(self, table):
@@ -112,33 +117,47 @@ class HolyGostQuery(object):
         logging.info("finished cross evals")
         final_classifier = self.semi_supervised_learner.averaged_learner(ws)
 
-        result = self.apply_classifier(final_classifier, experiment, all_test_target_scores,
-                                       all_test_decoy_scores, table)
+        result, data_for_persistence = self.apply_classifier(final_classifier, experiment,
+                                                             all_test_target_scores,
+                                                             all_test_decoy_scores, table)
         logging.info("calculated scoring and statistics")
-        return result
+        return result, data_for_persistence
 
     @profile
-    def apply_classifier(self,
-                         final_classifier,
-                         experiment,
-                         all_test_target_scores,
-                         all_test_decoy_scores,
-                         table):
+    def apply_loaded_scorer(self, table, loaded_scorer):
+
+        experiment = Experiment(prepare_data_table(table))
+        final_classifier, mu, nu, df_raw_stat = loaded_scorer
+
+        final_score = final_classifier.score(experiment, True)
+        experiment["d_score"] = (final_score - mu) / nu
+        q_values = lookup_q_values_from_error_table(experiment["d_score"], df_raw_stat)
+        experiment["m_score"] = q_values
+        logging.info("mean m_score = %e, std_dev m_sore = %e" % (np.mean(q_values),
+                     np.std(q_values, ddof=1)))
+        experiment.add_peak_group_rank()
+
+        scored_table = table.join(experiment[["d_score", "m_score", "peak_group_rank"]])
+        return (None, None, scored_table), None
+
+    @profile
+    def apply_classifier(self, final_classifier, experiment, all_test_target_scores,
+                         all_test_decoy_scores, table):
 
         lambda_ = CONFIG.get("final_statistics.lambda")
-
-        self.assign_d_score(final_classifier, experiment)
+        mu, nu, final_score = self.assign_d_score(final_classifier, experiment)
+        experiment["d_score"] = (final_score - mu) / nu
 
         all_tt_scores = experiment.get_top_target_peaks()["d_score"]
 
         df_raw_stat = calculate_final_statistics(all_tt_scores, all_test_target_scores,
                                                  all_test_decoy_scores, lambda_)
 
-        final_statistics = final_err_table(df_raw_stat)
-        summary_statistics = summary_err_table(df_raw_stat)
-
         q_values = lookup_q_values_from_error_table(experiment["d_score"], df_raw_stat)
         experiment["m_score"] = q_values
+
+        logging.info("mean m_score = %e, std_dev m_sore = %e" % (np.mean(q_values),
+                     np.std(q_values, ddof=1)))
 
         experiment.add_peak_group_rank()
 
@@ -146,17 +165,19 @@ class HolyGostQuery(object):
         # to table might result in wrong assignment:
         scored_table = table.join(experiment[["d_score", "m_score", "peak_group_rank"]])
 
-        return summary_statistics, final_statistics, scored_table
+        final_statistics = final_err_table(df_raw_stat)
+        summary_statistics = summary_err_table(df_raw_stat)
+
+        needed_to_persist = (final_classifier, mu, nu, df_raw_stat.loc[:, ["qvalue", "cutoff"]])
+        return (summary_statistics, final_statistics, scored_table), needed_to_persist
 
     @profile
     def assign_d_score(self, final_classifier, experiment):
-
-        # with .values it's faster:
         final_score = final_classifier.score(experiment, True)
         experiment.set_and_rerank("classifier_score", final_score)
         td_scores = experiment.get_top_decoy_peaks()["classifier_score"]
         mu, nu = mean_and_std_dev(td_scores)
-        experiment["d_score"] = (final_score - mu) / nu
+        return mu, nu, final_score
 
 
 @profile

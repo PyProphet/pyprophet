@@ -15,6 +15,8 @@ import sys
 import time
 import warnings
 import logging
+import cPickle
+import zlib
 
 
 def print_help():
@@ -75,6 +77,20 @@ def main():
         print_help()
         raise Exception("no input file given")
 
+    persisted = None
+    if "apply" in options:
+        to_load = options.get("apply")
+        if not os.path.exists(to_load):
+            raise Exception("scorer file %s does not exist" % to_load)
+        try:
+            persisted = cPickle.loads(zlib.decompress(open(to_load, "rb").read()))
+        except:
+            import traceback
+            traceback.print_exc()
+            raise
+
+    apply_existing_scorer = persisted is not None
+
     CONFIG, info = standard_config()
     CONFIG.update(options)
     fix_config_types(CONFIG)
@@ -88,13 +104,21 @@ def main():
         dirname = os.path.dirname(path)
     prefix, __ = os.path.splitext(os.path.basename(path))
 
+
     scored_table_path = os.path.join(dirname, prefix + "_with_dscore.csv")
     final_stat_path = os.path.join(dirname, prefix + "_full_stat.csv")
     summ_stat_path = os.path.join(dirname, prefix + "_summary_stat.csv")
 
+    if not apply_existing_scorer:
+        pickled_scorer_path = os.path.join(dirname, prefix + "_scorer.bin")
+
+
     if not CONFIG.get("target.overwrite", False):
         found_exsiting_file = False
-        for p in (scored_table_path, final_stat_path, summ_stat_path):
+        to_check = (scored_table_path, final_stat_path, summ_stat_path)
+        if not apply_existing_scorer:
+            to_check = to_check + (pickled_scorer_path,)
+        for p in to_check:
             if os.path.exists(p):
                 found_exsiting_file = True
                 print "ERROR: %s already exists" % p
@@ -111,8 +135,9 @@ def main():
         logging.info("    %s: %s" % (k, v))
     start_at = time.time()
     with warnings.catch_warnings():
-        warnings.simplefilter("ignore") 
-        summ_stat, final_stat, scored_table = PyProphet().process_csv(path, delim_in,)
+        warnings.simplefilter("ignore")
+        result, needed_to_persist = PyProphet().process_csv(path, delim_in, persisted)
+        (summ_stat, final_stat, scored_table) = result
     needed = time.time() - start_at
 
     print
@@ -123,12 +148,20 @@ def main():
     print "=" * 78
 
     print
-    summ_stat.to_csv(summ_stat_path, sep=delim_out)
-    print "WRITTEN: ", summ_stat_path
-    final_stat.to_csv(final_stat_path, sep=delim_out)
-    print "WRITTEN: ", final_stat_path
+    if summ_stat is not None:
+        summ_stat.to_csv(summ_stat_path, sep=delim_out)
+        print "WRITTEN: ", summ_stat_path
+    if final_stat is not None:
+        final_stat.to_csv(final_stat_path, sep=delim_out)
+        print "WRITTEN: ", final_stat_path
     scored_table.to_csv(scored_table_path, sep=delim_out)
     print "WRITTEN: ", scored_table_path
+
+    if not apply_existing_scorer:
+        bin_data = zlib.compress(cPickle.dumps(needed_to_persist, protocol=2))
+        with open(pickled_scorer_path, "wb") as fp:
+            fp.write(bin_data)
+        print "WRITTEN: ", pickled_scorer_path
     print
 
     seconds = int(needed)
