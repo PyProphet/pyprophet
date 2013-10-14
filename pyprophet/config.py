@@ -42,6 +42,9 @@ def standard_config(n_cpus=1):
     CONFIG["target.dir"] = None
     CONFIG["target.overwrite"] = 0
 
+    CONFIG["apply"] = None
+    info["apply"] = r"""[name of *_scorer.bin file of existing classifier]"""
+
     return CONFIG, info
 
 CONFIG, __ = standard_config()

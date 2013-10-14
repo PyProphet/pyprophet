@@ -77,20 +77,6 @@ def main():
         print_help()
         raise Exception("no input file given")
 
-    persisted = None
-    if "apply" in options:
-        to_load = options.get("apply")
-        if not os.path.exists(to_load):
-            raise Exception("scorer file %s does not exist" % to_load)
-        try:
-            persisted = cPickle.loads(zlib.decompress(open(to_load, "rb").read()))
-        except:
-            import traceback
-            traceback.print_exc()
-            raise
-
-    apply_existing_scorer = persisted is not None
-
     CONFIG, info = standard_config()
     CONFIG.update(options)
     fix_config_types(CONFIG)
@@ -104,6 +90,19 @@ def main():
         dirname = os.path.dirname(path)
     prefix, __ = os.path.splitext(os.path.basename(path))
 
+    persisted = None
+    apply_ = CONFIG.get("apply")
+    if apply_:
+        if not os.path.exists(apply_):
+            raise Exception("scorer file %s does not exist" % apply_)
+        try:
+            persisted = cPickle.loads(zlib.decompress(open(apply_, "rb").read()))
+        except:
+            import traceback
+            traceback.print_exc()
+            raise
+
+    apply_existing_scorer = persisted is not None
 
     scored_table_path = os.path.join(dirname, prefix + "_with_dscore.csv")
     final_stat_path = os.path.join(dirname, prefix + "_full_stat.csv")
