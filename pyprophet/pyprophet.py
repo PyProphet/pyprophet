@@ -78,7 +78,9 @@ class HolyGostQuery(object):
     @profile
     def learn_and_apply_classifier(self, table):
 
-        experiment = Experiment(prepare_data_table(table))
+        prepared_table, score_columns = prepare_data_table(table)
+
+        experiment = Experiment(prepared_table)
 
         is_test = CONFIG.get("is_test", False)
 
@@ -121,13 +123,16 @@ class HolyGostQuery(object):
                                                              all_test_target_scores,
                                                              all_test_decoy_scores, table)
         logging.info("calculated scoring and statistics")
-        return result, data_for_persistence
+        return result, data_for_persistence + (score_columns,)
 
     @profile
     def apply_loaded_scorer(self, table, loaded_scorer):
 
-        experiment = Experiment(prepare_data_table(table))
-        final_classifier, mu, nu, df_raw_stat = loaded_scorer
+        final_classifier, mu, nu, df_raw_stat, loaded_score_columns = loaded_scorer
+
+        prepared_table, __ = prepare_data_table(table, loaded_score_columns=loaded_score_columns)
+
+        experiment = Experiment(prepared_table)
 
         final_score = final_classifier.score(experiment, True)
         experiment["d_score"] = (final_score - mu) / nu

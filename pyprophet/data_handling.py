@@ -22,31 +22,46 @@ import logging
 def prepare_data_table(table, tg_id_name="transition_group_id",
                        decoy_name="decoy",
                        main_score_name=None,
+                       loaded_score_columns=None,
                        **extra_args_to_dev_null
                        ):
 
     column_names = table.columns.values
 
+    if loaded_score_columns is not None:
+        missing = set(loaded_score_columns) - set(column_names)
+        if missing:
+            missing_txt = ", ".join("'%s'" % m for m in missing)
+            msg = "column(s) %s missing in input file for applying existing scorer" % missing_txt
+            raise Exception(msg)
+
     # check if given column names appear in table:
     assert tg_id_name in column_names, "colum %s not in table" % tg_id_name
     assert decoy_name in column_names, "colum %s not in table" % decoy_name
-    if main_score_name is not None:
-        assert main_score_name in column_names, "colum %s not in table" % main_score_name
 
-    # if no main_score_name provided, look for unique column with name
-    # starting with "main_":
+    if loaded_score_columns is not None:
+        # we assume there is exactly one main_score in loaded_score_columns as we checked that in
+        # the run which persisted the classifier:
+        var_column_names = [c for c in loaded_score_columns if c.startswith("var_")]
+        main_score_name = [c for c in loaded_score_columns if c.startswith("main_")][0]
     else:
-        main_columns = [c for c in column_names if c.startswith("main_")]
-        if not main_columns:
-            raise Exception("no column with main_* in table")
-        if len(main_columns) > 1:
-            raise Exception("multiple columns with name main_* in table")
-        main_score_name = main_columns[0]
+        if main_score_name is not None:
+            assert main_score_name in column_names, "colum %s not in table" % main_score_name
 
-    # get all other score columns, name beginning with "var_"
-    var_columns = [c for c in column_names if c.startswith("var_")]
-    if not var_columns:
-        raise Exception("no column with name var_* in table")
+        # if no main_score_name provided, look for unique column with name
+        # starting with "main_":
+        else:
+            main_columns = [c for c in column_names if c.startswith("main_")]
+            if not main_columns:
+                raise Exception("no column with main_* in table")
+            if len(main_columns) > 1:
+                raise Exception("multiple columns with name main_* in table")
+            main_score_name = main_columns[0]
+
+        # get all other score columns, name beginning with "var_"
+        var_column_names = [c for c in column_names if c.startswith("var_")]
+        if not var_column_names:
+            raise Exception("no column with name var_* in table")
 
     # collect needed data:
     column_names = "tg_id tg_num_id is_decoy is_top_peak is_train main_score".split()
@@ -69,7 +84,7 @@ def prepare_data_table(table, tg_id_name="transition_group_id",
                 main_score=table[main_score_name].values,
                 )
 
-    for i, v in enumerate(var_columns):
+    for i, v in enumerate(var_column_names):
         col_name = "var_%d" % i
         data[col_name] = table[v].values
         column_names.append(col_name)
@@ -83,7 +98,7 @@ def prepare_data_table(table, tg_id_name="transition_group_id",
     # for each transition group: enumerate peaks in this group, and
     # add peak_rank where increasing rank corresponds to decreasing main
     # score. peak_rank == 0 is peak with max main score
-    return df
+    return df, tuple(var_column_names) + (main_score_name,)
 
 
 class Experiment(object):
@@ -93,8 +108,8 @@ class Experiment(object):
         self.df = df
 
     def log_summary(self):
-	logging.info("summary input file:")
-	logging.info("   %d lines" % len(self.df))
+        logging.info("summary input file:")
+        logging.info("   %d lines" % len(self.df))
         logging.info("   %d transition groups" %  len(self.df.tg_id.unique()))
         logging.info("   %d scores including main score" %  (len(self.df.columns.values) - 6))
 
