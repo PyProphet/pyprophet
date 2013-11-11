@@ -50,17 +50,18 @@ def dump_config(config):
 
 
 def main():
+    _main(sys.argv[1:])
 
-    options = [p for p in sys.argv[1:] if p.startswith("--")]
+def _main(args):
 
     options = dict()
     path = None
 
-    if "--help" in sys.argv[1:]:
+    if "--help" in args:
         print_help()
         return
 
-    for arg in sys.argv[1:]:
+    for arg in args:
         if arg.startswith("--"):
             if "=" in arg:
                 pre, __, post = arg.partition("=")

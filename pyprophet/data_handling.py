@@ -19,6 +19,35 @@ import logging
 
 
 @profile
+def cleanup_and_check(df):
+    score_columns = ["main_score"] + [c for c in df.columns if c.startswith("var_")]
+    # this is fast but not easy to read
+    # find peak groups with in valid scores:
+
+    idx = (~pd.isnull(df.loc[:, score_columns])).all(axis=1)
+    df_cleaned = df.iloc[idx, :]
+
+    # decoy / non decoy sub tables
+    df_decoy = df_cleaned[df_cleaned["is_decoy"] == True]
+    df_target = df_cleaned[df_cleaned["is_decoy"] == False]
+
+    # groups
+    decoy_groups = set(df_decoy["tg_id"])
+    target_groups = set(df_target["tg_id"])
+
+    n_decoy = len(decoy_groups)
+    n_target = len(target_groups)
+
+    msg = "data set contains %d decoy and %d target transition groups" % (n_decoy, n_target)
+    logging.info(msg)
+    if n_decoy < 10 or n_target < 10:
+        logging.error("need at least 10 decoy groups ans 10 non decoy groups")
+        raise Exception("need at least 10 decoy groups ans 10 non decoy groups. %s" % msg)
+
+    return df_cleaned
+
+
+@profile
 def prepare_data_table(table, tg_id_name="transition_group_id",
                        decoy_name="decoy",
                        main_score_name=None,
@@ -95,10 +124,14 @@ def prepare_data_table(table, tg_id_name="transition_group_id",
     # build data frame:
     df = pd.DataFrame(data, columns=column_names)
 
+    all_score_columns = tuple(var_column_names) + (main_score_name,)
+
+    df = cleanup_and_check(df)
+
     # for each transition group: enumerate peaks in this group, and
     # add peak_rank where increasing rank corresponds to decreasing main
     # score. peak_rank == 0 is peak with max main score
-    return df, tuple(var_column_names) + (main_score_name,)
+    return df, all_score_columns
 
 
 class Experiment(object):
@@ -112,10 +145,6 @@ class Experiment(object):
         logging.info("   %d lines" % len(self.df))
         logging.info("   %d transition groups" %  len(self.df.tg_id.unique()))
         logging.info("   %d scores including main score" %  (len(self.df.columns.values) - 6))
-
-    def get_top_decoy_peaks(self):
-        df = self.df[(self.df.is_decoy == False) & (self.df.is_top_peak == True)]
-        return Experiment(df)
 
     def __getitem__(self, *args):
         return self.df.__getitem__(*args)

@@ -54,7 +54,8 @@ class HolyGostQuery(object):
         start_at = time.time()
 
         logging.info("read %s" % path)
-        table = pd.read_csv(path, delim)
+
+        table = pd.read_csv(path, delim, na_values=["NA", "NaN", "infinite"])
 
         if loaded_scorer is not None:
             logging.info("apply scorer to  %s" % path)
