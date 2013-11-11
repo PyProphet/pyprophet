@@ -9,6 +9,7 @@ import random
 import pandas as pd
 import numpy as np
 from optimized import find_top_ranked, rank
+from config import CONFIG
 
 try:
     profile
@@ -23,9 +24,12 @@ def cleanup_and_check(df):
     score_columns = ["main_score"] + [c for c in df.columns if c.startswith("var_")]
     # this is fast but not easy to read
     # find peak groups with in valid scores:
+    sub_df = df.loc[:, score_columns]
+    flags = ~pd.isnull(sub_df) 
+    valid_rows = flags.all(axis=1)
 
-    idx = (~pd.isnull(df.loc[:, score_columns])).all(axis=1)
-    df_cleaned = df.iloc[idx, :]
+    #idx = (~pd.isnull(df.loc[:, score_columns])).all(axis=1)
+    df_cleaned = df.loc[valid_rows, :]
 
     # decoy / non decoy sub tables
     df_decoy = df_cleaned[df_cleaned["is_decoy"] == True]
@@ -113,9 +117,17 @@ def prepare_data_table(table, tg_id_name="transition_group_id",
                 main_score=table[main_score_name].values,
                 )
 
+    ignore_invalid_scores = CONFIG["ignore.invalid_score_columns"]
     for i, v in enumerate(var_column_names):
         col_name = "var_%d" % i
-        data[col_name] = table[v].values
+        col_data = table[v]
+        if pd.isnull(col_data).all():
+	    msg = "column %s contains only invalid/missing values" % v
+            if ignore_invalid_scores:
+		    logging.warn("%s. pyprophet skips this.")
+		    continue	
+            raise Exception("%s. you may use --ignore.invalid_score_columns")
+        data[col_name] = col_data
         column_names.append(col_name)
 
     data["classifier_score"] = empty_col

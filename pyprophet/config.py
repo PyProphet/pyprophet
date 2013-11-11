@@ -9,6 +9,7 @@ import multiprocessing
 
 CONFIG = dict(is_test=0)
 
+
 def standard_config(n_cpus=1):
     info = dict(is_test="[switches randomness off]")
 
@@ -42,6 +43,10 @@ def standard_config(n_cpus=1):
     CONFIG["target.dir"] = None
     CONFIG["target.overwrite"] = 0
 
+    CONFIG["ignore.invalid_score_columns"] = False
+    info["ignore.invalid_score_columns"] =\
+        """ignore score columns which conly contain NaN of infinity values"""
+
     CONFIG["apply"] = None
     info["apply"] = r"""[name of *_scorer.bin file of existing classifier]"""
 
@@ -54,6 +59,7 @@ def fix_config_types(dd):
     for k in ["xeval.num_iter",
               "semi_supervised_learner.num_iter",
               "is_test",
+              "ignore.invalid_score_columns",
               "target.overwrite",
               "num_processes"]:
         dd[k] = int(dd[k])
