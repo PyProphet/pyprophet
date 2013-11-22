@@ -26,8 +26,15 @@ def print_help():
     print "       %s [options] input_file" % script
     print "   or "
     print "       %s --help" % script
+    print "   or "
+    print "       %s --version" % script
     CONFIG, info = standard_config()
     dump_config_info(CONFIG, info)
+
+
+def print_version():
+    import version
+    print "%d.%d.%d" % version.version
 
 
 def dump_config_info(config, info):
@@ -52,6 +59,7 @@ def dump_config(config):
 def main():
     _main(sys.argv[1:])
 
+
 def _main(args):
 
     options = dict()
@@ -59,6 +67,10 @@ def _main(args):
 
     if "--help" in args:
         print_help()
+        return
+
+    if "--version" in args:
+        print_version()
         return
 
     for arg in args:
@@ -111,7 +123,6 @@ def _main(args):
 
     if not apply_existing_scorer:
         pickled_scorer_path = os.path.join(dirname, prefix + "_scorer.bin")
-
 
     if not CONFIG.get("target.overwrite", False):
         found_exsiting_file = False
