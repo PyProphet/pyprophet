@@ -149,12 +149,12 @@ def _main(args):
 
     print
     if summ_stat is not None:
-        summ_stat.to_csv(summ_stat_path, sep=delim_out)
+        summ_stat.to_csv(summ_stat_path, sep=delim_out, index=False)
         print "WRITTEN: ", summ_stat_path
     if final_stat is not None:
-        final_stat.to_csv(final_stat_path, sep=delim_out)
+        final_stat.to_csv(final_stat_path, sep=delim_out, index=False)
         print "WRITTEN: ", final_stat_path
-    scored_table.to_csv(scored_table_path, sep=delim_out)
+    scored_table.to_csv(scored_table_path, sep=delim_out, index=False)
     print "WRITTEN: ", scored_table_path
 
     if not apply_existing_scorer:
