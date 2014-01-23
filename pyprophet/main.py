@@ -11,6 +11,7 @@ except:
 
 from pyprophet import PyProphet
 from config import standard_config, fix_config_types
+from report import save_report
 import sys
 import time
 import warnings
@@ -101,7 +102,9 @@ def _main(args):
     dirname = CONFIG.get("target.dir", None)
     if dirname is None:
         dirname = os.path.dirname(path)
-    prefix, __ = os.path.splitext(os.path.basename(path))
+
+    basename = os.path.basename(path)
+    prefix, __ = os.path.splitext(basename)
 
     persisted = None
     apply_ = CONFIG.get("apply")
@@ -120,13 +123,14 @@ def _main(args):
     scored_table_path = os.path.join(dirname, prefix + "_with_dscore.csv")
     final_stat_path = os.path.join(dirname, prefix + "_full_stat.csv")
     summ_stat_path = os.path.join(dirname, prefix + "_summary_stat.csv")
+    report_path = os.path.join(dirname, prefix + "_report.pdf")
 
     if not apply_existing_scorer:
         pickled_scorer_path = os.path.join(dirname, prefix + "_scorer.bin")
 
     if not CONFIG.get("target.overwrite", False):
         found_exsiting_file = False
-        to_check = (scored_table_path, final_stat_path, summ_stat_path)
+        to_check = (scored_table_path, final_stat_path, summ_stat_path, report_path)
         if not apply_existing_scorer:
             to_check = to_check + (pickled_scorer_path,)
         for p in to_check:
@@ -165,6 +169,8 @@ def _main(args):
     if final_stat is not None:
         final_stat.to_csv(final_stat_path, sep=delim_out, index=False)
         print "WRITTEN: ", final_stat_path
+        save_report(report_path, basename, scored_table, final_stat)
+        print "WRITTEN: ", report_path
     scored_table.to_csv(scored_table_path, sep=delim_out, index=False)
     print "WRITTEN: ", scored_table_path
 
