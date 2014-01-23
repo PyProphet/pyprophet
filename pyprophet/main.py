@@ -120,19 +120,31 @@ def _main(args):
 
     apply_existing_scorer = persisted is not None
 
-    scored_table_path = os.path.join(dirname, prefix + "_with_dscore.csv")
-    final_stat_path = os.path.join(dirname, prefix + "_full_stat.csv")
-    summ_stat_path = os.path.join(dirname, prefix + "_summary_stat.csv")
-    report_path = os.path.join(dirname, prefix + "_report.pdf")
+    class Pathes(dict):
+        def __init__(self, prefix=prefix, dirname=dirname, **kw):
+            for k, postfix in kw.items():
+                self[k] = os.path.join(dirname, prefix + postfix)
+        __getattr__ = dict.__getitem__
+
+    pathes = Pathes(scored_table="_with_dscore.csv",
+                    final_stat="_full_stat.csv",
+                    summ_stat="_summary_stat.csv",
+                    report="_report.pdf",
+                    cutoffs="_cutoffs.txt",
+                    svalues="_svalues.txt",
+                    qvalues="_qvalues.txt",
+                    d_scores_top_target_peaks="_dscores_top_target_peaks.txt",
+                    d_scores_top_decoy_peaks="_dscores_top_decoy_peaks.txt",
+    )
 
     if not apply_existing_scorer:
         pickled_scorer_path = os.path.join(dirname, prefix + "_scorer.bin")
 
     if not CONFIG.get("target.overwrite", False):
         found_exsiting_file = False
-        to_check = (scored_table_path, final_stat_path, summ_stat_path, report_path)
+        to_check = list(pathes.keys())
         if not apply_existing_scorer:
-            to_check = to_check + (pickled_scorer_path,)
+            to_check.append(pickled_scorer_path)
         for p in to_check:
             if os.path.exists(p):
                 found_exsiting_file = True
@@ -164,15 +176,23 @@ def _main(args):
 
     print
     if summ_stat is not None:
-        summ_stat.to_csv(summ_stat_path, sep=delim_out, index=False)
-        print "WRITTEN: ", summ_stat_path
+        summ_stat.to_csv(pathes.summ_stat, sep=delim_out, index=False)
+        print "WRITTEN: ", pathes.summ_stat
     if final_stat is not None:
-        final_stat.to_csv(final_stat_path, sep=delim_out, index=False)
-        print "WRITTEN: ", final_stat_path
-        save_report(report_path, basename, scored_table, final_stat)
-        print "WRITTEN: ", report_path
-    scored_table.to_csv(scored_table_path, sep=delim_out, index=False)
-    print "WRITTEN: ", scored_table_path
+        final_stat.to_csv(pathes.final_stat, sep=delim_out, index=False)
+        print "WRITTEN: ", pathes.final_stat
+        plot_data = save_report(pathes.report, basename, scored_table, final_stat)
+        print "WRITTEN: ", pathes.report
+        cutoffs, svalues, qvalues, top_target, top_decoys = plot_data
+        for (name, values) in [("cutoffs", cutoffs), ("svalues", svalues), ("qvalues", qvalues),
+                               ("d_scores_top_target_peaks", top_target),
+                               ("d_scores_top_decoy_peaks", top_decoys)]:
+            path = pathes[name]
+            with open(path, "w") as fp:
+                fp.write(" ".join("%e" % v for v in values))
+            print "WRITTEN: ", path
+    scored_table.to_csv(pathes.scored_table, sep=delim_out, index=False)
+    print "WRITTEN: ", pathes.scored_table
 
     if not apply_existing_scorer:
         bin_data = zlib.compress(cPickle.dumps(needed_to_persist, protocol=2))

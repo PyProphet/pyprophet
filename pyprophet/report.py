@@ -17,7 +17,7 @@ def save_report(report_path, in_file_name, scored_table, final_stat):
 
     tops = scored_table[scored_table["peak_group_rank"] == 1]
     top_decoys = tops[tops["decoy"] == 1]["d_score"].values
-    top_orig = tops[tops["decoy"] == 0]["d_score"].values
+    top_target = tops[tops["decoy"] == 0]["d_score"].values
 
     # thanks to lorenz blum for the plotting code below:
 
@@ -47,7 +47,9 @@ def save_report(report_path, in_file_name, scored_table, final_stat):
     plt.xlabel("d_score")
     plt.ylabel("# of groups")
     plt.hist(
-        [top_orig, top_decoys], 20, color=['w', 'r'], label=['target', 'decoy'], histtype='bar')
+        [top_target, top_decoys], 20, color=['w', 'r'], label=['target', 'decoy'], histtype='bar')
     plt.legend(loc=2)
 
     plt.savefig(report_path)
+
+    return cutoffs, svalues, qvalues, top_target, top_decoys
