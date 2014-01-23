@@ -19,6 +19,8 @@ def save_report(report_path, in_file_name, scored_table, final_stat):
     top_decoys = tops[tops["decoy"] == 1]["d_score"].values
     top_orig = tops[tops["decoy"] == 0]["d_score"].values
 
+    # thanks to lorenz blum for the plotting code below:
+
     plt.figure(figsize=(8.27, 11.69))
     plt.subplots_adjust(hspace=.5)
 
