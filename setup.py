@@ -3,6 +3,7 @@ from distutils.extension import Extension
 
 
 import pyprophet
+import numpy
 
 version = pyprophet.__version__
 
@@ -18,6 +19,7 @@ setup(name='pyprophet',
       packages=find_packages(exclude=['ez_setup',
                                       'examples', 'tests']),
       include_package_data=True,
+      include_dirs = [numpy.get_include()],
       classifiers=[
       'Development Status :: 3 - Alpha',
       'Environment :: Console',
