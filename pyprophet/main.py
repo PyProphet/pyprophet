@@ -9,7 +9,10 @@ try:
 except:
     profile = lambda x: x
 
-from pyprophet import PyProphet
+from pyprophet import PyProphet, HolyGostQuery
+from classifiers import SGDLearner, LDALearner, LinearSVMLearner, RbfSVMLearner, LogitLearner
+from semi_supervised import StandardSemiSupervisedTeacher
+
 from config import standard_config, fix_config_types
 from report import save_report
 import sys
@@ -65,7 +68,10 @@ def _main(args):
 
     options = dict()
     path = None
-
+    saveResults = True
+    
+    print "WOHOOOOOO - managed to modify it!"
+    
     if "--help" in args:
         print_help()
         return
@@ -141,15 +147,15 @@ def _main(args):
         pickled_scorer_path = os.path.join(dirname, prefix + "_scorer.bin")
 
     if not CONFIG.get("target.overwrite", False):
-        found_exsiting_file = False
+        found_existing_file = False
         to_check = list(pathes.keys())
         if not apply_existing_scorer:
             to_check.append(pickled_scorer_path)
         for p in to_check:
             if os.path.exists(p):
-                found_exsiting_file = True
+                found_existing_file = True
                 print "ERROR: %s already exists" % p
-        if found_exsiting_file:
+        if found_existing_file:
             print
             print "please use --target.overwrite option"
             print
@@ -163,7 +169,26 @@ def _main(args):
     start_at = time.time()
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        result, needed_to_persist = PyProphet().process_csv(path, delim_in, persisted)
+        
+        classifierType = CONFIG.get("classifier.type")
+        if classifierType == "LDA":
+            classifier = LDALearner
+        elif classifierType == "SGD":
+            classifier = SGDLearner
+        elif classifierType == "linSVM":
+            classifier = LinearSVMLearner
+        elif classifierType == "rbfSVM":
+            classifier = RbfSVMLearner
+        elif classifierType == "logit":
+            classifier = LogitLearner
+        else:
+            print
+            print "classifier '%s' is not supported" % classifierType
+            print
+            return
+        
+        method = HolyGostQuery(StandardSemiSupervisedTeacher(classifier))
+        result, needed_to_persist = method.process_csv(path, delim_in, persisted)
         (summ_stat, final_stat, scored_table) = result
     needed = time.time() - start_at
 
@@ -175,31 +200,33 @@ def _main(args):
     print "=" * 78
 
     print
-    if summ_stat is not None:
-        summ_stat.to_csv(pathes.summ_stat, sep=delim_out, index=False)
-        print "WRITTEN: ", pathes.summ_stat
-    if final_stat is not None:
-        final_stat.to_csv(pathes.final_stat, sep=delim_out, index=False)
-        print "WRITTEN: ", pathes.final_stat
-        plot_data = save_report(pathes.report, basename, scored_table, final_stat)
-        print "WRITTEN: ", pathes.report
-        cutoffs, svalues, qvalues, top_target, top_decoys = plot_data
-        for (name, values) in [("cutoffs", cutoffs), ("svalues", svalues), ("qvalues", qvalues),
-                               ("d_scores_top_target_peaks", top_target),
-                               ("d_scores_top_decoy_peaks", top_decoys)]:
-            path = pathes[name]
-            with open(path, "w") as fp:
-                fp.write(" ".join("%e" % v for v in values))
-            print "WRITTEN: ", path
-    scored_table.to_csv(pathes.scored_table, sep=delim_out, index=False)
-    print "WRITTEN: ", pathes.scored_table
+    
+    if saveResults:
+		if summ_stat is not None:
+		    summ_stat.to_csv(pathes.summ_stat, sep=delim_out, index=False)
+		    print "WRITTEN: ", pathes.summ_stat
+		if final_stat is not None:
+		    final_stat.to_csv(pathes.final_stat, sep=delim_out, index=False)
+		    print "WRITTEN: ", pathes.final_stat
+		    plot_data = save_report(pathes.report, basename, scored_table, final_stat)
+		    print "WRITTEN: ", pathes.report
+		    cutoffs, svalues, qvalues, top_target, top_decoys = plot_data
+		    for (name, values) in [("cutoffs", cutoffs), ("svalues", svalues), ("qvalues", qvalues),
+		                           ("d_scores_top_target_peaks", top_target),
+		                           ("d_scores_top_decoy_peaks", top_decoys)]:
+		        path = pathes[name]
+		        with open(path, "w") as fp:
+		            fp.write(" ".join("%e" % v for v in values))
+		        print "WRITTEN: ", path
+		scored_table.to_csv(pathes.scored_table, sep=delim_out, index=False)
+		print "WRITTEN: ", pathes.scored_table
 
-    if not apply_existing_scorer:
-        bin_data = zlib.compress(cPickle.dumps(needed_to_persist, protocol=2))
-        with open(pickled_scorer_path, "wb") as fp:
-            fp.write(bin_data)
-        print "WRITTEN: ", pickled_scorer_path
-    print
+		if not apply_existing_scorer:
+		    bin_data = zlib.compress(cPickle.dumps(needed_to_persist, protocol=2))
+		    with open(pickled_scorer_path, "wb") as fp:
+		        fp.write(bin_data)
+		    print "WRITTEN: ", pickled_scorer_path
+		print
 
     seconds = int(needed)
     msecs = int(1000 * (needed - seconds))

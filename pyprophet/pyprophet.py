@@ -17,8 +17,8 @@ from stats import (lookup_s_and_q_values_from_error_table, calculate_final_stati
 from config import CONFIG
 
 from data_handling import (prepare_data_table, Experiment)
-from classifiers import (LDALearner)
-from semi_supervised import (AbstractSemiSupervisedLearner, StandardSemiSupervisedLearner)
+from classifiers import (LDALearner, ConsensusPredictor)
+from semi_supervised import (AbstractSemiSupervisedTeacher, StandardSemiSupervisedTeacher)
 
 import multiprocessing
 
@@ -44,10 +44,10 @@ class HolyGostQuery(object):
         See below how PyProphet parameterises this class.
     """
 
-    def __init__(self, semi_supervised_learner):
-        assert isinstance(semi_supervised_learner,
-                          AbstractSemiSupervisedLearner)
-        self.semi_supervised_learner = semi_supervised_learner
+    def __init__(self, semi_supervised_teacher):
+        assert isinstance(semi_supervised_teacher,
+                          AbstractSemiSupervisedTeacher)
+        self.semi_supervised_teacher = semi_supervised_teacher
 
     @profile
     def process_csv(self, path, delim=",", loaded_scorer=None):
@@ -63,7 +63,7 @@ class HolyGostQuery(object):
             data_for_persistence = None
         else:
             logging.info("learn and apply scorer to %s" % path)
-            result_tables, data_for_persistence = self.learn_and_apply_classifier(table)
+            result_tables, data_for_persistence = self.tutor_and_apply_classifier(table)
         logging.info("processing %s finished" % path)
 
         needed = time.time() - start_at
@@ -77,7 +77,7 @@ class HolyGostQuery(object):
         return result_tables, data_for_persistence
 
     @profile
-    def learn_and_apply_classifier(self, table):
+    def tutor_and_apply_classifier(self, table):
 
         prepared_table, score_columns = prepare_data_table(table)
 
@@ -92,33 +92,33 @@ class HolyGostQuery(object):
 
         all_test_target_scores = []
         all_test_decoy_scores = []
-        ws = []
+        clfs = []
         neval = CONFIG.get("xeval.num_iter")
-        inst = self.semi_supervised_learner
+        teacher = self.semi_supervised_teacher
         num_processes = CONFIG.get("num_processes")
         logging.info("start %d cross evals using %d processes" % (neval, num_processes))
         if num_processes == 1:
             for k in range(neval):
-                (ttt_scores, ttd_scores, w) = inst.learn_randomized(experiment)
+                (ttt_scores, ttd_scores, clf) = teacher.tutor_randomized(experiment)
                 all_test_target_scores.extend(ttt_scores)
                 all_test_decoy_scores.extend(ttd_scores)
-                ws.append(w.flatten())
+                clfs.append(clf)
         else:
             pool = multiprocessing.Pool(processes=num_processes)
             while neval:
                 remaining = max(0, neval - num_processes)
                 todo = neval - remaining
                 neval -= todo
-                args = ((inst, "learn_randomized", (experiment, )), ) * todo
+                args = ((teacher, "tutor_randomized", (experiment, )), ) * todo
                 res = pool.map(unwrap_self_for_multiprocessing, args)
                 top_test_target_scores = [ti for r in res for ti in r[0]]
                 top_test_decoy_scores = [ti for r in res for ti in r[1]]
-                ws.extend([r[2] for r in res])
+                clfs.extend([r[2] for r in res])
                 all_test_target_scores.extend(top_test_target_scores)
                 all_test_decoy_scores.extend(top_test_decoy_scores)
 
         logging.info("finished cross evals")
-        final_classifier = self.semi_supervised_learner.averaged_learner(ws)
+        final_classifier = ConsensusPredictor(clfs)
 
         result, data_for_persistence = self.apply_classifier(final_classifier, experiment,
                                                              all_test_target_scores,
@@ -191,4 +191,4 @@ class HolyGostQuery(object):
 
 @profile
 def PyProphet():
-    return HolyGostQuery(StandardSemiSupervisedLearner(LDALearner()))
+    return HolyGostQuery(StandardSemiSupervisedTeacher(LDALearner()))

@@ -29,6 +29,14 @@ def standard_config(n_cpus=1):
 
     CONFIG["semi_supervised_learner.num_iter"] = 5
 
+    CONFIG["classifier.type"] = "LDA"
+    info["classifier.type"] = "The type of inner learner to use [LDA, linSVM, rbfSVM, SGD, logit]"
+    
+    CONFIG["classifier.weight_classes"] = False
+    CONFIG["classifier.scale_subscores"] = False
+    CONFIG["classifier.cache_size"] = 500
+
+
     CONFIG["final_statistics.lambda"] = lambda_
 
     CONFIG["num_processes"] = n_cpus
