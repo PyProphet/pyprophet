@@ -40,6 +40,7 @@ class AbstractSemiSupervisedTeacher(object):
 
         fraction = CONFIG.get("xeval.fraction")
         is_test = CONFIG.get("is_test", False)
+        
         experiment.split_for_xval(fraction, is_test)
         lesson = experiment.get_train_peaks()
 

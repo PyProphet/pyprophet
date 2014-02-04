@@ -93,13 +93,21 @@ class HolyGostQuery(object):
         all_test_target_scores = []
         all_test_decoy_scores = []
         clfs = []
-        neval = CONFIG.get("xeval.num_iter")
-        teacher = self.semi_supervised_teacher
+        
+        train_frac     = CONFIG.get("train.fraction")
+        is_test     = CONFIG.get("is_test", False)
+        neval         = CONFIG.get("xeval.num_iter")
+        teacher     = self.semi_supervised_teacher
         num_processes = CONFIG.get("num_processes")
+        
+        # reserve part of experiment for testing and FDR calc.
+        experiment.split_for_xval(train_frac, is_test)
+        train_exp, test_exp = experiment.get_train_and_test_peaks()
+        
         logging.info("start %d cross evals using %d processes" % (neval, num_processes))
         if num_processes == 1:
             for k in range(neval):
-                (ttt_scores, ttd_scores, clf) = teacher.tutor_randomized(experiment)
+                (ttt_scores, ttd_scores, clf) = teacher.tutor_randomized(train_exp)
                 all_test_target_scores.extend(ttt_scores)
                 all_test_decoy_scores.extend(ttd_scores)
                 clfs.append(clf)
@@ -109,7 +117,7 @@ class HolyGostQuery(object):
                 remaining = max(0, neval - num_processes)
                 todo = neval - remaining
                 neval -= todo
-                args = ((teacher, "tutor_randomized", (experiment, )), ) * todo
+                args = ((teacher, "tutor_randomized", (train_exp, )), ) * todo
                 res = pool.map(unwrap_self_for_multiprocessing, args)
                 top_test_target_scores = [ti for r in res for ti in r[0]]
                 top_test_decoy_scores = [ti for r in res for ti in r[1]]
@@ -120,11 +128,13 @@ class HolyGostQuery(object):
         logging.info("finished cross evals")
         final_classifier = ConsensusPredictor(clfs)
 
-        result, data_for_persistence = self.apply_classifier(final_classifier, experiment,
+        result, data_for_persistence = self.apply_classifier(final_classifier, experiment, test_exp,
                                                              all_test_target_scores,
                                                              all_test_decoy_scores, table)
         logging.info("calculated scoring and statistics")
         return result, data_for_persistence + (score_columns,)
+
+
 
     @profile
     def apply_loaded_scorer(self, table, loaded_scorer):
@@ -142,6 +152,8 @@ class HolyGostQuery(object):
 
         return (None, None, scored_table), None
 
+
+
     @profile
     def enrich_table_with_results(self, table, experiment, df_raw_stat):
         s_values, q_values = lookup_s_and_q_values_from_error_table(experiment["d_score"],
@@ -157,8 +169,10 @@ class HolyGostQuery(object):
         scored_table = table.join(experiment[["d_score", "m_score", "peak_group_rank"]])
         return scored_table
 
+
+
     @profile
-    def apply_classifier(self, final_classifier, experiment, all_test_target_scores,
+    def apply_classifier(self, final_classifier, experiment, test_exp, all_test_target_scores,
                          all_test_decoy_scores, table):
 
         lambda_ = CONFIG.get("final_statistics.lambda")
@@ -167,18 +181,34 @@ class HolyGostQuery(object):
         experiment["d_score"] = (final_score - mu) / nu
 
         all_tt_scores = experiment.get_top_target_peaks()["d_score"]
+        df_raw_stat = calculate_final_statistics(
+                all_tt_scores, 
+                all_test_target_scores,
+                all_test_decoy_scores, 
+                lambda_
+            )
 
-        df_raw_stat = calculate_final_statistics(all_tt_scores, all_test_target_scores,
-                                                 all_test_decoy_scores, lambda_)
+        muT, nuT, final_scoreT = self.calculate_params_for_d_score(final_classifier, test_exp)
+        test_exp["d_score"] = (final_scoreT - muT) / nuT
+        df_raw_statT = calculate_final_statistics(
+                all_tt_scores, 
+                test_exp.get_top_target_peaks()["d_score"],
+                test_exp.get_top_decoy_peaks()["d_score"],
+                lambda_
+            )
+
 
         scored_table = self.enrich_table_with_results(table, experiment, df_raw_stat)
 
         final_statistics = final_err_table(df_raw_stat)
         summary_statistics = summary_err_table(df_raw_stat)
+        summary_statisticsT = summary_err_table(df_raw_statT)
 
         needed_to_persist = (final_classifier, mu, nu,
                              df_raw_stat.loc[:, ["svalue", "qvalue", "cutoff"]])
-        return (summary_statistics, final_statistics, scored_table), needed_to_persist
+        return (summary_statistics, summary_statisticsT, final_statistics, scored_table), needed_to_persist
+
+
 
     @profile
     def calculate_params_for_d_score(self, classifier, experiment):

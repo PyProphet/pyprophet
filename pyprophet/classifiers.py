@@ -88,7 +88,6 @@ class ConsensusPredictor(Predictor):
 
     def score_by_matrix(self, feature_matrix):
         scores = [pred.score_by_matrix(feature_matrix) for pred in self.predictors]
-        print [s[1] for s in scores]
         return np.mean(scores, axis=0)
 
 

@@ -18,6 +18,10 @@ def standard_config(n_cpus=1):
     if n_cpus == -1:
         n_cpus = multiprocessing.cpu_count()
 
+    CONFIG["train.fraction"] = 0.7
+    
+    CONFIG["no.file.output"] = False
+    
     CONFIG["xeval.fraction"] = 0.5
     CONFIG["xeval.num_iter"] = 5
 

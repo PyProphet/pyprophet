@@ -68,7 +68,6 @@ def _main(args):
 
     options = dict()
     path = None
-    saveResults = True
     
     print "WOHOOOOOO - managed to modify it!"
     
@@ -189,19 +188,27 @@ def _main(args):
         
         method = HolyGostQuery(StandardSemiSupervisedTeacher(classifier))
         result, needed_to_persist = method.process_csv(path, delim_in, persisted)
-        (summ_stat, final_stat, scored_table) = result
+        (summ_stat, summ_statT, final_stat, scored_table) = result
     needed = time.time() - start_at
 
+    train_frac 	= CONFIG.get("train.fraction")
     print
     print "=" * 78
+    print "PyProph standard stats:"
+    print "'" * 78
     print
     print summ_stat
     print
     print "=" * 78
-
+    print "Proper stats, based on left out %d%% of the chroms" % ((1 - train_frac)*100)
+    print "'" * 78
+    print
+    print summ_statT
+    print
+    print "=" * 78
     print
     
-    if saveResults:
+    if not CONFIG.get("no.file.output"):
 		if summ_stat is not None:
 		    summ_stat.to_csv(pathes.summ_stat, sep=delim_out, index=False)
 		    print "WRITTEN: ", pathes.summ_stat

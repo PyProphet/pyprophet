@@ -232,3 +232,6 @@ class Experiment(object):
     def get_train_peaks(self):
         df = self.df[self.df.is_train == True]
         return Experiment(df)
+
+    def get_train_and_test_peaks(self):
+        return Experiment(self.df[self.df.is_train == True]), Experiment(self.df[self.df.is_train == False])
