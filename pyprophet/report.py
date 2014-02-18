@@ -41,6 +41,7 @@ def save_report(report_path, in_file_name, scored_table, final_stat):
     plt.plot(cutoffs, svalues, color='g', label="TPR (svalue)")
     plt.scatter(cutoffs, qvalues, color='r', s=3)
     plt.plot(cutoffs, qvalues, color='r', label="FPR (qvalue)")
+    plt.axis([-5, 15, 0, 1])
 
     plt.subplot(313)
     plt.title("Top Peak Groups' d-score Distributions")

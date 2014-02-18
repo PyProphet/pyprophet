@@ -11,6 +11,7 @@ except:
 
 from data_handling import Experiment
 from classifiers import AbstractLearner
+from scaler import ShiftDivScaler
 from config import CONFIG
 
 import numpy as np
@@ -37,15 +38,10 @@ class AbstractSemiSupervisedTeacher(object):
 
         num_iter = CONFIG.get("semi_supervised_learner.num_iter")
         logging.info("start learn_randomized")
-
-        fraction = CONFIG.get("xeval.fraction")
-        is_test = CONFIG.get("is_test", False)
-        
-        experiment.split_for_xval(fraction, is_test)
         lesson = experiment.get_train_peaks()
-
         lesson.rank_by("main_score")
 
+        #print "num train:", len(lesson.df)
         # initial semi-supervised learning
         student = self.new_student()
         clf_scores = self.start_semi_supervised_learning(lesson, student)
@@ -63,8 +59,11 @@ class AbstractSemiSupervisedTeacher(object):
 
         td_scores = experiment.get_top_decoy_peaks()["classifier_score"]
 
-        mu, nu = mean_and_std_dev(td_scores)
-        experiment["classifier_score"] = (experiment["classifier_score"] - mu) / nu
+        mid = np.median(td_scores)
+        p95 = np.percentile(td_scores, 95.0)#mu, nu = mean_and_std_dev(td_scores)
+        #print mid, p95
+        #student.post_scaler = ShiftDivScaler(mid, p95-mid)
+        experiment["classifier_score"] = student.post_scaler.scale(experiment["classifier_score"])#mu) / nu
         experiment.rank_by("classifier_score")
 
         top_test_peaks = experiment.get_top_test_peaks()

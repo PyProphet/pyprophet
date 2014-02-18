@@ -20,14 +20,18 @@ from config import CONFIG
 import logging
 
 from data_handling import Experiment
-
+from scaler import Scaler
+from scaler import NonScaler
 
 
 class Predictor(object):
 
+    def __init__(self):
+        self.post_scaler = NonScaler()
+
     def score(self, peaks, use_main_score):
         X = peaks.get_feature_matrix(use_main_score)
-        return self.score_by_matrix(X)
+        return self.post_scaler.scale(self.score_by_matrix(X))
 
     def score_by_matrix(self, feature_matrix):
         raise NotImplementedError()
@@ -58,13 +62,14 @@ class AbstractLearner(Predictor):
 class LinearLearner(AbstractLearner):
 
     def __init__(self):
+    	AbstractLearner.__init__(self)
         self.coefs = None
 
     def score_by_matrix(self, feature_matrix):
         return np.dot(feature_matrix, self.coefs)
 
     def simplistic(self):
-        return True
+        return isinstance(self.post_scaler, NonScaler)
 
     def get_coefs(self):
         return self.coefs
@@ -74,6 +79,7 @@ class LinearLearner(AbstractLearner):
 class ConsensusPredictor(Predictor):
 
     def __init__(self, preds):
+    	Predictor.__init__(self)
         linCoefs = [pred.get_coefs() for pred in preds if pred.simplistic() ]
         self.predictors = [pred for pred in preds if not pred.simplistic() ]
         
@@ -95,6 +101,7 @@ class ConsensusPredictor(Predictor):
 class LinearPredictor(Predictor):
 
     def __init__(self, coefs):
+    	Predictor.__init__(self)
         self.coefs = coefs
 
     def score_by_matrix(self, feature_matrix):
@@ -106,7 +113,9 @@ class LinearPredictor(Predictor):
 class LDALearner(LinearLearner):
     
     def __init__(self):
+    	LinearLearner.__init__(self)
         self.classifier = sklearn.lda.LDA()
+        logging.info("===> doing LDA")
     
     def learn(self, decoy_peaks, target_peaks, use_main_score=True):
         X, y = self.format_train_data(decoy_peaks, target_peaks, use_main_score)
@@ -121,6 +130,7 @@ class LDALearner(LinearLearner):
 class SGDLearner(LinearLearner):
 
     def __init__(self):
+    	LinearLearner.__init__(self)
         if CONFIG.get("classifier.weight_classes"):
             logging.info("===> doing weighted SGD")
             self.classifier = sklearn.linear_model.SGDClassifier(shuffle=True, n_iter=10, class_weight="auto")
@@ -156,6 +166,7 @@ class SGDLearner(LinearLearner):
 class LinearSVMLearner(LinearLearner):
 
     def __init__(self):
+    	LinearLearner.__init__(self)
         c_size = int(CONFIG.get("classifier.cache_size", "500"))
         if CONFIG.get("classifier.weight_classes"):
             logging.info("===> doing weighted SVM")
@@ -192,12 +203,13 @@ class LinearSVMLearner(LinearLearner):
 class RbfSVMLearner(AbstractLearner):
 
     def __init__(self):
+    	AbstractLearner.__init__(self)
         c_size = int(CONFIG.get("classifier.cache_size", "500"))
         if CONFIG.get("classifier.weight_classes"):
-            logging.info("===> doing weighted SVM")
+            logging.info("===> doing weighted rbfSVM")
             self.classifier = sklearn.svm.SVC(cache_size=c_size, class_weight="auto")
         else:
-            logging.info("===> doing non-weighted SVM")
+            logging.info("===> doing non-weighted rbfSVM")
             self.classifier = sklearn.svm.SVC(cache_size=c_size)
         self.scaler = sklearn.preprocessing.StandardScaler()
 
@@ -216,13 +228,46 @@ class RbfSVMLearner(AbstractLearner):
         if CONFIG.get("classifier.scale_subscores"):
             feature_matrix = self.scaler.transform(feature_matrix)
         return self.classifier.decision_function(feature_matrix)
+ 
+            
+        
 
+
+class PolySVMLearner(AbstractLearner):
+            
+    def __init__(self):
+        AbstractLearner.__init__(self)
+        c_size = int(CONFIG.get("classifier.cache_size", "500"))
+        if CONFIG.get("classifier.weight_classes"):
+            logging.info("===> doing weighted polySVM")
+            self.classifier = sklearn.svm.SVC(cache_size=c_size, kernel="poly", class_weight="auto")
+        else:
+            logging.info("===> doing non-weighted polySVM")
+            self.classifier = sklearn.svm.SVC(cache_size=c_size, kernel="poly")
+        self.scaler = sklearn.preprocessing.StandardScaler()
+            
+        
+    def learn(self, decoy_peaks, target_peaks, use_main_score=True):
+        X, y = self.format_train_data(decoy_peaks, target_peaks, use_main_score)
+        if CONFIG.get("classifier.scale_subscores"):
+            self.scaler = self.scaler.fit(X)
+            X = self.scaler.transform(X)
+        self.classifier.fit(X, y)
+        #scores = np.dot(X, self.scalings)
+        return self
+        
+        
+    def score_by_matrix(self, feature_matrix):
+        if CONFIG.get("classifier.scale_subscores"):
+            feature_matrix = self.scaler.transform(feature_matrix)
+        return self.classifier.decision_function(feature_matrix)
 
 
 
 class LogitLearner(LinearLearner):
 
     def __init__(self):
+        AbstractLearner.__init__(self)
         if CONFIG.get("classifier.weight_classes"):
             logging.info("===> doing weighted logit")
             self.classifier = sklearn.linear_model.LogisticRegression(class_weight='auto')

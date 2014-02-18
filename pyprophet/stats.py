@@ -15,6 +15,7 @@ except:
 
 from optimized import find_nearest_matches as _find_nearest_matches, count_num_positives
 import scipy.special
+from scipy.stats import lognorm
 import traceback
 import math
 
@@ -57,10 +58,19 @@ def to_one_dim_array(values, as_type=None):
 def pnorm(pvalues, mu, sigma):
     """ [P(X>pi, mu, sigma) for pi in pvalues] for normal distributed P with
     expectation value mu and std deviation sigma """
-
+    
     pvalues = to_one_dim_array(pvalues)
     args = (pvalues - mu) / sigma
     return 0.5 * (1.0 + scipy.special.erf(args / np.sqrt(2.0)))
+    
+    
+def plognorm(X, mu, sigma):
+    """ [P(X>pi, mu, sigma) for pi in pvalues] for normal distributed P with
+    expectation value mu and std deviation sigma """
+    pass
+    #X = to_one_dim_array(X)
+    #args = (pvalues - mu) / sigma
+    #return lognorm.cdf(X, loc=, scale=sigma)
 
 
 def mean_and_std_dev(values):
@@ -179,6 +189,7 @@ def get_error_table_from_pvalues_new(p_values, lambda_=0.4):
     p_values = np.sort(to_one_dim_array(p_values))[::-1]
 
     # estimate FDR with storeys method:
+    
     num_null = 1.0 / (1.0 - lambda_) * (p_values >= lambda_).sum()
     num = len(p_values)
 
