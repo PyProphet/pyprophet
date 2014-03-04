@@ -11,7 +11,7 @@ except:
 
 from pyprophet import PyProphet
 from config import standard_config, fix_config_types
-from report import save_report
+from report import save_report, export_mayu
 import sys
 import time
 import warnings
@@ -135,6 +135,9 @@ def _main(args):
                     qvalues="_qvalues.txt",
                     d_scores_top_target_peaks="_dscores_top_target_peaks.txt",
                     d_scores_top_decoy_peaks="_dscores_top_decoy_peaks.txt",
+                    mayu_cutoff="_mayu.cutoff",
+                    mayu_fasta="_mayu.fasta",
+                    mayu_csv="_mayu.csv",
     )
 
     if not apply_existing_scorer:
@@ -199,6 +202,12 @@ def _main(args):
         with open(pickled_scorer_path, "wb") as fp:
             fp.write(bin_data)
         print "WRITTEN: ", pickled_scorer_path
+
+    if CONFIG.get("export.mayu", True):
+        export_mayu(pathes.mayu_cutoff, pathes.mayu_fasta, pathes.mayu_csv, scored_table, final_stat)
+        print "WRITTEN: ", pathes.mayu_cutoff
+        print "WRITTEN: ", pathes.mayu_fasta
+        print "WRITTEN: ", pathes.mayu_csv
     print
 
     seconds = int(needed)
