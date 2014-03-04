@@ -7,7 +7,7 @@ import numpy as np
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def find_nearest_matches(np.float64_t[:] basis, np.float64_t[:] sample_points):
+def find_nearest_matches(np.float64_t[:] basis, np.float64_t[:] sample_points, use_sort_order=1):
     cdef size_t num_basis = basis.shape[0]
     cdef size_t num_samples = sample_points.shape[0]
     result = np.zeros((num_samples,), dtype=np.int64)
@@ -15,7 +15,22 @@ def find_nearest_matches(np.float64_t[:] basis, np.float64_t[:] sample_points):
     cdef size_t i, best_j
     cdef size_t low, high, mid
     cdef double sp_i, best_dist, dist
-    cdef int sort_order = find_sort_order(basis)
+    cdef int sort_order
+
+    if not use_sort_order:
+        for i in range(num_samples):
+            sp_i = sample_points[i]
+            best_j = 0
+            best_dist = abs(basis[0] - sp_i)
+            for j in range(1, num_basis):
+                dist = abs(basis[j] - sp_i)
+                if dist < best_dist:
+                    best_dist = dist
+                    best_j = j
+            view[i] = best_j
+        return result
+
+    sort_order = find_sort_order(basis)
     for i in range(num_samples):
         sp_i = sample_points[i]
         if sort_order == 0:
@@ -39,7 +54,6 @@ def find_nearest_matches(np.float64_t[:] basis, np.float64_t[:] sample_points):
                     mid = (low + high) / 2
                     if basis[mid] == sp_i:
                         best_j = mid
-                        break
                     if basis[mid] < sp_i:
                         low = mid
                     else:
@@ -49,7 +63,12 @@ def find_nearest_matches(np.float64_t[:] basis, np.float64_t[:] sample_points):
                         best_j = low
                     else:
                         best_j = high
-
+            # find first match in list !
+            while best_j > 0:
+                if basis[best_j - 1] == basis[best_j]:
+                    best_j = best_j - 1
+                else:
+                    break
         else:
             low = 0
             high = num_basis - 1
@@ -73,6 +92,12 @@ def find_nearest_matches(np.float64_t[:] basis, np.float64_t[:] sample_points):
                         best_j = low
                     else:
                         best_j = high
+            # find first match in list:
+            while best_j > 0:
+                if basis[best_j - 1] == basis[best_j]:
+                    best_j = best_j - 1
+                else:
+                    break
 
         view[i] = best_j
     return result

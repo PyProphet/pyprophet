@@ -2,10 +2,10 @@ from setuptools import setup, find_packages
 from distutils.extension import Extension
 
 
-version = (0, 6, 0)
+import pyprophet
+import numpy
 
-with open("pyprophet/version.py", "w") as fp:
-    fp.write("version = %r" % (version,))
+version = pyprophet.__version__
 
 ext_modules = [Extension("pyprophet._optimized", ["pyprophet/_optimized.c"])]
 
@@ -19,6 +19,7 @@ setup(name='pyprophet',
       packages=find_packages(exclude=['ez_setup',
                                       'examples', 'tests']),
       include_package_data=True,
+      include_dirs = [numpy.get_include()],
       classifiers=[
           'Development Status :: 3 - Alpha',
           'Environment :: Console',

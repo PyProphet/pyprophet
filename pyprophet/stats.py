@@ -119,10 +119,10 @@ def get_error_table_using_percentile_positives_new(err_df, target_scores, num_nu
 
 
 @profile
-def lookup_q_values_from_error_table(scores, err_df):
+def lookup_s_and_q_values_from_error_table(scores, err_df):
     """ find best matching q-value foe each score in 'scores' """
     ix = find_nearest_matches(err_df.cutoff, scores)
-    return err_df.qvalue.iloc[ix].values
+    return err_df.svalue.iloc[ix].values, err_df.qvalue.iloc[ix].values
 
 
 @profile
@@ -172,8 +172,8 @@ def summary_err_table(df, qvalues=[0, 0.01, 0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5]
 
 @profile
 def get_error_table_from_pvalues_new(p_values, lambda_=0.4):
-    """ estimate error table from p_values with method of storey for
-    estimating fdrs and q-values """
+    """ estimate error table from p_values with method of storey for estimating fdrs and q-values
+    """
 
     # sort descending:
     p_values = np.sort(to_one_dim_array(p_values))[::-1]
@@ -237,8 +237,8 @@ def get_error_table_from_pvalues_new(p_values, lambda_=0.4):
 
 @profile
 def get_error_stat_from_null(target_scores, decoy_scores, lambda_):
-    """ takes list of decoy and master scores and creates error statistics
-    for target values based on mean and std dev of decoy scores"""
+    """ takes list of decoy and master scores and creates error statistics for target values based
+    on mean and std dev of decoy scores"""
 
     decoy_scores = to_one_dim_array(decoy_scores)
     mu, nu = mean_and_std_dev(decoy_scores)
@@ -248,8 +248,7 @@ def get_error_stat_from_null(target_scores, decoy_scores, lambda_):
 
     target_pvalues = 1.0 - pnorm(target_scores, mu, nu)
 
-    df, num_null, num = get_error_table_from_pvalues_new(
-        target_pvalues, lambda_)
+    df, num_null, num = get_error_table_from_pvalues_new(target_pvalues, lambda_)
     df["cutoff"] = target_scores
     return df, num_null, num
 
@@ -258,6 +257,8 @@ def find_cutoff(target_scores, decoy_scores, lambda_, fdr):
     """ finds cut off target score for specified false discovery rate fdr """
 
     df, __, __ = get_error_stat_from_null(target_scores, decoy_scores, lambda_)
+    if not len(df):
+        raise Exception("to little data for calculating error statistcs")
     i0 = (df.qvalue - fdr).abs().argmin()
     cutoff = df.iloc[i0]["cutoff"]
     return cutoff
