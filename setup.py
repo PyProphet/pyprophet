@@ -20,28 +20,28 @@ setup(name='pyprophet',
                                       'examples', 'tests']),
       include_package_data=True,
       classifiers=[
-      'Development Status :: 3 - Alpha',
-      'Environment :: Console',
-      'Intended Audience :: Science/Research',
-      'License :: OSI Approved :: BSD License',
-      'Operating System :: OS Independent',
-      'Topic :: Scientific/Engineering :: Bio-Informatics',
-      'Topic :: Scientific/Engineering :: Chemistry',
+          'Development Status :: 3 - Alpha',
+          'Environment :: Console',
+          'Intended Audience :: Science/Research',
+          'License :: OSI Approved :: BSD License',
+          'Operating System :: OS Independent',
+          'Topic :: Scientific/Engineering :: Bio-Informatics',
+          'Topic :: Scientific/Engineering :: Chemistry',
       ],
       zip_safe=False,
       install_requires=[
-      "numpy >= 1.7.0",
-      "pandas >= 0.10.0",
-      "scipy >= 0.9.0",
-      "numexpr >= 2.1",
-      "scikit-learn >= 0.13",
+          "numpy >= 1.7.0",
+          "pandas == 0.12.0",   # 0.13.0 does not work yet
+          "scipy >= 0.9.0",
+          "numexpr >= 2.1",
+          "scikit-learn >= 0.13",
       ],
       test_suite="nose.collector",
       tests_require="nose",
       entry_points={
-      'console_scripts': [
-          "pyprophet=pyprophet.main:main",
-      ]
+          'console_scripts': [
+              "pyprophet=pyprophet.main:main",
+              ]
       },
       ext_modules=ext_modules,
       )
