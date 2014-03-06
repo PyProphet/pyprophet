@@ -50,6 +50,10 @@ def standard_config(n_cpus=1):
     CONFIG["apply"] = None
     info["apply"] = r"""[name of *_scorer.bin file of existing classifier]"""
 
+    CONFIG["export.mayu"] = False
+    info["export.mayu"] =\
+        """Export input files for MAYU"""
+
     return CONFIG, info
 
 CONFIG, __ = standard_config()
