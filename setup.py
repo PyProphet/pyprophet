@@ -32,7 +32,7 @@ setup(name='pyprophet',
       zip_safe=False,
       install_requires=[
           "numpy >= 1.7.0",
-          "pandas == 0.12.0",   # 0.13.0 does not work yet
+          "pandas == 0.12",   # 0.13.0 does not work yet
           "scipy >= 0.9.0",
           "numexpr >= 2.1",
           "scikit-learn >= 0.13",
