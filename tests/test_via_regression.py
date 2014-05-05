@@ -10,10 +10,14 @@ def test_regression_test():
     path = os.path.join(os.path.abspath(os.path.dirname(__file__)), "test_data.txt")
     (res, __, tab), __  = pyprophet.pyprophet.PyProphet().process_csv(path, "\t")
 
-    tobe =  [ 7.13743586,-0.29133736,-0.34778976,-1.33578699, numpy.nan,
-              numpy.nan, numpy.nan, numpy.nan, numpy.nan]
+    tobe =  [ 7.13743586,-0.29133736,-0.34778976,-1.33578699, None,
+              None, None, None, None]
 
-    numpy.testing.assert_array_almost_equal(res.cutoff.values, tobe)
+    cutoffs = res.cutoff.values
+
+    assert all(c is None for c in cutoffs[4:])
+
+    numpy.testing.assert_array_almost_equal(cutoffs[:4], tobe[:4])
 
     assert list(tab.columns)[-3:] == ["d_score", "m_score", "peak_group_rank"]
 

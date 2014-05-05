@@ -82,7 +82,7 @@ def get_error_table_using_percentile_positives_new(err_df, target_scores, num_nu
     pp = num_positives.astype(float) / num
 
     # find best matching row in err_df for each percentile_positive in pp:
-    imax = find_nearest_matches(err_df.percentile_positive, pp)
+    imax = find_nearest_matches(err_df.percentile_positive.values, pp)
 
     qvalues = err_df.qvalue.iloc[imax].values
     svalues = err_df.svalue.iloc[imax].values
@@ -121,7 +121,7 @@ def get_error_table_using_percentile_positives_new(err_df, target_scores, num_nu
 @profile
 def lookup_s_and_q_values_from_error_table(scores, err_df):
     """ find best matching q-value foe each score in 'scores' """
-    ix = find_nearest_matches(err_df.cutoff, scores)
+    ix = find_nearest_matches(err_df.cutoff.values, scores.values)
     return err_df.svalue.iloc[ix].values, err_df.qvalue.iloc[ix].values
 
 
@@ -138,7 +138,7 @@ def final_err_table(df, num_cut_offs=51):
     sampled_cutoffs = np.linspace(min_ - margin, max_ + margin, num_cut_offs)
 
     # find best matching row index for each sampled cut off:
-    ix = find_nearest_matches(df.cutoff, sampled_cutoffs)
+    ix = find_nearest_matches(df.cutoff.values, sampled_cutoffs)
 
     # create sub dataframe:
     sampled_df = df.iloc[ix]
