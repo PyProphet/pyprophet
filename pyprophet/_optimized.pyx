@@ -196,7 +196,7 @@ cdef partial_rank(np.float64_t[:] v, size_t imin, size_t imax, np.int64_t[:] ran
 @cython.wraparound(False)
 def rank(np.int64_t[:] tg_ids, np.float64_t[:] scores):
     cdef size_t n = tg_ids.shape[0]
-    result = np.zeros((n,), dtype=int)
+    result = np.zeros((n,), dtype=np.int64)
     cdef np.int64_t[:] ranks = result
     cdef size_t imin = 0
     cdef size_t imax

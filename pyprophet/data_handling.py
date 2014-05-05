@@ -174,6 +174,8 @@ class Experiment(object):
         self.rank_by(col_name)
 
     def rank_by(self, score_col_name):
+        v = self.df.tg_num_id.values
+
         flags = find_top_ranked(self.df.tg_num_id.values, self.df[score_col_name].values)
         self.df.is_top_peak = flags
 

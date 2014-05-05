@@ -8,7 +8,7 @@ def test_rank():
     groups = [1, 1, 1, 1, 1, 2, 3, 3, 3, 0]
     values = [2, 7, 0, 5, 3, 7, 2, 1, 3, 9]
 
-    groups = np.array(groups)
+    groups = np.array(groups, dtype=np.int64)
     values = np.array(values, dtype=float)
 
     ranks = o.rank(groups, values)
@@ -16,11 +16,11 @@ def test_rank():
 
     # corner cases:
 
-    groups = np.array([1])
+    groups = np.array([1], dtype=np.int64)
     values = np.array([1.0])
     assert list(o.rank(groups, values)) == [1]
 
-    groups = np.array([], dtype=int)
+    groups = np.array([], dtype=np.int64)
     values = np.array([], dtype=float)
     assert list(o.rank(groups, values)) == []
 
