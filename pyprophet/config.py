@@ -21,6 +21,7 @@ def standard_config(n_cpus=1):
     CONFIG["train.fraction"] = 0.7
     
     CONFIG["no.file.output"] = False
+    CONFIG["all.output"] = False
     
     CONFIG["xeval.fraction"] = 0.5
     CONFIG["xeval.num_iter"] = 5

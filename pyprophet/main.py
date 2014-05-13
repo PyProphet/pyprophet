@@ -71,7 +71,7 @@ def _main(args):
 	options = dict()
 	path = None
 	
-	print "WOHOOOOOO - managed to modify it!"
+	print "PyProphet, DIANA edition - built Tue May 13 11:08:56 CEST 2014"
 	
 	if "--help" in args:
 		print_help()
@@ -127,13 +127,13 @@ def _main(args):
 
 	apply_existing_scorer = persisted is not None
 
-	class Pathes(dict):
+	class Paths(dict):
 		def __init__(self, prefix=prefix, dirname=dirname, **kw):
 			for k, postfix in kw.items():
 				self[k] = os.path.join(dirname, prefix + postfix)
 		__getattr__ = dict.__getitem__
 
-	pathes = Pathes(scored_table="_with_dscore.csv",
+	paths = Paths(scored_table="_with_dscore.csv",
 					output="_output.csv",
 					final_stat="_full_stat.csv",
 					summ_stat="_summary_stat.csv",
@@ -150,7 +150,7 @@ def _main(args):
 
 	if not CONFIG.get("target.overwrite", False):
 		found_existing_file = False
-		to_check = list(pathes.keys())
+		to_check = list(paths.keys())
 		if not apply_existing_scorer:
 			to_check.append(pickled_scorer_path)
 		for p in to_check:
@@ -222,37 +222,37 @@ def _main(args):
 		summ_stat, final_stat, scored_table = result_tables['res']
 		#if 'true_normal' in result_tables:
 		#	summ_statT, final_statT, scored_tableT = result_tables['true_normal']
-		#	summ_stat.to_csv(pathes.summ_stat, sep=delim_out, index=False)
-		#	print "WRITTEN: ", pathes.summ_stat
-		#	plot_data = save_report(pathes.reportT, basename, scored_tableT, final_statT)
-		#	print "WRITTEN: ", pathes.report
+		#	summ_stat.to_csv(paths.summ_stat, sep=delim_out, index=False)
+		#	print "WRITTEN: ", paths.summ_stat
+		#	plot_data = save_report(paths.reportT, basename, scored_tableT, final_statT)
+		#	print "WRITTEN: ", paths.report
 
 		if final_stat is not None:
-			final_stat.to_csv(pathes.final_stat, sep=delim_out, index=False)
-			print "WRITTEN: ", pathes.final_stat
-			plot_data = save_report(pathes.report, basename, scored_table, final_stat)
-			print "WRITTEN: ", pathes.report
-			cutoffs, svalues, qvalues, top_target, top_decoys = plot_data
-			for (name, values) in [("cutoffs", cutoffs), ("svalues", svalues), ("qvalues", qvalues),
+			plot_data = save_report(paths.report, basename, scored_table, final_stat)
+			print "WRITTEN: ", paths.report
+			
+			if CONFIG.get("all.output"):
+				final_stat.to_csv(paths.final_stat, sep=delim_out, index=False)
+				print "WRITTEN: ", paths.final_stat
+				
+				cutoffs, svalues, qvalues, top_target, top_decoys = plot_data
+				for (name, values) in [("cutoffs", cutoffs), ("svalues", svalues), ("qvalues", qvalues),
 								   ("d_scores_top_target_peaks", top_target),
 								   ("d_scores_top_decoy_peaks", top_decoys)]:
-				path = pathes[name]
-				with open(path, "w") as fp:
-					fp.write(" ".join("%e" % v for v in values))
-				print "WRITTEN: ", path
+					path = paths[name]
+					with open(path, "w") as fp:
+						fp.write(" ".join("%e" % v for v in values))
+					print "WRITTEN: ", path
 		
-		if clfs_df is not None:
+		if clfs_df is not None and CONFIG.get("all.output"):
 			clfs_df.to_csv("clfs.csv", sep=delim_out, index=False)
 			print "WRITTEN: ", "clfs.csv"
 		
-		scored_table.to_csv(pathes.scored_table, sep=delim_out, index=False)
-		print "WRITTEN: ", pathes.scored_table
-
 		output = scored_table.rename(columns = {"d_score" : "pyProph_score", "m_score" : "qvalue"})
-		output.to_csv(pathes.output, sep=delim_out, index=False)
-		print "WRITTEN: ", pathes.output
+		output.to_csv(paths.output, sep=delim_out, index=False)
+		print "WRITTEN: ", paths.output
 		
-		if not apply_existing_scorer:
+		if not apply_existing_scorer and CONFIG.get("all.output"):
 			bin_data = zlib.compress(cPickle.dumps(needed_to_persist, protocol=2))
 			with open(pickled_scorer_path, "wb") as fp:
 				fp.write(bin_data)
