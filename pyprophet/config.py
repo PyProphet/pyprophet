@@ -18,7 +18,7 @@ def standard_config(n_cpus=1):
     if n_cpus == -1:
         n_cpus = multiprocessing.cpu_count()
 
-	CONFIG["decoy.missing"] = 0.0
+    CONFIG["decoy.missing"] = 0.0 
     CONFIG["train.fraction"] = 0.7
     
     CONFIG["no.file.output"] = False
