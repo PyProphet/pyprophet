@@ -88,7 +88,8 @@ def fix_config_types(dd):
               "num_processes"]:
         dd[k] = int(dd[k])
 
-    for k in ["xeval.fraction",
+    for k in ["decoy.missing",
+              "xeval.fraction",
               "train.fraction",
               "semi_supervised_learner.initial_fdr",
               "semi_supervised_learner.initial_lambda",

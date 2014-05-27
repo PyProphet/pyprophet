@@ -71,7 +71,7 @@ def _main(args):
 	options = dict()
 	path = None
 	
-	print "PyProphet, DIANA edition - built Tue May 13 11:08:56 CEST 2014"
+	print "PyProphet, DIANA edition - built Tue May 27 15:52:00 CEST 2014"
 	
 	if "--help" in args:
 		print_help()
