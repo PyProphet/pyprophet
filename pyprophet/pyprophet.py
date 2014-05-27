@@ -311,6 +311,7 @@ class HolyGostQuery(object):
 			 fdr_calc 		= getFDRCalc(CONFIG.get("final_statistics.fdr_calc"))
 			 stat_calc 		= getStatCalc(CONFIG.get("final_statistics.stat_calc"))
 			 stat_sampler 	= getStatSampler(CONFIG.get("final_statistics.stat_sampler"))
+			 decoys_missing	= CONFIG.get("decoy.missing", 0.0)
 			 d = dict(
 			 		res = getRes(FlexibleErrorTable(
 						all_tt_scores,
@@ -320,7 +321,8 @@ class HolyGostQuery(object):
 						null_model,
 						fdr_calc,
 						stat_calc,
-						stat_sampler
+						stat_sampler,
+						decoys_missing
 					))
 			 	)
 

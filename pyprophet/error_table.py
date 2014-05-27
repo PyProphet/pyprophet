@@ -34,7 +34,8 @@ class IErrorTable(object):
 class FlexibleErrorTable(IErrorTable):
 	
 	
-	def __init__(self, scores, ref_target_scores, ref_decoy_scores, lambda_, null_model, fdr_calc, stat_calc, stat_sampler):
+	def __init__(self, 	scores, ref_target_scores, ref_decoy_scores, lambda_, 
+						null_model, fdr_calc, stat_calc, stat_sampler, decoysMissing=0.0):
 		self.null_model = null_model
 		self.fdr = fdr_calc
 		self.stat = stat_calc
@@ -44,7 +45,7 @@ class FlexibleErrorTable(IErrorTable):
 		target_scores = to_one_dim_array(ref_target_scores)
 		target_scores = np.sort(target_scores[~np.isnan(target_scores)])
 
-		target_pvalues = self.null_model.pvalues(target_scores, decoy_scores)
+		target_pvalues = self.null_model.pvalues(target_scores, decoy_scores) * (1.0 - decoysMissing)
 		
 		FDR_table, num_null, num_total = self.fdr.calc(target_pvalues, lambda_)
 		FDR_table["cutoff"] = target_scores
