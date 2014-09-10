@@ -26,16 +26,19 @@ def save_report(report_path, in_file_name, scored_table, final_stat):
     svalues = final_stat["svalue"].values
     qvalues = final_stat["qvalue"].values
 
+    decoys = scored_table[scored_table["decoy"] == 1]["d_score"].values
+    targets = scored_table[scored_table["decoy"] == 0]["d_score"].values
+
     tops = scored_table[scored_table["peak_group_rank"] == 1]
     top_decoys = tops[tops["decoy"] == 1]["d_score"].values
     top_target = tops[tops["decoy"] == 0]["d_score"].values
 
     # thanks to lorenz blum for the plotting code below:
 
-    plt.figure(figsize=(8.27, 15.59))
+    plt.figure(figsize=(10, 20))
     plt.subplots_adjust(hspace=.5)
 
-    plt.subplot(411)
+    plt.subplot(511)
     plt.title(in_file_name + "\n\nROC")
     plt.xlabel('False Positive Rate (qvalue)')
     plt.ylabel('True Positive Rate (svalue)')
@@ -43,7 +46,7 @@ def save_report(report_path, in_file_name, scored_table, final_stat):
     plt.scatter(qvalues, svalues, s=3)
     plt.plot(qvalues, svalues)
 
-    plt.subplot(412)
+    plt.subplot(512)
     plt.title('d_score Performance')
     plt.xlabel('dscore cutoff')
     plt.ylabel('rates')
@@ -53,8 +56,8 @@ def save_report(report_path, in_file_name, scored_table, final_stat):
     plt.scatter(cutoffs, qvalues, color='r', s=3)
     plt.plot(cutoffs, qvalues, color='r', label="FPR (qvalue)")
 
-    plt.subplot(413)
-    plt.title("Top Peak Groups' d-score Distributions")
+    plt.subplot(513)
+    plt.title("Top Peak Groups' d_score Distributions")
     plt.xlabel("d_score")
     plt.ylabel("# of groups")
     plt.hist(
@@ -68,12 +71,27 @@ def save_report(report_path, in_file_name, scored_table, final_stat):
     ddensity.covariance_factor = lambda : .25
     ddensity._compute_covariance()
     xs = linspace(min(concatenate((top_target,top_decoys))),max(concatenate((top_target,top_decoys))),200)
-    plt.subplot(414)
-    plt.title("Top Peak Groups' d-score Density")
+    plt.subplot(514)
+    plt.title("Top Peak Groups' d_score Density")
     plt.xlabel("d_score")
     plt.ylabel("density")
     plt.plot(xs, tdensity(xs), color='g', label='target')
     plt.plot(xs, ddensity(xs), color='r', label='decoy')
+    plt.legend(loc=2)
+
+    atdensity = gaussian_kde(targets)
+    atdensity.covariance_factor = lambda : .25
+    atdensity._compute_covariance()
+    addensity = gaussian_kde(decoys)
+    addensity.covariance_factor = lambda : .25
+    addensity._compute_covariance()
+    axs = linspace(min(concatenate((targets,decoys))),max(concatenate((targets,decoys))),200)
+    plt.subplot(515)
+    plt.title("All Peak Groups' d_score Density")
+    plt.xlabel("d_score")
+    plt.ylabel("density")
+    plt.plot(axs, atdensity(xs), color='g', label='target')
+    plt.plot(axs, addensity(xs), color='r', label='decoy')
     plt.legend(loc=2)
 
     plt.savefig(report_path)
