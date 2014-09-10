@@ -3,6 +3,8 @@ import matplotlib
 matplotlib.use('Agg')
 
 import matplotlib.pyplot as plt
+from scipy.stats import gaussian_kde
+from numpy import linspace, concatenate
 
 
 class Protein:
@@ -30,10 +32,10 @@ def save_report(report_path, in_file_name, scored_table, final_stat):
 
     # thanks to lorenz blum for the plotting code below:
 
-    plt.figure(figsize=(8.27, 11.69))
+    plt.figure(figsize=(8.27, 15.59))
     plt.subplots_adjust(hspace=.5)
 
-    plt.subplot(311)
+    plt.subplot(411)
     plt.title(in_file_name + "\n\nROC")
     plt.xlabel('False Positive Rate (qvalue)')
     plt.ylabel('True Positive Rate (svalue)')
@@ -41,7 +43,7 @@ def save_report(report_path, in_file_name, scored_table, final_stat):
     plt.scatter(qvalues, svalues, s=3)
     plt.plot(qvalues, svalues)
 
-    plt.subplot(312)
+    plt.subplot(412)
     plt.title('d_score Performance')
     plt.xlabel('dscore cutoff')
     plt.ylabel('rates')
@@ -51,12 +53,27 @@ def save_report(report_path, in_file_name, scored_table, final_stat):
     plt.scatter(cutoffs, qvalues, color='r', s=3)
     plt.plot(cutoffs, qvalues, color='r', label="FPR (qvalue)")
 
-    plt.subplot(313)
+    plt.subplot(413)
     plt.title("Top Peak Groups' d-score Distributions")
     plt.xlabel("d_score")
     plt.ylabel("# of groups")
     plt.hist(
         [top_target, top_decoys], 20, color=['w', 'r'], label=['target', 'decoy'], histtype='bar')
+    plt.legend(loc=2)
+
+    tdensity = gaussian_kde(top_target)
+    tdensity.covariance_factor = lambda : .25
+    tdensity._compute_covariance()
+    ddensity = gaussian_kde(top_decoys)
+    ddensity.covariance_factor = lambda : .25
+    ddensity._compute_covariance()
+    xs = linspace(min(concatenate((top_target,top_decoys))),max(concatenate((top_target,top_decoys))),200)
+    plt.subplot(414)
+    plt.title("Top Peak Groups' d-score Density")
+    plt.xlabel("d_score")
+    plt.ylabel("density")
+    plt.plot(xs, tdensity(xs), color='g', label='target')
+    plt.plot(xs, ddensity(xs), color='r', label='decoy')
     plt.legend(loc=2)
 
     plt.savefig(report_path)
