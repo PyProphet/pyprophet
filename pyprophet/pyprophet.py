@@ -167,7 +167,10 @@ class HolyGostQuery(object):
         mu, nu, final_score = self.calculate_params_for_d_score(final_classifier, experiment)
         experiment["d_score"] = (final_score - mu) / nu
 
-        all_tt_scores = experiment.get_top_target_peaks()["d_score"]
+        if (CONFIG.get("final_statistics.fdr_all_pg")):
+            all_tt_scores = experiment.get_target_peaks()["d_score"]
+        else:
+            all_tt_scores = experiment.get_top_target_peaks()["d_score"]
 
         df_raw_stat, num_null, num_total = calculate_final_statistics(all_tt_scores, all_test_target_scores,
                                                  all_test_decoy_scores, lambda_)
@@ -218,7 +221,12 @@ class HolyGostQuery(object):
     def calculate_params_for_d_score(self, classifier, experiment):
         score = classifier.score(experiment, True)
         experiment.set_and_rerank("classifier_score", score)
-        td_scores = experiment.get_top_decoy_peaks()["classifier_score"]
+
+        if (CONFIG.get("final_statistics.fdr_all_pg")):
+            td_scores = experiment.get_decoy_peaks()["classifier_score"]
+        else:
+            td_scores = experiment.get_top_decoy_peaks()["classifier_score"]
+
         mu, nu = mean_and_std_dev(td_scores)
         return mu, nu, score
 
