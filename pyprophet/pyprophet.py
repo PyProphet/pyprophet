@@ -14,7 +14,7 @@ import numpy as np
 
 from stats import (lookup_s_and_q_values_from_error_table, calculate_final_statistics,
                    mean_and_std_dev, final_err_table, summary_err_table, pnorm, find_cutoff, posterior_pg_prob)
-from stats import posterior_chromatogram_hypotheses
+from stats import posterior_chromatogram_hypotheses_fast
 from config import CONFIG
 
 from data_handling import (prepare_data_table, Experiment)
@@ -190,7 +190,10 @@ class HolyGostQuery(object):
             experiment.df[ "pg_score"]  = pp_pg_pvalues
             scored_table = scored_table.join(experiment[["pg_score"]])
 
-            scored_table = posterior_chromatogram_hypotheses(experiment, prior_chrom_null, scored_table)
+            allhypothesis, h0 = posterior_chromatogram_hypotheses_fast(experiment, prior_chrom_null, scored_table)
+            experiment.df[ "h_score"]  = allhypothesis
+            experiment.df[ "h0_score"]  = h0
+            scored_table = scored_table.join(experiment[["h_score", "h0_score"]])
 
         final_statistics = final_err_table(df_raw_stat)
         summary_statistics = summary_err_table(df_raw_stat)
