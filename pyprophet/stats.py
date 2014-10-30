@@ -13,7 +13,7 @@ try:
 except:
     profile = lambda x: x
 
-from optimized import find_nearest_matches as _find_nearest_matches, count_num_positives
+from optimized import find_nearest_matches as _find_nearest_matches, count_num_positives, single_chromatogram_hypothesis_fast
 import scipy.special
 import traceback
 import math
@@ -90,6 +90,38 @@ def posterior_pg_prob(experiment, prior_peakgroup_true, lambda_=0.5, fdr_estimat
 
     return pp_pg_pvalues
 
+def posterior_chromatogram_hypotheses_fast(experiment, prior_chrom_null, scored_table):
+
+    tg_ids = experiment.df.tg_num_id.values
+    pp_values = experiment.df["pg_score"].values
+
+    current_tg_id = tg_ids[0]
+    scores = []
+    final_result = []
+    final_result_h0 = []
+    for i in range(tg_ids.shape[0]):
+
+        id_ = tg_ids[i]
+        if id_ != current_tg_id:
+
+            prior_pg_true = (1.0-prior_chrom_null) / len(scores)
+            rr = single_chromatogram_hypothesis_fast(np.array(scores), prior_chrom_null, prior_pg_true)
+            final_result.extend(rr[1:])
+            final_result_h0.extend( rr[0] for i in range(len(scores) ) )
+
+            # Reset for next cycle
+            scores = []
+            current_tg_id = id_
+
+        scores.append( 1.0 - pp_values[i] )
+
+    # Last cycle
+    prior_pg_true = (1.0-prior_chrom_null) / len(scores)
+    rr = single_chromatogram_hypothesis_fast(np.array(scores), prior_chrom_null, prior_pg_true)
+    final_result.extend(rr[1:])
+    final_result_h0.extend( rr[0] for i in range(len(scores) ) )
+
+    return final_result, final_result_h0
 
 def single_chromatogram_hypothesis(pg_pp_true, prior_chrom_null, prior_pg_true):
     all_hypothesis = []
