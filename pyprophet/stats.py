@@ -120,9 +120,10 @@ def get_error_table_using_percentile_positives_new(err_df, target_scores, num_nu
 
 @profile
 def lookup_s_and_q_values_from_error_table(scores, err_df):
-    """ find best matching q-value foe each score in 'scores' """
+    """ find best matching q-value for each score in 'scores' """
     ix = find_nearest_matches(err_df.cutoff.values, scores.values)
     return err_df.svalue.iloc[ix].values, err_df.qvalue.iloc[ix].values
+
 
 
 @profile
@@ -185,7 +186,7 @@ def get_error_table_from_pvalues_new(p_values, lambda_=0.4):
     # p_values = p_values[:,None]
 
     # optimized with numpys broadcasting: comparing column vector with row
-    # vectory yieds a matrix with pairwaise somparision results.  sum(axis=0)
+    # vector yields a matrix with pairwise comparison results.  sum(axis=0)
     # sums up each column:
     num_positives = count_num_positives(p_values)
     num_negatives = num - num_positives
@@ -210,7 +211,7 @@ def get_error_table_from_pvalues_new(p_values, lambda_=0.4):
     else:
         fpr = 0.0 * fp
 
-    # assemble statisteics as data frame
+    # assemble statistics as data frame
     error_stat = pd.DataFrame(
         dict(pvalue=p_values.flatten(),
              percentile_positive=pp.flatten(),

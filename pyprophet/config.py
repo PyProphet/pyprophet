@@ -45,7 +45,7 @@ def standard_config(n_cpus=1):
 
     CONFIG["ignore.invalid_score_columns"] = False
     info["ignore.invalid_score_columns"] =\
-        """ignore score columns which conly contain NaN of infinity values"""
+        """ignore score columns which only contain NaN of infinity values"""
 
     CONFIG["apply"] = None
     info["apply"] = r"""[name of *_scorer.bin file of existing classifier]"""
