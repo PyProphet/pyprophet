@@ -13,7 +13,7 @@ import pandas as pd
 import numpy as np
 
 from stats import (lookup_s_and_q_values_from_error_table, calculate_final_statistics,
-                   mean_and_std_dev, final_err_table, summary_err_table, pnorm)
+                   mean_and_std_dev, final_err_table, summary_err_table, pnorm, find_cutoff, posterior_pg_prob)
 from config import CONFIG
 
 from data_handling import (prepare_data_table, Experiment)
@@ -173,6 +173,22 @@ class HolyGostQuery(object):
                                                  all_test_decoy_scores, lambda_)
 
         scored_table = self.enrich_table_with_results(table, experiment, df_raw_stat)
+
+        if CONFIG.get("compute.probabilities"):
+
+            # Note that num_null and num_total are the sum of the
+            # cross-validated statistics computed before, therefore the total
+            # number of data points selected will be 
+            #   len(data) /  xeval.fraction * xeval.num_iter
+            # 
+            prior_chrom_null = num_null * 1.0 / num_total
+            number_true_chromatograms = (1.0-prior_chrom_null) * len(experiment.get_top_target_peaks().df)
+            number_target_pg = len( Experiment(experiment.df[(experiment.df.is_decoy == False) ]).df )
+            prior_peakgroup_true = number_true_chromatograms / number_target_pg
+
+            pp_pg_pvalues = posterior_pg_prob(experiment, prior_peakgroup_true)
+            experiment.df[ "pg_score"]  = pp_pg_pvalues
+            scored_table = scored_table.join(experiment[["pg_score"]])
 
         final_statistics = final_err_table(df_raw_stat)
         summary_statistics = summary_err_table(df_raw_stat)

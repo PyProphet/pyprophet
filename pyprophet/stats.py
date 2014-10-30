@@ -17,6 +17,7 @@ from optimized import find_nearest_matches as _find_nearest_matches, count_num_p
 import scipy.special
 import traceback
 import math
+import scipy.stats
 
 from config import CONFIG
 
@@ -52,6 +53,42 @@ def to_one_dim_array(values, as_type=None):
     if as_type is not None:
         return values.astype(as_type)
     return values
+
+def posterior_pg_prob(experiment, prior_peakgroup_true, lambda_=0.5, fdr_estimate=0.15):
+    """ Compute posterior probabilities for each peakgroup
+
+    - Estimate the true distribution by using all target peakgroups above the
+      given the cutoff (estimated FDR as given as input). Assume gaussian distribution.
+
+    - Estimate the false/decoy distribution by using all decoy peakgroups.
+      Assume gaussian distribution.
+
+    """
+
+    # All target values and all decoy values
+    tvals = experiment.df.loc[(experiment.df.is_decoy == False), "d_score" ]
+    dvals = experiment.df.loc[(experiment.df.is_decoy == True), "d_score" ]
+
+    # Estimate a suitable cutoff in discriminant score (d_score)
+    target_scores = experiment.get_top_target_peaks().df[ "d_score"]
+    decoy_scores = experiment.get_top_decoy_peaks().df[ "d_score"]
+    estimated_cutoff = find_cutoff(target_scores, decoy_scores, lambda_, fdr_estimate)
+
+    # Get all top target peaks above the cutoff (very likely true) to estimate the true distribution
+    target_peaks = experiment.get_top_target_peaks()
+    target_scores_above = target_peaks.df.loc[ target_peaks.df.d_score > estimated_cutoff, "d_score"]
+
+    # Use all decoys and top-peaks of top target chromatograms to parametrically estimate the two distributions
+    all_scores = experiment.df["d_score"]
+    p_decoy = scipy.stats.norm.pdf(all_scores, np.mean(dvals), np.std(dvals, ddof=1))
+    p_target = scipy.stats.norm.pdf(all_scores, np.mean(target_scores_above), np.std(target_scores_above, ddof=1))
+
+    # Bayesian inference 
+    # Posterior probabilities for each peakgroup
+    pp_pg_pvalues = p_target *  prior_peakgroup_true / \
+            ( p_target * prior_peakgroup_true +  p_decoy * (1.0 - prior_peakgroup_true) )  
+
+    return pp_pg_pvalues
 
 
 def pnorm(pvalues, mu, sigma):
