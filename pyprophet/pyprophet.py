@@ -14,6 +14,7 @@ import numpy as np
 
 from stats import (lookup_s_and_q_values_from_error_table, calculate_final_statistics,
                    mean_and_std_dev, final_err_table, summary_err_table, pnorm, find_cutoff, posterior_pg_prob)
+from stats import posterior_chromatogram_hypotheses
 from config import CONFIG
 
 from data_handling import (prepare_data_table, Experiment)
@@ -25,7 +26,6 @@ import multiprocessing
 import logging
 
 import time
-
 
 def unwrap_self_for_multiprocessing((inst, method_name, args),):
     """ You can not call methods with multiprocessing, but free functions,
@@ -189,6 +189,8 @@ class HolyGostQuery(object):
             pp_pg_pvalues = posterior_pg_prob(experiment, prior_peakgroup_true)
             experiment.df[ "pg_score"]  = pp_pg_pvalues
             scored_table = scored_table.join(experiment[["pg_score"]])
+
+            scored_table = posterior_chromatogram_hypotheses(experiment, prior_chrom_null, scored_table)
 
         final_statistics = final_err_table(df_raw_stat)
         summary_statistics = summary_err_table(df_raw_stat)

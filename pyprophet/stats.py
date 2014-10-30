@@ -91,6 +91,44 @@ def posterior_pg_prob(experiment, prior_peakgroup_true, lambda_=0.5, fdr_estimat
     return pp_pg_pvalues
 
 
+def single_chromatogram_hypothesis(pg_pp_true, prior_chrom_null, prior_pg_true):
+    all_hypothesis = []
+    import operator
+    all_false = reduce(operator.mul, 1-pg_pp_true, 1)
+    all_hypothesis.append(all_false * prior_chrom_null )
+    for i,val in enumerate(1-pg_pp_true):
+        all_except_one = [x for j,x in enumerate(1-pg_pp_true ) if j != i]
+        final_val = (1-val) * reduce(operator.mul, all_except_one, 1)
+        all_hypothesis.append(final_val * prior_pg_true )
+
+    all_hypothesis = all_hypothesis / sum(all_hypothesis)
+
+    return all_hypothesis
+
+def posterior_chromatogram_hypotheses(experiment, prior_chrom_null, scored_table):
+
+    grouped = experiment.df.groupby([ 'tg_id' ])
+    ff = grouped.groups
+    tgids = experiment.df.tg_id.unique()
+
+    experiment['h_score'] = pd.Series(len(experiment["d_score"]))
+    experiment['h0_score'] = pd.Series(len(experiment["d_score"]))
+
+    for tname in tgids:
+
+        tr_gr = grouped.get_group( tname )
+        prior_pg_true = (1-prior_chrom_null) / len(tr_gr)
+        pg_pp_true = tr_gr["pg_score"]
+
+        all_hypothesis = single_chromatogram_hypothesis(np.array(pg_pp_true), prior_chrom_null, prior_pg_true)
+
+        experiment.df.loc[ experiment.df.tg_id == tname, "h_score" ] = all_hypothesis[1:]
+        experiment.df.loc[ experiment.df.tg_id == tname, "h0_score" ] = all_hypothesis[0]
+
+    scored_table = scored_table.join(experiment[["h_score", "h0_score"]])
+    return scored_table
+
+
 def pnorm(pvalues, mu, sigma):
     """ [P(X>pi, mu, sigma) for pi in pvalues] for normal distributed P with
     expectation value mu and std deviation sigma """
