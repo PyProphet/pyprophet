@@ -13,7 +13,7 @@ import pandas as pd
 import numpy as np
 
 from stats import (lookup_s_and_q_values_from_error_table, calculate_final_statistics,
-                   mean_and_std_dev, final_err_table, summary_err_table)
+                   mean_and_std_dev, final_err_table, summary_err_table, pnorm)
 from config import CONFIG
 
 from data_handling import (prepare_data_table, Experiment)
@@ -50,7 +50,7 @@ class HolyGostQuery(object):
         self.semi_supervised_learner = semi_supervised_learner
 
     @profile
-    def process_csv(self, path, delim=",", loaded_scorer=None):
+    def process_csv(self, path, delim=",", loaded_scorer=None, p_score=False):
         start_at = time.time()
 
         logging.info("read %s" % path)
@@ -77,7 +77,7 @@ class HolyGostQuery(object):
         return result_tables, data_for_persistence
 
     @profile
-    def learn_and_apply_classifier(self, table):
+    def learn_and_apply_classifier(self, table, p_score=False):
 
         prepared_table, score_columns = prepare_data_table(table)
 
@@ -122,7 +122,7 @@ class HolyGostQuery(object):
 
         result, data_for_persistence = self.apply_classifier(final_classifier, experiment,
                                                              all_test_target_scores,
-                                                             all_test_decoy_scores, table)
+                                                             all_test_decoy_scores, table, p_score=p_score)
         logging.info("calculated scoring and statistics")
         return result, data_for_persistence + (score_columns,)
 
@@ -159,7 +159,7 @@ class HolyGostQuery(object):
 
     @profile
     def apply_classifier(self, final_classifier, experiment, all_test_target_scores,
-                         all_test_decoy_scores, table):
+                         all_test_decoy_scores, table, p_score=False):
 
         lambda_ = CONFIG.get("final_statistics.lambda")
 
@@ -168,7 +168,7 @@ class HolyGostQuery(object):
 
         all_tt_scores = experiment.get_top_target_peaks()["d_score"]
 
-        df_raw_stat = calculate_final_statistics(all_tt_scores, all_test_target_scores,
+        df_raw_stat, num_null, num_total = calculate_final_statistics(all_tt_scores, all_test_target_scores,
                                                  all_test_decoy_scores, lambda_)
 
         scored_table = self.enrich_table_with_results(table, experiment, df_raw_stat)
@@ -177,7 +177,7 @@ class HolyGostQuery(object):
         summary_statistics = summary_err_table(df_raw_stat)
 
         needed_to_persist = (final_classifier, mu, nu,
-                             df_raw_stat.loc[:, ["svalue", "qvalue", "cutoff"]])
+                             df_raw_stat.loc[:, ["svalue", "qvalue", "cutoff"]], num_null, num_total)
         return (summary_statistics, final_statistics, scored_table), needed_to_persist
 
     @profile

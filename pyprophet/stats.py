@@ -292,4 +292,5 @@ def calculate_final_statistics(all_top_target_scores,
         df, all_top_target_scores,
         num_null_top_target)
 
-    return df_raw_stat
+    return df_raw_stat, num_null, num_total
+
