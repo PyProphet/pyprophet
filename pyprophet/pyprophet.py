@@ -129,7 +129,8 @@ class HolyGostQuery(object):
     @profile
     def apply_loaded_scorer(self, table, loaded_scorer):
 
-        final_classifier, mu, nu, df_raw_stat, loaded_score_columns = loaded_scorer
+        # Compare with apply_classifier function (what goes into persistence)
+        final_classifier, mu, nu, df_raw_stat, num_null, num_total, loaded_score_columns = loaded_scorer
 
         prepared_table, __ = prepare_data_table(table, loaded_score_columns=loaded_score_columns)
 
