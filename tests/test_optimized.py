@@ -24,6 +24,30 @@ def test_rank():
     values = np.array([], dtype=float)
     assert list(o.rank(groups, values)) == []
 
+def test_single_chromatogram_hypothesis_fast():
+
+    prior_chrom_null = 0.2
+    prior_pg = 0.1
+
+    probabilities = [0.7] # probability that the peaks are false
+    probabilities = np.array(probabilities, dtype=np.float64)
+
+    result = o.single_chromatogram_hypothesis_fast(probabilities, prior_chrom_null, prior_pg)
+    result_h0 = result[0]
+    result = result[1:]
+
+    np.testing.assert_array_almost_equal(result, [0.17647059] )
+    np.testing.assert_array_almost_equal( [result_h0], [0.823529411765] )
+
+    probabilities = [0.5, 0.7, 0.1, 0.01] # probability that the peaks are false
+    probabilities = np.array(probabilities, dtype=np.float64)
+
+    result = o.single_chromatogram_hypothesis_fast(probabilities, prior_chrom_null, prior_pg)
+    result_h0 = result[0]
+    result = result[1:]
+
+    np.testing.assert_array_almost_equal(result, [0.00897436, 0.00384615, 0.08076923, 0.88846154] )
+    np.testing.assert_array_almost_equal( [result_h0], [0.0179487179487] )
 
 def _test_match(values):
     values = np.array(values, dtype=float)
@@ -153,3 +177,6 @@ def _test_find_neared_matches_fuzzy():
             tobe = o.find_nearest_matches(basis, search, 0)
             optim = o.find_nearest_matches(basis, search)
             assert np.all(tobe == optim)
+
+
+

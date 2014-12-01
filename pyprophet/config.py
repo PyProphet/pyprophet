@@ -51,7 +51,10 @@ def standard_config(n_cpus=1):
     info["apply"] = r"""[name of *_scorer.bin file of existing classifier]"""
 
     CONFIG["export.mayu"] = False
-    info["export.mayu"] = """[export input files for MAYU """
+    info["export.mayu"] = """[export input files for MAYU]"""
+
+    CONFIG["compute.probabilities"] = False
+    info["compute.probabilities"] = """[Compute approximate binned probability values]"""
 
     return CONFIG, info
 
