@@ -175,6 +175,9 @@ class HolyGostQuery(object):
         scored_table = self.enrich_table_with_results(table, experiment, df_raw_stat)
 
         if CONFIG.get("compute.probabilities"):
+            logging.info( "" )
+            logging.info( "Posterior Probability estimation:" )
+            logging.info( "Estimated number of null %0.2f out of a total of %s. " % (num_null, num_total) )
 
             # Note that num_null and num_total are the sum of the
             # cross-validated statistics computed before, therefore the total
@@ -186,7 +189,16 @@ class HolyGostQuery(object):
             number_target_pg = len( Experiment(experiment.df[(experiment.df.is_decoy == False) ]).df )
             prior_peakgroup_true = number_true_chromatograms / number_target_pg
 
-            pp_pg_pvalues = posterior_pg_prob(experiment, prior_peakgroup_true)
+            logging.info( "Prior for a peakgroup: %s" % (number_true_chromatograms / number_target_pg))
+            logging.info( "Prior for a chromatogram: %s" % str(1-prior_chrom_null) )
+            logging.info( "Estimated number of true chromatograms: %s out of %s" % (number_true_chromatograms, len(experiment.get_top_target_peaks().df)) )
+            logging.info( "Number of target data: %s" % len( Experiment(experiment.df[(experiment.df.is_decoy == False) ]).df ) )
+
+            # pg_score = posterior probability for each peakgroup
+            # h_score = posterior probability for the hypothesis that this peakgroup is true (and all other false)
+            # h0_score = posterior probability for the hypothesis that no peakgroup is true
+
+            pp_pg_pvalues = posterior_pg_prob(experiment, prior_peakgroup_true, lambda_=lambda_)
             experiment.df[ "pg_score"]  = pp_pg_pvalues
             scored_table = scored_table.join(experiment[["pg_score"]])
 
