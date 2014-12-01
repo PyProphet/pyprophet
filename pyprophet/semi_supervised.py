@@ -51,12 +51,13 @@ class AbstractSemiSupervisedLearner(object):
         params, clf_scores = self.start_semi_supervised_learning(train)
 
         train.set_and_rerank("classifier_score", clf_scores)
+
         # semi supervised iteration:
         for inner in range(num_iter):
             params, clf_scores = self.iter_semi_supervised_learning(train)
             train.set_and_rerank("classifier_score", clf_scores)
 
-        # nach semi supervsised iter: classfiy full dataset
+        # after semi supervised iteration: classify full dataset
         clf_scores = self.score(experiment, params)
         mu, nu = mean_and_std_dev(clf_scores)
         experiment.set_and_rerank("classifier_score", clf_scores)
