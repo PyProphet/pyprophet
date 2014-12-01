@@ -202,7 +202,7 @@ class HolyGostQuery(object):
             experiment.df[ "pg_score"]  = pp_pg_pvalues
             scored_table = scored_table.join(experiment[["pg_score"]])
 
-            allhypothesis, h0 = posterior_chromatogram_hypotheses_fast(experiment, prior_chrom_null, scored_table)
+            allhypothesis, h0 = posterior_chromatogram_hypotheses_fast(experiment, prior_chrom_null)
             experiment.df[ "h_score"]  = allhypothesis
             experiment.df[ "h0_score"]  = h0
             scored_table = scored_table.join(experiment[["h_score", "h0_score"]])

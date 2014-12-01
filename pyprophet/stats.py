@@ -90,7 +90,27 @@ def posterior_pg_prob(experiment, prior_peakgroup_true, lambda_=0.5, fdr_estimat
 
     return pp_pg_pvalues
 
-def posterior_chromatogram_hypotheses_fast(experiment, prior_chrom_null, scored_table):
+def posterior_chromatogram_hypotheses_fast(experiment, prior_chrom_null):
+    """ Compute posterior probabilities for each chromatogram
+
+    For each chromatogram (each transition_group), all hypothesis of all peaks
+    being correct (and all others false) as well as the h0 (all peaks are
+    false) are computed.
+
+    The prior probability that the  are given in the function
+
+    This assumes that the input data is sorted by tg_num_id
+
+        Args:
+            experiment(:class:`data_handling.Multipeptide`): the data of one experiment
+            prior_chrom_null(float): the prior probability that any precursor
+                is absent (all peaks are false)
+
+        Returns:
+            tuple(hypothesis, h0): two vectors that contain for each entry in
+            the input dataframe the probabilities for the hypothesis that the
+            peak is correct and the probability for the h0
+    """
 
     tg_ids = experiment.df.tg_num_id.values
     pp_values = experiment.df["pg_score"].values
@@ -104,6 +124,7 @@ def posterior_chromatogram_hypotheses_fast(experiment, prior_chrom_null, scored_
         id_ = tg_ids[i]
         if id_ != current_tg_id:
 
+            # Actual computation for a single transition group (chromatogram)
             prior_pg_true = (1.0-prior_chrom_null) / len(scores)
             rr = single_chromatogram_hypothesis_fast(np.array(scores), prior_chrom_null, prior_pg_true)
             final_result.extend(rr[1:])
