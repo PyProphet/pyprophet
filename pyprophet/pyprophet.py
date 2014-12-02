@@ -13,7 +13,8 @@ import pandas as pd
 import numpy as np
 
 from stats import (lookup_s_and_q_values_from_error_table, calculate_final_statistics,
-                   mean_and_std_dev, final_err_table, summary_err_table)
+                   mean_and_std_dev, final_err_table, summary_err_table, pnorm, find_cutoff, posterior_pg_prob)
+from stats import posterior_chromatogram_hypotheses_fast
 from config import CONFIG
 
 from data_handling import (prepare_data_table, Experiment)
@@ -25,7 +26,6 @@ import multiprocessing
 import logging
 
 import time
-
 
 def unwrap_self_for_multiprocessing((inst, method_name, args),):
     """ You can not call methods with multiprocessing, but free functions,
@@ -50,7 +50,7 @@ class HolyGostQuery(object):
         self.semi_supervised_learner = semi_supervised_learner
 
     @profile
-    def process_csv(self, path, delim=",", loaded_scorer=None):
+    def process_csv(self, path, delim=",", loaded_scorer=None, p_score=False):
         start_at = time.time()
 
         logging.info("read %s" % path)
@@ -77,7 +77,7 @@ class HolyGostQuery(object):
         return result_tables, data_for_persistence
 
     @profile
-    def learn_and_apply_classifier(self, table):
+    def learn_and_apply_classifier(self, table, p_score=False):
 
         prepared_table, score_columns = prepare_data_table(table)
 
@@ -122,14 +122,15 @@ class HolyGostQuery(object):
 
         result, data_for_persistence = self.apply_classifier(final_classifier, experiment,
                                                              all_test_target_scores,
-                                                             all_test_decoy_scores, table)
+                                                             all_test_decoy_scores, table, p_score=p_score)
         logging.info("calculated scoring and statistics")
         return result, data_for_persistence + (score_columns,)
 
     @profile
     def apply_loaded_scorer(self, table, loaded_scorer):
 
-        final_classifier, mu, nu, df_raw_stat, loaded_score_columns = loaded_scorer
+        # Compare with apply_classifier function (what goes into persistence)
+        final_classifier, mu, nu, df_raw_stat, num_null, num_total, loaded_score_columns = loaded_scorer
 
         prepared_table, __ = prepare_data_table(table, loaded_score_columns=loaded_score_columns)
 
@@ -159,7 +160,7 @@ class HolyGostQuery(object):
 
     @profile
     def apply_classifier(self, final_classifier, experiment, all_test_target_scores,
-                         all_test_decoy_scores, table):
+                         all_test_decoy_scores, table, p_score=False):
 
         lambda_ = CONFIG.get("final_statistics.lambda")
 
@@ -168,16 +169,49 @@ class HolyGostQuery(object):
 
         all_tt_scores = experiment.get_top_target_peaks()["d_score"]
 
-        df_raw_stat = calculate_final_statistics(all_tt_scores, all_test_target_scores,
+        df_raw_stat, num_null, num_total = calculate_final_statistics(all_tt_scores, all_test_target_scores,
                                                  all_test_decoy_scores, lambda_)
 
         scored_table = self.enrich_table_with_results(table, experiment, df_raw_stat)
+
+        if CONFIG.get("compute.probabilities"):
+            logging.info( "" )
+            logging.info( "Posterior Probability estimation:" )
+            logging.info( "Estimated number of null %0.2f out of a total of %s. " % (num_null, num_total) )
+
+            # Note that num_null and num_total are the sum of the
+            # cross-validated statistics computed before, therefore the total
+            # number of data points selected will be 
+            #   len(data) /  xeval.fraction * xeval.num_iter
+            # 
+            prior_chrom_null = num_null * 1.0 / num_total
+            number_true_chromatograms = (1.0-prior_chrom_null) * len(experiment.get_top_target_peaks().df)
+            number_target_pg = len( Experiment(experiment.df[(experiment.df.is_decoy == False) ]).df )
+            prior_peakgroup_true = number_true_chromatograms / number_target_pg
+
+            logging.info( "Prior for a peakgroup: %s" % (number_true_chromatograms / number_target_pg))
+            logging.info( "Prior for a chromatogram: %s" % str(1-prior_chrom_null) )
+            logging.info( "Estimated number of true chromatograms: %s out of %s" % (number_true_chromatograms, len(experiment.get_top_target_peaks().df)) )
+            logging.info( "Number of target data: %s" % len( Experiment(experiment.df[(experiment.df.is_decoy == False) ]).df ) )
+
+            # pg_score = posterior probability for each peakgroup
+            # h_score = posterior probability for the hypothesis that this peakgroup is true (and all other false)
+            # h0_score = posterior probability for the hypothesis that no peakgroup is true
+
+            pp_pg_pvalues = posterior_pg_prob(experiment, prior_peakgroup_true, lambda_=lambda_)
+            experiment.df[ "pg_score"]  = pp_pg_pvalues
+            scored_table = scored_table.join(experiment[["pg_score"]])
+
+            allhypothesis, h0 = posterior_chromatogram_hypotheses_fast(experiment, prior_chrom_null)
+            experiment.df[ "h_score"]  = allhypothesis
+            experiment.df[ "h0_score"]  = h0
+            scored_table = scored_table.join(experiment[["h_score", "h0_score"]])
 
         final_statistics = final_err_table(df_raw_stat)
         summary_statistics = summary_err_table(df_raw_stat)
 
         needed_to_persist = (final_classifier, mu, nu,
-                             df_raw_stat.loc[:, ["svalue", "qvalue", "cutoff"]])
+                             df_raw_stat.loc[:, ["svalue", "qvalue", "cutoff"]], num_null, num_total)
         return (summary_statistics, final_statistics, scored_table), needed_to_persist
 
     @profile
