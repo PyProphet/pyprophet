@@ -6,7 +6,7 @@ os.putenv("OPENBLAS_NUM_THREADS", "1")
 
 try:
     profile
-except:
+except NameError:
     profile = lambda x: x
 
 from pyprophet import PyProphet
@@ -121,6 +121,7 @@ def _main(args):
     apply_existing_scorer = persisted is not None
 
     class Pathes(dict):
+
         def __init__(self, prefix=prefix, dirname=dirname, **kw):
             for k, postfix in kw.items():
                 self[k] = os.path.join(dirname, prefix + postfix)
@@ -138,7 +139,7 @@ def _main(args):
                     mayu_cutoff="_mayu.cutoff",
                     mayu_fasta="_mayu.fasta",
                     mayu_csv="_mayu.csv",
-    )
+                    )
 
     if not apply_existing_scorer:
         pickled_scorer_path = os.path.join(dirname, prefix + "_scorer.bin")

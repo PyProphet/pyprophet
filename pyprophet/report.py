@@ -100,8 +100,8 @@ def export_mayu(mayu_cutoff_file, mayu_fasta_file, mayu_csv_file, scored_table, 
 
     # write MAYU cutoff input file
     mayu_cutoff = (final_stat.ix[0]['FP'] + final_stat.ix[0]['TN']) / \
-        (final_stat.ix[0]['TP'] + final_stat.ix[0]['FN']
-         + final_stat.ix[0]['FP'] + final_stat.ix[0]['TN'])
+                  (final_stat.ix[0]['TP'] + final_stat.ix[0]['FN']
+                   + final_stat.ix[0]['FP'] + final_stat.ix[0]['TN'])
 
     mayu_cutoff_file_out = open(mayu_cutoff_file, "w")
     mayu_cutoff_file_out.write("%s" % mayu_cutoff)

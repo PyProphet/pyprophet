@@ -10,12 +10,11 @@ import pandas as pd
 
 try:
     profile
-except:
+except NameError:
     profile = lambda x: x
 
 from optimized import find_nearest_matches as _find_nearest_matches, count_num_positives
 import scipy.special
-import traceback
 import math
 
 from config import CONFIG
@@ -75,7 +74,7 @@ def get_error_table_using_percentile_positives_new(err_df, target_scores, num_nu
     num_alternative = num - num_null
     target_scores = np.sort(to_one_dim_array(target_scores))  # ascending
 
-    # optimized 
+    # optimized
     num_positives = count_num_positives(target_scores)
 
     num_negatives = num - num_positives
@@ -167,7 +166,6 @@ def summary_err_table(df, qvalues=[0, 0.01, 0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5]
     # remove old index from original df:
     df_sub.reset_index(inplace=True, drop=True)
     return df_sub
-
 
 
 @profile

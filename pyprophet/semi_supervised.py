@@ -6,7 +6,7 @@ os.putenv("OPENBLAS_NUM_THREADS", "1")
 
 try:
     profile
-except:
+except NameError:
     profile = lambda x: x
 
 from data_handling import Experiment
@@ -101,8 +101,7 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
     def start_semi_supervised_learning(self, train):
         fdr = CONFIG.get("semi_supervised_learner.initial_fdr")
         lambda_ = CONFIG.get("semi_supervised_learner.initial_lambda")
-        td_peaks, bt_peaks = self.select_train_peaks(
-            train, "main_score", fdr, lambda_)
+        td_peaks, bt_peaks = self.select_train_peaks(train, "main_score", fdr, lambda_)
         model = self.inner_learner.learn(td_peaks, bt_peaks, False)
         w = model.get_parameters()
         clf_scores = model.score(train, False)
@@ -113,7 +112,7 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
     def iter_semi_supervised_learning(self, train):
         fdr = CONFIG.get("semi_supervised_learner.iteration_fdr")
         lambda_ = CONFIG.get("semi_supervised_learner.iteration_lambda")
-        td_peaks, bt_peaks = self.select_train_peaks( train, "classifier_score", fdr, lambda_)
+        td_peaks, bt_peaks = self.select_train_peaks(train, "classifier_score", fdr, lambda_)
 
         model = self.inner_learner.learn(td_peaks, bt_peaks, True)
         w = model.get_parameters()

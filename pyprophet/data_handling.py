@@ -13,7 +13,7 @@ from config import CONFIG
 
 try:
     profile
-except:
+except NameError:
     profile = lambda x: x
 
 import logging
@@ -25,10 +25,9 @@ def cleanup_and_check(df):
     # this is fast but not easy to read
     # find peak groups with in valid scores:
     sub_df = df.loc[:, score_columns]
-    flags = ~pd.isnull(sub_df) 
+    flags = ~pd.isnull(sub_df)
     valid_rows = flags.all(axis=1)
 
-    #idx = (~pd.isnull(df.loc[:, score_columns])).all(axis=1)
     df_cleaned = df.loc[valid_rows, :]
 
     # decoy / non decoy sub tables
@@ -122,10 +121,10 @@ def prepare_data_table(table, tg_id_name="transition_group_id",
         col_name = "var_%d" % i
         col_data = table[v]
         if pd.isnull(col_data).all():
-	    msg = "column %s contains only invalid/missing values" % v
+            msg = "column %s contains only invalid/missing values" % v
             if ignore_invalid_scores:
-		    logging.warn("%s. pyprophet skips this.")
-		    continue	
+                logging.warn("%s. pyprophet skips this.")
+                continue
             raise Exception("%s. you may use --ignore.invalid_score_columns")
         data[col_name] = col_data
         column_names.append(col_name)
@@ -155,8 +154,8 @@ class Experiment(object):
     def log_summary(self):
         logging.info("summary input file:")
         logging.info("   %d lines" % len(self.df))
-        logging.info("   %d transition groups" %  len(self.df.tg_id.unique()))
-        logging.info("   %d scores including main score" %  (len(self.df.columns.values) - 6))
+        logging.info("   %d transition groups" % len(self.df.tg_id.unique()))
+        logging.info("   %d scores including main score" % (len(self.df.columns.values) - 6))
 
     def __getitem__(self, *args):
         return self.df.__getitem__(*args)
@@ -174,8 +173,6 @@ class Experiment(object):
         self.rank_by(col_name)
 
     def rank_by(self, score_col_name):
-        v = self.df.tg_num_id.values
-
         flags = find_top_ranked(self.df.tg_num_id.values, self.df[score_col_name].values)
         self.df.is_top_peak = flags
 

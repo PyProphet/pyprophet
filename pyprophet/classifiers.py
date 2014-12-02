@@ -1,4 +1,4 @@
-#encoding: latin-1
+# encoding: latin-1
 
 # openblas + multiprocessing crashes for OPENBLAS_NUM_THREADS > 1 !!!
 import os
@@ -6,7 +6,7 @@ os.putenv("OPENBLAS_NUM_THREADS", "1")
 
 try:
     profile
-except:
+except NameError:
     profile = lambda x: x
 
 import sklearn.lda
@@ -69,7 +69,6 @@ class LDALearner(LinearLearner):
         classifier.fit(X, y)
         self.classifier = classifier
         self.scalings = classifier.scalings_.flatten()
-        #scores = np.dot(X, self.scalings)
         return self
 
     def get_parameters(self):

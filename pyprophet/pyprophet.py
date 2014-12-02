@@ -5,8 +5,8 @@ import os
 os.putenv("OPENBLAS_NUM_THREADS", "1")
 
 try:
-    profile  # ignore
-except:
+    profile
+except NameError:
     profile = lambda x: x
 
 import pandas as pd
