@@ -50,7 +50,7 @@ class HolyGostQuery(object):
         self.semi_supervised_learner = semi_supervised_learner
 
     @profile
-    def process_csv(self, path, delim=",", loaded_scorer=None, p_score=False):
+    def process_csv(self, path, delim=",", loaded_scorer=None, loaded_weights=None, p_score=False):
         start_at = time.time()
 
         logging.info("read %s" % path)
@@ -63,7 +63,7 @@ class HolyGostQuery(object):
             data_for_persistence = None
         else:
             logging.info("learn and apply scorer to %s" % path)
-            result_tables, data_for_persistence = self.learn_and_apply_classifier(table)
+            result_tables, data_for_persistence, trained_weights = self.learn_and_apply_classifier(table, p_score, loaded_weights)
         logging.info("processing %s finished" % path)
 
         needed = time.time() - start_at
@@ -74,10 +74,10 @@ class HolyGostQuery(object):
         needed -= minutes * 60
 
         logging.info("time needed: %02d:%02d:%.1f" % (hours, minutes, needed))
-        return result_tables, data_for_persistence
+        return result_tables, data_for_persistence, trained_weights
 
     @profile
-    def learn_and_apply_classifier(self, table, p_score=False):
+    def learn_and_apply_classifier(self, table, p_score=False, loaded_weights=None):
 
         prepared_table, score_columns = prepare_data_table(table)
 
@@ -90,41 +90,55 @@ class HolyGostQuery(object):
 
         experiment.log_summary()
 
-        all_test_target_scores = []
-        all_test_decoy_scores = []
+        inst = self.semi_supervised_learner
         ws = []
         neval = CONFIG.get("xeval.num_iter")
-        inst = self.semi_supervised_learner
         num_processes = CONFIG.get("num_processes")
-        logging.info("start %d cross evals using %d processes" % (neval, num_processes))
-        if num_processes == 1:
-            for k in range(neval):
-                (ttt_scores, ttd_scores, w) = inst.learn_randomized(experiment)
-                all_test_target_scores.extend(ttt_scores)
-                all_test_decoy_scores.extend(ttd_scores)
-                ws.append(w.flatten())
-        else:
-            pool = multiprocessing.Pool(processes=num_processes)
-            while neval:
-                remaining = max(0, neval - num_processes)
-                todo = neval - remaining
-                neval -= todo
-                args = ((inst, "learn_randomized", (experiment, )), ) * todo
-                res = pool.map(unwrap_self_for_multiprocessing, args)
-                top_test_target_scores = [ti for r in res for ti in r[0]]
-                top_test_decoy_scores = [ti for r in res for ti in r[1]]
-                ws.extend([r[2] for r in res])
-                all_test_target_scores.extend(top_test_target_scores)
-                all_test_decoy_scores.extend(top_test_decoy_scores)
+        all_test_target_scores = []
+        all_test_decoy_scores = []
 
-        logging.info("finished cross evals")
+        if loaded_weights == None:
+            logging.info("start %d cross evals using %d processes" % (neval, num_processes))
+            if num_processes == 1:
+                for k in range(neval):
+                    (ttt_scores, ttd_scores, w) = inst.learn_randomized(experiment)
+                    all_test_target_scores.extend(ttt_scores)
+                    all_test_decoy_scores.extend(ttd_scores)
+                    ws.append(w.flatten())
+            else:
+                pool = multiprocessing.Pool(processes=num_processes)
+                while neval:
+                    remaining = max(0, neval - num_processes)
+                    todo = neval - remaining
+                    neval -= todo
+                    args = ((inst, "learn_randomized", (experiment, )), ) * todo
+                    res = pool.map(unwrap_self_for_multiprocessing, args)
+                    top_test_target_scores = [ti for r in res for ti in r[0]]
+                    top_test_decoy_scores = [ti for r in res for ti in r[1]]
+                    ws.extend([r[2] for r in res])
+                    all_test_target_scores.extend(top_test_target_scores)
+                    all_test_decoy_scores.extend(top_test_decoy_scores)
+            logging.info("finished cross evals")
+
+        else:
+            logging.info("start application of pretrained weights")
+            ws.append(loaded_weights.flatten())
+            clf_scores = inst.score(experiment, loaded_weights)
+            experiment.set_and_rerank("classifier_score", clf_scores)
+
+            all_test_target_scores.extend(experiment.get_target_peaks()["classifier_score"])
+            all_test_decoy_scores.extend(experiment.get_decoy_peaks()["classifier_score"])
+            logging.info("finished pretrained scoring")
+
         final_classifier = self.semi_supervised_learner.averaged_learner(ws)
+
+        loaded_weights = final_classifier.get_parameters()
 
         result, data_for_persistence = self.apply_classifier(final_classifier, experiment,
                                                              all_test_target_scores,
                                                              all_test_decoy_scores, table, p_score=p_score)
         logging.info("calculated scoring and statistics")
-        return result, data_for_persistence + (score_columns,)
+        return result, data_for_persistence + (score_columns,), loaded_weights
 
     @profile
     def apply_loaded_scorer(self, table, loaded_scorer):
