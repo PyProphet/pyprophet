@@ -126,8 +126,8 @@ class HolyGostQuery(object):
             clf_scores = inst.score(experiment, loaded_weights)
             experiment.set_and_rerank("classifier_score", clf_scores)
 
-            all_test_target_scores.extend(experiment.get_target_peaks()["classifier_score"])
-            all_test_decoy_scores.extend(experiment.get_decoy_peaks()["classifier_score"])
+            all_test_target_scores.extend(experiment.get_top_target_peaks()["classifier_score"])
+            all_test_decoy_scores.extend(experiment.get_top_decoy_peaks()["classifier_score"])
             logging.info("finished pretrained scoring")
 
         final_classifier = self.semi_supervised_learner.averaged_learner(ws)
