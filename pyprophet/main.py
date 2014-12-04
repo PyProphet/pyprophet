@@ -107,12 +107,12 @@ def _main(args):
     prefix, __ = os.path.splitext(basename)
 
     persisted_scorer = None
-    apply_scorer_ = CONFIG.get("apply_scorer")
-    if apply_scorer_:
-        if not os.path.exists(apply_scorer_):
-            raise Exception("scorer file %s does not exist" % apply_scorer_)
+    apply_scorer = CONFIG.get("apply_scorer")
+    if apply_scorer:
+        if not os.path.exists(apply_scorer):
+            raise Exception("scorer file %s does not exist" % apply_scorer)
         try:
-            persisted_scorer = cPickle.loads(zlib.decompress(open(apply_scorer_, "rb").read()))
+            persisted_scorer = cPickle.loads(zlib.decompress(open(apply_scorer, "rb").read()))
         except:
             import traceback
             traceback.print_exc()
@@ -121,12 +121,12 @@ def _main(args):
     apply_existing_scorer = persisted_scorer is not None
 
     persisted_weights = None
-    apply_weights_ = CONFIG.get("apply_weights")
-    if apply_weights_:
-        if not os.path.exists(apply_weights_):
-            raise Exception("weights file %s does not exist" % apply_weights_)
+    apply_weights = CONFIG.get("apply_weights")
+    if apply_weights:
+        if not os.path.exists(apply_weights):
+            raise Exception("weights file %s does not exist" % apply_weights)
         try:
-            persisted_weights = np.loadtxt(apply_weights_)
+            persisted_weights = np.loadtxt(apply_weights)
 
         except:
             import traceback

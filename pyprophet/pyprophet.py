@@ -59,7 +59,7 @@ class HolyGostQuery(object):
 
         if loaded_scorer is not None:
             logging.info("apply scorer to  %s" % path)
-            result_tables, data_for_persistence = self.apply_loaded_scorer(table, loaded_scorer)
+            result_tables, data_for_persistence, trained_weights = self.apply_loaded_scorer(table, loaded_scorer)
             data_for_persistence = None
         else:
             logging.info("learn and apply scorer to %s" % path)
@@ -155,7 +155,9 @@ class HolyGostQuery(object):
 
         scored_table = self.enrich_table_with_results(table, experiment, df_raw_stat)
 
-        return (None, None, scored_table), None
+        trained_weights = final_classifier.get_parameters()
+
+        return (None, None, scored_table), None, trained_weights
 
     @profile
     def enrich_table_with_results(self, table, experiment, df_raw_stat):
