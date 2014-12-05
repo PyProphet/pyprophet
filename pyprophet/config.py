@@ -31,6 +31,9 @@ def standard_config(n_cpus=1):
 
     CONFIG["final_statistics.lambda"] = lambda_
 
+    CONFIG["final_statistics.fdr_all_pg"] = False
+    info["final_statistics.fdr_all_pg"] = """[use all peak groups for score & q-value calculation]"""
+
     CONFIG["num_processes"] = n_cpus
     info["num_processes"] = "[-1 means 'all available cpus']"
 
@@ -45,7 +48,7 @@ def standard_config(n_cpus=1):
 
     CONFIG["ignore.invalid_score_columns"] = False
     info["ignore.invalid_score_columns"] =\
-        """ignore score columns which only contain NaN of infinity values"""
+        """[ignore score columns which only contain NaN or infinity values]"""
 
     CONFIG["apply_scorer"] = None
     info["apply_scorer"] = r"""[name of *_scorer.bin file of existing classifier]"""
