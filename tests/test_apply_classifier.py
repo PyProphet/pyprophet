@@ -29,7 +29,7 @@ def test_apply_classifier(tmpdir):
     __, __, interesting_s_value_output = s_value_stat[0].partition("mean s_value")
 
     stdout = subprocess.check_output(
-                        "pyprophet test_data.txt --apply=test_data_scorer.bin --target.overwrite",
+                        "pyprophet test_data.txt --apply_scorer=test_data_scorer.bin --target.overwrite",
                         shell=True,
                         stderr=subprocess.STDOUT)
 

@@ -18,7 +18,7 @@ import warnings
 import logging
 import cPickle
 import zlib
-
+import numpy as np
 
 def print_help():
     print
@@ -106,19 +106,35 @@ def _main(args):
     basename = os.path.basename(path)
     prefix, __ = os.path.splitext(basename)
 
-    persisted = None
-    apply_ = CONFIG.get("apply")
-    if apply_:
-        if not os.path.exists(apply_):
-            raise Exception("scorer file %s does not exist" % apply_)
+    persisted_scorer = None
+    apply_scorer = CONFIG.get("apply_scorer")
+    if apply_scorer:
+        if not os.path.exists(apply_scorer):
+            raise Exception("scorer file %s does not exist" % apply_scorer)
         try:
-            persisted = cPickle.loads(zlib.decompress(open(apply_, "rb").read()))
+            persisted_scorer = cPickle.loads(zlib.decompress(open(apply_scorer, "rb").read()))
         except:
             import traceback
             traceback.print_exc()
             raise
 
-    apply_existing_scorer = persisted is not None
+    apply_existing_scorer = persisted_scorer is not None
+
+    persisted_weights = None
+    apply_weights = CONFIG.get("apply_weights")
+    if apply_weights:
+        if not os.path.exists(apply_weights):
+            raise Exception("weights file %s does not exist" % apply_weights)
+        try:
+            persisted_weights = np.loadtxt(apply_weights)
+
+        except:
+            import traceback
+            traceback.print_exc()
+            raise
+
+    apply_existing_weights = persisted_weights is not None
+
 
     class Pathes(dict):
 
@@ -144,11 +160,16 @@ def _main(args):
     if not apply_existing_scorer:
         pickled_scorer_path = os.path.join(dirname, prefix + "_scorer.bin")
 
+    if not apply_existing_weights:
+        trained_weights_path = os.path.join(dirname, prefix + "_weights.txt")
+
     if not CONFIG.get("target.overwrite", False):
         found_exsiting_file = False
         to_check = list(pathes.keys())
         if not apply_existing_scorer:
             to_check.append(pickled_scorer_path)
+        if not apply_existing_weights:
+            to_check.append(trained_weights_path)
         for p in to_check:
             if os.path.exists(p):
                 found_exsiting_file = True
@@ -167,7 +188,7 @@ def _main(args):
     start_at = time.time()
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        result, needed_to_persist = PyProphet().process_csv(path, delim_in, persisted)
+        result, needed_to_persist, trained_weights = PyProphet().process_csv(path, delim_in, persisted_scorer, persisted_weights)
         (summ_stat, final_stat, scored_table) = result
     needed = time.time() - start_at
 
@@ -203,6 +224,10 @@ def _main(args):
         with open(pickled_scorer_path, "wb") as fp:
             fp.write(bin_data)
         print "WRITTEN: ", pickled_scorer_path
+
+    if not apply_existing_weights:
+        np.savetxt(trained_weights_path,trained_weights,delimiter="\t")
+        print "WRITTEN: ", trained_weights_path
 
     if CONFIG.get("export.mayu", True):
         export_mayu(pathes.mayu_cutoff, pathes.mayu_fasta, pathes.mayu_csv, scored_table, final_stat)

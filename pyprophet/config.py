@@ -47,8 +47,11 @@ def standard_config(n_cpus=1):
     info["ignore.invalid_score_columns"] =\
         """ignore score columns which only contain NaN of infinity values"""
 
-    CONFIG["apply"] = None
-    info["apply"] = r"""[name of *_scorer.bin file of existing classifier]"""
+    CONFIG["apply_scorer"] = None
+    info["apply_scorer"] = r"""[name of *_scorer.bin file of existing classifier]"""
+
+    CONFIG["apply_weights"] = None
+    info["apply_weights"] = r"""[name of *_weights.txt file of existing LDA weights]"""
 
     CONFIG["export.mayu"] = False
     info["export.mayu"] = """[export input files for MAYU]"""
