@@ -144,6 +144,7 @@ def _main(args):
         __getattr__ = dict.__getitem__
 
     pathes = Pathes(scored_table="_with_dscore.csv",
+                    filtered_table="_with_dscore_filtered.csv",
                     final_stat="_full_stat.csv",
                     summ_stat="_summary_stat.csv",
                     report="_report.pdf",
@@ -218,6 +219,11 @@ def _main(args):
             print "WRITTEN: ", path
     scored_table.to_csv(pathes.scored_table, sep=delim_out, index=False)
     print "WRITTEN: ", pathes.scored_table
+
+    filtered_table = scored_table[scored_table.d_score > CONFIG.get("d_score.cutoff")]
+
+    filtered_table.to_csv(pathes.filtered_table, sep=delim_out, index=False)
+    print "WRITTEN: ", pathes.filtered_table
 
     if not apply_existing_scorer:
         bin_data = zlib.compress(cPickle.dumps(needed_to_persist, protocol=2))

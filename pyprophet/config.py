@@ -62,6 +62,9 @@ def standard_config(n_cpus=1):
     CONFIG["compute.probabilities"] = False
     info["compute.probabilities"] = """[Compute approximate binned probability values]"""
 
+    CONFIG["d_score.cutoff"] = -1000.0
+    info["d_score.cutoff"] = """[Filter output such that only results with a d_score higher than this value are reported]"""
+
     return CONFIG, info
 
 CONFIG, __ = standard_config()
@@ -77,6 +80,7 @@ def fix_config_types(dd):
         dd[k] = int(dd[k])
 
     for k in ["xeval.fraction",
+              "d_score.cutoff",
               "semi_supervised_learner.initial_fdr",
               "semi_supervised_learner.initial_lambda",
               "semi_supervised_learner.iteration_lambda",
