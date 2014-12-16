@@ -18,17 +18,17 @@ Installation
 
 Install *pyprophet* from Python package index:
 
-```
+````
     $ pip install numpy
     $ pip install pyprophet
-```
+````
 
 or:
 
-```
+````
    $ easy_install numpy
    $ easy_install pyprophet
-```
+````
 
 
 Running pyprophet
@@ -36,15 +36,15 @@ Running pyprophet
 
 *pyoprophet* is not only a Python package, but also a command line tool:
 
-```
+````
    $ pyprophet --help
-```
+````
 
 or:
 
-```
+````
    $ pyprophet --delim=tab tests/test_data.txt
-```
+````
 
 
 Running tests
@@ -52,8 +52,8 @@ Running tests
 
 The *pyprophet* tests are best executed using `py.test`, to run the tests use:
 
-```
+````
     $ pip install pytest
     $ py.test tests
-```
+````
 
