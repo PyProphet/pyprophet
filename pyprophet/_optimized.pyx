@@ -269,5 +269,3 @@ def single_chromatogram_hypothesis_fast(np.float64_t[:] inv_pg_pp_true, np.float
         i += 1
 
     return result
-
-

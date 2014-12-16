@@ -13,7 +13,9 @@ try:
 except NameError:
     profile = lambda x: x
 
-from optimized import find_nearest_matches as _find_nearest_matches, count_num_positives, single_chromatogram_hypothesis_fast
+from optimized import (find_nearest_matches as _find_nearest_matches,
+                       count_num_positives,
+                       single_chromatogram_hypothesis_fast)
 import scipy.special
 import math
 import scipy.stats
