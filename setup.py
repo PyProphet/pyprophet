@@ -2,10 +2,9 @@ from setuptools import setup, find_packages
 from distutils.extension import Extension
 
 
-import pyprophet
 import numpy
 
-version = pyprophet.__version__
+version = (0, 13, 3)
 
 ext_modules = [Extension("pyprophet._optimized", ["pyprophet/_optimized.c"])]
 
