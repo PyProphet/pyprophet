@@ -63,8 +63,8 @@ class NonParamNullModel(NullModel):
 class LogNormalNullModel(NullModel):
 
 	def pvalues(self, target_scores, decoy_scores):
-		print "LOG NORMAL NULL MODEL:"
+		#print "LOG NORMAL NULL MODEL:"
 		corr = - np.min(decoy_scores) + 0.0001
 		mu, nu = mean_and_std_dev(np.log(decoy_scores + corr))
-		print mu, nu, np.min(decoy_scores)
+		#print mu, nu, np.min(decoy_scores)
 		return 1.0 - pnorm(np.log(target_scores + corr), mu, nu)

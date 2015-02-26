@@ -19,7 +19,7 @@ def standard_config(n_cpus=1):
         n_cpus = multiprocessing.cpu_count()
 
     CONFIG["decoy.missing"] = 0.0 
-    CONFIG["train.fraction"] = 0.7
+    CONFIG["train.fraction"] = 1.0
     
     CONFIG["no.file.output"] = False
     CONFIG["all.output"] = False
@@ -54,6 +54,9 @@ def standard_config(n_cpus=1):
     CONFIG["final_statistics.stat_sampler"] = "mProph"
     info["final_statistics.stat_sampler"] = "how to sample from classification stats to actual scores [mProph]"
 
+    CONFIG["final_statistics.fdr_all_pg"] = False
+    info["final_statistics.fdr_all_pg"] = """[use all peak groups for score & q-value calculation]"""
+
     CONFIG["num_processes"] = n_cpus
     info["num_processes"] = "[-1 means 'all available cpus']"
 
@@ -68,10 +71,22 @@ def standard_config(n_cpus=1):
 
     CONFIG["ignore.invalid_score_columns"] = False
     info["ignore.invalid_score_columns"] =\
-        """ignore score columns which conly contain NaN of infinity values"""
+        """[ignore score columns which only contain NaN or infinity values]"""
 
-    CONFIG["apply"] = None
-    info["apply"] = r"""[name of *_scorer.bin file of existing classifier]"""
+    CONFIG["apply_scorer"] = None
+    info["apply_scorer"] = r"""[name of *_scorer.bin file of existing classifier]"""
+
+    CONFIG["apply_weights"] = None
+    info["apply_weights"] = r"""[name of *_weights.txt file of existing LDA weights]"""
+
+    CONFIG["export.mayu"] = False
+    info["export.mayu"] = """[export input files for MAYU]"""
+
+    CONFIG["compute.probabilities"] = False
+    info["compute.probabilities"] = """[Compute approximate binned probability values]"""
+
+    CONFIG["d_score.cutoff"] = -1000.0
+    info["d_score.cutoff"] = """[Filter output such that only results with a d_score higher than this value are reported]"""
 
     return CONFIG, info
 
@@ -91,6 +106,7 @@ def fix_config_types(dd):
     for k in ["decoy.missing",
               "xeval.fraction",
               "train.fraction",
+              "d_score.cutoff",
               "semi_supervised_learner.initial_fdr",
               "semi_supervised_learner.initial_lambda",
               "semi_supervised_learner.iteration_lambda",
@@ -103,3 +119,8 @@ def fix_config_types(dd):
 
     if dd["delim.out"] == "tab":
         dd["delim.out"] = "\t"
+
+
+def get_invalid_params(std, custom):
+    return [k for k in custom.keys() if k not in std]
+            

@@ -10,14 +10,17 @@ import pandas as pd
 
 try:
     profile
-except:
+except NameError:
     profile = lambda x: x
 
-from optimized import find_nearest_matches as _find_nearest_matches, count_num_positives
+from optimized import (find_nearest_matches as _find_nearest_matches,
+                       count_num_positives,
+                       single_chromatogram_hypothesis_fast)
 import scipy.special
 from scipy.stats import lognorm
 import traceback
 import math
+import scipy.stats
 
 from config import CONFIG
 
@@ -54,6 +57,95 @@ def to_one_dim_array(values, as_type=None):
         return values.astype(as_type)
     return values
 
+def posterior_pg_prob(experiment, prior_peakgroup_true, lambda_=0.5, fdr_estimate=0.15):
+    """ Compute posterior probabilities for each peakgroup
+
+    - Estimate the true distribution by using all target peakgroups above the
+      given the cutoff (estimated FDR as given as input). Assume gaussian distribution.
+
+    - Estimate the false/decoy distribution by using all decoy peakgroups.
+      Assume gaussian distribution.
+
+    """
+
+    # All target values and all decoy values
+    tvals = experiment.df.loc[(experiment.df.is_decoy == False), "d_score" ]
+    dvals = experiment.df.loc[(experiment.df.is_decoy == True), "d_score" ]
+
+    # Estimate a suitable cutoff in discriminant score (d_score)
+    target_scores = experiment.get_top_target_peaks().df[ "d_score"]
+    decoy_scores = experiment.get_top_decoy_peaks().df[ "d_score"]
+    estimated_cutoff = find_cutoff(target_scores, decoy_scores, lambda_, fdr_estimate)
+
+    # Get all top target peaks above the cutoff (very likely true) to estimate the true distribution
+    target_peaks = experiment.get_top_target_peaks()
+    target_scores_above = target_peaks.df.loc[ target_peaks.df.d_score > estimated_cutoff, "d_score"]
+
+    # Use all decoys and top-peaks of top target chromatograms to parametrically estimate the two distributions
+    all_scores = experiment.df["d_score"]
+    p_decoy = scipy.stats.norm.pdf(all_scores, np.mean(dvals), np.std(dvals, ddof=1))
+    p_target = scipy.stats.norm.pdf(all_scores, np.mean(target_scores_above), np.std(target_scores_above, ddof=1))
+
+    # Bayesian inference 
+    # Posterior probabilities for each peakgroup
+    pp_pg_pvalues = p_target *  prior_peakgroup_true / \
+            ( p_target * prior_peakgroup_true +  p_decoy * (1.0 - prior_peakgroup_true) )  
+
+    return pp_pg_pvalues
+
+def posterior_chromatogram_hypotheses_fast(experiment, prior_chrom_null):
+    """ Compute posterior probabilities for each chromatogram
+
+    For each chromatogram (each transition_group), all hypothesis of all peaks
+    being correct (and all others false) as well as the h0 (all peaks are
+    false) are computed.
+
+    The prior probability that the  are given in the function
+
+    This assumes that the input data is sorted by tg_num_id
+
+        Args:
+            experiment(:class:`data_handling.Multipeptide`): the data of one experiment
+            prior_chrom_null(float): the prior probability that any precursor
+                is absent (all peaks are false)
+
+        Returns:
+            tuple(hypothesis, h0): two vectors that contain for each entry in
+            the input dataframe the probabilities for the hypothesis that the
+            peak is correct and the probability for the h0
+    """
+
+    tg_ids = experiment.df.tg_num_id.values
+    pp_values = experiment.df["pg_score"].values
+
+    current_tg_id = tg_ids[0]
+    scores = []
+    final_result = []
+    final_result_h0 = []
+    for i in range(tg_ids.shape[0]):
+
+        id_ = tg_ids[i]
+        if id_ != current_tg_id:
+
+            # Actual computation for a single transition group (chromatogram)
+            prior_pg_true = (1.0-prior_chrom_null) / len(scores)
+            rr = single_chromatogram_hypothesis_fast(np.array(scores), prior_chrom_null, prior_pg_true)
+            final_result.extend(rr[1:])
+            final_result_h0.extend( rr[0] for i in range(len(scores) ) )
+
+            # Reset for next cycle
+            scores = []
+            current_tg_id = id_
+
+        scores.append( 1.0 - pp_values[i] )
+
+    # Last cycle
+    prior_pg_true = (1.0-prior_chrom_null) / len(scores)
+    rr = single_chromatogram_hypothesis_fast(np.array(scores), prior_chrom_null, prior_pg_true)
+    final_result.extend(rr[1:])
+    final_result_h0.extend( rr[0] for i in range(len(scores) ) )
+
+    return final_result, final_result_h0
 
 def pnorm(pvalues, mu, sigma):
     """ [P(X>pi, mu, sigma) for pi in pvalues] for normal distributed P with
@@ -85,14 +177,14 @@ def get_error_table_using_percentile_positives_new(err_df, target_scores, num_nu
     num_alternative = num - num_null
     target_scores = np.sort(to_one_dim_array(target_scores))  # ascending
 
-    # optimized 
+    # optimized
     num_positives = count_num_positives(target_scores)
 
     num_negatives = num - num_positives
     pp = num_positives.astype(float) / num
 
     # find best matching row in err_df for each percentile_positive in pp:
-    imax = find_nearest_matches(err_df.percentile_positive, pp)
+    imax = find_nearest_matches(err_df.percentile_positive.values, pp)
 
     qvalues = err_df.qvalue.iloc[imax].values
     svalues = err_df.svalue.iloc[imax].values
@@ -130,9 +222,10 @@ def get_error_table_using_percentile_positives_new(err_df, target_scores, num_nu
 
 @profile
 def lookup_s_and_q_values_from_error_table(scores, err_df):
-    """ find best matching q-value foe each score in 'scores' """
-    ix = find_nearest_matches(err_df.cutoff, scores)
+    """ find best matching q-value for each score in 'scores' """
+    ix = find_nearest_matches(err_df.cutoff.values, scores.values)
     return err_df.svalue.iloc[ix].values, err_df.qvalue.iloc[ix].values
+
 
 
 @profile
@@ -148,7 +241,7 @@ def final_err_table(df, num_cut_offs=51):
     sampled_cutoffs = np.linspace(min_ - margin, max_ + margin, num_cut_offs)
 
     # find best matching row index for each sampled cut off:
-    ix = find_nearest_matches(df.cutoff, sampled_cutoffs)
+    ix = find_nearest_matches(df.cutoff.values, sampled_cutoffs)
 
     # create sub dataframe:
     sampled_df = df.iloc[ix]
@@ -179,7 +272,6 @@ def summary_err_table(df, qvalues=[0, 0.01, 0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5]
     return df_sub
 
 
-
 @profile
 def get_error_table_from_pvalues_new(p_values, lambda_=0.4):
     """ estimate error table from p_values with method of storey for estimating fdrs and q-values
@@ -196,7 +288,7 @@ def get_error_table_from_pvalues_new(p_values, lambda_=0.4):
     # p_values = p_values[:,None]
 
     # optimized with numpys broadcasting: comparing column vector with row
-    # vectory yieds a matrix with pairwaise somparision results.  sum(axis=0)
+    # vector yields a matrix with pairwise comparison results.  sum(axis=0)
     # sums up each column:
     num_positives = count_num_positives(p_values)
     num_negatives = num - num_positives
@@ -221,7 +313,7 @@ def get_error_table_from_pvalues_new(p_values, lambda_=0.4):
     else:
         fpr = 0.0 * fp
 
-    # assemble statisteics as data frame
+    # assemble statistics as data frame
     error_stat = pd.DataFrame(
         dict(pvalue=p_values.flatten(),
              percentile_positive=pp.flatten(),
@@ -303,4 +395,5 @@ def calculate_final_statistics(all_top_target_scores,
         df, all_top_target_scores,
         num_null_top_target)
 
-    return df_raw_stat
+    return df_raw_stat, num_null, num_total
+

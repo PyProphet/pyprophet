@@ -6,7 +6,7 @@ os.putenv("OPENBLAS_NUM_THREADS", "1")
 
 try:
     profile
-except:
+except NameError:
     profile = lambda x: x
 
 from data_handling import Experiment
@@ -45,8 +45,8 @@ class AbstractSemiSupervisedTeacher(object):
         # initial semi-supervised learning
         student = self.new_student()
         clf_scores = self.start_semi_supervised_learning(lesson, student)
-
         lesson.set_and_rerank("classifier_score", clf_scores)
+
         # semi supervised iteration
         for inner in range(num_iter):
             clf_scores = self.iter_semi_supervised_learning(lesson, student)
@@ -54,16 +54,17 @@ class AbstractSemiSupervisedTeacher(object):
 
         # after semi-supervised iterations classify full dataset
         clf_scores = student.score(experiment, True)
-        #mu, nu = mean_and_std_dev(clf_scores)
         experiment.set_and_rerank("classifier_score", clf_scores)
 
         td_scores = experiment.get_top_decoy_peaks()["classifier_score"]
 
-        mid = np.median(td_scores)
-        p95 = np.percentile(td_scores, 95.0)#mu, nu = mean_and_std_dev(td_scores)
-        #print mid, p95
-        #student.post_scaler = ShiftDivScaler(mid, p95-mid)
-        experiment["classifier_score"] = student.post_scaler.scale(experiment["classifier_score"])#mu) / nu
+#        mid = np.median(td_scores)
+#        p95 = np.percentile(td_scores, 95.0)
+#        print mid, p95
+
+        mu, nu = mean_and_std_dev(td_scores)
+        student.post_scaler = ShiftDivScaler(mu, nu)
+        experiment["classifier_score"] = student.post_scaler.scale(experiment["classifier_score"])
         experiment.rank_by("classifier_score")
 
         top_test_peaks = experiment.get_top_test_peaks()

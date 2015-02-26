@@ -91,7 +91,7 @@ class StoreyFDRCalc(FDRCalc):
 
 def getStatCalc(x):
 	if x == "mProph":
-		return PyProphStatCalc()
+		return MProphStatCalc()
 	elif x == "jt":
 		return JTStatCalc()
 	else:
@@ -103,7 +103,7 @@ class StatCalc(object):
 		raise NotImplementedError
 
 
-class PyProphStatCalc(object):
+class MProphStatCalc(object):
 	def calc(self, df, scores, num_null):
 		return get_error_table_using_percentile_positives_new(
 			df, scores, num_null)
@@ -222,7 +222,7 @@ class MProphStatSampler(StatSampler):
 		sampled_cutoffs = np.linspace(min_ - margin, max_ + margin, num_cut_offs)
 
 		# find best matching row index for each sampled cut off:
-		ix = find_nearest_matches(df.cutoff, sampled_cutoffs)
+		ix = find_nearest_matches(df.cutoff.values, sampled_cutoffs)
 	
 		# create sub dataframe:
 		sampled_df = df.iloc[ix]

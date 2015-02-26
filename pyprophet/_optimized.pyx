@@ -196,7 +196,7 @@ cdef partial_rank(np.float64_t[:] v, size_t imin, size_t imax, np.int64_t[:] ran
 @cython.wraparound(False)
 def rank(np.int64_t[:] tg_ids, np.float64_t[:] scores):
     cdef size_t n = tg_ids.shape[0]
-    result = np.zeros((n,), dtype=int)
+    result = np.zeros((n,), dtype=np.int64)
     cdef np.int64_t[:] ranks = result
     cdef size_t imin = 0
     cdef size_t imax
@@ -208,4 +208,64 @@ def rank(np.int64_t[:] tg_ids, np.float64_t[:] scores):
             imax += 1
         partial_rank(scores, imin, imax, ranks)
         imin = imax
+    return result
+
+
+import operator
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def single_chromatogram_hypothesis_fast(np.float64_t[:] inv_pg_pp_true, np.float64_t prior_chrom_null, np.float64_t prior_pg_true):
+
+    # inv_pg_pp_true contains the probabilities that the peaks are false
+
+    cdef size_t n = inv_pg_pp_true.shape[0]
+    cdef np.float64_t final_val
+    cdef np.float64_t val
+    cdef np.float64_t sum_all = 0.0
+    result = np.zeros((n+1,), dtype=np.float64)
+    cdef np.float64_t[:] cresult = result
+
+    cdef int i
+    cdef int j
+    cdef double af = 1.0
+
+    # Compute the null hypothesis (e.g. all peaks are false)
+    i = 0
+    while i < n:
+        af *= inv_pg_pp_true[i]
+        i += 1
+
+    cresult[0] = af * prior_chrom_null 
+
+    # Compute the alternative hypotheses (e.g. one peak is true and all other
+    # peaks are false)
+    i = 0
+    while i < n:
+        val = inv_pg_pp_true[i]
+        j = 0
+        af = 1.0
+        # Compute the product of all peaks being false except i
+        while j < n:
+            if i != j:
+                af *= inv_pg_pp_true[j]
+            j += 1
+
+        final_val = <np.float64_t>( (1-val) * af) # value i is true
+
+        cresult[i+1] = final_val * prior_pg_true 
+        i += 1
+
+    # Compute sum over all hypothesis
+    i = 0
+    while i < n+1:
+        sum_all += cresult[i]
+        i += 1
+
+    # Divide by sum over all hypothesis (normalize)
+    i = 0
+    while i < n+1:
+        cresult[i] = cresult[i] / sum_all
+        i += 1
+
     return result
