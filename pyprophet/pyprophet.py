@@ -19,7 +19,7 @@ from config import CONFIG
 from misc import nice_time
 
 from data_handling import (prepare_data_table, Experiment)
-from classifiers import (LDALearner, ConsensusPredictor)
+from classifiers import (LDALearner, ConsensusPredictor, LinearPredictor)
 from semi_supervised import (AbstractSemiSupervisedTeacher, StandardSemiSupervisedTeacher)
 
 from error_table import FlexibleErrorTable
@@ -70,7 +70,7 @@ class HolyGostQuery(object):
 			data_for_persistence = None
 		else:
 			logging.info("learn and apply scorer to %s" % path)
-			result_tables, clf_scores, data_for_persistence, trained_weights = self.tutor_and_apply_classifier(table)
+			result_tables, clf_scores, data_for_persistence, trained_weights = self.tutor_and_apply_classifier(table, p_score, loaded_weights)
 		
 		logging.info("processing %s finished" % path)
 		logging.info("time needed: %s" % (nice_time(time.time() - start_at)))
@@ -94,7 +94,6 @@ class HolyGostQuery(object):
 		all_test_target_scores = []
 		all_test_decoy_scores = []
 		clfs = []
-		ws = [] # are ws and clfs redundant?
 		
 		train_frac	 = CONFIG.get("train.fraction")
 		is_test	 = CONFIG.get("is_test", False)
@@ -144,10 +143,10 @@ class HolyGostQuery(object):
 			logging.info("finished cross evals")
 		else:
 			logging.info("start application of pretrained weights")
-			ws.append(loaded_weights.flatten())
-			clf_scores = teacher.score(experiment, loaded_weights)
+			loaded_clf = LinearPredictor(loaded_weights)
+			clfs.append(loaded_clf)
+			clf_scores = loaded_clf.score(experiment, True)
 			experiment.set_and_rerank("classifier_score", clf_scores)
-
 			all_test_target_scores.extend(experiment.get_top_target_peaks()["classifier_score"])
 			all_test_decoy_scores.extend(experiment.get_top_decoy_peaks()["classifier_score"])
 			logging.info("finished pretrained scoring")
@@ -156,8 +155,8 @@ class HolyGostQuery(object):
 		final_classifier = ConsensusPredictor(clfs)
 		# TODO: How to solve this for general (non-linear) predictors?
 		# ... maybe just ignore for now
-		loaded_weights = [] #final_classifier.get_parameters()
-		
+		loaded_weights = final_classifier.get_coefs()
+
 		d = {}
 		d["tg_id"] = experiment.df.tg_num_id.values
 		d["decoy"] = experiment.df.is_decoy.values
@@ -192,7 +191,7 @@ class HolyGostQuery(object):
 
 		scored_table = self.enrich_table_with_results(table, experiment, df_raw_stat)
 
-		trained_weights = [] #final_classifier.get_parameters()
+		trained_weights = final_classifier.get_coefs()
 
 		return (None, None, scored_table), None, None, trained_weights
 

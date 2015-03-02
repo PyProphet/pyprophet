@@ -36,6 +36,10 @@ class Predictor(object):
     def score_by_matrix(self, feature_matrix):
         raise NotImplementedError()
 
+    def simplistic(self):
+        return False
+    
+
 
 class AbstractLearner(Predictor):
 
@@ -52,11 +56,9 @@ class AbstractLearner(Predictor):
     def learn(self, decoy_peaks, target_peaks, use_main_score=True):
         raise NotImplementedError()
 
-    def simplistic(self):
-        return False
-    
     def get_coefs(self):
         raise NotImplementedError()
+
 
 
 class LinearLearner(AbstractLearner):
@@ -97,6 +99,15 @@ class ConsensusPredictor(Predictor):
         return np.mean(scores, axis=0)
 
 
+    def get_coefs(self):
+        linCoefs = [pred.get_coefs() for pred in self.predictors if isinstance(pred, LinearLearner) ]
+        if len(linCoefs) > 0:
+            avg_coefs = np.vstack(linCoefs).mean(axis=0)
+            return avg_coefs
+        else:
+            return []
+
+
 
 class LinearPredictor(Predictor):
 
@@ -106,6 +117,9 @@ class LinearPredictor(Predictor):
 
     def score_by_matrix(self, feature_matrix):
         return np.dot(feature_matrix, self.coefs)
+
+    def get_coefs(self):
+        return self.coefs
 
 
 
