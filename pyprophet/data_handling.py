@@ -96,7 +96,7 @@ def prepare_data_table(table, tg_id_name="transition_group_id",
             raise Exception("no column with name var_* in table")
 
     # collect needed data:
-    column_names = "tg_id tg_num_id is_decoy is_top_peak is_train xval_set main_score".split()
+    column_names = "tg_id tg_num_id is_decoy is_top_peak is_train main_score".split()
     N = len(table)
     empty_col = [0] * N
     empty_none_col = [None] * N
@@ -113,7 +113,6 @@ def prepare_data_table(table, tg_id_name="transition_group_id",
                 is_decoy=table[decoy_name].values.astype(bool),
                 is_top_peak=empty_col,
                 is_train=empty_none_col,
-                xval_set=empty_col,
                 main_score=table[main_score_name].values,
                 )
 
@@ -196,7 +195,7 @@ class Experiment(object):
         return Experiment(self.df[(self.df.is_decoy == False) & ix_top])
 
     def get_feature_matrix(self, use_main_score):
-        min_col = 6 if use_main_score else 7
+        min_col = 5 if use_main_score else 6
         return self.df.iloc[:, min_col:-1].values
 
     def filter_(self, idx):
@@ -210,7 +209,7 @@ class Experiment(object):
         self.df["peak_group_rank"] = peak_group_ranks
 
     @profile
-    def split_train_test(self, fraction, is_test):
+    def split_for_xval(self, fraction, is_test):
         df = self.df
         decoy_ids = df[df.is_decoy == True].tg_id.unique()
         target_ids = df[df.is_decoy == False].tg_id.unique()
@@ -229,38 +228,6 @@ class Experiment(object):
         df.is_train[ix_learn] = True
         df.is_train[~ix_learn] = False
 
-    def set_xval_sets(self, num_sets, is_test):
-        df = self.df
-        decoy_ids = df[df.is_decoy == True].tg_id.unique()
-        target_ids = df[df.is_decoy == False].tg_id.unique()
-            
-        if not is_test:
-            random.shuffle(decoy_ids)
-            random.shuffle(target_ids)
-        else:
-            decoy_ids = sorted(decoy_ids)
-            target_ids = sorted(target_ids)
-
-        for i in range(num_sets):
-            decoy_ids = decoy_ids[(len(decoy_ids) * i) / num_sets : (len(decoy_ids) * (i+1)) / num_sets]
-            target_ids = target_ids[(len(decoy_ids) * i) / num_sets : (len(decoy_ids) * (i+1)) / num_sets]
-            learn_ids = np.concatenate((decoy_ids, target_ids))
-            ix_learn = df.tg_id.isin(learn_ids)
-            df.xval_set[ix_learn] = i
-
-    def trian_on_xval_sets(self, sets):
-        df = self.df
-        ix_learn = df.xval_set.isin(sets)
-        df.is_train[ix_learn] = True
-        df.is_train[~ix_learn] = False
-
     def get_train_peaks(self):
         df = self.df[self.df.is_train == True]
         return Experiment(df)
-
-    def get_train_and_test_peaks(self):
-        return Experiment(self.df[self.df.is_train == True]), Experiment(self.df[self.df.is_train == False])
-
-
-def xval_sets(num_sets, num_in_set):
-    return [ ([(i0+n)%5 for n in range(3)]) for i0 in range(5) ]
