@@ -10,7 +10,7 @@ SRM experiments.* **Nat Methods.** 2011 May;8(5):430-5. [doi:
 
 In short, the algorithm can take targeted proteomics data, learn a linear
 separation between true signal and the noise signal and then compute a q-value
-(false discovery rate) to achieve experiment-wide cutoffs.  
+(false discovery rate) to achieve experiment-wide cutoffs.
 
 
 Installation
@@ -42,10 +42,12 @@ or:
 Running tests
 =============
 
-The *pyprophet* tests are best executed using `py.test`, to run the tests use:
+The *pyprophet* tests are best executed using `py.test` and `pytest-regtest` plugin,
+to run the tests use:
 
 ````
     $ pip install pytest
+    $ pip install pytest-regtest
     $ py.test tests
 ````
 
