@@ -26,14 +26,6 @@ Install *pyprophet* from Python package index:
     $ pip install pyprophet
 ````
 
-or:
-
-````
-   $ easy_install numpy
-   $ easy_install pyprophet
-````
-
-
 Running pyprophet
 =================
 
