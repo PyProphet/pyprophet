@@ -24,7 +24,7 @@ If you now create a new test function `test_0` in a file `test_xyz.py`, first ru
 which will show you the yet not approved output. You can approve this output using
 
 ````
-    $ py.test --regtest-rest tests/test_xyz.py::test_0
+    $ py.test --regtest-reset tests/test_xyz.py::test_0
 ````
 
 Which will create a file in `tests/_regtest_outputs/test_xyz.test_0.out` which you should not forget to
