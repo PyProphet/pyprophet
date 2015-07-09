@@ -1,3 +1,4 @@
+import pdb
 # encoding: latin-1
 
 # openblas + multiprocessing crashes for OPENBLAS_NUM_THREADS > 1 !!!
@@ -7,14 +8,22 @@ os.putenv("OPENBLAS_NUM_THREADS", "1")
 try:
     profile
 except NameError:
-    profile = lambda x: x
+    def profile(fun):
+        return fun
 
 import pandas as pd
 import numpy as np
 
+# set output options for regression tests on a wide terminal
+pd.set_option('display.width', 180)
+
+# reduce precision to avoid to sensitive tests because of roundings:
+pd.set_option('display.precision', 6)
+
 from stats import (lookup_s_and_q_values_from_error_table, calculate_final_statistics,
-                   mean_and_std_dev, final_err_table, summary_err_table, pnorm, find_cutoff, posterior_pg_prob)
-from stats import posterior_chromatogram_hypotheses_fast
+                   mean_and_std_dev, final_err_table, summary_err_table,
+                   posterior_pg_prob, posterior_chromatogram_hypotheses_fast)
+
 from config import CONFIG
 
 from data_handling import (prepare_data_table, Experiment)
@@ -26,6 +35,7 @@ import multiprocessing
 import logging
 
 import time
+
 
 def unwrap_self_for_multiprocessing((inst, method_name, args),):
     """ You can not call methods with multiprocessing, but free functions,
@@ -62,7 +72,7 @@ class HolyGostQuery(object):
             result_tables, data_for_persistence, trained_weights = self.apply_loaded_scorer(table, loaded_scorer)
             data_for_persistence = None
         else:
-            logging.info("learn and apply scorer to %s" % path)
+            logging.info("process %s" % path)
             result_tables, data_for_persistence, trained_weights = self.learn_and_apply_classifier(table, p_score, loaded_weights)
         logging.info("processing %s finished" % path)
 
@@ -97,7 +107,8 @@ class HolyGostQuery(object):
         all_test_target_scores = []
         all_test_decoy_scores = []
 
-        if loaded_weights == None:
+        if loaded_weights is None:
+            logging.info("learn and apply scorer")
             logging.info("start %d cross evals using %d processes" % (neval, num_processes))
             if num_processes == 1:
                 for k in range(neval):
@@ -151,6 +162,7 @@ class HolyGostQuery(object):
         experiment = Experiment(prepared_table)
 
         final_score = final_classifier.score(experiment, True)
+        experiment["classifier_score"] = final_score
         experiment["d_score"] = (final_score - mu) / nu
 
         scored_table = self.enrich_table_with_results(table, experiment, df_raw_stat)
@@ -188,42 +200,40 @@ class HolyGostQuery(object):
         else:
             all_tt_scores = experiment.get_top_target_peaks()["d_score"]
 
-        df_raw_stat, num_null, num_total = calculate_final_statistics(all_tt_scores, all_test_target_scores,
-                                                 all_test_decoy_scores, lambda_)
+        df_raw_stat, num_null, num_total = calculate_final_statistics(all_tt_scores,
+                                                                      all_test_target_scores,
+                                                                      all_test_decoy_scores,
+                                                                      lambda_)
 
         scored_table = self.enrich_table_with_results(table, experiment, df_raw_stat)
 
         if CONFIG.get("compute.probabilities"):
-            logging.info( "" )
-            logging.info( "Posterior Probability estimation:" )
-            logging.info( "Estimated number of null %0.2f out of a total of %s. " % (num_null, num_total) )
+            logging.info("")
+            logging.info("Posterior Probability estimation:")
+            logging.info("Estimated number of null %0.2f out of a total of %s. " % (num_null, num_total))
 
             # Note that num_null and num_total are the sum of the
             # cross-validated statistics computed before, therefore the total
-            # number of data points selected will be 
+            # number of data points selected will be
             #   len(data) /  xeval.fraction * xeval.num_iter
-            # 
+            #
             prior_chrom_null = num_null * 1.0 / num_total
-            number_true_chromatograms = (1.0-prior_chrom_null) * len(experiment.get_top_target_peaks().df)
-            number_target_pg = len( Experiment(experiment.df[(experiment.df.is_decoy == False) ]).df )
+            number_true_chromatograms = (1.0 - prior_chrom_null) * len(experiment.get_top_target_peaks().df)
+            number_target_pg = len(Experiment(experiment.df[experiment.df.is_decoy == False]).df)
             prior_peakgroup_true = number_true_chromatograms / number_target_pg
 
-            logging.info( "Prior for a peakgroup: %s" % (number_true_chromatograms / number_target_pg))
-            logging.info( "Prior for a chromatogram: %s" % str(1-prior_chrom_null) )
-            logging.info( "Estimated number of true chromatograms: %s out of %s" % (number_true_chromatograms, len(experiment.get_top_target_peaks().df)) )
-            logging.info( "Number of target data: %s" % len( Experiment(experiment.df[(experiment.df.is_decoy == False) ]).df ) )
-
-            # pg_score = posterior probability for each peakgroup
-            # h_score = posterior probability for the hypothesis that this peakgroup is true (and all other false)
-            # h0_score = posterior probability for the hypothesis that no peakgroup is true
+            logging.info("Prior for a peakgroup: %s" % (number_true_chromatograms / number_target_pg))
+            logging.info("Prior for a chromatogram: %s" % (1.0 - prior_chrom_null))
+            logging.info("Estimated number of true chromatograms: %s out of %s" % (number_true_chromatograms, len(experiment.get_top_target_peaks().df)))
+            logging.info("Number of target data: %s" % len(Experiment(experiment.df[experiment.df.is_decoy == False]).df))
 
             pp_pg_pvalues = posterior_pg_prob(experiment, prior_peakgroup_true, lambda_=lambda_)
-            experiment.df[ "pg_score"]  = pp_pg_pvalues
+            experiment.df["pg_score"] = pp_pg_pvalues
             scored_table = scored_table.join(experiment[["pg_score"]])
 
             allhypothesis, h0 = posterior_chromatogram_hypotheses_fast(experiment, prior_chrom_null)
-            experiment.df[ "h_score"]  = allhypothesis
-            experiment.df[ "h0_score"]  = h0
+            experiment.df["h_score"] = allhypothesis
+            experiment.df["h0_score"] = h0
             scored_table = scored_table.join(experiment[["h_score", "h0_score"]])
 
         final_statistics = final_err_table(df_raw_stat)

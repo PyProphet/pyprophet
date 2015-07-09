@@ -10,7 +10,7 @@ except NameError:
     profile = lambda x: x
 
 from pyprophet import PyProphet
-from config import standard_config, fix_config_types
+from config import CONFIG, set_pandas_print_options
 from report import save_report, export_mayu
 import sys
 import time
@@ -29,8 +29,7 @@ def print_help():
     print "       %s --help" % script
     print "   or "
     print "       %s --version" % script
-    CONFIG, info = standard_config()
-    dump_config_info(CONFIG, info)
+    dump_config_info(CONFIG.config, CONFIG.info)
 
 
 def print_version():
@@ -91,10 +90,8 @@ def _main(args):
         print_help()
         raise Exception("no input file given")
 
-    CONFIG, info = standard_config()
     CONFIG.update(options)
-    fix_config_types(CONFIG)
-    dump_config(CONFIG)
+    dump_config(CONFIG.config)
 
     delim_in = CONFIG.get("delim.in", ",")
     delim_out = CONFIG.get("delim.out", ",")
@@ -184,21 +181,27 @@ def _main(args):
     format_ = "%(levelname)s -- [pid=%(process)s] : %(asctime)s: %(message)s"
     logging.basicConfig(level=logging.INFO, format=format_)
     logging.info("config settings:")
-    for k, v in sorted(CONFIG.items()):
+    for k, v in sorted(CONFIG.config.items()):
         logging.info("    %s: %s" % (k, v))
     start_at = time.time()
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        result, needed_to_persist, trained_weights = PyProphet().process_csv(path, delim_in, persisted_scorer, persisted_weights)
+        (result, needed_to_persist, trained_weights) = PyProphet().process_csv(path,
+                                                                               delim_in,
+                                                                               persisted_scorer,
+                                                                               persisted_weights)
         (summ_stat, final_stat, scored_table) = result
     needed = time.time() - start_at
 
-    print
-    print "=" * 78
-    print
-    print summ_stat
-    print
-    print "=" * 78
+    set_pandas_print_options()
+
+    if summ_stat is not None:
+        print
+        print "=" * 98
+        print
+        print summ_stat
+        print
+        print "=" * 98
 
     print
     if summ_stat is not None:

@@ -6,11 +6,12 @@ os.putenv("OPENBLAS_NUM_THREADS", "1")
 
 import multiprocessing
 
+import pandas as pd
 
-CONFIG = dict(is_test=0)
 
+def _standard_config(n_cpus=1):
 
-def standard_config(n_cpus=1):
+    config = dict(is_test=0)
     info = dict(is_test="[switches randomness off]")
 
     lambda_ = 0.4
@@ -18,59 +19,57 @@ def standard_config(n_cpus=1):
     if n_cpus == -1:
         n_cpus = multiprocessing.cpu_count()
 
-    CONFIG["xeval.fraction"] = 0.5
-    CONFIG["xeval.num_iter"] = 5
+    config["xeval.fraction"] = 0.5
+    config["xeval.num_iter"] = 5
 
-    CONFIG["semi_supervised_learner.initial_fdr"] = 0.15
-    CONFIG["semi_supervised_learner.initial_lambda"] = lambda_
+    config["semi_supervised_learner.initial_fdr"] = 0.15
+    config["semi_supervised_learner.initial_lambda"] = lambda_
 
-    CONFIG["semi_supervised_learner.iteration_fdr"] = 0.02
-    CONFIG["semi_supervised_learner.iteration_lambda"] = lambda_
+    config["semi_supervised_learner.iteration_fdr"] = 0.02
+    config["semi_supervised_learner.iteration_lambda"] = lambda_
 
-    CONFIG["semi_supervised_learner.num_iter"] = 5
+    config["semi_supervised_learner.num_iter"] = 5
 
-    CONFIG["final_statistics.lambda"] = lambda_
+    config["final_statistics.lambda"] = lambda_
 
-    CONFIG["final_statistics.fdr_all_pg"] = False
+    config["final_statistics.fdr_all_pg"] = False
     info["final_statistics.fdr_all_pg"] = """[use all peak groups for score & q-value calculation]"""
 
-    CONFIG["num_processes"] = n_cpus
+    config["num_processes"] = n_cpus
     info["num_processes"] = "[-1 means 'all available cpus']"
 
-    CONFIG["delim.in"] = "tab"
+    config["delim.in"] = "tab"
     info["delim.in"] = r"""[you can eg use 'tab' or ',']"""
 
-    CONFIG["delim.out"] = "tab"
+    config["delim.out"] = "tab"
     info["delim.out"] = r"""[you can eg use 'tab' or ',']"""
 
-    CONFIG["target.dir"] = None
-    CONFIG["target.overwrite"] = 0
+    config["target.dir"] = None
+    config["target.overwrite"] = 0
 
-    CONFIG["ignore.invalid_score_columns"] = False
+    config["ignore.invalid_score_columns"] = False
     info["ignore.invalid_score_columns"] =\
         """[ignore score columns which only contain NaN or infinity values]"""
 
-    CONFIG["apply_scorer"] = None
+    config["apply_scorer"] = None
     info["apply_scorer"] = r"""[name of *_scorer.bin file of existing classifier]"""
 
-    CONFIG["apply_weights"] = None
+    config["apply_weights"] = None
     info["apply_weights"] = r"""[name of *_weights.txt file of existing LDA weights]"""
 
-    CONFIG["export.mayu"] = False
+    config["export.mayu"] = False
     info["export.mayu"] = """[export input files for MAYU]"""
 
-    CONFIG["compute.probabilities"] = False
+    config["compute.probabilities"] = False
     info["compute.probabilities"] = """[Compute approximate binned probability values]"""
 
-    CONFIG["d_score.cutoff"] = -1000.0
+    config["d_score.cutoff"] = -1000.0
     info["d_score.cutoff"] = """[Filter output such that only results with a d_score higher than this value are reported]"""
 
-    return CONFIG, info
-
-CONFIG, __ = standard_config()
+    return config, info
 
 
-def fix_config_types(dd):
+def _fix_config_types(dd):
     for k in ["xeval.num_iter",
               "semi_supervised_learner.num_iter",
               "is_test",
@@ -94,3 +93,36 @@ def fix_config_types(dd):
 
     if dd["delim.out"] == "tab":
         dd["delim.out"] = "\t"
+
+
+def set_pandas_print_options():
+    # w, h = pd.util.terminal.get_terminal_size()
+
+    # set output options for regression tests on a wide terminal
+    pd.set_option('display.width', 100)
+    # reduce precision to avoid to sensitive tests because of roundings:
+    pd.set_option('display.precision', 6)
+
+
+class _ConfigHolder(object):
+
+    def __init__(self):
+        self.config, self.info = _standard_config()
+
+    def update(self, dd):
+        self.config.update(dd)
+        _fix_config_types(self.config)
+
+    def get(self, name, default=None):
+        return self.config.get(name, default)
+
+    def __getitem__(self, name):
+        return self.config[name]
+
+    def __setitem__(self, name, value):
+        self.config[name] = value
+        _fix_config_types(self.config)
+
+
+CONFIG = _ConfigHolder()
+

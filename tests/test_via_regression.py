@@ -36,3 +36,18 @@ def test_regression_test_with_probabilities(regtest):
     print(res, file=regtest)
     print(tab[:10], file=regtest)
     print(tab[-10:], file=regtest)
+
+
+def test_regression_test_with_probabilities(regtest):
+    import pyprophet.config
+    import pyprophet.pyprophet
+    import os.path
+
+    pyprophet.config.CONFIG["is_test"] = True
+    pyprophet.config.CONFIG["compute.probabilities"] = True
+    path = os.path.join(os.path.abspath(os.path.dirname(__file__)), "test_data.txt")
+    (res, __, tab), __, __ = pyprophet.pyprophet.PyProphet().process_csv(path, "\t")
+
+    print(res, file=regtest)
+    print(tab[:10], file=regtest)
+    print(tab[-10:], file=regtest)

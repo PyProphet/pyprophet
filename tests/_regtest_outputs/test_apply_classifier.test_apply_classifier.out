@@ -1,0 +1,162 @@
+ config settings:
+     apply_scorer: None
+     apply_weights: None
+     compute.probabilities: False
+     d_score.cutoff: -1000.0
+     delim.in:
+     delim.out:
+     export.mayu: False
+     final_statistics.fdr_all_pg: False
+     final_statistics.lambda: 0.4
+     ignore.invalid_score_columns: 0
+     is_test: 1
+     num_processes: 1
+     semi_supervised_learner.initial_fdr: 0.15
+     semi_supervised_learner.initial_lambda: 0.4
+     semi_supervised_learner.iteration_fdr: 0.02
+     semi_supervised_learner.iteration_lambda: 0.4
+     semi_supervised_learner.num_iter: 5
+     target.dir: None
+     target.overwrite: 0
+     xeval.fraction: 0.5
+     xeval.num_iter: 5
+ read test_data.txt
+ process test_data.txt
+ data set contains 387 decoy and 387 target transition groups
+ summary input file:
+    9165 lines
+    774 transition groups
+    17 scores including main score
+ learn and apply scorer
+ start 5 cross evals using 1 processes
+ start learn_randomized
+ end learn_randomized
+ start learn_randomized
+ end learn_randomized
+ start learn_randomized
+ end learn_randomized
+ start learn_randomized
+ end learn_randomized
+ start learn_randomized
+ end learn_randomized
+ finished cross evals
+ mean m_score = 3.179270e-02, std_dev m_score = 1.183096e-02
+ mean s_value = 9.785905e-01, std_dev s_value = 1.145276e-01
+ calculated scoring and statistics
+ processing test_data.txt finished
+
+used parameters:
+
+    apply_scorer                               : None
+    apply_weights                              : None
+    compute.probabilities                      : False
+    d_score.cutoff                             : -1000.0
+    delim.in                                   : '\t'
+    delim.out                                  : '\t'
+    export.mayu                                : False
+    final_statistics.fdr_all_pg                : False
+    final_statistics.lambda                    : 0.4
+    ignore.invalid_score_columns               : 0
+    is_test                                    : 1
+    num_processes                              : 1
+    semi_supervised_learner.initial_fdr        : 0.15
+    semi_supervised_learner.initial_lambda     : 0.4
+    semi_supervised_learner.iteration_fdr      : 0.02
+    semi_supervised_learner.iteration_lambda   : 0.4
+    semi_supervised_learner.num_iter           : 5
+    target.dir                                 : None
+    target.overwrite                           : 0
+    xeval.fraction                             : 0.5
+    xeval.num_iter                             : 5
+
+
+==================================================================================================
+
+   qvalue   svalue   TP  FP        TN         FN          FDR     sens   cutoff
+0    0.00  0.02166    9   0  16.70984  361.29016  1.45145e-11  0.02431  7.13744
+1    0.01  1.00000  374   3  13.70984   -3.70984  6.83275e-03  1.00000 -0.29134
+2    0.02  1.00000  371   8   8.70984   -0.70984  2.17886e-02  1.00000 -0.34779
+3    0.05  1.00000  373  14   2.70984   -2.70984  3.73491e-02  1.00000 -1.33579
+4    0.10      NaN  NaN NaN       NaN        NaN          NaN      NaN      NaN
+5    0.20      NaN  NaN NaN       NaN        NaN          NaN      NaN      NaN
+6    0.30      NaN  NaN NaN       NaN        NaN          NaN      NaN      NaN
+7    0.40      NaN  NaN NaN       NaN        NaN          NaN      NaN      NaN
+8    0.50      NaN  NaN NaN       NaN        NaN          NaN      NaN      NaN
+
+==================================================================================================
+
+WRITTEN:  test_data_summary_stat.csv
+WRITTEN:  test_data_full_stat.csv
+WRITTEN:  test_data_report.pdf
+WRITTEN:  test_data_cutoffs.txt
+WRITTEN:  test_data_svalues.txt
+WRITTEN:  test_data_qvalues.txt
+WRITTEN:  test_data_dscores_top_target_peaks.txt
+WRITTEN:  test_data_dscores_top_decoy_peaks.txt
+WRITTEN:  test_data_with_dscore.csv
+WRITTEN:  test_data_with_dscore_filtered.csv
+WRITTEN:  test_data_scorer.bin
+WRITTEN:  test_data_weights.txt
+
+
+
+ config settings:
+     apply_scorer: test_data_scorer.bin
+     apply_weights: None
+     compute.probabilities: False
+     d_score.cutoff: -1000.0
+     delim.in:
+     delim.out:
+     export.mayu: False
+     final_statistics.fdr_all_pg: False
+     final_statistics.lambda: 0.4
+     ignore.invalid_score_columns: 0
+     is_test: 1
+     num_processes: 1
+     semi_supervised_learner.initial_fdr: 0.15
+     semi_supervised_learner.initial_lambda: 0.4
+     semi_supervised_learner.iteration_fdr: 0.02
+     semi_supervised_learner.iteration_lambda: 0.4
+     semi_supervised_learner.num_iter: 5
+     target.dir: None
+     target.overwrite: 1
+     xeval.fraction: 0.5
+     xeval.num_iter: 5
+ read test_data.txt
+ apply scorer to  test_data.txt
+ data set contains 387 decoy and 387 target transition groups
+ mean m_score = 3.179270e-02, std_dev m_score = 1.183096e-02
+ mean s_value = 9.785905e-01, std_dev s_value = 1.145276e-01
+ processing test_data.txt finished
+
+used parameters:
+
+    apply_scorer                               : 'test_data_scorer.bin'
+    apply_weights                              : None
+    compute.probabilities                      : False
+    d_score.cutoff                             : -1000.0
+    delim.in                                   : '\t'
+    delim.out                                  : '\t'
+    export.mayu                                : False
+    final_statistics.fdr_all_pg                : False
+    final_statistics.lambda                    : 0.4
+    ignore.invalid_score_columns               : 0
+    is_test                                    : 1
+    num_processes                              : 1
+    semi_supervised_learner.initial_fdr        : 0.15
+    semi_supervised_learner.initial_lambda     : 0.4
+    semi_supervised_learner.iteration_fdr      : 0.02
+    semi_supervised_learner.iteration_lambda   : 0.4
+    semi_supervised_learner.num_iter           : 5
+    target.dir                                 : None
+    target.overwrite                           : 1
+    xeval.fraction                             : 0.5
+    xeval.num_iter                             : 5
+
+
+WRITTEN:  test_data_with_dscore.csv
+WRITTEN:  test_data_with_dscore_filtered.csv
+WRITTEN:  test_data_weights.txt
+
+
+
