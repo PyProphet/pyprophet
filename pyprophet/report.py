@@ -108,11 +108,16 @@ def save_report(report_path, in_file_name, scored_table, final_stat):
     return cutoffs, svalues, qvalues, top_target, top_decoys
 
 
-def export_mayu(mayu_cutoff_file, mayu_fasta_file, mayu_csv_file, scored_table, final_stat):
-
-    # write MAYU CSV input file
+def mayu_cols():
     interesting_cols = ['run_id', 'transition_group_id', 'Sequence', 'ProteinName', 'm_score',
                         'Charge']
+    return interesting_cols
+
+
+def export_mayu(mayu_cutoff_file, mayu_fasta_file, mayu_csv_file, scored_table, final_stat):
+
+    interesting_cols = mayu_cols()
+    # write MAYU CSV input file
     mayu_csv = scored_table[scored_table["peak_group_rank"] == 1][interesting_cols]
     row_index = [str(i) for i in range(len(mayu_csv.index))]
     mayu_csv['Identifier'] = ("run" + mayu_csv['run_id'].astype('|S10') + "." + row_index

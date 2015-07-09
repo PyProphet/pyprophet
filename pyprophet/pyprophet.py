@@ -59,13 +59,31 @@ class HolyGostQuery(object):
                           AbstractSemiSupervisedLearner)
         self.semi_supervised_learner = semi_supervised_learner
 
+    @staticmethod
+    def _check_header(path, delim, check_cols):
+        header = pd.read_csv(path, delim, nrows=1).columns
+        if check_cols:
+            missing = set(check_cols) - set(header)
+            if missing:
+                missing = sorted(missing)
+                raise Exception("columns %s are missing in input file" % ", ".join(missing))
+
+        if not any(name.startswith("main_") for name in header):
+            raise Exception("no column starting with 'main_' found in input file")
+
+        if not any(name.startswith("var_") for name in header):
+            raise Exception("no column starting with 'var_' found in input file")
+
     @profile
-    def process_csv(self, path, delim=",", loaded_scorer=None, loaded_weights=None, p_score=False):
+    def process_csv(self, path, delim=",", loaded_scorer=None, loaded_weights=None,
+                    check_cols=None, p_score=None):
         start_at = time.time()
 
         logging.info("read %s" % path)
 
-        table = pd.read_csv(path, delim, na_values=["NA", "NaN", "infinite"])
+        HolyGostQuery._check_header(path, delim, check_cols)
+
+        table = pd.read_csv(path, delim, na_values=["NA", "NaN", "infinite"], engine="c")
 
         if loaded_scorer is not None:
             logging.info("apply scorer to  %s" % path)

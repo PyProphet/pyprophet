@@ -11,7 +11,7 @@ except NameError:
 
 from pyprophet import PyProphet
 from config import CONFIG, set_pandas_print_options
-from report import save_report, export_mayu
+from report import save_report, export_mayu, mayu_cols
 import sys
 import time
 import warnings
@@ -184,12 +184,19 @@ def _main(args):
     for k, v in sorted(CONFIG.config.items()):
         logging.info("    %s: %s" % (k, v))
     start_at = time.time()
+
+
+    check_cols = ["transition_group_id", "run_id", "decoy"]
+    if CONFIG.get("export.mayu", True):
+        check_cols += mayu_cols()
+
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         (result, needed_to_persist, trained_weights) = PyProphet().process_csv(path,
                                                                                delim_in,
                                                                                persisted_scorer,
-                                                                               persisted_weights)
+                                                                               persisted_weights,
+                                                                               check_cols)
         (summ_stat, final_stat, scored_table) = result
     needed = time.time() - start_at
 
