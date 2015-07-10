@@ -44,7 +44,11 @@ def _standard_config(n_cpus=1):
     config["delim.out"] = "tab"
     info["delim.out"] = r"""[you can eg use 'tab' or ',']"""
 
+    config["multiple_files.merge_results"] = 0
+    info["multiple_files.merge_results"] = r"""[create one merged result table over all inputs]"""
+
     config["target.dir"] = None
+    config["target.prefix"] = None
     config["target.overwrite"] = 0
 
     config["ignore.invalid_score_columns"] = False
@@ -114,6 +118,8 @@ class _ConfigHolder(object):
         _fix_config_types(self.config)
 
     def get(self, name, default=None):
+        if default is not None:
+            raise RuntimeError("default value not allowed")
         return self.config.get(name, default)
 
     def __getitem__(self, name):

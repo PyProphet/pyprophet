@@ -42,7 +42,7 @@ class AbstractSemiSupervisedLearner(object):
         logging.info("start learn_randomized")
 
         fraction = CONFIG.get("xeval.fraction")
-        is_test = CONFIG.get("is_test", False)
+        is_test = CONFIG.get("is_test")
         experiment.split_for_xval(fraction, is_test)
         train = experiment.get_train_peaks()
 

@@ -21,7 +21,7 @@ class Protein:
         return "".join(self.peptides)
 
 
-def save_report(report_path, in_file_name, scored_table, final_stat):
+def save_report(report_path, prefix, scored_table, final_stat):
 
     cutoffs = final_stat["cutoff"].values
     svalues = final_stat["svalue"].values
@@ -40,7 +40,7 @@ def save_report(report_path, in_file_name, scored_table, final_stat):
     plt.subplots_adjust(hspace=.5)
 
     plt.subplot(411)
-    plt.title(in_file_name + "\n\nROC")
+    plt.title(prefix + "\n\nROC")
     plt.xlabel('False Positive Rate (qvalue)')
     plt.ylabel('True Positive Rate (svalue)')
 
