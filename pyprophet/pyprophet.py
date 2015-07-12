@@ -1,5 +1,7 @@
 # encoding: latin-1
 
+from __future__ import division
+
 # openblas + multiprocessing crashes for OPENBLAS_NUM_THREADS > 1 !!!
 import os
 os.putenv("OPENBLAS_NUM_THREADS", "1")
@@ -21,7 +23,8 @@ pd.set_option('display.precision', 6)
 
 from stats import (lookup_s_and_q_values_from_error_table, calculate_final_statistics,
                    mean_and_std_dev, final_err_table, summary_err_table,
-                   posterior_pg_prob, posterior_chromatogram_hypotheses_fast)
+                   posterior_pg_prob, posterior_chromatogram_hypotheses_fast,
+                   ErrorStatistics)
 
 from config import CONFIG
 
@@ -98,7 +101,6 @@ class HolyGostQuery(object):
         if loaded_scorer is not None:
             logging.info("apply scorer to input data")
             result_tables, data_for_persistence, trained_weights = self.apply_loaded_scorer(tables, loaded_scorer)
-            # return tables, (None, None, scored_tables), None, trained_weights
             data_for_persistence = None
         else:
             logging.info("learn and apply classifier from input data")
@@ -186,7 +188,7 @@ class HolyGostQuery(object):
     def apply_loaded_scorer(self, tables, loaded_scorer):
 
         # Compare with apply_classifier function (what goes into persistence)
-        final_classifier, mu, nu, df_raw_stat, num_null, num_total, loaded_score_columns = loaded_scorer
+        final_classifier, mu, nu, error_stat, loaded_score_columns = loaded_scorer
 
         prepared_tables, __ = prepare_data_tables(tables, loaded_score_columns=loaded_score_columns)
         prepared_table = pd.concat(prepared_tables)
@@ -199,7 +201,7 @@ class HolyGostQuery(object):
 
         scored_tables = []
         for table in tables:
-            scored_table = self.enrich_table_with_results(table, experiment, df_raw_stat)
+            scored_table = self.enrich_table_with_results(table, experiment, error_stat.df)
             scored_tables.append(scored_table)
 
         trained_weights = final_classifier.get_parameters()
@@ -207,9 +209,9 @@ class HolyGostQuery(object):
         return (None, None, scored_tables), None, trained_weights
 
     @profile
-    def enrich_table_with_results(self, table, experiment, df_raw_stat):
+    def enrich_table_with_results(self, table, experiment, error_df):
         s_values, q_values = lookup_s_and_q_values_from_error_table(experiment["d_score"],
-                                                                    df_raw_stat)
+                                                                    error_df)
         experiment["m_score"] = q_values
         experiment["s_value"] = s_values
         logging.info("mean m_score = %e, std_dev m_score = %e" % (np.mean(q_values),
@@ -235,51 +237,69 @@ class HolyGostQuery(object):
         else:
             all_tt_scores = experiment.get_top_target_peaks()["d_score"]
 
+        error_stat = calculate_final_statistics(all_tt_scores, all_test_target_scores,
+                                                all_test_decoy_scores, lambda_)
+
+        """
         df_raw_stat, num_null, num_total = calculate_final_statistics(all_tt_scores,
                                                                       all_test_target_scores,
                                                                       all_test_decoy_scores,
                                                                       lambda_)
+        todo: -returvalues mit named tuple grupppieren
+              -dann scored_table build in hauptprobramm
+              -auf den tabellen.
+              -dann out of core mode
+        """
+
         scored_tables = []
         for table in tables:
-            scored_table = self.enrich_table_with_results(table, experiment, df_raw_stat)
-
-            if CONFIG.get("compute.probabilities"):
-                logging.info("Posterior Probability estimation:")
-                logging.info("Estimated number of null %0.2f out of a total of %s. " % (num_null, num_total))
-
-                # Note that num_null and num_total are the sum of the
-                # cross-validated statistics computed before, therefore the total
-                # number of data points selected will be
-                #   len(data) /  xeval.fraction * xeval.num_iter
-                #
-                prior_chrom_null = num_null * 1.0 / num_total
-                number_true_chromatograms = (1.0 - prior_chrom_null) * len(experiment.get_top_target_peaks().df)
-                number_target_pg = len(Experiment(experiment.df[experiment.df.is_decoy == False]).df)
-                prior_peakgroup_true = number_true_chromatograms / number_target_pg
-
-                logging.info("Prior for a peakgroup: %s" % (number_true_chromatograms / number_target_pg))
-                logging.info("Prior for a chromatogram: %s" % (1.0 - prior_chrom_null))
-                logging.info("Estimated number of true chromatograms: %s out of %s" % (number_true_chromatograms, len(experiment.get_top_target_peaks().df)))
-                logging.info("Number of target data: %s" % len(Experiment(experiment.df[experiment.df.is_decoy == False]).df))
-                logging.info("")
-
-                pp_pg_pvalues = posterior_pg_prob(experiment, prior_peakgroup_true, lambda_=lambda_)
-                experiment.df["pg_score"] = pp_pg_pvalues
-                scored_table = scored_table.join(experiment[["pg_score"]])
-
-                allhypothesis, h0 = posterior_chromatogram_hypotheses_fast(experiment, prior_chrom_null)
-                experiment.df["h_score"] = allhypothesis
-                experiment.df["h0_score"] = h0
-                scored_table = scored_table.join(experiment[["h_score", "h0_score"]])
-
+            scored_table = self.build_scored_table(table, experiment, error_stat)
             scored_tables.append(scored_table)
 
-        final_statistics = final_err_table(df_raw_stat)
-        summary_statistics = summary_err_table(df_raw_stat)
+        final_statistics = final_err_table(error_stat.df)
+        summary_statistics = summary_err_table(error_stat.df)
 
-        needed_to_persist = (final_classifier, mu, nu,
-                             df_raw_stat.loc[:, ["svalue", "qvalue", "cutoff"]], num_null, num_total)
+        minimal_err_stat = ErrorStatistics(error_stat.df.loc[:, ["svalue", "qvalue", "cutoff"]],
+                                           error_stat.num_null, error_stat.num_total)
+
+
+        needed_to_persist = (final_classifier, mu, nu, minimal_err_stat)
         return (summary_statistics, final_statistics, scored_tables), needed_to_persist
+
+    def build_scored_table(self, table, experiment, error_stat):
+        scored_table = self.enrich_table_with_results(table, experiment, error_stat.df)
+        lambda_ = CONFIG.get("final_statistics.lambda")
+
+        if CONFIG.get("compute.probabilities"):
+            logging.info("Posterior Probability estimation:")
+            logging.info("Estimated number of null %.2f out of a total of %s." \
+                         % (error_stat.num_null, error_stat.num_total))
+
+            # Note that num_null and num_total are the sum of the
+            # cross-validated statistics computed before, therefore the total
+            # number of data points selected will be
+            #   len(data) /  xeval.fraction * xeval.num_iter
+            #
+            prior_chrom_null = error_stat.num_null / error_stat.num_total
+            number_true_chromatograms = (1.0 - prior_chrom_null) * len(experiment.get_top_target_peaks().df)
+            number_target_pg = len(Experiment(experiment.df[experiment.df.is_decoy == False]).df)
+            prior_peakgroup_true = number_true_chromatograms / number_target_pg
+
+            logging.info("Prior for a peakgroup: %s" % (number_true_chromatograms / number_target_pg))
+            logging.info("Prior for a chromatogram: %s" % (1.0 - prior_chrom_null))
+            logging.info("Estimated number of true chromatograms: %s out of %s" % (number_true_chromatograms, len(experiment.get_top_target_peaks().df)))
+            logging.info("Number of target data: %s" % len(Experiment(experiment.df[experiment.df.is_decoy == False]).df))
+            logging.info("")
+
+            pp_pg_pvalues = posterior_pg_prob(experiment, prior_peakgroup_true, lambda_=lambda_)
+            experiment.df["pg_score"] = pp_pg_pvalues
+            scored_table = scored_table.join(experiment[["pg_score"]])
+
+            allhypothesis, h0 = posterior_chromatogram_hypotheses_fast(experiment, prior_chrom_null)
+            experiment.df["h_score"] = allhypothesis
+            experiment.df["h0_score"] = h0
+            scored_table = scored_table.join(experiment[["h_score", "h0_score"]])
+        return scored_table
 
     @profile
     def calculate_params_for_d_score(self, classifier, experiment):

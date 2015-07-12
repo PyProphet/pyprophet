@@ -1,9 +1,12 @@
 # encoding: latin-1
 
+from __future__ import division
+
 # openblas + multiprocessing crashes for OPENBLAS_NUM_THREADS > 1 !!!
 import os
 os.putenv("OPENBLAS_NUM_THREADS", "1")
 
+from collections import namedtuple
 
 import numpy as np
 import pandas as pd
@@ -25,6 +28,9 @@ from config import CONFIG
 import multiprocessing
 
 
+ErrorStatistics = namedtuple("ErrorStatistics", "df num_null num_total")
+
+
 def _ff(a):
     return _find_nearest_matches(*a)
 
@@ -35,7 +41,7 @@ def find_nearest_matches(x, y):
         pool = multiprocessing.Pool(processes=num_processes)
         batch_size = int(math.ceil(len(y) / num_processes))
         parts = [(x, y[i:i + batch_size]) for i in range(0, len(y),
-                 batch_size)]
+                                                         batch_size)]
         res = pool.map(_ff, parts)
         res_par = np.hstack(res)
         return res_par
@@ -55,6 +61,7 @@ def to_one_dim_array(values, as_type=None):
         return values.astype(as_type)
     return values
 
+
 def posterior_pg_prob(experiment, prior_peakgroup_true, lambda_=0.5, fdr_estimate=0.15):
     """ Compute posterior probabilities for each peakgroup
 
@@ -67,29 +74,32 @@ def posterior_pg_prob(experiment, prior_peakgroup_true, lambda_=0.5, fdr_estimat
     """
 
     # All target values and all decoy values
-    tvals = experiment.df.loc[(experiment.df.is_decoy == False), "d_score" ]
-    dvals = experiment.df.loc[(experiment.df.is_decoy == True), "d_score" ]
+    tvals = experiment.df.loc[(experiment.df.is_decoy == False), "d_score"]
+    dvals = experiment.df.loc[(experiment.df.is_decoy == True), "d_score"]
 
     # Estimate a suitable cutoff in discriminant score (d_score)
-    target_scores = experiment.get_top_target_peaks().df[ "d_score"]
-    decoy_scores = experiment.get_top_decoy_peaks().df[ "d_score"]
+    target_scores = experiment.get_top_target_peaks().df["d_score"]
+    decoy_scores = experiment.get_top_decoy_peaks().df["d_score"]
     estimated_cutoff = find_cutoff(target_scores, decoy_scores, lambda_, fdr_estimate)
 
     # Get all top target peaks above the cutoff (very likely true) to estimate the true distribution
     target_peaks = experiment.get_top_target_peaks()
-    target_scores_above = target_peaks.df.loc[ target_peaks.df.d_score > estimated_cutoff, "d_score"]
+    target_scores_above = target_peaks.df.loc[target_peaks.df.d_score > estimated_cutoff, "d_score"]
 
-    # Use all decoys and top-peaks of top target chromatograms to parametrically estimate the two distributions
+    # Use all decoys and top-peaks of top target chromatograms to
+    # parametrically estimate the two distributions
     all_scores = experiment.df["d_score"]
     p_decoy = scipy.stats.norm.pdf(all_scores, np.mean(dvals), np.std(dvals, ddof=1))
-    p_target = scipy.stats.norm.pdf(all_scores, np.mean(target_scores_above), np.std(target_scores_above, ddof=1))
+    p_target = scipy.stats.norm.pdf(
+        all_scores, np.mean(target_scores_above), np.std(target_scores_above, ddof=1))
 
-    # Bayesian inference 
+    # Bayesian inference
     # Posterior probabilities for each peakgroup
     pp_pg_pvalues = p_target *  prior_peakgroup_true / \
-            ( p_target * prior_peakgroup_true +  p_decoy * (1.0 - prior_peakgroup_true) )  
+        (p_target * prior_peakgroup_true + p_decoy * (1.0 - prior_peakgroup_true))
 
     return pp_pg_pvalues
+
 
 def posterior_chromatogram_hypotheses_fast(experiment, prior_chrom_null):
     """ Compute posterior probabilities for each chromatogram
@@ -127,23 +137,25 @@ def posterior_chromatogram_hypotheses_fast(experiment, prior_chrom_null):
 
             # Actual computation for a single transition group (chromatogram)
             prior_pg_true = (1.0-prior_chrom_null) / len(scores)
-            rr = single_chromatogram_hypothesis_fast(np.array(scores), prior_chrom_null, prior_pg_true)
+            rr = single_chromatogram_hypothesis_fast(
+                np.array(scores), prior_chrom_null, prior_pg_true)
             final_result.extend(rr[1:])
-            final_result_h0.extend( rr[0] for i in range(len(scores) ) )
+            final_result_h0.extend(rr[0] for i in range(len(scores)))
 
             # Reset for next cycle
             scores = []
             current_tg_id = id_
 
-        scores.append( 1.0 - pp_values[i] )
+        scores.append(1.0 - pp_values[i])
 
     # Last cycle
     prior_pg_true = (1.0-prior_chrom_null) / len(scores)
     rr = single_chromatogram_hypothesis_fast(np.array(scores), prior_chrom_null, prior_pg_true)
     final_result.extend(rr[1:])
-    final_result_h0.extend( rr[0] for i in range(len(scores) ) )
+    final_result_h0.extend([rr[0]] * len(scores))
 
     return final_result, final_result_h0
+
 
 def pnorm(pvalues, mu, sigma):
     """ [P(X>pi, mu, sigma) for pi in pvalues] for normal distributed P with
@@ -162,15 +174,15 @@ def get_error_table_using_percentile_positives_new(err_df, target_scores, num_nu
     """ transfer error statistics in err_df for many target scores and given
     number of estimated null hypothesises 'num_null' """
 
-    num = len(target_scores)
-    num_alternative = num - num_null
+    num_total = len(target_scores)
+    num_alternative = num_total - num_null
     target_scores = np.sort(to_one_dim_array(target_scores))  # ascending
 
     # optimized
     num_positives = count_num_positives(target_scores)
 
-    num_negatives = num - num_positives
-    pp = num_positives.astype(float) / num
+    num_negatives = num_total - num_positives
+    pp = num_positives.astype(float) / num_total
 
     # find best matching row in err_df for each percentile_positive in pp:
     imax = find_nearest_matches(err_df.percentile_positive.values, pp)
@@ -214,7 +226,6 @@ def lookup_s_and_q_values_from_error_table(scores, err_df):
     """ find best matching q-value for each score in 'scores' """
     ix = find_nearest_matches(err_df.cutoff.values, scores.values)
     return err_df.svalue.iloc[ix].values, err_df.qvalue.iloc[ix].values
-
 
 
 @profile
@@ -271,7 +282,7 @@ def get_error_table_from_pvalues_new(p_values, lambda_=0.4):
 
     # estimate FDR with storeys method:
     num_null = 1.0 / (1.0 - lambda_) * (p_values >= lambda_).sum()
-    num = len(p_values)
+    num_total = len(p_values)
 
     # p_values = p_values[:,None]
 
@@ -279,8 +290,8 @@ def get_error_table_from_pvalues_new(p_values, lambda_=0.4):
     # vector yields a matrix with pairwise comparison results.  sum(axis=0)
     # sums up each column:
     num_positives = count_num_positives(p_values)
-    num_negatives = num - num_positives
-    pp = 1.0 * num_positives / num
+    num_negatives = num_total - num_positives
+    pp = 1.0 * num_positives / num_total
     tp = num_positives - num_null * p_values
     fp = num_null * p_values
     tn = num_null * (1.0 - p_values)
@@ -291,7 +302,7 @@ def get_error_table_from_pvalues_new(p_values, lambda_=0.4):
     fdr[fdr < 0.0] = 0.0
     fdr[fdr > 1.0] = 1.0
 
-    sens = tp / (num - num_null)
+    sens = tp / (num_total - num_null)
     # cut off values to range 0..1
     sens[sens < 0.0] = 0.0
     sens[sens > 1.0] = 1.0
@@ -302,7 +313,7 @@ def get_error_table_from_pvalues_new(p_values, lambda_=0.4):
         fpr = 0.0 * fp
 
     # assemble statistics as data frame
-    error_stat = pd.DataFrame(
+    df = pd.DataFrame(
         dict(pvalue=p_values.flatten(),
              percentile_positive=pp.flatten(),
              positive=num_positives.flatten(),
@@ -320,10 +331,10 @@ def get_error_table_from_pvalues_new(p_values, lambda_=0.4):
 
     # cummin/cummax not available in numpy, so we create them from dataframe
     # here:
-    error_stat["qvalue"] = error_stat.FDR.cummin()
-    error_stat["svalue"] = error_stat.sens[::-1].cummax()[::-1]
+    df["qvalue"] = df.FDR.cummin()
+    df["svalue"] = df.sens[::-1].cummax()[::-1]
 
-    return error_stat, num_null, num
+    return ErrorStatistics(df, num_null, num_total)
 
 
 @profile
@@ -339,19 +350,19 @@ def get_error_stat_from_null(target_scores, decoy_scores, lambda_):
 
     target_pvalues = 1.0 - pnorm(target_scores, mu, nu)
 
-    df, num_null, num = get_error_table_from_pvalues_new(target_pvalues, lambda_)
-    df["cutoff"] = target_scores
-    return df, num_null, num
+    error_stat = get_error_table_from_pvalues_new(target_pvalues, lambda_)
+    error_stat.df["cutoff"] = target_scores
+    return error_stat
 
 
 def find_cutoff(target_scores, decoy_scores, lambda_, fdr):
     """ finds cut off target score for specified false discovery rate fdr """
 
-    df, __, __ = get_error_stat_from_null(target_scores, decoy_scores, lambda_)
-    if not len(df):
+    error_stat = get_error_stat_from_null(target_scores, decoy_scores, lambda_)
+    if not len(error_stat.df):
         raise Exception("to little data for calculating error statistcs")
-    i0 = (df.qvalue - fdr).abs().argmin()
-    cutoff = df.iloc[i0]["cutoff"]
+    i0 = (error_stat.df.qvalue - fdr).abs().argmin()
+    cutoff = error_stat.df.iloc[i0]["cutoff"]
     return cutoff
 
 
@@ -365,23 +376,20 @@ def calculate_final_statistics(all_top_target_scores,
     'exp' """
 
     # estimate error statistics from given samples
-    df, num_null, num_total = get_error_stat_from_null(
-        test_target_scores, test_decoy_scores,
-        lambda_)
+    error_stat = get_error_stat_from_null(test_target_scores, test_decoy_scores, lambda_)
 
     # fraction of null hypothesises in sample values
-    summed_test_fraction_null = float(num_null) / num_total
+    summed_test_fraction_null = error_stat.num_null / error_stat.num_total
 
     # transfer statistics from sample set to full set:
-    num_top_target = len(all_top_target_scores)
+    num_top_target=len(all_top_target_scores)
 
     # most important: transfer estimted number of null hyptothesis:
-    num_null_top_target = num_top_target * summed_test_fraction_null
+    num_null_top_target=num_top_target * summed_test_fraction_null
 
     # now complete error stats based on num_null_top_target:
-    df_raw_stat = get_error_table_using_percentile_positives_new(
-        df, all_top_target_scores,
-        num_null_top_target)
+    raw_error_stat=get_error_table_using_percentile_positives_new(error_stat.df,
+                                                                  all_top_target_scores,
+                                                                  num_null_top_target)
 
-    return df_raw_stat, num_null, num_total
-
+    return ErrorStatistics(raw_error_stat, error_stat.num_null, error_stat.num_total)
