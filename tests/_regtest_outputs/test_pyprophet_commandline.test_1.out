@@ -165,6 +165,7 @@ pyprophet test_data.txt --is_test --compute.probabilities
  end learn_randomized
  finished cross evals
 
+ data set contains 387 decoy and 387 target transition groups
  mean m_score = 3.179270e-02, std_dev m_score = 1.183096e-02
  mean s_value = 9.785905e-01, std_dev s_value = 1.145276e-01
  Posterior Probability estimation:

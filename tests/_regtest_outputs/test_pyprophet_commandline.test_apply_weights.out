@@ -1,8 +1,8 @@
-pyprophet test_data.txt --is_test --compute.probabilities
+pyprophet test_data.txt --is_test
  config settings:
      apply_scorer: None
      apply_weights: None
-     compute.probabilities: True
+     compute.probabilities: False
      d_score.cutoff: -1000.0
      delim.in:
      delim.out:
@@ -44,15 +44,9 @@ pyprophet test_data.txt --is_test --compute.probabilities
  end learn_randomized
  finished cross evals
 
+ data set contains 387 decoy and 387 target transition groups
  mean m_score = 3.179270e-02, std_dev m_score = 1.183096e-02
  mean s_value = 9.785905e-01, std_dev s_value = 1.145276e-01
- Posterior Probability estimation:
- Estimated number of null 41.67 out of a total of 965.
- Prior for a peakgroup: 0.105495770781
- Prior for a chromatogram: 0.956822107081
- Estimated number of true chromatograms: 370.29015544 out of 387
- Number of target data: 3510
-
  calculated scoring and statistics
  processing input data finished
 
@@ -60,7 +54,7 @@ used parameters:
 
     apply_scorer                               : None
     apply_weights                              : None
-    compute.probabilities                      : True
+    compute.probabilities                      : False
     d_score.cutoff                             : -1000.0
     delim.in                                   : '\t'
     delim.out                                  : '\t'
@@ -146,6 +140,7 @@ pyprophet test_data.txt --apply_weights=test_data_weights.txt --target.overwrite
     17 scores including main score
  start application of pretrained weights
  finished pretrained scoring
+ data set contains 387 decoy and 387 target transition groups
  mean m_score = 6.617904e-02, std_dev m_score = 1.927532e-02
  mean s_value = 9.801818e-01, std_dev s_value = 1.121182e-01
  calculated scoring and statistics

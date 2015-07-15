@@ -28,7 +28,7 @@ from stats import (lookup_s_and_q_values_from_error_table, calculate_final_stati
 
 from config import CONFIG
 
-from data_handling import (prepare_data_tables, Experiment)
+from data_handling import (prepare_data_tables, prepare_data_table, Experiment, check_header)
 from classifiers import (LDALearner)
 from semi_supervised import (AbstractSemiSupervisedLearner, StandardSemiSupervisedLearner)
 
@@ -37,6 +37,28 @@ import multiprocessing
 import logging
 
 import time
+
+from collections import namedtuple
+from contextlib import contextmanager
+
+
+@contextmanager
+def timer():
+    start_at = time.time()
+
+    yield
+
+    needed = time.time() - start_at
+    hours = int(needed / 3600)
+    needed -= hours * 3600
+
+    minutes = int(needed / 60)
+    needed -= minutes * 60
+
+    logging.info("time needed: %02d:%02d:%.1f" % (hours, minutes, needed))
+
+
+Result = namedtuple("Result", "summary_statistics final_statistics scored_tables")
 
 
 def unwrap_self_for_multiprocessing((inst, method_name, args),):
@@ -50,6 +72,114 @@ def unwrap_self_for_multiprocessing((inst, method_name, args),):
     return getattr(inst, method_name)(*args)
 
 
+@profile
+def calculate_params_for_d_score(classifier, experiment):
+    score = classifier.score(experiment, True)
+    experiment.set_and_rerank("classifier_score", score)
+
+    if (CONFIG.get("final_statistics.fdr_all_pg")):
+        td_scores = experiment.get_decoy_peaks()["classifier_score"]
+    else:
+        td_scores = experiment.get_top_decoy_peaks()["classifier_score"]
+
+    mu, nu = mean_and_std_dev(td_scores)
+    return mu, nu
+
+
+class Scorer(object):
+
+    def __init__(self, classifier, score_columns, experiment, all_test_target_scores,
+                 all_test_decoy_scores):
+
+        self.classifier = classifier
+        self.score_columns = score_columns
+        self.mu, self.nu = calculate_params_for_d_score(classifier, experiment)
+        final_score = classifier.score(experiment, True)
+        experiment["d_score"] = (final_score - self.mu) / self.nu
+        lambda_ = CONFIG.get("final_statistics.lambda")
+        if (CONFIG.get("final_statistics.fdr_all_pg")):
+            all_tt_scores = experiment.get_target_peaks()["d_score"]
+        else:
+            all_tt_scores = experiment.get_top_target_peaks()["d_score"]
+
+        self.error_stat = calculate_final_statistics(all_tt_scores, all_test_target_scores,
+                                                     all_test_decoy_scores, lambda_)
+
+        self.number_target_pg = len(experiment.df[experiment.df.is_decoy == False])
+        self.number_target_peaks = len(experiment.get_top_target_peaks().df)
+        self.dvals = experiment.df.loc[(experiment.df.is_decoy == True), "d_score"]
+        self.target_scores = experiment.get_top_target_peaks().df["d_score"]
+        self.decoy_scores = experiment.get_top_decoy_peaks().df["d_score"]
+
+    def score(self, table):
+
+        prepared_table, __ = prepare_data_table(table, score_columns=self.score_columns)
+        texp = Experiment(prepared_table)
+        score = self.classifier.score(texp, True)
+        texp["d_score"] = (score - self.mu) / self.nu
+
+        s_values, q_values = lookup_s_and_q_values_from_error_table(texp["d_score"],
+                                                                    self.error_stat.df)
+        texp["m_score"] = q_values
+        texp["s_value"] = s_values
+        logging.info("mean m_score = %e, std_dev m_score = %e" % (np.mean(q_values),
+                                                                  np.std(q_values, ddof=1)))
+        logging.info("mean s_value = %e, std_dev s_value = %e" % (np.mean(s_values),
+                                                                  np.std(s_values, ddof=1)))
+        texp.add_peak_group_rank()
+
+        scored_table = table.join(texp[["d_score", "m_score", "peak_group_rank"]])
+
+        if CONFIG.get("compute.probabilities"):
+            scored_table = self.add_probabilities(scored_table, texp)
+
+        return scored_table
+
+    def add_probabilities(self, scored_table, texp):
+
+        lambda_ = CONFIG.get("final_statistics.lambda")
+        pp_pg_pvalues = posterior_pg_prob(self.dvals, self.target_scores, self.decoy_scores,
+                                          self.error_stat, self.number_target_peaks,
+                                          self.number_target_pg,
+                                          texp.df["d_score"],
+                                          lambda_)
+        texp.df["pg_score"] = pp_pg_pvalues
+        scored_table = scored_table.join(texp[["pg_score"]])
+
+        prior_chrom_null = self.error_stat.num_null / self.error_stat.num_total
+        allhypothesis, h0 = posterior_chromatogram_hypotheses_fast(texp, prior_chrom_null)
+        texp.df["h_score"] = allhypothesis
+        texp.df["h0_score"] = h0
+        scored_table = scored_table.join(texp[["h_score", "h0_score"]])
+
+        return scored_table
+
+    def score_many(self, tables):
+        scored_tables = []
+        for table in tables:
+            scored_table = self.score(table)
+            scored_tables.append(scored_table)
+        return scored_tables
+
+    def get_error_stats(self):
+        return final_err_table(self.error_stat.df), summary_err_table(self.error_stat.df)
+
+    def minimal_error_stat(self):
+        minimal_err_stat = ErrorStatistics(self.error_stat.df.loc[:, ["svalue", "qvalue", "cutoff"]],
+                                           self.error_stat.num_null, self.error_stat.num_total)
+        return minimal_err_stat
+
+    def __getstate__(self):
+        """when pickling"""
+        data = vars(self)
+        data["error_stat"] = self.minimal_error_stat()
+        return data
+
+    def __setstate__(self, data):
+        """when unpickling"""
+        self.__dict__.update(data)
+
+
 class HolyGostQuery(object):
 
     """ HolyGhostQuery assembles the unsupervised methods.
@@ -61,33 +191,33 @@ class HolyGostQuery(object):
                           AbstractSemiSupervisedLearner)
         self.semi_supervised_learner = semi_supervised_learner
 
-    @staticmethod
-    def _check_header(path, delim, check_cols):
-        header = pd.read_csv(path, delim, nrows=1).columns
-        if check_cols:
-            missing = set(check_cols) - set(header)
-            if missing:
-                missing = sorted(missing)
-                raise Exception("columns %s are missing in input file" % ", ".join(missing))
-
-        if not any(name.startswith("main_") for name in header):
-            raise Exception("no column starting with 'main_' found in input file")
-
-        if not any(name.startswith("var_") for name in header):
-            raise Exception("no column starting with 'var_' found in input file")
-
-        return header
-
     @profile
     def process_csv(self, pathes, delim=",", loaded_scorer=None, loaded_weights=None,
                     check_cols=None, p_score=None):
 
-        start_at = time.time()
+        tables = self.read_tables(pathes, delim, check_cols)
+
+        with timer():
+
+            if loaded_scorer is not None:
+                logging.info("apply scorer to input data")
+                result, __, trained_weights = self.apply_loaded_scorer(tables, loaded_scorer)
+                learned_scorer = None
+            else:
+                logging.info("learn and apply classifier from input data")
+                result, learned_scorer, trained_weights = self.learn_and_apply_classifier(
+                    tables, p_score, loaded_weights)
+
+            logging.info("processing input data finished")
+
+        return tables, result, learned_scorer, trained_weights
+
+    def read_tables(self, pathes, delim, check_cols):
 
         logging.info("process %s" % ", ".join(pathes))
         headers = set()
         for path in pathes:
-            header = HolyGostQuery._check_header(path, delim, check_cols)
+            header = check_header(path, delim, check_cols)
             headers.add(tuple(header))
 
         if len(headers) > 1:
@@ -98,24 +228,7 @@ class HolyGostQuery(object):
             part = pd.read_csv(path, delim, na_values=["NA", "NaN", "infinite"], engine="c")
             tables.append(part)
 
-        if loaded_scorer is not None:
-            logging.info("apply scorer to input data")
-            result_tables, data_for_persistence, trained_weights = self.apply_loaded_scorer(tables, loaded_scorer)
-            data_for_persistence = None
-        else:
-            logging.info("learn and apply classifier from input data")
-            result_tables, data_for_persistence, trained_weights = self.learn_and_apply_classifier(tables, p_score, loaded_weights)
-        logging.info("processing input data finished")
-
-        needed = time.time() - start_at
-        hours = int(needed / 3600)
-        needed -= hours * 3600
-
-        minutes = int(needed / 60)
-        needed -= minutes * 60
-
-        logging.info("time needed: %02d:%02d:%.1f" % (hours, minutes, needed))
-        return tables, result_tables, data_for_persistence, trained_weights
+        return tables
 
     @profile
     def learn_and_apply_classifier(self, tables, p_score=False, loaded_weights=None):
@@ -176,143 +289,25 @@ class HolyGostQuery(object):
 
         final_classifier = self.semi_supervised_learner.averaged_learner(ws)
 
-        loaded_weights = final_classifier.get_parameters()
+        weights = final_classifier.get_parameters()
 
-        result, data_for_persistence = self.apply_classifier(final_classifier, experiment,
-                                                             all_test_target_scores,
-                                                             all_test_decoy_scores, tables, p_score=p_score)
+        scorer = Scorer(final_classifier, score_columns, experiment, all_test_target_scores,
+                        all_test_decoy_scores)
+
+        scored_tables = scorer.score_many(tables)
+
+        final_statistics, summary_statistics = scorer.get_error_stats()
+        result = Result(summary_statistics, final_statistics, scored_tables)
+
         logging.info("calculated scoring and statistics")
-        return result, data_for_persistence + (score_columns,), loaded_weights
+        return result, scorer, weights
 
     @profile
     def apply_loaded_scorer(self, tables, loaded_scorer):
 
-        # Compare with apply_classifier function (what goes into persistence)
-        final_classifier, mu, nu, error_stat, loaded_score_columns = loaded_scorer
-
-        prepared_tables, __ = prepare_data_tables(tables, loaded_score_columns=loaded_score_columns)
-        prepared_table = pd.concat(prepared_tables)
-
-        experiment = Experiment(prepared_table)
-
-        final_score = final_classifier.score(experiment, True)
-        experiment["classifier_score"] = final_score
-        experiment["d_score"] = (final_score - mu) / nu
-
-        scored_tables = []
-        for table in tables:
-            scored_table = self.enrich_table_with_results(table, experiment, error_stat.df)
-            scored_tables.append(scored_table)
-
-        trained_weights = final_classifier.get_parameters()
-
-        return (None, None, scored_tables), None, trained_weights
-
-    @profile
-    def enrich_table_with_results(self, table, experiment, error_df):
-        s_values, q_values = lookup_s_and_q_values_from_error_table(experiment["d_score"],
-                                                                    error_df)
-        experiment["m_score"] = q_values
-        experiment["s_value"] = s_values
-        logging.info("mean m_score = %e, std_dev m_score = %e" % (np.mean(q_values),
-                     np.std(q_values, ddof=1)))
-        logging.info("mean s_value = %e, std_dev s_value = %e" % (np.mean(s_values),
-                     np.std(s_values, ddof=1)))
-        experiment.add_peak_group_rank()
-
-        scored_table = table.join(experiment[["d_score", "m_score", "peak_group_rank"]])
-        return scored_table
-
-    @profile
-    def apply_classifier(self, final_classifier, experiment, all_test_target_scores,
-                         all_test_decoy_scores, tables, p_score=False):
-
-        lambda_ = CONFIG.get("final_statistics.lambda")
-
-        mu, nu, final_score = self.calculate_params_for_d_score(final_classifier, experiment)
-        experiment["d_score"] = (final_score - mu) / nu
-
-        if (CONFIG.get("final_statistics.fdr_all_pg")):
-            all_tt_scores = experiment.get_target_peaks()["d_score"]
-        else:
-            all_tt_scores = experiment.get_top_target_peaks()["d_score"]
-
-        error_stat = calculate_final_statistics(all_tt_scores, all_test_target_scores,
-                                                all_test_decoy_scores, lambda_)
-
-        """
-        df_raw_stat, num_null, num_total = calculate_final_statistics(all_tt_scores,
-                                                                      all_test_target_scores,
-                                                                      all_test_decoy_scores,
-                                                                      lambda_)
-        todo: -returvalues mit named tuple grupppieren
-              -dann scored_table build in hauptprobramm
-              -auf den tabellen.
-              -dann out of core mode
-        """
-
-        scored_tables = []
-        for table in tables:
-            scored_table = self.build_scored_table(table, experiment, error_stat)
-            scored_tables.append(scored_table)
-
-        final_statistics = final_err_table(error_stat.df)
-        summary_statistics = summary_err_table(error_stat.df)
-
-        minimal_err_stat = ErrorStatistics(error_stat.df.loc[:, ["svalue", "qvalue", "cutoff"]],
-                                           error_stat.num_null, error_stat.num_total)
-
-
-        needed_to_persist = (final_classifier, mu, nu, minimal_err_stat)
-        return (summary_statistics, final_statistics, scored_tables), needed_to_persist
-
-    def build_scored_table(self, table, experiment, error_stat):
-        scored_table = self.enrich_table_with_results(table, experiment, error_stat.df)
-        lambda_ = CONFIG.get("final_statistics.lambda")
-
-        if CONFIG.get("compute.probabilities"):
-            logging.info("Posterior Probability estimation:")
-            logging.info("Estimated number of null %.2f out of a total of %s." \
-                         % (error_stat.num_null, error_stat.num_total))
-
-            # Note that num_null and num_total are the sum of the
-            # cross-validated statistics computed before, therefore the total
-            # number of data points selected will be
-            #   len(data) /  xeval.fraction * xeval.num_iter
-            #
-            prior_chrom_null = error_stat.num_null / error_stat.num_total
-            number_true_chromatograms = (1.0 - prior_chrom_null) * len(experiment.get_top_target_peaks().df)
-            number_target_pg = len(Experiment(experiment.df[experiment.df.is_decoy == False]).df)
-            prior_peakgroup_true = number_true_chromatograms / number_target_pg
-
-            logging.info("Prior for a peakgroup: %s" % (number_true_chromatograms / number_target_pg))
-            logging.info("Prior for a chromatogram: %s" % (1.0 - prior_chrom_null))
-            logging.info("Estimated number of true chromatograms: %s out of %s" % (number_true_chromatograms, len(experiment.get_top_target_peaks().df)))
-            logging.info("Number of target data: %s" % len(Experiment(experiment.df[experiment.df.is_decoy == False]).df))
-            logging.info("")
-
-            pp_pg_pvalues = posterior_pg_prob(experiment, prior_peakgroup_true, lambda_=lambda_)
-            experiment.df["pg_score"] = pp_pg_pvalues
-            scored_table = scored_table.join(experiment[["pg_score"]])
-
-            allhypothesis, h0 = posterior_chromatogram_hypotheses_fast(experiment, prior_chrom_null)
-            experiment.df["h_score"] = allhypothesis
-            experiment.df["h0_score"] = h0
-            scored_table = scored_table.join(experiment[["h_score", "h0_score"]])
-        return scored_table
-
-    @profile
-    def calculate_params_for_d_score(self, classifier, experiment):
-        score = classifier.score(experiment, True)
-        experiment.set_and_rerank("classifier_score", score)
-
-        if (CONFIG.get("final_statistics.fdr_all_pg")):
-            td_scores = experiment.get_decoy_peaks()["classifier_score"]
-        else:
-            td_scores = experiment.get_top_decoy_peaks()["classifier_score"]
-
-        mu, nu = mean_and_std_dev(td_scores)
-        return mu, nu, score
+        scored_tables = loaded_scorer.score_many(tables)
+        trained_weights = loaded_scorer.classifier.get_parameters()
+        return Result(None, None, scored_tables), None, trained_weights
 
 
 @profile

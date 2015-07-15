@@ -45,8 +45,9 @@ pyprophet test_data_2.txt test_data_3.txt --is_test --target.overwrite --multipl
  end learn_randomized
  finished cross evals
 
- mean m_score = 3.179270e-02, std_dev m_score = 1.183064e-02
- mean s_value = 9.785905e-01, std_dev s_value = 1.145245e-01
+ data set contains 387 decoy and 387 target transition groups
+ mean m_score = 3.179270e-02, std_dev m_score = 1.183096e-02
+ mean s_value = 9.785905e-01, std_dev s_value = 1.145276e-01
  Posterior Probability estimation:
  Estimated number of null 41.67 out of a total of 965.
  Prior for a peakgroup: 0.0527478853904
@@ -54,8 +55,9 @@ pyprophet test_data_2.txt test_data_3.txt --is_test --target.overwrite --multipl
  Estimated number of true chromatograms: 370.29015544 out of 387
  Number of target data: 7020
 
- mean m_score = 3.179270e-02, std_dev m_score = 1.183064e-02
- mean s_value = 9.785905e-01, std_dev s_value = 1.145245e-01
+ data set contains 387 decoy and 387 target transition groups
+ mean m_score = 3.179270e-02, std_dev m_score = 1.183096e-02
+ mean s_value = 9.785905e-01, std_dev s_value = 1.145276e-01
  Posterior Probability estimation:
  Estimated number of null 41.67 out of a total of 965.
  Prior for a peakgroup: 0.0527478853904

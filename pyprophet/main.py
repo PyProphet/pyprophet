@@ -10,7 +10,7 @@ except NameError:
     def profile(fun):
         return fun
 
-from pyprophet import PyProphet
+from pyprophet import PyProphet, Result
 from config import CONFIG, set_pandas_print_options
 from report import save_report, export_mayu, mayu_cols
 import sys
@@ -276,40 +276,39 @@ def _main(args):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
 
-        # was kommt genau zurück ????
-        (tables, result, needed_to_persist, trained_weights) = PyProphet().process_csv(pathes,
-                                                                                       delim_in,
-                                                                                       persisted_scorer,
-                                                                                       persisted_weights,
-                                                                                       check_cols)
-        (summ_stat, full_stat, scored_tables) = result
+        (tables, result, scorer, weights) = PyProphet().process_csv(pathes,
+                                                                    delim_in,
+                                                                    persisted_scorer,
+                                                                    persisted_weights,
+                                                                    check_cols)
 
-    if merge_results and len(scored_tables) > 0:
-        scored_tables = [pd.concat(scored_tables)]
+    if merge_results and len(result.scored_tables) > 0:
+        scored_tables = [pd.concat(result.scored_tables)]
+        result = Result(result.summary_statistics, result.final_statistics, scored_tables)
 
     needed = time.time() - start_at
 
     set_pandas_print_options()
 
-    if summ_stat is not None:
+    if result.summary_statistics is not None:
         print
         print "=" * 98
         print
-        print summ_stat
+        print result.summary_statistics
         print
         print "=" * 98
 
     print
-    if summ_stat is not None:
-        summ_stat.to_csv(summ_stat_path, delim_out, index=False)
+    if result.summary_statistics is not None:
+        result.summary_statistics.to_csv(summ_stat_path, delim_out, index=False)
         print "WRITTEN: ", summ_stat_path
 
-    if full_stat is not None:
-        full_stat.to_csv(full_stat_path, sep=delim_out, index=False)
+    if result.final_statistics is not None:
+        result.final_statistics.to_csv(full_stat_path, sep=delim_out, index=False)
         print "WRITTEN: ", full_stat_path
 
-        for scored_table, out_path in zip(scored_tables, out_pathes):
-            plot_data = save_report(out_path.report, prefix, scored_table, full_stat)
+        for scored_table, out_path in zip(result.scored_tables, out_pathes):
+            plot_data = save_report(out_path.report, prefix, scored_table, result.final_statistics)
             print "WRITTEN: ", out_path.report
 
             cutoffs, svalues, qvalues, top_target, top_decoys = plot_data
@@ -321,7 +320,7 @@ def _main(args):
                     fp.write(" ".join("%e" % v for v in values))
                 print "WRITTEN: ", path
 
-    for scored_table, out_path in zip(scored_tables, out_pathes):
+    for scored_table, out_path in zip(result.scored_tables, out_pathes):
 
         scored_table.to_csv(out_path.scored_table, sep=delim_out, index=False)
         print "WRITTEN: ", out_path.scored_table
@@ -332,9 +331,9 @@ def _main(args):
         print "WRITTEN: ", out_path.filtered_table
 
         if CONFIG.get("export.mayu"):
-            if full_stat:
+            if result.final_statistics:
                 export_mayu(out_pathes.mayu_cutoff, out_pathes.mayu_fasta,
-                            out_pathes.mayu_csv, scored_table, full_stat)
+                            out_pathes.mayu_csv, scored_table, result.final_statistics)
                 print "WRITTEN: ", out_pathes.mayu_cutoff
                 print "WRITTEN: ", out_pathes.mayu_fasta
                 print "WRITTEN: ", out_pathes.mayu_csv
@@ -342,13 +341,13 @@ def _main(args):
                 logging.warn("can not write mayu table in this case")
 
     if not apply_existing_scorer:
-        bin_data = zlib.compress(cPickle.dumps(needed_to_persist, protocol=2))
+        bin_data = zlib.compress(cPickle.dumps(scorer, protocol=2))
         with open(pickled_scorer_path, "wb") as fp:
             fp.write(bin_data)
         print "WRITTEN: ", pickled_scorer_path
 
     if not apply_existing_weights:
-        np.savetxt(trained_weights_path, trained_weights, delimiter="\t")
+        np.savetxt(trained_weights_path, weights, delimiter="\t")
         print "WRITTEN: ", trained_weights_path
 
     seconds = int(needed)

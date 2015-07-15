@@ -1,6 +1,7 @@
 # encoding: latin-1
 
 from __future__ import division
+import pdb
 
 # openblas + multiprocessing crashes for OPENBLAS_NUM_THREADS > 1 !!!
 import os
@@ -26,6 +27,8 @@ import scipy.stats
 from config import CONFIG
 
 import multiprocessing
+
+import logging
 
 
 ErrorStatistics = namedtuple("ErrorStatistics", "df num_null num_total")
@@ -62,7 +65,10 @@ def to_one_dim_array(values, as_type=None):
     return values
 
 
-def posterior_pg_prob(experiment, prior_peakgroup_true, lambda_=0.5, fdr_estimate=0.15):
+def posterior_pg_prob(dvals, target_scores, decoy_scores, error_stat, number_target_peaks,
+                      number_target_pg,
+                      given_scores, lambda_=0.5, fdr_estimate=0.15):
+
     """ Compute posterior probabilities for each peakgroup
 
     - Estimate the true distribution by using all target peakgroups above the
@@ -73,25 +79,40 @@ def posterior_pg_prob(experiment, prior_peakgroup_true, lambda_=0.5, fdr_estimat
 
     """
 
-    # All target values and all decoy values
-    tvals = experiment.df.loc[(experiment.df.is_decoy == False), "d_score"]
-    dvals = experiment.df.loc[(experiment.df.is_decoy == True), "d_score"]
+    # Note that num_null and num_total are the sum of the
+    # cross-validated statistics computed before, therefore the total
+    # number of data points selected will be
+    #   len(data) /  xeval.fraction * xeval.num_iter
+    #
+    logging.info("Posterior Probability estimation:")
+    logging.info("Estimated number of null %.2f out of a total of %s." \
+                 % (error_stat.num_null, error_stat.num_total))
+
+
+    prior_chrom_null = error_stat.num_null / error_stat.num_total
+    number_true_chromatograms = (1.0 - prior_chrom_null) * number_target_peaks
+    prior_peakgroup_true = number_true_chromatograms / number_target_pg
+
+    logging.info("Prior for a peakgroup: %s" % (number_true_chromatograms / number_target_pg))
+    logging.info("Prior for a chromatogram: %s" % (1.0 - prior_chrom_null))
+    logging.info("Estimated number of true chromatograms: %s out of %s" %
+                 (number_true_chromatograms, number_target_peaks))
+    logging.info("Number of target data: %s" % number_target_pg)
+    logging.info("")
 
     # Estimate a suitable cutoff in discriminant score (d_score)
-    target_scores = experiment.get_top_target_peaks().df["d_score"]
-    decoy_scores = experiment.get_top_decoy_peaks().df["d_score"]
+    # target_scores = experiment.get_top_target_peaks().df["d_score"]
+    # decoy_scores = experiment.get_top_decoy_peaks().df["d_score"]
     estimated_cutoff = find_cutoff(target_scores, decoy_scores, lambda_, fdr_estimate)
 
-    # Get all top target peaks above the cutoff (very likely true) to estimate the true distribution
-    target_peaks = experiment.get_top_target_peaks()
-    target_scores_above = target_peaks.df.loc[target_peaks.df.d_score > estimated_cutoff, "d_score"]
+    target_scores_above = target_scores[target_scores > estimated_cutoff]
 
     # Use all decoys and top-peaks of top target chromatograms to
     # parametrically estimate the two distributions
-    all_scores = experiment.df["d_score"]
-    p_decoy = scipy.stats.norm.pdf(all_scores, np.mean(dvals), np.std(dvals, ddof=1))
+
+    p_decoy = scipy.stats.norm.pdf(given_scores, np.mean(dvals), np.std(dvals, ddof=1))
     p_target = scipy.stats.norm.pdf(
-        all_scores, np.mean(target_scores_above), np.std(target_scores_above, ddof=1))
+        given_scores, np.mean(target_scores_above), np.std(target_scores_above, ddof=1))
 
     # Bayesian inference
     # Posterior probabilities for each peakgroup
@@ -360,6 +381,7 @@ def find_cutoff(target_scores, decoy_scores, lambda_, fdr):
 
     error_stat = get_error_stat_from_null(target_scores, decoy_scores, lambda_)
     if not len(error_stat.df):
+        pdb.set_trace()  ############################## Breakpoint  ##############################
         raise Exception("to little data for calculating error statistcs")
     i0 = (error_stat.df.qvalue - fdr).abs().argmin()
     cutoff = error_stat.df.iloc[i0]["cutoff"]
@@ -382,14 +404,14 @@ def calculate_final_statistics(all_top_target_scores,
     summed_test_fraction_null = error_stat.num_null / error_stat.num_total
 
     # transfer statistics from sample set to full set:
-    num_top_target=len(all_top_target_scores)
+    num_top_target = len(all_top_target_scores)
 
     # most important: transfer estimted number of null hyptothesis:
-    num_null_top_target=num_top_target * summed_test_fraction_null
+    num_null_top_target = num_top_target * summed_test_fraction_null
 
     # now complete error stats based on num_null_top_target:
-    raw_error_stat=get_error_table_using_percentile_positives_new(error_stat.df,
-                                                                  all_top_target_scores,
-                                                                  num_null_top_target)
+    raw_error_stat = get_error_table_using_percentile_positives_new(error_stat.df,
+                                                                    all_top_target_scores,
+                                                                    num_null_top_target)
 
     return ErrorStatistics(raw_error_stat, error_stat.num_null, error_stat.num_total)

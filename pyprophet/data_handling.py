@@ -50,44 +50,35 @@ def cleanup_and_check(df):
     return df_cleaned
 
 
-@profile
-def prepare_data_tables(tables, tg_id_name="transition_group_id",
-                        decoy_name="decoy",
-                        main_score_name=None,
-                        loaded_score_columns=None,
-                        **extra_args_to_dev_null
-                        ):
-
-    headers = [table.columns.values for table in tables]
-
-    if loaded_score_columns is not None:
-        missing = set()
-        for header in headers:
-            missing.update(set(loaded_score_columns) - set(header))
+def prepare_data_table(table, tg_id_name="transition_group_id",
+                       decoy_name="decoy",
+                       main_score_name=None,
+                       score_columns=None,
+                       ):
+    header = table.columns.values
+    if score_columns is not None:
+        missing = set(score_columns) - set(header)
         if missing:
-            missing_txt = ", ".join("'%s'" % m for m in missing)
+            missing_txt = ", ".join(["'%s'" % m for m in missing])
             msg = "column(s) %s missing in input file for applying existing scorer" % missing_txt
             raise Exception(msg)
 
-    # check if given column names appear in table:
-    for header in headers:
-        assert tg_id_name in header, "colum %s not in table" % tg_id_name
-        assert decoy_name in header, "colum %s not in table" % decoy_name
+    assert tg_id_name in header, "colum %s not in table" % tg_id_name
+    assert decoy_name in header, "colum %s not in table" % decoy_name
 
-    if loaded_score_columns is not None:
-        # we assume there is exactly one main_score in loaded_score_columns as we checked that in
+    if score_columns is not None:
+        # we assume there is exactly one main_score in score_columns as we checked that in
         # the run which persisted the classifier:
-        var_column_names = [c for c in loaded_score_columns if c.startswith("var_")]
-        main_score_name = [c for c in loaded_score_columns if c.startswith("main_")][0]
+        var_column_names = [c for c in score_columns if c.startswith("var_")]
+        main_score_name = [c for c in score_columns if c.startswith("main_")][0]
     else:
         if main_score_name is not None:
-            for header in headers:
-                assert main_score_name in header, "colum %s not in table" % main_score_name
+            assert main_score_name in header, "colum %s not in table" % main_score_name
 
         # if no main_score_name provided, look for unique column with name
         # starting with "main_":
         else:
-            main_columns = set(c for header in headers for c in header if c.startswith("main_"))
+            main_columns = set(c for c in header if c.startswith("main_"))
             if not main_columns:
                 raise Exception("no column with main_* in table(s)")
             if len(main_columns) > 1:
@@ -95,70 +86,93 @@ def prepare_data_tables(tables, tg_id_name="transition_group_id",
             main_score_name = main_columns.pop()
 
         # get all other score columns, name beginning with "var_"
-        var_column_names = set()
-        for header in headers:
-            var_cols = tuple(h for h in header if h.startswith("var_"))
-            var_column_names.add(var_cols)
+        var_column_names = tuple(h for h in header if h.startswith("var_"))
 
         if not var_column_names:
             raise Exception("no column with name var_* in table(s)")
-        if len(var_column_names) > 1:
-            raise Exception("no column name var_* differ in table(s)")
-        var_column_names = var_column_names.pop()
 
     # collect needed data:
 
+    N = len(table)
+    empty_col = [0] * N
+    empty_none_col = [None] * N
+
+    tg_ids = table[tg_id_name]
+
+    tg_map = dict()
+    for i, tg_id in enumerate(tg_ids.unique()):
+        tg_map[tg_id] = i
+    tg_num_ids = [tg_map[tg_id] for tg_id in tg_ids]
+
+    data = dict(tg_id=tg_ids.values,
+                tg_num_id=tg_num_ids,
+                is_decoy=table[decoy_name].values.astype(bool),
+                is_top_peak=empty_col,
+                is_train=empty_none_col,
+                main_score=table[main_score_name].values,
+                )
+
+    ignore_invalid_scores = CONFIG["ignore.invalid_score_columns"]
+    column_names = ["tg_id", "tg_num_id", "is_decoy", "is_top_peak", "is_train", "main_score"]
+    for i, v in enumerate(var_column_names):
+        col_name = "var_%d" % i
+        col_data = table[v]
+        if pd.isnull(col_data).all():
+            msg = "column %s contains only invalid/missing values" % v
+            if ignore_invalid_scores:
+                logging.warn("%s. pyprophet skips this.")
+                continue
+            raise Exception("%s. you may use --ignore.invalid_score_columns")
+        data[col_name] = col_data
+        column_names.append(col_name)
+
+    data["classifier_score"] = empty_col
+    column_names.append("classifier_score")
+
+    # build data frame:
+    df = pd.DataFrame(data, columns=column_names)
+
+    all_score_columns = tuple(var_column_names) + (main_score_name,)
+    df = cleanup_and_check(df)
+    return df, all_score_columns
+
+
+def check_header(path, delim, check_cols):
+    header = pd.read_csv(path, delim, nrows=1).columns
+    if check_cols:
+        missing = set(check_cols) - set(header)
+        if missing:
+            missing = sorted(missing)
+            raise Exception("columns %s are missing in input file" % ", ".join(missing))
+
+    if not any(name.startswith("main_") for name in header):
+        raise Exception("no column starting with 'main_' found in input file")
+
+    if not any(name.startswith("var_") for name in header):
+        raise Exception("no column starting with 'var_' found in input file")
+
+    return header
+
+
+@profile
+def prepare_data_tables(tables, tg_id_name="transition_group_id",
+                        decoy_name="decoy",
+                        main_score_name=None,
+                        score_columns=None,
+                        ):
+
+    all_score_columns = set()
     dfs = []
-
     for table in tables:
-        N = len(table)
-        empty_col = [0] * N
-        empty_none_col = [None] * N
-
-        tg_ids = table[tg_id_name]
-
-        tg_map = dict()
-        for i, tg_id in enumerate(tg_ids.unique()):
-            tg_map[tg_id] = i
-        tg_num_ids = [tg_map[tg_id] for tg_id in tg_ids]
-
-        data = dict(tg_id=tg_ids.values,
-                    tg_num_id=tg_num_ids,
-                    is_decoy=table[decoy_name].values.astype(bool),
-                    is_top_peak=empty_col,
-                    is_train=empty_none_col,
-                    main_score=table[main_score_name].values,
-                    )
-
-        ignore_invalid_scores = CONFIG["ignore.invalid_score_columns"]
-        column_names = ["tg_id", "tg_num_id", "is_decoy", "is_top_peak", "is_train", "main_score"]
-        for i, v in enumerate(var_column_names):
-            col_name = "var_%d" % i
-            col_data = table[v]
-            if pd.isnull(col_data).all():
-                msg = "column %s contains only invalid/missing values" % v
-                if ignore_invalid_scores:
-                    logging.warn("%s. pyprophet skips this.")
-                    continue
-                raise Exception("%s. you may use --ignore.invalid_score_columns")
-            data[col_name] = col_data
-            column_names.append(col_name)
-
-        data["classifier_score"] = empty_col
-        column_names.append("classifier_score")
-
-        # build data frame:
-        df = pd.DataFrame(data, columns=column_names)
-
-        all_score_columns = tuple(var_column_names) + (main_score_name,)
-
-        df = cleanup_and_check(df)
+        df, score_columns = prepare_data_table(table, tg_id_name, decoy_name, main_score_name,
+                                               score_columns)
+        all_score_columns.add(tuple(score_columns))
         dfs.append(df)
 
-    # for each transition group: enumerate peaks in this group, and
-    # add peak_rank where increasing rank corresponds to decreasing main
-    # score. peak_rank == 0 is peak with max main score
-    return dfs, all_score_columns
+    if len(all_score_columns) > 1:
+        raise Exception("score columns in input tables are not consistent (order and/or naming)")
+
+    return dfs, all_score_columns.pop()
 
 
 class Experiment(object):
