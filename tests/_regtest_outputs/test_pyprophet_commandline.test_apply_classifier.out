@@ -133,10 +133,10 @@ pyprophet test_data.txt --apply_scorer=test_data_scorer.bin --target.overwrite -
      xeval.num_iter: 5
  process test_data.txt
  apply scorer to input data
+ processing input data finished
  data set contains 387 decoy and 387 target transition groups
  mean m_score = 3.179270e-02, std_dev m_score = 1.183096e-02
  mean s_value = 9.785905e-01, std_dev s_value = 1.145276e-01
- processing input data finished
 
 used parameters:
 
@@ -167,6 +167,5 @@ used parameters:
 
 WRITTEN:  test_data_with_dscore.csv
 WRITTEN:  test_data_with_dscore_filtered.csv
-WRITTEN:  test_data_weights.txt
 
 

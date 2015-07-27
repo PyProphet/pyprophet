@@ -104,14 +104,14 @@ WRITTEN:  test_data_2_svalues.txt
 WRITTEN:  test_data_2_qvalues.txt
 WRITTEN:  test_data_2_dscores_top_target_peaks.txt
 WRITTEN:  test_data_2_dscores_top_decoy_peaks.txt
+WRITTEN:  test_data_2_with_dscore.csv
+WRITTEN:  test_data_2_with_dscore_filtered.csv
 WRITTEN:  test_data_3_report.pdf
 WRITTEN:  test_data_3_cutoffs.txt
 WRITTEN:  test_data_3_svalues.txt
 WRITTEN:  test_data_3_qvalues.txt
 WRITTEN:  test_data_3_dscores_top_target_peaks.txt
 WRITTEN:  test_data_3_dscores_top_decoy_peaks.txt
-WRITTEN:  test_data_2_with_dscore.csv
-WRITTEN:  test_data_2_with_dscore_filtered.csv
 WRITTEN:  test_data_3_with_dscore.csv
 WRITTEN:  test_data_3_with_dscore_filtered.csv
 WRITTEN:  test_data__scorer.bin

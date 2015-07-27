@@ -10,353 +10,312 @@ except NameError:
     def profile(fun):
         return fun
 
-from pyprophet import PyProphet, Result
-from config import CONFIG, set_pandas_print_options
-from report import save_report, export_mayu, mayu_cols
+import abc
+import cPickle
+import logging
 import sys
 import time
 import warnings
-import logging
-import cPickle
 import zlib
+
 import numpy as np
 import pandas as pd
+
+from pyprophet import PyProphet, Result
+from config import CONFIG, set_pandas_print_options
+from report import save_report, export_mayu, mayu_cols
 
 format_ = "%(levelname)s -- [pid=%(process)s] : %(asctime)s: %(message)s"
 logging.basicConfig(level=logging.INFO, format=format_)
 
-
-def print_help():
-    print
-    script = os.path.basename(sys.argv[0])
-    print "usage:"
-    print "       %s [options] input_file [input_file ...]" % script
-    print "   or "
-    print "       %s --help" % script
-    print "   or "
-    print "       %s --version" % script
-    dump_config_info(CONFIG.config, CONFIG.info)
+from .main_helpers import (parse_cmdline, create_pathes, check_if_any_exists)
 
 
-def print_version():
-    import version
-    print "%d.%d.%d" % version.version
+class PyProphetRunner(object):
+
+    __metaclass__ = abc.ABCMeta
+
+    """Base class for workflow of command line tool
+    """
+
+    def __init__(self, pathes, prefix, merge_results, delim_in, delim_out):
+        self.pathes = pathes
+        self.prefix = prefix
+        self.merge_results = merge_results
+        self.delim_in = delim_in
+        self.delim_out = delim_out
+
+    @abc.abstractmethod
+    def run_algo(self):
+        pass
+
+    @abc.abstractmethod
+    def extra_writes(self):
+        pass
+
+    def determine_output_dir_name(self):
+
+        # from now on: paramterchecks above only for learning mode
+
+        dirname = CONFIG.get("target.dir")
+        if dirname is None:
+            dirnames = set(os.path.dirname(path) for path in self.pathes)
+            # is always ok for not learning_mode, which includes that pathes has only one entry
+            if len(dirnames) > 1:
+                raise Exception("could not derive common directory name of input files, please use "
+                                "--target.dir option")
+            dirname = dirnames.pop()
+
+        if dirname and not os.path.exists(dirname):
+            os.makedirs(dirname)
+            logging.info("created folder %s" % dirname)
+        return dirname
+
+    def check_pathes(self):
+
+        if len(self.pathes) > 1 and not self.merge_results and self.prefix:
+            logging.warn("ignore --target.prefix=%r" % self.prefix)
+
+        if self.prefix is None:
+            prefixes = [os.path.splitext(os.path.basename(path))[0] for path in self.pathes]
+            common_prefix = os.path.commonprefix(prefixes)
+            # is always ok for not learning_mode, which includes that pathes has only one entry
+            if not common_prefix:
+                raise Exception("could not derive common prefix of input file names, please use "
+                                "--target.prefix option")
+            prefix = common_prefix
+        return prefix
+
+    def create_out_pathes(self, dirname):
+
+        if self.merge_results:
+            assert self.prefix is not None
+            out_pathes = [create_pathes(self.prefix, dirname)]
+
+        elif len(self.pathes) == 1:
+            assert self.prefix is not None
+            out_pathes = [create_pathes(self.prefix, dirname)]
+        else:
+            out_pathes = []
+            for path in self.pathes:
+                specific_prefix = os.path.splitext(os.path.basename(path))[0]
+                out_pathes.append(create_pathes(specific_prefix, dirname))
+        return out_pathes
+
+    def run(self):
+
+        self.prefix = self.check_pathes()
+        dirname = self.determine_output_dir_name()
+        out_pathes = self.create_out_pathes(dirname)
+
+        extra_writes = dict(self.extra_writes(dirname))
+
+        to_check = list(k for p in out_pathes for k in p.keys())
+        to_check.extend(extra_writes.values())
+
+        if not CONFIG.get("target.overwrite"):
+            error = check_if_any_exists(to_check)
+            if error:
+                return False
+
+        self.check_cols = ["transition_group_id", "run_id", "decoy"]
+        if CONFIG.get("export.mayu"):
+            self.check_cols += mayu_cols()
+
+        logging.info("config settings:")
+        for k, v in sorted(CONFIG.config.items()):
+            logging.info("    %s: %s" % (k, v))
+
+        start_at = time.time()
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            (tables, self.result, scorer, weights) = self.run_algo()
+        needed = time.time() - start_at
+
+        set_pandas_print_options()
+        self.print_summary()
+        self.save_results(extra_writes, out_pathes)
+        self.save_scorer(scorer, extra_writes)
+        self.save_weights(weights, extra_writes)
+
+        seconds = int(needed)
+        msecs = int(1000 * (needed - seconds))
+        minutes = int(needed / 60.0)
+
+        print "NEEDED",
+        if minutes:
+            print minutes, "minutes and",
+
+        print "%d seconds and %d msecs wall time" % (seconds, msecs)
+        print
+
+    def print_summary(self):
+        if self.result.summary_statistics is not None:
+            print
+            print "=" * 98
+            print
+            print self.result.summary_statistics
+            print
+            print "=" * 98
+        print
+
+    def save_results(self, extra_writes, out_pathes):
+        summ_stat_path = extra_writes.get("summ_stat_path")
+        if summ_stat_path is not None:
+            self.result.summary_statistics.to_csv(summ_stat_path, self.delim_out, index=False)
+            print "WRITTEN: ", summ_stat_path
+
+        full_stat_path = extra_writes.get("full_stat_path")
+        if full_stat_path is not None:
+            self.result.final_statistics.to_csv(full_stat_path, sep=self.delim_out, index=False)
+            print "WRITTEN: ", full_stat_path
+
+        for scored_table, out_path in zip(self.result.scored_tables, out_pathes):
+
+            if self.result.final_statistics is not None:
+
+                plot_data = save_report(
+                    out_path.report, self.prefix, scored_table, self.result.final_statistics)
+                print "WRITTEN: ", out_path.report
+
+                cutoffs, svalues, qvalues, top_target, top_decoys = plot_data
+                for (name, values) in [("cutoffs", cutoffs), ("svalues", svalues), ("qvalues", qvalues),
+                                       ("d_scores_top_target_peaks", top_target),
+                                       ("d_scores_top_decoy_peaks", top_decoys)]:
+                    path = out_path[name]
+                    with open(path, "w") as fp:
+                        fp.write(" ".join("%e" % v for v in values))
+                    print "WRITTEN: ", path
+
+            scored_table.to_csv(out_path.scored_table, sep=self.delim_out, index=False)
+            print "WRITTEN: ", out_path.scored_table
+
+            filtered_table = scored_table[scored_table.d_score > CONFIG.get("d_score.cutoff")]
+
+            filtered_table.to_csv(out_path.filtered_table, sep=self.delim_out, index=False)
+            print "WRITTEN: ", out_path.filtered_table
+
+            if CONFIG.get("export.mayu"):
+                if self.result.final_statistics:
+                    export_mayu(out_pathes.mayu_cutoff, out_pathes.mayu_fasta,
+                                out_pathes.mayu_csv, scored_table, self.result.final_statistics)
+                    print "WRITTEN: ", out_pathes.mayu_cutoff
+                    print "WRITTEN: ", out_pathes.mayu_fasta
+                    print "WRITTEN: ", out_pathes.mayu_csv
+                else:
+                    logging.warn("can not write mayu table in this case")
+
+    def save_scorer(self, scorer, extra_writes):
+        pickled_scorer_path = extra_writes.get("pickled_scorer_path")
+        if pickled_scorer_path is not None:
+            assert scorer is not None, "invalid setting, should never happend"
+            bin_data = zlib.compress(cPickle.dumps(scorer, protocol=2))
+            with open(pickled_scorer_path, "wb") as fp:
+                fp.write(bin_data)
+            print "WRITTEN: ", pickled_scorer_path
+
+    def save_weights(self, weights, extra_writes):
+        trained_weights_path = extra_writes.get("trained_weights_path")
+        if trained_weights_path is not None:
+            np.savetxt(trained_weights_path, weights, delimiter="\t")
+            print "WRITTEN: ", trained_weights_path
 
 
-def dump_config_info(config, info):
-    print
-    print "parameters:"
-    print
-    for k, v in sorted(config.items()):
-        comment = info.get(k, "")
-        print "    --%-40s   default: %-5r %s" % (k, v, comment)
-    print
+class PyProphetLearner(PyProphetRunner):
+
+    def run_algo(self):
+        (tables, result, scorer, weights) = PyProphet().learn_and_apply(self.pathes, self.delim_in,
+                                                                        self.check_cols)
+        return (tables, result, scorer, weights)
+
+    def extra_writes(self, dirname):
+        yield "summ_stat_path", os.path.join(dirname, self.prefix + "_summary_stat.csv")
+        yield "full_stat_path", os.path.join(dirname, self.prefix + "_full_stat.csv")
+        yield "pickled_scorer_path", os.path.join(dirname, self.prefix + "_scorer.bin")
+        yield "trained_weights_path", os.path.join(dirname, self.prefix + "_weights.txt")
 
 
-def dump_config(config):
-    print
-    print "used parameters:"
-    print
-    for k, v in sorted(config.items()):
-        print "    %-40s   : %r" % (k, v)
-    print
+class PyProphetWeightApplier(PyProphetRunner):
+
+    def __init__(self, pathes, prefix, merge_results, apply_weights, delim_in, delim_out):
+        super(PyProphetWeightApplier, self).__init__(pathes, prefix, merge_results, delim_in,
+                                                     delim_out)
+        if not os.path.exists(apply_weights):
+            raise Exception("weights file %s does not exist" % apply_weights)
+        try:
+            self.persisted_weights = np.loadtxt(apply_weights)
+        except:
+            import traceback
+            traceback.print_exc()
+            raise
+
+    def run_algo(self):
+        (tables, result, scorer, weights) = PyProphet().apply_weights(self.pathes, self.delim_in,
+                                                                      self.check_cols,
+                                                                      self.persisted_weights)
+        return (tables, result, scorer, weights)
+
+    def extra_writes(self, dirname):
+        yield "summ_stat_path", os.path.join(dirname, self.prefix + "_summary_stat.csv")
+        yield "full_stat_path", os.path.join(dirname, self.prefix + "_full_stat.csv")
+        yield "pickled_scorer_path", os.path.join(dirname, self.prefix + "_scorer.bin")
 
 
-def _create_path(prefix, dirname):
+class PyProphetScorerApplier(PyProphetRunner):
 
-    class Pathes(dict):
+    def __init__(self, pathes, prefix, merge_results, apply_scorer, delim_in, delim_out):
+        super(PyProphetScorerApplier, self).__init__(pathes, prefix, merge_results, delim_in,
+                                                     delim_out)
+        if not os.path.exists(apply_scorer):
+            raise Exception("persisted scorer file %s does not exist" % apply_scorer)
+        try:
+            self.persisted_scorer = cPickle.loads(zlib.decompress(open(apply_scorer, "rb").read()))
+        except:
+            import traceback
+            traceback.print_exc()
+            raise
 
-        def __init__(self, prefix, dirname, **kw):
-            for k, postfix in kw.items():
-                self[k] = os.path.join(dirname, prefix + postfix)
-        __getattr__ = dict.__getitem__
+    def run_algo(self):
+        (tables, result, scorer, weights) = PyProphet().apply_scorer(self.pathes, self.delim_in,
+                                                                     self.check_cols,
+                                                                     self.persisted_scorer)
+        return (tables, result, scorer, weights)
 
-    return Pathes(prefix, dirname,
-                  scored_table="_with_dscore.csv",
-                  filtered_table="_with_dscore_filtered.csv",
-                  report="_report.pdf",
-                  cutoffs="_cutoffs.txt",
-                  svalues="_svalues.txt",
-                  qvalues="_qvalues.txt",
-                  d_scores_top_target_peaks="_dscores_top_target_peaks.txt",
-                  d_scores_top_decoy_peaks="_dscores_top_decoy_peaks.txt",
-                  mayu_cutoff="_mayu.cutoff",
-                  mayu_fasta="_mayu.fasta",
-                  mayu_csv="_mayu.csv",
-                  )
-
-
-def main():
-    _main(sys.argv[1:])
+    def extra_writes(self, dirname):
+        """empty generator, see
+        http://stackoverflow.com/questions/13243766/python-empty-generator-function
+        """
+        return
+        yield
 
 
 def _main(args):
 
-    options = dict()
-    pathes = []
-
-    if "--help" in args:
-        print_help()
-        return
-
-    if "--version" in args:
-        print_version()
-        return
-
-    for arg in args:
-        if arg.startswith("--"):
-            if "=" in arg:
-                pre, __, post = arg.partition("=")
-                options[pre[2:]] = post
-            else:
-                options[arg[2:]] = True
-        else:
-            pathes.append(arg)
-
-    if not pathes:
-        print_help()
-        raise Exception("no input file given")
-
-    CONFIG.update(options)
-    dump_config(CONFIG.config)
+    pathes = parse_cmdline(args)
 
     apply_scorer = CONFIG.get("apply_scorer")
     apply_weights = CONFIG.get("apply_weights")
-
-    learning_mode = not apply_scorer and not apply_weights
-
-    """
-    valid combinations
-
-    learning? len(pathes)>1? merge_results?  prefix? reaction
-
-    NO        YES            ???             ???     not allowed
-
-              NO             ???             ???     ok
-
-    YES       YES            YES             ???     ok
-
-                             ???             YES     prefix ignored, ok
-
-                                             NO      ok
-
-              NO             ???             ???     ok
-
-    """
-
-    # line 1 from above:
-    if len(pathes) > 1 and not learning_mode:
-        raise Exception("multiple input files are only allowed for learning a shared model")
-
-    # from now on: paramterchecks above only for learning mode
-
-    dirname = CONFIG.get("target.dir")
-    if dirname is None:
-        dirnames = set(os.path.dirname(path) for path in pathes)
-        # is always ok for not learning_mode, which includes that pathes has only one entry
-        if len(dirnames) > 1:
-            raise Exception("could not derive common directory name of input files, please use "
-                            "--target.dir option")
-        dirname = dirnames.pop()
-
-    if dirname and not os.path.exists(dirname):
-        os.makedirs(dirname)
-        logging.info("created folder %s" % dirname)
-
     prefix = CONFIG.get("target.prefix")
-
     merge_results = CONFIG.get("multiple_files.merge_results")
-
-    # line 4 from above:
-    if learning_mode and len(pathes) > 1 and not merge_results and prefix:
-        logging.warn("ignore --target.prefix=%r" % prefix)
-
-    if prefix is None:
-        prefixes = [os.path.splitext(os.path.basename(path))[0] for path in pathes]
-        common_prefix = os.path.commonprefix(prefixes)
-        # is always ok for not learning_mode, which includes that pathes has only one entry
-        if not common_prefix:
-            raise Exception("could not derive common prefix of input file names, please use "
-                            "--target.prefix option")
-        prefix = common_prefix
-
-    persisted_scorer = None
-    if apply_scorer:
-        if not os.path.exists(apply_scorer):
-            raise Exception("scorer file %s does not exist" % apply_scorer)
-        try:
-            persisted_scorer = cPickle.loads(zlib.decompress(open(apply_scorer, "rb").read()))
-        except:
-            import traceback
-            traceback.print_exc()
-            raise
-
-    apply_existing_scorer = persisted_scorer is not None
-
-    persisted_weights = None
-    if apply_weights:
-        if apply_existing_scorer:
-            raise Exception("can not apply existing scorer and existing weights at the same time")
-        if not os.path.exists(apply_weights):
-            raise Exception("weights file %s does not exist" % apply_weights)
-        try:
-            persisted_weights = np.loadtxt(apply_weights)
-
-        except:
-            import traceback
-            traceback.print_exc()
-            raise
-
-    apply_existing_weights = persisted_weights is not None
-
-    """
-    len(pathes) > 1 and merge_results -> 1 output
-    else:                                len(pathes) output
-    """
-
-    if merge_results:
-        assert prefix
-        out_pathes = [_create_path(prefix, dirname)]
-
-    else:
-        out_pathes = []
-        for path in pathes:
-            if len(pathes) > 1:
-                specific_prefix = os.path.splitext(os.path.basename(path))[0]
-            else:
-                specific_prefix = prefix
-            out_pathes.append(_create_path(specific_prefix, dirname))
-
-    summ_stat_path = full_stat_path = None
-
-    if not apply_existing_scorer:
-        # this is the only case where not statics will be written:
-        summ_stat_path = os.path.join(dirname, prefix + "_summary_stat.csv")
-        full_stat_path = os.path.join(dirname, prefix + "_full_stat.csv")
-
-    if not apply_existing_scorer:
-        pickled_scorer_path = os.path.join(dirname, prefix + "_scorer.bin")
-
-    if not apply_existing_weights:
-        trained_weights_path = os.path.join(dirname, prefix + "_weights.txt")
-
-    if not CONFIG.get("target.overwrite"):
-        found_exsiting_file = False
-        to_check = list(k for p in out_pathes for k in p.keys())
-        if summ_stat_path:
-            to_check.append(summ_stat_path)
-        if full_stat_path:
-            to_check.append(full_stat_path)
-        if not apply_existing_scorer:
-            to_check.append(pickled_scorer_path)
-        if not apply_existing_weights:
-            to_check.append(trained_weights_path)
-        for p in to_check:
-            if os.path.exists(p):
-                found_exsiting_file = True
-                print "ERROR: %s already exists" % p
-        if found_exsiting_file:
-            print
-            print "please use --target.overwrite option"
-            print
-            return
-
-    logging.info("config settings:")
-    for k, v in sorted(CONFIG.config.items()):
-        logging.info("    %s: %s" % (k, v))
-    start_at = time.time()
-
-    check_cols = ["transition_group_id", "run_id", "decoy"]
-    if CONFIG.get("export.mayu"):
-        check_cols += mayu_cols()
-
     delim_in = CONFIG.get("delim.in")
     delim_out = CONFIG.get("delim.out")
 
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
+    if apply_scorer and apply_weights:
+        raise Exception("can not apply scorer and weights at the same time")
 
-        (tables, result, scorer, weights) = PyProphet().process_csv(pathes,
-                                                                    delim_in,
-                                                                    persisted_scorer,
-                                                                    persisted_weights,
-                                                                    check_cols)
+    learning_mode = not apply_scorer and not apply_weights
 
-    if merge_results and len(result.scored_tables) > 0:
-        scored_tables = [pd.concat(result.scored_tables)]
-        result = Result(result.summary_statistics, result.final_statistics, scored_tables)
+    if learning_mode:
+        PyProphetLearner(pathes, prefix, merge_results, delim_in, delim_out).run()
 
-    needed = time.time() - start_at
+    elif apply_weights:
+        PyProphetWeightApplier(
+            pathes, prefix, merge_results, apply_weights, delim_in, delim_out).run()
 
-    set_pandas_print_options()
+    else:
+        PyProphetScorerApplier(
+            pathes, prefix, merge_results, apply_scorer, delim_in, delim_out).run()
 
-    if result.summary_statistics is not None:
-        print
-        print "=" * 98
-        print
-        print result.summary_statistics
-        print
-        print "=" * 98
 
-    print
-    if result.summary_statistics is not None:
-        result.summary_statistics.to_csv(summ_stat_path, delim_out, index=False)
-        print "WRITTEN: ", summ_stat_path
-
-    if result.final_statistics is not None:
-        result.final_statistics.to_csv(full_stat_path, sep=delim_out, index=False)
-        print "WRITTEN: ", full_stat_path
-
-        for scored_table, out_path in zip(result.scored_tables, out_pathes):
-            plot_data = save_report(out_path.report, prefix, scored_table, result.final_statistics)
-            print "WRITTEN: ", out_path.report
-
-            cutoffs, svalues, qvalues, top_target, top_decoys = plot_data
-            for (name, values) in [("cutoffs", cutoffs), ("svalues", svalues), ("qvalues", qvalues),
-                                ("d_scores_top_target_peaks", top_target),
-                                ("d_scores_top_decoy_peaks", top_decoys)]:
-                path = out_path[name]
-                with open(path, "w") as fp:
-                    fp.write(" ".join("%e" % v for v in values))
-                print "WRITTEN: ", path
-
-    for scored_table, out_path in zip(result.scored_tables, out_pathes):
-
-        scored_table.to_csv(out_path.scored_table, sep=delim_out, index=False)
-        print "WRITTEN: ", out_path.scored_table
-
-        filtered_table = scored_table[scored_table.d_score > CONFIG.get("d_score.cutoff")]
-
-        filtered_table.to_csv(out_path.filtered_table, sep=delim_out, index=False)
-        print "WRITTEN: ", out_path.filtered_table
-
-        if CONFIG.get("export.mayu"):
-            if result.final_statistics:
-                export_mayu(out_pathes.mayu_cutoff, out_pathes.mayu_fasta,
-                            out_pathes.mayu_csv, scored_table, result.final_statistics)
-                print "WRITTEN: ", out_pathes.mayu_cutoff
-                print "WRITTEN: ", out_pathes.mayu_fasta
-                print "WRITTEN: ", out_pathes.mayu_csv
-            else:
-                logging.warn("can not write mayu table in this case")
-
-    if not apply_existing_scorer:
-        bin_data = zlib.compress(cPickle.dumps(scorer, protocol=2))
-        with open(pickled_scorer_path, "wb") as fp:
-            fp.write(bin_data)
-        print "WRITTEN: ", pickled_scorer_path
-
-    if not apply_existing_weights:
-        np.savetxt(trained_weights_path, weights, delimiter="\t")
-        print "WRITTEN: ", trained_weights_path
-
-    seconds = int(needed)
-    msecs = int(1000 * (needed - seconds))
-    minutes = int(needed / 60.0)
-
-    print "NEEDED",
-    if minutes:
-        print minutes, "minutes and",
-
-    print "%d seconds and %d msecs wall time" % (seconds, msecs)
-    print
+def main():
+    _main(sys.argv[1:])

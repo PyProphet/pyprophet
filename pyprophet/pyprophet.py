@@ -43,7 +43,7 @@ from contextlib import contextmanager
 
 
 @contextmanager
-def timer():
+def timer(name=""):
     start_at = time.time()
 
     yield
@@ -55,7 +55,10 @@ def timer():
     minutes = int(needed / 60)
     needed -= minutes * 60
 
-    logging.info("time needed: %02d:%02d:%.1f" % (hours, minutes, needed))
+    if name:
+        logging.info("time needed for %s: %02d:%02d:%.1f" % (name, hours, minutes, needed))
+    else:
+        logging.info("time needed: %02d:%02d:%.1f" % (hours, minutes, needed))
 
 
 Result = namedtuple("Result", "summary_statistics final_statistics scored_tables")
@@ -158,8 +161,7 @@ class Scorer(object):
         scored_tables = []
         for table in tables:
             scored_table = self.score(table)
-            scored_tables.append(scored_table)
-        return scored_tables
+            yield scored_table
 
     def get_error_stats(self):
         return final_err_table(self.error_stat.df), summary_err_table(self.error_stat.df)
@@ -191,28 +193,8 @@ class HolyGostQuery(object):
                           AbstractSemiSupervisedLearner)
         self.semi_supervised_learner = semi_supervised_learner
 
-    @profile
-    def process_csv(self, pathes, delim=",", loaded_scorer=None, loaded_weights=None,
-                    check_cols=None, p_score=None):
 
-        tables = self.read_tables(pathes, delim, check_cols)
-
-        with timer():
-
-            if loaded_scorer is not None:
-                logging.info("apply scorer to input data")
-                result, __, trained_weights = self.apply_loaded_scorer(tables, loaded_scorer)
-                learned_scorer = None
-            else:
-                logging.info("learn and apply classifier from input data")
-                result, learned_scorer, trained_weights = self.learn_and_apply_classifier(
-                    tables, p_score, loaded_weights)
-
-            logging.info("processing input data finished")
-
-        return tables, result, learned_scorer, trained_weights
-
-    def read_tables(self, pathes, delim, check_cols):
+    def read_tables_iter(self, pathes, delim, check_cols):
 
         logging.info("process %s" % ", ".join(pathes))
         headers = set()
@@ -223,91 +205,143 @@ class HolyGostQuery(object):
         if len(headers) > 1:
             raise Exception("the input files have different headers.")
 
-        tables = []
         for path in pathes:
             part = pd.read_csv(path, delim, na_values=["NA", "NaN", "infinite"], engine="c")
-            tables.append(part)
+            yield part
 
-        return tables
 
-    @profile
-    def learn_and_apply_classifier(self, tables, p_score=False, loaded_weights=None):
-
+    def _setup_experiment(self, tables):
         prepared_tables, score_columns = prepare_data_tables(tables)
         prepared_table = pd.concat(prepared_tables)
-
         experiment = Experiment(prepared_table)
+        experiment.log_summary()
+        return experiment, score_columns
+
+
+    def apply_weights(self, pathes, delim_in, check_cols, loaded_weights):
+
+        tables = list(self.read_tables_iter(pathes, delim_in, check_cols))
+        with timer():
+            logging.info("apply weights")
+            result, learned_scorer, trained_weights = self._apply_weights(tables, loaded_weights)
+            logging.info("processing input data finished")
+        return tables, result, learned_scorer, trained_weights
+
+    def _apply_weights(self, tables, loaded_weights):
+
+        experiment, score_columns = self._setup_experiment(tables)
+
+        learner = self.semi_supervised_learner
+
+        logging.info("start application of pretrained weights")
+        clf_scores = learner.score(experiment, loaded_weights)
+        experiment.set_and_rerank("classifier_score", clf_scores)
+
+        all_test_target_scores = experiment.get_top_target_peaks()["classifier_score"]
+        all_test_decoy_scores = experiment.get_top_decoy_peaks()["classifier_score"]
+        logging.info("finished pretrained scoring")
+
+        ws = [loaded_weights.flatten()]
+        final_classifier = self.semi_supervised_learner.averaged_learner(ws)
+
+        return self._build_result(tables, final_classifier, score_columns, experiment,
+                                  all_test_target_scores, all_test_decoy_scores)
+
+    @profile
+    def apply_scorer(self, pathes, delim, check_cols, loaded_scorer):
+        tables = list(self.read_tables_iter(pathes, delim, check_cols))
+
+        with timer():
+            logging.info("apply scorer to input data")
+            result, __, trained_weights = self._apply_scorer(tables, loaded_scorer)
+            learned_scorer = None
+            logging.info("processing input data finished")
+        return tables, result, learned_scorer, trained_weights
+
+    @profile
+    def _apply_scorer(self, tables, loaded_scorer):
+        scored_tables = loaded_scorer.score_many(tables)
+        trained_weights = loaded_scorer.classifier.get_parameters()
+        return Result(None, None, scored_tables), None, trained_weights
+
+    @profile
+    def learn_and_apply(self, pathes, delim, check_cols):
+
+        tables = list(self.read_tables_iter(pathes, delim, check_cols))
+        with timer():
+
+            logging.info("learn and apply classifier from input data")
+            result, learned_scorer, trained_weights = self._learn_and_apply(tables)
+            logging.info("processing input data finished")
+
+        return tables, result, learned_scorer, trained_weights
+
+    def _learn_and_apply(self, tables):
+
+        experiment, score_columns = self._setup_experiment(tables)
 
         is_test = CONFIG.get("is_test")
 
         if is_test:  # for reliable results
             experiment.df.sort("tg_id", ascending=True, inplace=True)
 
-        experiment.log_summary()
-
-        inst = self.semi_supervised_learner
+        learner = self.semi_supervised_learner
         ws = []
+
         neval = CONFIG.get("xeval.num_iter")
         num_processes = CONFIG.get("num_processes")
         all_test_target_scores = []
         all_test_decoy_scores = []
 
-        if loaded_weights is None:
-            logging.info("learn and apply scorer")
-            logging.info("start %d cross evals using %d processes" % (neval, num_processes))
-            if num_processes == 1:
-                for k in range(neval):
-                    (ttt_scores, ttd_scores, w) = inst.learn_randomized(experiment)
-                    all_test_target_scores.extend(ttt_scores)
-                    all_test_decoy_scores.extend(ttd_scores)
-                    ws.append(w.flatten())
-            else:
-                pool = multiprocessing.Pool(processes=num_processes)
-                while neval:
-                    remaining = max(0, neval - num_processes)
-                    todo = neval - remaining
-                    neval -= todo
-                    args = ((inst, "learn_randomized", (experiment, )), ) * todo
-                    res = pool.map(unwrap_self_for_multiprocessing, args)
-                    top_test_target_scores = [ti for r in res for ti in r[0]]
-                    top_test_decoy_scores = [ti for r in res for ti in r[1]]
-                    ws.extend([r[2] for r in res])
-                    all_test_target_scores.extend(top_test_target_scores)
-                    all_test_decoy_scores.extend(top_test_decoy_scores)
-            logging.info("finished cross evals")
-            logging.info("")
-
+        logging.info("learn and apply scorer")
+        logging.info("start %d cross evals using %d processes" % (neval, num_processes))
+        if num_processes == 1:
+            for k in range(neval):
+                (ttt_scores, ttd_scores, w) = learner.learn_randomized(experiment)
+                all_test_target_scores.extend(ttt_scores)
+                all_test_decoy_scores.extend(ttd_scores)
+                ws.append(w.flatten())
         else:
-            logging.info("start application of pretrained weights")
-            ws.append(loaded_weights.flatten())
-            clf_scores = inst.score(experiment, loaded_weights)
-            experiment.set_and_rerank("classifier_score", clf_scores)
-
-            all_test_target_scores.extend(experiment.get_top_target_peaks()["classifier_score"])
-            all_test_decoy_scores.extend(experiment.get_top_decoy_peaks()["classifier_score"])
-            logging.info("finished pretrained scoring")
+            pool = multiprocessing.Pool(processes=num_processes)
+            while neval:
+                remaining = max(0, neval - num_processes)
+                todo = neval - remaining
+                neval -= todo
+                args = ((learner, "learn_randomized", (experiment, )), ) * todo
+                res = pool.map(unwrap_self_for_multiprocessing, args)
+                top_test_target_scores = [ti for r in res for ti in r[0]]
+                top_test_decoy_scores = [ti for r in res for ti in r[1]]
+                ws.extend([r[2] for r in res])
+                all_test_target_scores.extend(top_test_target_scores)
+                all_test_decoy_scores.extend(top_test_decoy_scores)
+        logging.info("finished cross evals")
+        logging.info("")
 
         final_classifier = self.semi_supervised_learner.averaged_learner(ws)
 
-        weights = final_classifier.get_parameters()
+        return self._build_result(tables, final_classifier, score_columns, experiment,
+                                  all_test_target_scores, all_test_decoy_scores)
 
+    def _build_result(self, tables, final_classifier, score_columns, experiment, all_test_target_scores,
+                      all_test_decoy_scores):
+
+        weights = final_classifier.get_parameters()
         scorer = Scorer(final_classifier, score_columns, experiment, all_test_target_scores,
                         all_test_decoy_scores)
 
-        scored_tables = scorer.score_many(tables)
+        scored_tables = list(scorer.score_many(tables))
 
         final_statistics, summary_statistics = scorer.get_error_stats()
+
+        merge_results = CONFIG.get("multiple_files.merge_results")
+        if merge_results:
+            scored_tables = [pd.concat(scored_tables)]
+
         result = Result(summary_statistics, final_statistics, scored_tables)
 
         logging.info("calculated scoring and statistics")
         return result, scorer, weights
 
-    @profile
-    def apply_loaded_scorer(self, tables, loaded_scorer):
-
-        scored_tables = loaded_scorer.score_many(tables)
-        trained_weights = loaded_scorer.classifier.get_parameters()
-        return Result(None, None, scored_tables), None, trained_weights
 
 
 @profile

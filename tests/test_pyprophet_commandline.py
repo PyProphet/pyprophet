@@ -74,18 +74,18 @@ def _run_pyprophet_to_learn_model(regtest, tmpdir, dump_result_files=False, with
             for line in lines[:5]:
                 if len(line) > 80:
                     line = line[:40] + " ... " + line[-45:]
-                print >> regtest, line
+                print >> regtest, line.rstrip()
             print >> regtest
             print >> regtest, "last 5 lines of", f
             for line in lines[-5:]:
                 if len(line) > 80:
                     line = line[:40] + " ... " + line[-45:]
-                print >> regtest, line
+                print >> regtest, line.rstrip()
         else:
             for line in lines:
                 if len(line) > 80:
                     line = line[:40] + " ... " + line[-45:]
-                print >> regtest, line
+                print >> regtest, line.rstrip()
 
     return stdout
 

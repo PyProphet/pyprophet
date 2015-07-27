@@ -132,7 +132,7 @@ pyprophet test_data.txt --apply_weights=test_data_weights.txt --target.overwrite
      xeval.fraction: 0.5
      xeval.num_iter: 5
  process test_data.txt
- learn and apply classifier from input data
+ apply weights
  data set contains 387 decoy and 387 target transition groups
  summary input file:
     9165 lines
