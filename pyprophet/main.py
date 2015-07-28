@@ -14,6 +14,7 @@ import abc
 import cPickle
 import logging
 import sys
+import random
 import time
 import warnings
 import zlib
@@ -129,12 +130,13 @@ class PyProphetRunner(object):
         start_at = time.time()
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            (tables, self.result, scorer, weights) = self.run_algo()
+            (result, scorer, weights) = self.run_algo()
         needed = time.time() - start_at
 
         set_pandas_print_options()
-        self.print_summary()
-        self.save_results(extra_writes, out_pathes)
+        self.print_summary(result)
+        self.save_results(result, extra_writes, out_pathes)
+
         self.save_scorer(scorer, extra_writes)
         self.save_weights(weights, extra_writes)
 
@@ -149,56 +151,54 @@ class PyProphetRunner(object):
         print "%d seconds and %d msecs wall time" % (seconds, msecs)
         print
 
-    def print_summary(self):
-        if self.result.summary_statistics is not None:
+    def print_summary(self, result):
+        if result.summary_statistics is not None:
             print
             print "=" * 98
             print
-            print self.result.summary_statistics
+            print result.summary_statistics
             print
             print "=" * 98
         print
 
-    def save_results(self, extra_writes, out_pathes):
+    def save_results(self, result, extra_writes, out_pathes):
         summ_stat_path = extra_writes.get("summ_stat_path")
         if summ_stat_path is not None:
-            self.result.summary_statistics.to_csv(summ_stat_path, self.delim_out, index=False)
+            result.summary_statistics.to_csv(summ_stat_path, self.delim_out, index=False)
             print "WRITTEN: ", summ_stat_path
 
         full_stat_path = extra_writes.get("full_stat_path")
         if full_stat_path is not None:
-            self.result.final_statistics.to_csv(full_stat_path, sep=self.delim_out, index=False)
+            result.final_statistics.to_csv(full_stat_path, sep=self.delim_out, index=False)
             print "WRITTEN: ", full_stat_path
 
-        for scored_table, out_path in zip(self.result.scored_tables, out_pathes):
+        for scored_table, out_path in zip(result.scored_tables, out_pathes):
 
-            if self.result.final_statistics is not None:
+
+            cutoff = CONFIG.get("d_score.cutoff")
+            scored_table.to_csv(out_path.scored_table, out_path.filtered_table, cutoff, sep=self.delim_out, index=False)
+            print "WRITTEN: ", out_path.scored_table
+            print "WRITTEN: ", out_path.filtered_table
+
+            if result.final_statistics is not None:
 
                 plot_data = save_report(
-                    out_path.report, self.prefix, scored_table, self.result.final_statistics)
+                    out_path.report, self.prefix, scored_table, result.final_statistics)
                 print "WRITTEN: ", out_path.report
 
-                cutoffs, svalues, qvalues, top_target, top_decoys = plot_data
+                cutoffs, svalues, qvalues, top_targets, top_decoys = plot_data
                 for (name, values) in [("cutoffs", cutoffs), ("svalues", svalues), ("qvalues", qvalues),
-                                       ("d_scores_top_target_peaks", top_target),
+                                       ("d_scores_top_target_peaks", top_targets),
                                        ("d_scores_top_decoy_peaks", top_decoys)]:
                     path = out_path[name]
                     with open(path, "w") as fp:
                         fp.write(" ".join("%e" % v for v in values))
                     print "WRITTEN: ", path
 
-            scored_table.to_csv(out_path.scored_table, sep=self.delim_out, index=False)
-            print "WRITTEN: ", out_path.scored_table
-
-            filtered_table = scored_table[scored_table.d_score > CONFIG.get("d_score.cutoff")]
-
-            filtered_table.to_csv(out_path.filtered_table, sep=self.delim_out, index=False)
-            print "WRITTEN: ", out_path.filtered_table
-
             if CONFIG.get("export.mayu"):
-                if self.result.final_statistics:
+                if result.final_statistics:
                     export_mayu(out_pathes.mayu_cutoff, out_pathes.mayu_fasta,
-                                out_pathes.mayu_csv, scored_table, self.result.final_statistics)
+                                out_pathes.mayu_csv, scored_table, result.final_statistics)
                     print "WRITTEN: ", out_pathes.mayu_cutoff
                     print "WRITTEN: ", out_pathes.mayu_fasta
                     print "WRITTEN: ", out_pathes.mayu_csv
@@ -224,9 +224,24 @@ class PyProphetRunner(object):
 class PyProphetLearner(PyProphetRunner):
 
     def run_algo(self):
-        (tables, result, scorer, weights) = PyProphet().learn_and_apply(self.pathes, self.delim_in,
+        (result, scorer, weights) = PyProphet().learn_and_apply(self.pathes, self.delim_in,
                                                                         self.check_cols)
-        return (tables, result, scorer, weights)
+        return (result, scorer, weights)
+
+    def extra_writes(self, dirname):
+        yield "summ_stat_path", os.path.join(dirname, self.prefix + "_summary_stat.csv")
+        yield "full_stat_path", os.path.join(dirname, self.prefix + "_full_stat.csv")
+        yield "pickled_scorer_path", os.path.join(dirname, self.prefix + "_scorer.bin")
+        yield "trained_weights_path", os.path.join(dirname, self.prefix + "_weights.txt")
+
+
+class PyProphetOutOfCoreLearner(PyProphetRunner):
+
+    def run_algo(self):
+        (result, scorer, weights) = PyProphet().learn_and_apply_out_of_core(self.pathes,
+                                                                            self.delim_in,
+                                                                            self.check_cols)
+        return (result, scorer, weights)
 
     def extra_writes(self, dirname):
         yield "summ_stat_path", os.path.join(dirname, self.prefix + "_summary_stat.csv")
@@ -250,10 +265,10 @@ class PyProphetWeightApplier(PyProphetRunner):
             raise
 
     def run_algo(self):
-        (tables, result, scorer, weights) = PyProphet().apply_weights(self.pathes, self.delim_in,
+        (result, scorer, weights) = PyProphet().apply_weights(self.pathes, self.delim_in,
                                                                       self.check_cols,
                                                                       self.persisted_weights)
-        return (tables, result, scorer, weights)
+        return (result, scorer, weights)
 
     def extra_writes(self, dirname):
         yield "summ_stat_path", os.path.join(dirname, self.prefix + "_summary_stat.csv")
@@ -276,10 +291,10 @@ class PyProphetScorerApplier(PyProphetRunner):
             raise
 
     def run_algo(self):
-        (tables, result, scorer, weights) = PyProphet().apply_scorer(self.pathes, self.delim_in,
+        (result, scorer, weights) = PyProphet().apply_scorer(self.pathes, self.delim_in,
                                                                      self.check_cols,
                                                                      self.persisted_scorer)
-        return (tables, result, scorer, weights)
+        return (result, scorer, weights)
 
     def extra_writes(self, dirname):
         """empty generator, see
@@ -299,6 +314,13 @@ def _main(args):
     merge_results = CONFIG.get("multiple_files.merge_results")
     delim_in = CONFIG.get("delim.in")
     delim_out = CONFIG.get("delim.out")
+    out_of_core = CONFIG.get("out_of_core")
+
+    random_seed = CONFIG.get("random_seed")
+
+    if random_seed is not None:
+        random.seed(random_seed)
+
 
     if apply_scorer and apply_weights:
         raise Exception("can not apply scorer and weights at the same time")
@@ -306,7 +328,10 @@ def _main(args):
     learning_mode = not apply_scorer and not apply_weights
 
     if learning_mode:
-        PyProphetLearner(pathes, prefix, merge_results, delim_in, delim_out).run()
+        if out_of_core:
+            PyProphetOutOfCoreLearner(pathes, prefix, merge_results, delim_in, delim_out).run()
+        else:
+            PyProphetLearner(pathes, prefix, merge_results, delim_in, delim_out).run()
 
     elif apply_weights:
         PyProphetWeightApplier(

@@ -1,0 +1,667 @@
+pyprophet test_data_2.txt test_data_3.txt --out_of_core --out_of_core.sampling_rate=1.0 --random_seed=42
+ config settings:
+     apply_scorer: None
+     apply_weights: None
+     compute.probabilities: False
+     d_score.cutoff: -1000.0
+     delim.in:
+     delim.out:
+     export.mayu: False
+     final_statistics.fdr_all_pg: False
+     final_statistics.lambda: 0.4
+     ignore.invalid_score_columns: 0
+     is_test: 0
+     multiple_files.merge_results: 0
+     num_processes: 1
+     out_of_core: 1
+     out_of_core.sampling_rate: 1.0
+     random_seed: 42
+     semi_supervised_learner.initial_fdr: 0.15
+     semi_supervised_learner.initial_lambda: 0.4
+     semi_supervised_learner.iteration_fdr: 0.02
+     semi_supervised_learner.iteration_lambda: 0.4
+     semi_supervised_learner.num_iter: 5
+     target.dir: None
+     target.overwrite: 0
+     target.prefix: None
+     xeval.fraction: 0.5
+     xeval.num_iter: 5
+ learn and apply classifier out of core
+ data set contains 387 decoy and 387 target transition groups
+ data set contains 387 decoy and 387 target transition groups
+ summary input file:
+    18330 lines
+    774 transition groups
+    17 scores including main score
+ learn and apply scorer
+ start 5 cross evals using 1 processes
+ start learn_randomized
+ end learn_randomized
+ start learn_randomized
+ end learn_randomized
+ start learn_randomized
+ end learn_randomized
+ start learn_randomized
+ end learn_randomized
+ start learn_randomized
+ end learn_randomized
+ finished cross evals
+
+ calculated scoring and statistics
+ processing input data finished
+ data set contains 387 decoy and 387 target transition groups
+ mean m_score = 6.086655e-02, std_dev m_score = 1.708347e-02
+ mean s_value = 9.801130e-01, std_dev s_value = 1.124938e-01
+ data set contains 387 decoy and 387 target transition groups
+ mean m_score = 6.086655e-02, std_dev m_score = 1.708347e-02
+ mean s_value = 9.801130e-01, std_dev s_value = 1.124938e-01
+
+used parameters:
+
+    apply_scorer                               : None
+    apply_weights                              : None
+    compute.probabilities                      : False
+    d_score.cutoff                             : -1000.0
+    delim.in                                   : '\t'
+    delim.out                                  : '\t'
+    export.mayu                                : False
+    final_statistics.fdr_all_pg                : False
+    final_statistics.lambda                    : 0.4
+    ignore.invalid_score_columns               : 0
+    is_test                                    : 0
+    multiple_files.merge_results               : 0
+    num_processes                              : 1
+    out_of_core                                : 1
+    out_of_core.sampling_rate                  : 1.0
+    random_seed                                : '42'
+    semi_supervised_learner.initial_fdr        : 0.15
+    semi_supervised_learner.initial_lambda     : 0.4
+    semi_supervised_learner.iteration_fdr      : 0.02
+    semi_supervised_learner.iteration_lambda   : 0.4
+    semi_supervised_learner.num_iter           : 5
+    target.dir                                 : None
+    target.overwrite                           : 0
+    target.prefix                              : None
+    xeval.fraction                             : 0.5
+    xeval.num_iter                             : 5
+
+
+==================================================================================================
+
+   qvalue   svalue   TP  FP        TN         FN          FDR     sens   cutoff
+0    0.00  0.00223    2   0  56.14508  715.85492  1.21819e-11  0.00279  7.25959
+1    0.01  1.00000  721   7  49.14508   -3.14508  9.28886e-03  1.00000  1.49107
+2    0.02  1.00000  723  13  43.14508   -5.14508  1.82423e-02  1.00000  0.90848
+3    0.05  1.00000  720  38  18.14508   -2.14508  4.94820e-02  1.00000 -0.50789
+4    0.10  1.00000  721  53   3.14508   -3.14508  6.80027e-02  1.00000 -1.44424
+5    0.20      NaN  NaN NaN       NaN        NaN          NaN      NaN      NaN
+6    0.30      NaN  NaN NaN       NaN        NaN          NaN      NaN      NaN
+7    0.40      NaN  NaN NaN       NaN        NaN          NaN      NaN      NaN
+8    0.50      NaN  NaN NaN       NaN        NaN          NaN      NaN      NaN
+
+==================================================================================================
+
+WRITTEN:  test_data__summary_stat.csv
+WRITTEN:  test_data__full_stat.csv
+WRITTEN:  test_data_2_with_dscore.csv
+WRITTEN:  test_data_2_with_dscore_filtered.csv
+WRITTEN:  test_data_2_report.pdf
+WRITTEN:  test_data_2_cutoffs.txt
+WRITTEN:  test_data_2_svalues.txt
+WRITTEN:  test_data_2_qvalues.txt
+WRITTEN:  test_data_2_dscores_top_target_peaks.txt
+WRITTEN:  test_data_2_dscores_top_decoy_peaks.txt
+WRITTEN:  test_data_3_with_dscore.csv
+WRITTEN:  test_data_3_with_dscore_filtered.csv
+WRITTEN:  test_data_3_report.pdf
+WRITTEN:  test_data_3_cutoffs.txt
+WRITTEN:  test_data_3_svalues.txt
+WRITTEN:  test_data_3_qvalues.txt
+WRITTEN:  test_data_3_dscores_top_target_peaks.txt
+WRITTEN:  test_data_3_dscores_top_decoy_peaks.txt
+WRITTEN:  test_data__scorer.bin
+WRITTEN:  test_data__weights.txt
+
+
+pyprophet test_data_2.txt test_data_3.txt --out_of_core --out_of_core.sampling_rate=1.0 --random_seed=42 --multiple_files.merge_results
+ config settings:
+     apply_scorer: None
+     apply_weights: None
+     compute.probabilities: False
+     d_score.cutoff: -1000.0
+     delim.in:
+     delim.out:
+     export.mayu: False
+     final_statistics.fdr_all_pg: False
+     final_statistics.lambda: 0.4
+     ignore.invalid_score_columns: 0
+     is_test: 0
+     multiple_files.merge_results: True
+     num_processes: 1
+     out_of_core: 1
+     out_of_core.sampling_rate: 1.0
+     random_seed: 42
+     semi_supervised_learner.initial_fdr: 0.15
+     semi_supervised_learner.initial_lambda: 0.4
+     semi_supervised_learner.iteration_fdr: 0.02
+     semi_supervised_learner.iteration_lambda: 0.4
+     semi_supervised_learner.num_iter: 5
+     target.dir: None
+     target.overwrite: 0
+     target.prefix: None
+     xeval.fraction: 0.5
+     xeval.num_iter: 5
+ learn and apply classifier out of core
+ data set contains 387 decoy and 387 target transition groups
+ data set contains 387 decoy and 387 target transition groups
+ summary input file:
+    18330 lines
+    774 transition groups
+    17 scores including main score
+ learn and apply scorer
+ start 5 cross evals using 1 processes
+ start learn_randomized
+ end learn_randomized
+ start learn_randomized
+ end learn_randomized
+ start learn_randomized
+ end learn_randomized
+ start learn_randomized
+ end learn_randomized
+ start learn_randomized
+ end learn_randomized
+ finished cross evals
+
+ calculated scoring and statistics
+ processing input data finished
+ data set contains 387 decoy and 387 target transition groups
+ mean m_score = 6.086655e-02, std_dev m_score = 1.708347e-02
+ mean s_value = 9.801130e-01, std_dev s_value = 1.124938e-01
+ data set contains 387 decoy and 387 target transition groups
+ mean m_score = 6.086655e-02, std_dev m_score = 1.708347e-02
+ mean s_value = 9.801130e-01, std_dev s_value = 1.124938e-01
+
+used parameters:
+
+    apply_scorer                               : None
+    apply_weights                              : None
+    compute.probabilities                      : False
+    d_score.cutoff                             : -1000.0
+    delim.in                                   : '\t'
+    delim.out                                  : '\t'
+    export.mayu                                : False
+    final_statistics.fdr_all_pg                : False
+    final_statistics.lambda                    : 0.4
+    ignore.invalid_score_columns               : 0
+    is_test                                    : 0
+    multiple_files.merge_results               : True
+    num_processes                              : 1
+    out_of_core                                : 1
+    out_of_core.sampling_rate                  : 1.0
+    random_seed                                : '42'
+    semi_supervised_learner.initial_fdr        : 0.15
+    semi_supervised_learner.initial_lambda     : 0.4
+    semi_supervised_learner.iteration_fdr      : 0.02
+    semi_supervised_learner.iteration_lambda   : 0.4
+    semi_supervised_learner.num_iter           : 5
+    target.dir                                 : None
+    target.overwrite                           : 0
+    target.prefix                              : None
+    xeval.fraction                             : 0.5
+    xeval.num_iter                             : 5
+
+
+==================================================================================================
+
+   qvalue   svalue   TP  FP        TN         FN          FDR     sens   cutoff
+0    0.00  0.00223    2   0  56.14508  715.85492  1.21819e-11  0.00279  7.25959
+1    0.01  1.00000  721   7  49.14508   -3.14508  9.28886e-03  1.00000  1.49107
+2    0.02  1.00000  723  13  43.14508   -5.14508  1.82423e-02  1.00000  0.90848
+3    0.05  1.00000  720  38  18.14508   -2.14508  4.94820e-02  1.00000 -0.50789
+4    0.10  1.00000  721  53   3.14508   -3.14508  6.80027e-02  1.00000 -1.44424
+5    0.20      NaN  NaN NaN       NaN        NaN          NaN      NaN      NaN
+6    0.30      NaN  NaN NaN       NaN        NaN          NaN      NaN      NaN
+7    0.40      NaN  NaN NaN       NaN        NaN          NaN      NaN      NaN
+8    0.50      NaN  NaN NaN       NaN        NaN          NaN      NaN      NaN
+
+==================================================================================================
+
+WRITTEN:  test_data__summary_stat.csv
+WRITTEN:  test_data__full_stat.csv
+WRITTEN:  test_data__with_dscore.csv
+WRITTEN:  test_data__with_dscore_filtered.csv
+WRITTEN:  test_data__report.pdf
+WRITTEN:  test_data__cutoffs.txt
+WRITTEN:  test_data__svalues.txt
+WRITTEN:  test_data__qvalues.txt
+WRITTEN:  test_data__dscores_top_target_peaks.txt
+WRITTEN:  test_data__dscores_top_decoy_peaks.txt
+WRITTEN:  test_data__scorer.bin
+WRITTEN:  test_data__weights.txt
+
+
+pyprophet test_data_2.txt test_data_3.txt --random_seed=42
+ config settings:
+     apply_scorer: None
+     apply_weights: None
+     compute.probabilities: False
+     d_score.cutoff: -1000.0
+     delim.in:
+     delim.out:
+     export.mayu: False
+     final_statistics.fdr_all_pg: False
+     final_statistics.lambda: 0.4
+     ignore.invalid_score_columns: 0
+     is_test: 0
+     multiple_files.merge_results: 0
+     num_processes: 1
+     out_of_core: 0
+     out_of_core.sampling_rate: 0.1
+     random_seed: 42
+     semi_supervised_learner.initial_fdr: 0.15
+     semi_supervised_learner.initial_lambda: 0.4
+     semi_supervised_learner.iteration_fdr: 0.02
+     semi_supervised_learner.iteration_lambda: 0.4
+     semi_supervised_learner.num_iter: 5
+     target.dir: None
+     target.overwrite: 0
+     target.prefix: None
+     xeval.fraction: 0.5
+     xeval.num_iter: 5
+ process test_data_2.txt, test_data_3.txt
+ learn and apply classifier from input data
+ data set contains 387 decoy and 387 target transition groups
+ data set contains 387 decoy and 387 target transition groups
+ summary input file:
+    18330 lines
+    774 transition groups
+    17 scores including main score
+ learn and apply scorer
+ start 5 cross evals using 1 processes
+ start learn_randomized
+ end learn_randomized
+ start learn_randomized
+ end learn_randomized
+ start learn_randomized
+ end learn_randomized
+ start learn_randomized
+ end learn_randomized
+ start learn_randomized
+ end learn_randomized
+ finished cross evals
+
+ data set contains 387 decoy and 387 target transition groups
+ mean m_score = 6.086655e-02, std_dev m_score = 1.708347e-02
+ mean s_value = 9.801130e-01, std_dev s_value = 1.124938e-01
+ data set contains 387 decoy and 387 target transition groups
+ mean m_score = 6.086655e-02, std_dev m_score = 1.708347e-02
+ mean s_value = 9.801130e-01, std_dev s_value = 1.124938e-01
+ calculated scoring and statistics
+ processing input data finished
+
+used parameters:
+
+    apply_scorer                               : None
+    apply_weights                              : None
+    compute.probabilities                      : False
+    d_score.cutoff                             : -1000.0
+    delim.in                                   : '\t'
+    delim.out                                  : '\t'
+    export.mayu                                : False
+    final_statistics.fdr_all_pg                : False
+    final_statistics.lambda                    : 0.4
+    ignore.invalid_score_columns               : 0
+    is_test                                    : 0
+    multiple_files.merge_results               : 0
+    num_processes                              : 1
+    out_of_core                                : 0
+    out_of_core.sampling_rate                  : 0.1
+    random_seed                                : '42'
+    semi_supervised_learner.initial_fdr        : 0.15
+    semi_supervised_learner.initial_lambda     : 0.4
+    semi_supervised_learner.iteration_fdr      : 0.02
+    semi_supervised_learner.iteration_lambda   : 0.4
+    semi_supervised_learner.num_iter           : 5
+    target.dir                                 : None
+    target.overwrite                           : 0
+    target.prefix                              : None
+    xeval.fraction                             : 0.5
+    xeval.num_iter                             : 5
+
+
+==================================================================================================
+
+   qvalue   svalue   TP  FP        TN         FN          FDR     sens   cutoff
+0    0.00  0.00223    2   0  56.14508  715.85492  1.21819e-11  0.00279  7.25959
+1    0.01  1.00000  721   7  49.14508   -3.14508  9.28886e-03  1.00000  1.49107
+2    0.02  1.00000  723  13  43.14508   -5.14508  1.82423e-02  1.00000  0.90848
+3    0.05  1.00000  720  38  18.14508   -2.14508  4.94820e-02  1.00000 -0.50789
+4    0.10  1.00000  721  53   3.14508   -3.14508  6.80027e-02  1.00000 -1.44424
+5    0.20      NaN  NaN NaN       NaN        NaN          NaN      NaN      NaN
+6    0.30      NaN  NaN NaN       NaN        NaN          NaN      NaN      NaN
+7    0.40      NaN  NaN NaN       NaN        NaN          NaN      NaN      NaN
+8    0.50      NaN  NaN NaN       NaN        NaN          NaN      NaN      NaN
+
+==================================================================================================
+
+WRITTEN:  test_data__summary_stat.csv
+WRITTEN:  test_data__full_stat.csv
+WRITTEN:  test_data_2_with_dscore.csv
+WRITTEN:  test_data_2_with_dscore_filtered.csv
+WRITTEN:  test_data_2_report.pdf
+WRITTEN:  test_data_2_cutoffs.txt
+WRITTEN:  test_data_2_svalues.txt
+WRITTEN:  test_data_2_qvalues.txt
+WRITTEN:  test_data_2_dscores_top_target_peaks.txt
+WRITTEN:  test_data_2_dscores_top_decoy_peaks.txt
+WRITTEN:  test_data_3_with_dscore.csv
+WRITTEN:  test_data_3_with_dscore_filtered.csv
+WRITTEN:  test_data_3_report.pdf
+WRITTEN:  test_data_3_cutoffs.txt
+WRITTEN:  test_data_3_svalues.txt
+WRITTEN:  test_data_3_qvalues.txt
+WRITTEN:  test_data_3_dscores_top_target_peaks.txt
+WRITTEN:  test_data_3_dscores_top_decoy_peaks.txt
+WRITTEN:  test_data__scorer.bin
+WRITTEN:  test_data__weights.txt
+
+
+pyprophet test_data_2.txt test_data_3.txt --random_seed=42 --multiple_files.merge_results
+ config settings:
+     apply_scorer: None
+     apply_weights: None
+     compute.probabilities: False
+     d_score.cutoff: -1000.0
+     delim.in:
+     delim.out:
+     export.mayu: False
+     final_statistics.fdr_all_pg: False
+     final_statistics.lambda: 0.4
+     ignore.invalid_score_columns: 0
+     is_test: 0
+     multiple_files.merge_results: True
+     num_processes: 1
+     out_of_core: 0
+     out_of_core.sampling_rate: 0.1
+     random_seed: 42
+     semi_supervised_learner.initial_fdr: 0.15
+     semi_supervised_learner.initial_lambda: 0.4
+     semi_supervised_learner.iteration_fdr: 0.02
+     semi_supervised_learner.iteration_lambda: 0.4
+     semi_supervised_learner.num_iter: 5
+     target.dir: None
+     target.overwrite: 0
+     target.prefix: None
+     xeval.fraction: 0.5
+     xeval.num_iter: 5
+ process test_data_2.txt, test_data_3.txt
+ learn and apply classifier from input data
+ data set contains 387 decoy and 387 target transition groups
+ data set contains 387 decoy and 387 target transition groups
+ summary input file:
+    18330 lines
+    774 transition groups
+    17 scores including main score
+ learn and apply scorer
+ start 5 cross evals using 1 processes
+ start learn_randomized
+ end learn_randomized
+ start learn_randomized
+ end learn_randomized
+ start learn_randomized
+ end learn_randomized
+ start learn_randomized
+ end learn_randomized
+ start learn_randomized
+ end learn_randomized
+ finished cross evals
+
+ data set contains 387 decoy and 387 target transition groups
+ mean m_score = 6.086655e-02, std_dev m_score = 1.708347e-02
+ mean s_value = 9.801130e-01, std_dev s_value = 1.124938e-01
+ data set contains 387 decoy and 387 target transition groups
+ mean m_score = 6.086655e-02, std_dev m_score = 1.708347e-02
+ mean s_value = 9.801130e-01, std_dev s_value = 1.124938e-01
+ calculated scoring and statistics
+ processing input data finished
+
+used parameters:
+
+    apply_scorer                               : None
+    apply_weights                              : None
+    compute.probabilities                      : False
+    d_score.cutoff                             : -1000.0
+    delim.in                                   : '\t'
+    delim.out                                  : '\t'
+    export.mayu                                : False
+    final_statistics.fdr_all_pg                : False
+    final_statistics.lambda                    : 0.4
+    ignore.invalid_score_columns               : 0
+    is_test                                    : 0
+    multiple_files.merge_results               : True
+    num_processes                              : 1
+    out_of_core                                : 0
+    out_of_core.sampling_rate                  : 0.1
+    random_seed                                : '42'
+    semi_supervised_learner.initial_fdr        : 0.15
+    semi_supervised_learner.initial_lambda     : 0.4
+    semi_supervised_learner.iteration_fdr      : 0.02
+    semi_supervised_learner.iteration_lambda   : 0.4
+    semi_supervised_learner.num_iter           : 5
+    target.dir                                 : None
+    target.overwrite                           : 0
+    target.prefix                              : None
+    xeval.fraction                             : 0.5
+    xeval.num_iter                             : 5
+
+
+==================================================================================================
+
+   qvalue   svalue   TP  FP        TN         FN          FDR     sens   cutoff
+0    0.00  0.00223    2   0  56.14508  715.85492  1.21819e-11  0.00279  7.25959
+1    0.01  1.00000  721   7  49.14508   -3.14508  9.28886e-03  1.00000  1.49107
+2    0.02  1.00000  723  13  43.14508   -5.14508  1.82423e-02  1.00000  0.90848
+3    0.05  1.00000  720  38  18.14508   -2.14508  4.94820e-02  1.00000 -0.50789
+4    0.10  1.00000  721  53   3.14508   -3.14508  6.80027e-02  1.00000 -1.44424
+5    0.20      NaN  NaN NaN       NaN        NaN          NaN      NaN      NaN
+6    0.30      NaN  NaN NaN       NaN        NaN          NaN      NaN      NaN
+7    0.40      NaN  NaN NaN       NaN        NaN          NaN      NaN      NaN
+8    0.50      NaN  NaN NaN       NaN        NaN          NaN      NaN      NaN
+
+==================================================================================================
+
+WRITTEN:  test_data__summary_stat.csv
+WRITTEN:  test_data__full_stat.csv
+WRITTEN:  test_data__with_dscore.csv
+WRITTEN:  test_data__with_dscore_filtered.csv
+WRITTEN:  test_data__report.pdf
+WRITTEN:  test_data__cutoffs.txt
+WRITTEN:  test_data__svalues.txt
+WRITTEN:  test_data__qvalues.txt
+WRITTEN:  test_data__dscores_top_target_peaks.txt
+WRITTEN:  test_data__dscores_top_decoy_peaks.txt
+WRITTEN:  test_data__scorer.bin
+WRITTEN:  test_data__weights.txt
+
+
+pyprophet test_data_2.txt test_data_3.txt --out_of_core --out_of_core.sampling_rate=0.9999999 --random_seed=42
+ config settings:
+     apply_scorer: None
+     apply_weights: None
+     compute.probabilities: False
+     d_score.cutoff: -1000.0
+     delim.in:
+     delim.out:
+     export.mayu: False
+     final_statistics.fdr_all_pg: False
+     final_statistics.lambda: 0.4
+     ignore.invalid_score_columns: 0
+     is_test: 0
+     multiple_files.merge_results: 0
+     num_processes: 1
+     out_of_core: 1
+     out_of_core.sampling_rate: 0.9999999
+     random_seed: 42
+     semi_supervised_learner.initial_fdr: 0.15
+     semi_supervised_learner.initial_lambda: 0.4
+     semi_supervised_learner.iteration_fdr: 0.02
+     semi_supervised_learner.iteration_lambda: 0.4
+     semi_supervised_learner.num_iter: 5
+     target.dir: None
+     target.overwrite: 0
+     target.prefix: None
+     xeval.fraction: 0.5
+     xeval.num_iter: 5
+ learn and apply classifier out of core
+ data set contains 386 decoy and 386 target transition groups
+ data set contains 386 decoy and 386 target transition groups
+ summary input file:
+    18264 lines
+    772 transition groups
+    17 scores including main score
+ learn and apply scorer
+ start 5 cross evals using 1 processes
+ start learn_randomized
+ end learn_randomized
+ start learn_randomized
+ end learn_randomized
+ start learn_randomized
+ end learn_randomized
+ start learn_randomized
+ end learn_randomized
+ start learn_randomized
+ end learn_randomized
+ finished cross evals
+
+ calculated scoring and statistics
+ processing input data finished
+ data set contains 387 decoy and 387 target transition groups
+ mean m_score = 5.861929e-02, std_dev m_score = 1.626129e-02
+ mean s_value = 9.800496e-01, std_dev s_value = 1.127038e-01
+ data set contains 387 decoy and 387 target transition groups
+ mean m_score = 5.861929e-02, std_dev m_score = 1.626129e-02
+ mean s_value = 9.800496e-01, std_dev s_value = 1.127038e-01
+
+used parameters:
+
+    apply_scorer                               : None
+    apply_weights                              : None
+    compute.probabilities                      : False
+    d_score.cutoff                             : -1000.0
+    delim.in                                   : '\t'
+    delim.out                                  : '\t'
+    export.mayu                                : False
+    final_statistics.fdr_all_pg                : False
+    final_statistics.lambda                    : 0.4
+    ignore.invalid_score_columns               : 0
+    is_test                                    : 0
+    multiple_files.merge_results               : 0
+    num_processes                              : 1
+    out_of_core                                : 1
+    out_of_core.sampling_rate                  : 0.9999999
+    random_seed                                : '42'
+    semi_supervised_learner.initial_fdr        : 0.15
+    semi_supervised_learner.initial_lambda     : 0.4
+    semi_supervised_learner.iteration_fdr      : 0.02
+    semi_supervised_learner.iteration_lambda   : 0.4
+    semi_supervised_learner.num_iter           : 5
+    target.dir                                 : None
+    target.overwrite                           : 0
+    target.prefix                              : None
+    xeval.fraction                             : 0.5
+    xeval.num_iter                             : 5
+
+
+==================================================================================================
+
+   qvalue   svalue   TP  FP        TN         FN          FDR     sens   cutoff
+0    0.00  0.00223    2   0  50.93056  719.06944  3.55789e-11  0.00277  6.75029
+1    0.01  0.99929  721   7  43.93056    0.06944  9.91054e-03  0.99990  1.44447
+2    0.02  1.00000  723  15  35.93056   -1.93056  2.06446e-02  1.00000  0.79440
+3    0.05  1.00000  723  39  11.93056   -1.93056  5.11677e-02  1.00000 -0.48944
+4    0.10  1.00000  722  50   0.93056   -0.93056  6.53605e-02  1.00000 -2.37359
+5    0.20      NaN  NaN NaN       NaN        NaN          NaN      NaN      NaN
+6    0.30      NaN  NaN NaN       NaN        NaN          NaN      NaN      NaN
+7    0.40      NaN  NaN NaN       NaN        NaN          NaN      NaN      NaN
+8    0.50      NaN  NaN NaN       NaN        NaN          NaN      NaN      NaN
+
+==================================================================================================
+
+WRITTEN:  test_data__summary_stat.csv
+WRITTEN:  test_data__full_stat.csv
+WRITTEN:  test_data_2_with_dscore.csv
+WRITTEN:  test_data_2_with_dscore_filtered.csv
+WRITTEN:  test_data_2_report.pdf
+WRITTEN:  test_data_2_cutoffs.txt
+WRITTEN:  test_data_2_svalues.txt
+WRITTEN:  test_data_2_qvalues.txt
+WRITTEN:  test_data_2_dscores_top_target_peaks.txt
+WRITTEN:  test_data_2_dscores_top_decoy_peaks.txt
+WRITTEN:  test_data_3_with_dscore.csv
+WRITTEN:  test_data_3_with_dscore_filtered.csv
+WRITTEN:  test_data_3_report.pdf
+WRITTEN:  test_data_3_cutoffs.txt
+WRITTEN:  test_data_3_svalues.txt
+WRITTEN:  test_data_3_qvalues.txt
+WRITTEN:  test_data_3_dscores_top_target_peaks.txt
+WRITTEN:  test_data_3_dscores_top_decoy_peaks.txt
+WRITTEN:  test_data__scorer.bin
+WRITTEN:  test_data__weights.txt
+
+
+
+the next three should be identical:
+
+test_data__summary_stat.csv contains 10 lines
+
+qvalue	svalue	TP	FP	TN	FN	FDR	sens	cutoff
+0.0	0.00223463687148	2.0	0.0	56.14507772 ... 819221377e-11	0.00278607827003	7.25958514002
+0.01	1.0	721.0	7.0	49.1450777202	-3.1450 ... 14507772021	0.009288859498	1.0	1.49106764047
+0.02	1.0	723.0	13.0	43.1450777202	-5.145 ... 507772021	0.0182423170183	1.0	0.908475566869
+0.05	1.0	720.0	38.0	18.1450777202	-2.145 ... 07772021	0.0494819599035	1.0	-0.507893711624
+0.1	1.0	721.0	53.0	3.14507772021	-3.1450 ... 4507772021	0.0680026860408	1.0	-1.4442357783
+0.2
+0.3
+0.4
+0.5
+
+test_data__summary_stat.csv contains 10 lines
+
+qvalue	svalue	TP	FP	TN	FN	FDR	sens	cutoff
+0.0	0.00223463687148	2.0	0.0	56.14507772 ... 819221377e-11	0.00278607827003	7.25958514002
+0.01	1.0	721.0	7.0	49.1450777202	-3.1450 ... 14507772021	0.009288859498	1.0	1.49106764047
+0.02	1.0	723.0	13.0	43.1450777202	-5.145 ... 507772021	0.0182423170183	1.0	0.908475566869
+0.05	1.0	720.0	38.0	18.1450777202	-2.145 ... 07772021	0.0494819599035	1.0	-0.507893711624
+0.1	1.0	721.0	53.0	3.14507772021	-3.1450 ... 4507772021	0.0680026860408	1.0	-1.4442357783
+0.2
+0.3
+0.4
+0.5
+
+test_data__summary_stat.csv contains 10 lines
+
+qvalue	svalue	TP	FP	TN	FN	FDR	sens	cutoff
+0.0	0.00223463687148	2.0	0.0	56.14507772 ... 819221377e-11	0.00278607827003	7.25958514002
+0.01	1.0	721.0	7.0	49.1450777202	-3.1450 ... 14507772021	0.009288859498	1.0	1.49106764047
+0.02	1.0	723.0	13.0	43.1450777202	-5.145 ... 507772021	0.0182423170183	1.0	0.908475566869
+0.05	1.0	720.0	38.0	18.1450777202	-2.145 ... 07772021	0.0494819599035	1.0	-0.507893711624
+0.1	1.0	721.0	53.0	3.14507772021	-3.1450 ... 4507772021	0.0680026860408	1.0	-1.4442357783
+0.2
+0.3
+0.4
+0.5
+
+this might be different:
+
+test_data__summary_stat.csv contains 10 lines
+
+qvalue	svalue	TP	FP	TN	FN	FDR	sens	cutoff
+0.0	0.0022304832713	2.0	0.0	50.930555555 ... 789471958e-11	0.00277365795404	6.75028511032
+0.01	0.999291039279	721.0	7.0	43.9305555 ... .00991053566813	0.999903692432	1.44447105906
+0.02	1.0	723.0	15.0	35.9305555556	-1.930 ... 055555556	0.0206446439932	1.0	0.794396840435
+0.05	1.0	723.0	39.0	11.9305555556	-1.930 ... 55555556	0.0511677245863	1.0	-0.489440216238
+0.1	1.0	722.0	50.0	0.930555555556	-0.930 ... 0555555556	0.0653605155531	1.0	-2.3735948046
+0.2
+0.3
+0.4
+0.5

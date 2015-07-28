@@ -27,12 +27,14 @@ def save_report(report_path, prefix, scored_table, final_stat):
     svalues = final_stat["svalue"].values
     qvalues = final_stat["qvalue"].values
 
-    decoys = scored_table[scored_table["decoy"] == 1]["d_score"].values
-    targets = scored_table[scored_table["decoy"] == 0]["d_score"].values
+    decoys, targets, top_decoys, top_targets = scored_table.scores()
 
-    tops = scored_table[scored_table["peak_group_rank"] == 1]
-    top_decoys = tops[tops["decoy"] == 1]["d_score"].values
-    top_target = tops[tops["decoy"] == 0]["d_score"].values
+    #decoys = scored_table[scored_table["decoy"] == 1]["d_score"].values
+    #targets = scored_table[scored_table["decoy"] == 0]["d_score"].values
+
+    #tops = scored_table[scored_table["peak_group_rank"] == 1]
+    #top_decoys = tops[tops["decoy"] == 1]["d_score"].values
+    #top_target = tops[tops["decoy"] == 0]["d_score"].values
 
     # thanks to lorenz blum for the plotting code below:
 
@@ -70,7 +72,7 @@ def save_report(report_path, prefix, scored_table, final_stat):
         plt.xlabel("d_score")
         plt.ylabel("# of groups")
         plt.hist(
-            [top_target, top_decoys], 20, color=['w', 'r'], label=['target', 'decoy'], histtype='bar')
+            [top_targets, top_decoys], 20, color=['w', 'r'], label=['target', 'decoy'], histtype='bar')
         plt.legend(loc=2)
 
     plt.subplot(414)
@@ -89,13 +91,13 @@ def save_report(report_path, prefix, scored_table, final_stat):
         plt.plot(axs, addensity(axs), color='r', label='decoy')
         plt.legend(loc=2)
     else:
-        tdensity = gaussian_kde(top_target)
+        tdensity = gaussian_kde(top_targets)
         tdensity.covariance_factor = lambda : .25
         tdensity._compute_covariance()
         ddensity = gaussian_kde(top_decoys)
         ddensity.covariance_factor = lambda : .25
         ddensity._compute_covariance()
-        xs = linspace(min(concatenate((top_target,top_decoys))),max(concatenate((top_target,top_decoys))),200)
+        xs = linspace(min(concatenate((top_targets,top_decoys))),max(concatenate((top_targets,top_decoys))),200)
         plt.title("Top Peak Groups' d_score Density")
         plt.xlabel("d_score")
         plt.ylabel("density")
@@ -105,7 +107,7 @@ def save_report(report_path, prefix, scored_table, final_stat):
 
     plt.savefig(report_path)
 
-    return cutoffs, svalues, qvalues, top_target, top_decoys
+    return cutoffs, svalues, qvalues, top_targets, top_decoys
 
 
 def mayu_cols():

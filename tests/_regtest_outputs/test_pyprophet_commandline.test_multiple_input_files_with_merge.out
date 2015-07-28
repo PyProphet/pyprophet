@@ -1,4 +1,4 @@
-pyprophet test_data_2.txt test_data_3.txt --is_test --target.overwrite --multiple_files.merge_results --compute.probabilities
+pyprophet test_data_2.txt test_data_3.txt --random_seed=42 --target.overwrite --multiple_files.merge_results --compute.probabilities
  config settings:
      apply_scorer: None
      apply_weights: None
@@ -10,9 +10,12 @@ pyprophet test_data_2.txt test_data_3.txt --is_test --target.overwrite --multipl
      final_statistics.fdr_all_pg: False
      final_statistics.lambda: 0.4
      ignore.invalid_score_columns: 0
-     is_test: 1
+     is_test: 0
      multiple_files.merge_results: True
      num_processes: 1
+     out_of_core: 0
+     out_of_core.sampling_rate: 0.1
+     random_seed: 42
      semi_supervised_learner.initial_fdr: 0.15
      semi_supervised_learner.initial_lambda: 0.4
      semi_supervised_learner.iteration_fdr: 0.02
@@ -46,23 +49,23 @@ pyprophet test_data_2.txt test_data_3.txt --is_test --target.overwrite --multipl
  finished cross evals
 
  data set contains 387 decoy and 387 target transition groups
- mean m_score = 3.179270e-02, std_dev m_score = 1.183096e-02
- mean s_value = 9.785905e-01, std_dev s_value = 1.145276e-01
+ mean m_score = 6.086655e-02, std_dev m_score = 1.708347e-02
+ mean s_value = 9.801130e-01, std_dev s_value = 1.124938e-01
  Posterior Probability estimation:
- Estimated number of null 41.67 out of a total of 965.
- Prior for a peakgroup: 0.0527478853904
- Prior for a chromatogram: 0.956822107081
- Estimated number of true chromatograms: 370.29015544 out of 387
+ Estimated number of null 140.00 out of a total of 1930.
+ Prior for a peakgroup: 0.102258535937
+ Prior for a chromatogram: 0.927461139896
+ Estimated number of true chromatograms: 717.85492228 out of 774
  Number of target data: 7020
 
  data set contains 387 decoy and 387 target transition groups
- mean m_score = 3.179270e-02, std_dev m_score = 1.183096e-02
- mean s_value = 9.785905e-01, std_dev s_value = 1.145276e-01
+ mean m_score = 6.086655e-02, std_dev m_score = 1.708347e-02
+ mean s_value = 9.801130e-01, std_dev s_value = 1.124938e-01
  Posterior Probability estimation:
- Estimated number of null 41.67 out of a total of 965.
- Prior for a peakgroup: 0.0527478853904
- Prior for a chromatogram: 0.956822107081
- Estimated number of true chromatograms: 370.29015544 out of 387
+ Estimated number of null 140.00 out of a total of 1930.
+ Prior for a peakgroup: 0.102258535937
+ Prior for a chromatogram: 0.927461139896
+ Estimated number of true chromatograms: 717.85492228 out of 774
  Number of target data: 7020
 
  calculated scoring and statistics
@@ -80,9 +83,12 @@ used parameters:
     final_statistics.fdr_all_pg                : False
     final_statistics.lambda                    : 0.4
     ignore.invalid_score_columns               : 0
-    is_test                                    : 1
+    is_test                                    : 0
     multiple_files.merge_results               : True
     num_processes                              : 1
+    out_of_core                                : 0
+    out_of_core.sampling_rate                  : 0.1
+    random_seed                                : '42'
     semi_supervised_learner.initial_fdr        : 0.15
     semi_supervised_learner.initial_lambda     : 0.4
     semi_supervised_learner.iteration_fdr      : 0.02
@@ -98,11 +104,11 @@ used parameters:
 ==================================================================================================
 
    qvalue   svalue   TP  FP        TN         FN          FDR     sens   cutoff
-0    0.00  0.02166    9   0  16.70984  361.29016  1.45145e-11  0.02431  7.13744
-1    0.01  1.00000  374   3  13.70984   -3.70984  6.83275e-03  1.00000 -0.29134
-2    0.02  1.00000  371   8   8.70984   -0.70984  2.17886e-02  1.00000 -0.34779
-3    0.05  1.00000  373  14   2.70984   -2.70984  3.73491e-02  1.00000 -1.33579
-4    0.10      NaN  NaN NaN       NaN        NaN          NaN      NaN      NaN
+0    0.00  0.00223    2   0  56.14508  715.85492  1.21819e-11  0.00279  7.25959
+1    0.01  1.00000  721   7  49.14508   -3.14508  9.28886e-03  1.00000  1.49107
+2    0.02  1.00000  723  13  43.14508   -5.14508  1.82423e-02  1.00000  0.90848
+3    0.05  1.00000  720  38  18.14508   -2.14508  4.94820e-02  1.00000 -0.50789
+4    0.10  1.00000  721  53   3.14508   -3.14508  6.80027e-02  1.00000 -1.44424
 5    0.20      NaN  NaN NaN       NaN        NaN          NaN      NaN      NaN
 6    0.30      NaN  NaN NaN       NaN        NaN          NaN      NaN      NaN
 7    0.40      NaN  NaN NaN       NaN        NaN          NaN      NaN      NaN
@@ -112,14 +118,14 @@ used parameters:
 
 WRITTEN:  test_data__summary_stat.csv
 WRITTEN:  test_data__full_stat.csv
+WRITTEN:  test_data__with_dscore.csv
+WRITTEN:  test_data__with_dscore_filtered.csv
 WRITTEN:  test_data__report.pdf
 WRITTEN:  test_data__cutoffs.txt
 WRITTEN:  test_data__svalues.txt
 WRITTEN:  test_data__qvalues.txt
 WRITTEN:  test_data__dscores_top_target_peaks.txt
 WRITTEN:  test_data__dscores_top_decoy_peaks.txt
-WRITTEN:  test_data__with_dscore.csv
-WRITTEN:  test_data__with_dscore_filtered.csv
 WRITTEN:  test_data__scorer.bin
 WRITTEN:  test_data__weights.txt
 

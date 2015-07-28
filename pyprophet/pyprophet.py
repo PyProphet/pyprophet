@@ -1,6 +1,7 @@
 # encoding: latin-1
 
 from __future__ import division
+import pdb
 
 # openblas + multiprocessing crashes for OPENBLAS_NUM_THREADS > 1 !!!
 import os
@@ -28,7 +29,8 @@ from stats import (lookup_s_and_q_values_from_error_table, calculate_final_stati
 
 from config import CONFIG
 
-from data_handling import (prepare_data_tables, prepare_data_table, Experiment, check_header)
+from data_handling import (prepare_data_tables, prepare_data_table, Experiment, check_header,
+                           sample_data_tables)
 from classifiers import (LDALearner)
 from semi_supervised import (AbstractSemiSupervisedLearner, StandardSemiSupervisedLearner)
 
@@ -92,11 +94,12 @@ def calculate_params_for_d_score(classifier, experiment):
 class Scorer(object):
 
     def __init__(self, classifier, score_columns, experiment, all_test_target_scores,
-                 all_test_decoy_scores):
+                 all_test_decoy_scores, merge_results):
 
         self.classifier = classifier
         self.score_columns = score_columns
         self.mu, self.nu = calculate_params_for_d_score(classifier, experiment)
+        self.merge_results = merge_results
         final_score = classifier.score(experiment, True)
         experiment["d_score"] = (final_score - self.mu) / self.nu
         lambda_ = CONFIG.get("final_statistics.lambda")
@@ -108,9 +111,9 @@ class Scorer(object):
         self.error_stat = calculate_final_statistics(all_tt_scores, all_test_target_scores,
                                                      all_test_decoy_scores, lambda_)
 
-        self.number_target_pg = len(experiment.df[experiment.df.is_decoy == False])
+        self.number_target_pg = len(experiment.df[experiment.df.is_decoy.eq(False)])
         self.number_target_peaks = len(experiment.get_top_target_peaks().df)
-        self.dvals = experiment.df.loc[(experiment.df.is_decoy == True), "d_score"]
+        self.dvals = experiment.df.loc[(experiment.df.is_decoy.eq(True)), "d_score"]
         self.target_scores = experiment.get_top_target_peaks().df["d_score"]
         self.decoy_scores = experiment.get_top_decoy_peaks().df["d_score"]
 
@@ -131,12 +134,12 @@ class Scorer(object):
                                                                   np.std(s_values, ddof=1)))
         texp.add_peak_group_rank()
 
-        scored_table = table.join(texp[["d_score", "m_score", "peak_group_rank"]])
+        df = table.join(texp[["d_score", "m_score", "peak_group_rank"]])
 
         if CONFIG.get("compute.probabilities"):
-            scored_table = self.add_probabilities(scored_table, texp)
+            df = self.add_probabilities(df, texp)
 
-        return scored_table
+        return df
 
     def add_probabilities(self, scored_table, texp):
 
@@ -158,10 +161,16 @@ class Scorer(object):
         return scored_table
 
     def score_many(self, tables):
-        scored_tables = []
-        for table in tables:
-            scored_table = self.score(table)
-            yield scored_table
+        if self.merge_results:
+            df = pd.concat([self.score(t) for t in tables])
+            yield ScoredTable(df)
+        else:
+            for table in tables:
+                df = self.score(table)
+                yield ScoredTable(df)
+
+    def score_many_lazy(self, pathes, delim_in):
+        return LazyScoredTablesIter(pathes, self.merge_results, self, delim_in=delim_in)
 
     def get_error_stats(self):
         return final_err_table(self.error_stat.df), summary_err_table(self.error_stat.df)
@@ -182,6 +191,131 @@ class Scorer(object):
         self.__dict__.update(data)
 
 
+class LazyScoredTablesIter(object):
+
+    def __init__(self, pathes, merge_results, scorer, **options):
+        self.pathes = pathes
+        self.merge_results = merge_results
+        self.scorer = scorer
+        self.options = options
+
+    def __iter__(self):
+        if self.merge_results:
+            yield MergedLazyScoredTables(self.pathes, self.scorer, self.options)
+
+        else:
+            for p in self.pathes:
+                yield LazyScoredTable(p, self.scorer, self.options)
+
+
+def _read_csv(path, delim):
+    return pd.read_csv(path, delim, na_values=["NA", "NaN", "infinite"], engine="c")
+
+
+class ScoredTable(object):
+
+    def __init__(self, df):
+        self.df = df
+
+    def to_csv(self, out_path, out_path_filtered, cutoff, sep,  **kw):
+        df = self.df
+        df.to_csv(out_path, sep, **kw)
+        df = df[df.d_score > cutoff]
+        df.to_csv(out_path_filtered, sep, **kw)
+
+    def scores(self):
+        decoys = self.df[self.df["decoy"] == 1]["d_score"].values
+        targets = self.df[self.df["decoy"] == 0]["d_score"].values
+
+        tops = self.df[self.df["peak_group_rank"] == 1]
+        top_decoys = tops[tops["decoy"] == 1]["d_score"].values
+        top_targets = tops[tops["decoy"] == 0]["d_score"].values
+
+        return decoys, targets, top_decoys, top_targets
+
+
+
+class LazyScoredTable(object):
+
+    def __init__(self, path, scorer, options):
+        self.path = path
+        self.scorer = scorer
+        self.options = options
+        self.decoys = self.targets = self.top_decoys = self.top_targets = None
+
+    def to_csv(self, out_path, out_path_filtered, cutoff, sep, **kw):
+        table = _read_csv(self.path, self.options.get("delim_in"))
+        df = self.scorer.score(table)
+        df.to_csv(out_path, sep, **kw)
+        df = df[df.d_score > cutoff]
+        df.to_csv(out_path_filtered, sep, **kw)
+
+        self.decoys = df[df["decoy"] == 1]["d_score"].values
+        self.targets = df[df["decoy"] == 0]["d_score"].values
+
+        tops = df[df["peak_group_rank"] == 1]
+        self.top_decoys = tops[tops["decoy"] == 1]["d_score"].values
+        self.top_targets = tops[tops["decoy"] == 0]["d_score"].values
+
+    def scores(self):
+        assert self.decoys is not None, ("you have to save the lazy table before you can access "
+                                         "scores")
+        return self.decoys, self.targets, self.top_decoys, self.top_targets
+
+
+class MergedLazyScoredTables(object):
+
+    def __init__(self, pathes, scorer, options):
+        self.pathes = pathes
+        self.scorer = scorer
+        self.options = options
+        self.decoys = self.targets = self.top_decoys = self.top_targets = None
+
+    def to_csv(self, out_path, out_path_filtered, cutoff, sep, **kw):
+        # write first table with header
+        path = self.pathes[0]
+        table = _read_csv(path, self.options.get("delim_in"))
+
+        df = self.scorer.score(table)
+        df.to_csv(out_path, sep, header=True, **kw)
+        self._update_scores(df)
+        df = df[df.d_score > cutoff]
+        df.to_csv(out_path_filtered, sep, header=True, **kw)
+
+        # now append and do not write headers again:
+        for path in self.pathes[1:]:
+            with open(out_path, "a") as fp, open(out_path_filtered, "a") as fp2:
+                table = _read_csv(path, self.options.get("delim_in"))
+
+                df = self.scorer.score(table)
+                df.to_csv(fp, sep, header=True, **kw)
+                self._update_scores(df)
+                df = df[df.d_score > cutoff]
+                df.to_csv(fp2, sep, header=True, **kw)
+
+    def scores(self):
+        assert self.decoys is not None, ("you have to save the lazy table before you can access "
+                                         "scores")
+        return self.decoys, self.targets, self.top_decoys, self.top_targets
+
+    def _update_scores(self, scored_table):
+
+        if self.decoys is None:
+            self.decoys = self.targets = self.top_decoys = self.top_targets = [] * 4
+
+        decoys = scored_table[scored_table["decoy"] == 1]["d_score"].values
+        targets = scored_table[scored_table["decoy"] == 0]["d_score"].values
+
+        tops = scored_table[scored_table["peak_group_rank"] == 1]
+        top_decoys = tops[tops["decoy"] == 1]["d_score"].values
+        top_targets = tops[tops["decoy"] == 0]["d_score"].values
+
+        self.decoys.extend(decoys)
+        self.targets.extend(targets)
+        self.top_decoys.extend(top_decoys)
+        self.top_targets.extend(top_targets)
+
+
 class HolyGostQuery(object):
 
     """ HolyGhostQuery assembles the unsupervised methods.
@@ -193,22 +327,19 @@ class HolyGostQuery(object):
                           AbstractSemiSupervisedLearner)
         self.semi_supervised_learner = semi_supervised_learner
 
-
-    def read_tables_iter(self, pathes, delim, check_cols):
-
+    def read_tables_iter(self, pathes, delim):
         logging.info("process %s" % ", ".join(pathes))
+        for path in pathes:
+            part = _read_csv(path, delim)
+            yield part
+
+    def check_table_headers(self, pathes, delim, check_cols):
         headers = set()
         for path in pathes:
             header = check_header(path, delim, check_cols)
             headers.add(tuple(header))
-
         if len(headers) > 1:
             raise Exception("the input files have different headers.")
-
-        for path in pathes:
-            part = pd.read_csv(path, delim, na_values=["NA", "NaN", "infinite"], engine="c")
-            yield part
-
 
     def _setup_experiment(self, tables):
         prepared_tables, score_columns = prepare_data_tables(tables)
@@ -217,15 +348,15 @@ class HolyGostQuery(object):
         experiment.log_summary()
         return experiment, score_columns
 
-
     def apply_weights(self, pathes, delim_in, check_cols, loaded_weights):
 
-        tables = list(self.read_tables_iter(pathes, delim_in, check_cols))
+        self.check_table_headers(pathes, delim_in, check_cols)
+        tables = list(self.read_tables_iter(pathes, delim_in))
         with timer():
             logging.info("apply weights")
-            result, learned_scorer, trained_weights = self._apply_weights(tables, loaded_weights)
+            result, scorer, trained_weights = self._apply_weights(tables, loaded_weights)
             logging.info("processing input data finished")
-        return tables, result, learned_scorer, trained_weights
+        return result, scorer, trained_weights
 
     def _apply_weights(self, tables, loaded_weights):
 
@@ -249,14 +380,15 @@ class HolyGostQuery(object):
 
     @profile
     def apply_scorer(self, pathes, delim, check_cols, loaded_scorer):
-        tables = list(self.read_tables_iter(pathes, delim, check_cols))
+        self.check_table_headers(pathes, delim, check_cols)
+        tables = list(self.read_tables_iter(pathes, delim))
 
         with timer():
             logging.info("apply scorer to input data")
             result, __, trained_weights = self._apply_scorer(tables, loaded_scorer)
-            learned_scorer = None
+            scorer = None
             logging.info("processing input data finished")
-        return tables, result, learned_scorer, trained_weights
+        return result, scorer, trained_weights
 
     @profile
     def _apply_scorer(self, tables, loaded_scorer):
@@ -265,23 +397,54 @@ class HolyGostQuery(object):
         return Result(None, None, scored_tables), None, trained_weights
 
     @profile
+    def learn_and_apply_out_of_core(self, pathes, delim, check_cols):
+
+        self.check_table_headers(pathes, delim, check_cols)
+        with timer():
+
+            logging.info("learn and apply classifier out of core")
+            result, scorer, trained_weights = self._learn_and_apply_out_of_core(pathes, delim)
+            logging.info("processing input data finished")
+
+        return result, scorer, trained_weights
+
+    @profile
+    def _learn_and_apply_out_of_core(self, pathes, delim):
+
+        sampling_rate = CONFIG.get("out_of_core.sampling_rate")
+        assert 0 < sampling_rate <= 1.0, "invalid sampling rate value"
+        prepared_tables, score_columns = sample_data_tables(pathes, delim, sampling_rate)
+        prepared_table = pd.concat(prepared_tables)
+        experiment = Experiment(prepared_table)
+        experiment.log_summary()
+        final_classifier, all_test_target_scores, all_test_decoy_scores = self._learn(experiment)
+        return self._build_lazy_result(pathes, final_classifier, score_columns, experiment,
+                                       all_test_target_scores, all_test_decoy_scores)
+
+
+    @profile
     def learn_and_apply(self, pathes, delim, check_cols):
 
-        tables = list(self.read_tables_iter(pathes, delim, check_cols))
+        self.check_table_headers(pathes, delim, check_cols)
+        tables = list(self.read_tables_iter(pathes, delim))
         with timer():
 
             logging.info("learn and apply classifier from input data")
-            result, learned_scorer, trained_weights = self._learn_and_apply(tables)
+            result, scorer, trained_weights = self._learn_and_apply(tables)
             logging.info("processing input data finished")
 
-        return tables, result, learned_scorer, trained_weights
+        return result, scorer, trained_weights
 
     def _learn_and_apply(self, tables):
 
         experiment, score_columns = self._setup_experiment(tables)
+        final_classifier, all_test_target_scores, all_test_decoy_scores = self._learn(experiment)
 
+        return self._build_result(tables, final_classifier, score_columns, experiment,
+                                  all_test_target_scores, all_test_decoy_scores)
+
+    def _learn(self, experiment):
         is_test = CONFIG.get("is_test")
-
         if is_test:  # for reliable results
             experiment.df.sort("tg_id", ascending=True, inplace=True)
 
@@ -318,30 +481,43 @@ class HolyGostQuery(object):
         logging.info("")
 
         final_classifier = self.semi_supervised_learner.averaged_learner(ws)
+        return final_classifier, all_test_target_scores, all_test_decoy_scores
 
-        return self._build_result(tables, final_classifier, score_columns, experiment,
-                                  all_test_target_scores, all_test_decoy_scores)
+    def _build_result(self, tables, final_classifier, score_columns, experiment,
+                      all_test_target_scores, all_test_decoy_scores):
 
-    def _build_result(self, tables, final_classifier, score_columns, experiment, all_test_target_scores,
-                      all_test_decoy_scores):
-
+        merge_results = CONFIG.get("multiple_files.merge_results")
         weights = final_classifier.get_parameters()
         scorer = Scorer(final_classifier, score_columns, experiment, all_test_target_scores,
-                        all_test_decoy_scores)
+                        all_test_decoy_scores, merge_results)
 
         scored_tables = list(scorer.score_many(tables))
 
         final_statistics, summary_statistics = scorer.get_error_stats()
 
-        merge_results = CONFIG.get("multiple_files.merge_results")
-        if merge_results:
-            scored_tables = [pd.concat(scored_tables)]
 
         result = Result(summary_statistics, final_statistics, scored_tables)
 
         logging.info("calculated scoring and statistics")
         return result, scorer, weights
 
+    def _build_lazy_result(self, pathes, final_classifier, score_columns, experiment,
+                           all_test_target_scores, all_test_decoy_scores):
+
+        merge_results = CONFIG.get("multiple_files.merge_results")
+        weights = final_classifier.get_parameters()
+        scorer = Scorer(final_classifier, score_columns, experiment, all_test_target_scores,
+                        all_test_decoy_scores, merge_results)
+
+        delim_in = CONFIG.get("delim.in")
+        scored_tables_lazy = scorer.score_many_lazy(pathes, delim_in)
+
+        final_statistics, summary_statistics = scorer.get_error_stats()
+
+        result = Result(summary_statistics, final_statistics, scored_tables_lazy)
+
+        logging.info("calculated scoring and statistics")
+        return result, scorer, weights
 
 
 @profile

@@ -1,3 +1,4 @@
+import pdb
 # encoding: latin-1
 
 # openblas + multiprocessing crashes for OPENBLAS_NUM_THREADS > 1 !!!
@@ -14,7 +15,8 @@ from config import CONFIG
 try:
     profile
 except NameError:
-    profile = lambda x: x
+    def profile(fun):
+        return fun
 
 import logging
 
@@ -31,8 +33,8 @@ def cleanup_and_check(df):
     df_cleaned = df.loc[valid_rows, :]
 
     # decoy / non decoy sub tables
-    df_decoy = df_cleaned[df_cleaned["is_decoy"] == True]
-    df_target = df_cleaned[df_cleaned["is_decoy"] == False]
+    df_decoy = df_cleaned[df_cleaned["is_decoy"].eq(True)]
+    df_target = df_cleaned[df_cleaned["is_decoy"].eq(False)]
 
     # groups
     decoy_groups = set(df_decoy["tg_id"])
@@ -173,6 +175,34 @@ def prepare_data_tables(tables, tg_id_name="transition_group_id",
         raise Exception("score columns in input tables are not consistent (order and/or naming)")
 
     return dfs, all_score_columns.pop()
+
+
+def sample_data_tables(pathes, delim,  sampling_rate=0.1, tg_id_name="transition_group_id",
+                       decoy_name="decoy"):
+    tg_ids = set()
+    for path in pathes:
+        for chunk in pd.read_csv(path, delim, iterator=True, chunksize=100000,
+                                 usecols=[tg_id_name, decoy_name]):
+            ids = chunk[chunk[decoy_name].eq(False)][tg_id_name].values
+            tg_ids.update(ids)
+
+    # subsample from targets
+    if sampling_rate < 1.0:
+        tg_ids = random.sample(tg_ids, int(sampling_rate * len(tg_ids)))
+    else:
+        tg_ids = list(tg_ids)
+    # add corresponding decoys
+    tg_ids += ["DECOY_" + id_ for id_ in tg_ids]
+    # convert to set for faster lookup below:
+    tg_ids = set(tg_ids)
+
+    chunks = []
+    for path in pathes:
+        for chunk in pd.read_csv(path, delim, iterator=True, chunksize=100000):
+            chunk = chunk[chunk[tg_id_name].isin(tg_ids)]
+            chunks.append(chunk)
+
+    return prepare_data_tables(chunks)
 
 
 class Experiment(object):

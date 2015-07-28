@@ -11,16 +11,20 @@ import pandas as pd
 
 def _standard_config(n_cpus=1):
 
-    config = dict(is_test=0)
-    info = dict(is_test="[switches randomness off]")
+    config = {}
+    info = {}
 
-    lambda_ = 0.4
 
-    if n_cpus == -1:
-        n_cpus = multiprocessing.cpu_count()
+    config["is_test"] = 0
+    info["is_test"] = "[switches randomness off]"
+
+    config["random_seed"] = None
+    info["random_seed"] = "[seed for pseude random generator. can be used to get reproducable results]"
 
     config["xeval.fraction"] = 0.5
     config["xeval.num_iter"] = 5
+
+    lambda_ = 0.4
 
     config["semi_supervised_learner.initial_fdr"] = 0.15
     config["semi_supervised_learner.initial_lambda"] = lambda_
@@ -70,6 +74,12 @@ def _standard_config(n_cpus=1):
     config["d_score.cutoff"] = -1000.0
     info["d_score.cutoff"] = """[Filter output such that only results with a d_score higher than this value are reported]"""
 
+    config["out_of_core"] = 0
+    info["out_of_core"] = """[handle large data files by slower out of core computation]"""
+
+    config["out_of_core.sampling_rate"] = 0.1
+    info["out_of_core.sampling_rate"] = """[handle large data files by random sampling. this value is between 0.0 and 1.0]"""
+
     return config, info
 
 
@@ -79,7 +89,9 @@ def _fix_config_types(dd):
               "is_test",
               "ignore.invalid_score_columns",
               "target.overwrite",
-              "num_processes"]:
+              "out_of_core",
+              "num_processes",
+              ]:
         dd[k] = int(dd[k])
 
     for k in ["xeval.fraction",
@@ -89,7 +101,9 @@ def _fix_config_types(dd):
               "semi_supervised_learner.iteration_lambda",
               "semi_supervised_learner.initial_fdr",
               "semi_supervised_learner.iteration_fdr",
-              "final_statistics.lambda"]:
+              "out_of_core.sampling_rate",
+              "final_statistics.lambda",
+              ]:
         dd[k] = float(dd[k])
 
     if dd["delim.in"] == "tab":
@@ -120,7 +134,13 @@ class _ConfigHolder(object):
     def get(self, name, default=None):
         if default is not None:
             raise RuntimeError("default value not allowed")
-        return self.config.get(name, default)
+        value = self.config.get(name, default)
+        return self._translate(name, value)
+
+    def _translate(self, name, value):
+        if name == "num_processes" and value == -1:
+            value = multiprocessing.cpu_count()
+        return value
 
     def __getitem__(self, name):
         return self.config[name]
