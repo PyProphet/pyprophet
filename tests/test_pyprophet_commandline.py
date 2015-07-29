@@ -68,7 +68,7 @@ def _run_pyprophet_to_learn_model(regtest, temp_folder, dump_result_files=False,
         dump(full_path, regtest)
 
     full_path = os.path.join(temp_folder, "test_data_scorer.bin")
-    dump_digest(regtest, full_path, "test_data_scorer.bin")
+    print >> regtest, "hex digtest pickled classifier:", dump_digest(full_path)
 
     return stdout
 
@@ -160,7 +160,7 @@ def test_apply_weights(tmpdir, regtest):
     _record(stdout, regtest)
 
     stdout = _run_cmdline("pyprophet test_data.txt --apply_weights=test_data_weights.txt "
-                          "--target.overwrite --random_seed=42")
+                          "--target.overwrite --random_seed=42 --out_of_core.sampling_rate=1.0")
 
     _record(stdout, regtest)
 
@@ -179,15 +179,51 @@ def test_apply_weights(tmpdir, regtest):
         dump(full_path, regtest)
 
     full_path = os.path.join(tmpdir.strpath, "test_data_scorer.bin")
-    dump_digest(regtest, full_path, "test_data_scorer.bin")
+    d_in_core = dump_digest(full_path)
 
 
-def dump_digest(regtest, full_path, name):
+    stdout = _run_cmdline("pyprophet test_data.txt --out_of_core --apply_weights=test_data_weights.txt "
+                          "--target.overwrite --random_seed=42 --out_of_core.sampling_rate=1.0")
+
+    _record(stdout, regtest)
+
+    for name in ["test_data_summary_stat.csv",
+                 "test_data_full_stat.csv",
+                 "test_data_report.pdf",
+                 "test_data_cutoffs.txt",
+                 "test_data_svalues.txt",
+                 "test_data_qvalues.txt",
+                 "test_data_dscores_top_target_peaks.txt",
+                 "test_data_dscores_top_decoy_peaks.txt",
+                 "test_data_with_dscore.csv",
+                 "test_data_with_dscore_filtered.csv", ]:
+
+        full_path = os.path.join(tmpdir.strpath, name)
+        dump(full_path, regtest)
+
+    full_path = os.path.join(tmpdir.strpath, "test_data_scorer.bin")
+    d_out_of_core = dump_digest(full_path)
+
+    assert d_in_core == d_out_of_core
+
+
+
+def dump_digest(full_path):
+    """first try: load the pickle as string and compute hexdigests
+       --> does not work. cPickle creates slight differences because of memoizing the
+           elements of the score_columns attribute of the scorer !
+       what works: load pickle and recreate scorer, the dump (with a "fresh" cPickle, so
+       no memoizing) to string than compute hexdigtest
+    """
     import hashlib
+    import cPickle
+    import zlib
+    obj = cPickle.loads(zlib.decompress(open(full_path, "rb").read()))
     h = hashlib.sha1()
-    h.update(open(full_path, "rb").read())
-    print >> regtest
-    print >> regtest, "digest", name, ":", h.hexdigest()
+    h.update(cPickle.dumps(obj))
+    # print >> regtest
+    # print >> regtest, "digest", name, ":", h.hexdigest()
+    return h.hexdigest()
 
 
 
@@ -289,3 +325,29 @@ def compare_folders(f1, f2):
         assert len(lines1) == len(lines2), (name, n1, n2)
         for i, (l1, l2) in enumerate(zip(lines1, lines2)):
             assert l1 == l2, (name, i, l1, l2)
+
+def test_out_of_core_apply_weights(tmpdir, regtest):
+
+    def setup(subfolder="."):
+        f = tmpdir.join(subfolder).strpath
+        os.makedirs(f)
+        os.chdir(f)
+        data_path = os.path.join(__here__, "test_data_3.txt")
+        shutil.copy(data_path, f)
+        data_path = os.path.join(__here__, "test_data_2.txt")
+        shutil.copy(data_path, f)
+        return f
+
+    f1 = setup("out_of_core")
+    stdout = _run_cmdline("pyprophet test_data_2.txt test_data_3.txt "
+                          "--out_of_core "
+                          "--out_of_core.sampling_rate=0.5 --random_seed=42")
+    _record(stdout, regtest)
+
+    stdout = _run_cmdline("pyprophet test_data_2.txt test_data_3.txt "
+                          "--out_of_core "
+                          "--apply_weights=test_data__weights.txt "
+                          "--target.overwrite "
+                          "--multiple_files.merge_results")
+
+    _record(stdout, regtest)

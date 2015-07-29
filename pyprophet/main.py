@@ -235,19 +235,13 @@ class PyProphetLearner(PyProphetRunner):
         yield "trained_weights_path", os.path.join(dirname, self.prefix + "_weights.txt")
 
 
-class PyProphetOutOfCoreLearner(PyProphetRunner):
+class PyProphetOutOfCoreLearner(PyProphetLearner):
 
     def run_algo(self):
         (result, scorer, weights) = PyProphet().learn_and_apply_out_of_core(self.pathes,
                                                                             self.delim_in,
                                                                             self.check_cols)
         return (result, scorer, weights)
-
-    def extra_writes(self, dirname):
-        yield "summ_stat_path", os.path.join(dirname, self.prefix + "_summary_stat.csv")
-        yield "full_stat_path", os.path.join(dirname, self.prefix + "_full_stat.csv")
-        yield "pickled_scorer_path", os.path.join(dirname, self.prefix + "_scorer.bin")
-        yield "trained_weights_path", os.path.join(dirname, self.prefix + "_weights.txt")
 
 
 class PyProphetWeightApplier(PyProphetRunner):
@@ -276,6 +270,15 @@ class PyProphetWeightApplier(PyProphetRunner):
         yield "pickled_scorer_path", os.path.join(dirname, self.prefix + "_scorer.bin")
 
 
+class PyProphetOutOfCoreWeightApplier(PyProphetWeightApplier):
+
+    def run_algo(self):
+        (result, scorer, weights) = PyProphet().apply_weights_out_of_core(self.pathes, self.delim_in,
+                                                                          self.check_cols,
+                                                                          self.persisted_weights)
+        return (result, scorer, weights)
+
+
 class PyProphetScorerApplier(PyProphetRunner):
 
     def __init__(self, pathes, prefix, merge_results, apply_scorer, delim_in, delim_out):
@@ -285,6 +288,7 @@ class PyProphetScorerApplier(PyProphetRunner):
             raise Exception("persisted scorer file %s does not exist" % apply_scorer)
         try:
             self.persisted_scorer = cPickle.loads(zlib.decompress(open(apply_scorer, "rb").read()))
+            self.persisted_scorer.merge_results = merge_results
         except:
             import traceback
             traceback.print_exc()
@@ -303,6 +307,33 @@ class PyProphetScorerApplier(PyProphetRunner):
         return
         yield
 
+
+class PyProphetOutOfCoreScorerApplier(PyProphetRunner):
+
+    def __init__(self, pathes, prefix, merge_results, apply_scorer, delim_in, delim_out):
+        super(PyProphetOutOfCoreScorerApplier, self).__init__(pathes, prefix, merge_results,
+                                                              delim_in, delim_out)
+        if not os.path.exists(apply_scorer):
+            raise Exception("persisted scorer file %s does not exist" % apply_scorer)
+        try:
+            self.persisted_scorer = cPickle.loads(zlib.decompress(open(apply_scorer, "rb").read()))
+        except:
+            import traceback
+            traceback.print_exc()
+            raise
+
+    def run_algo(self):
+        (result, scorer, weights) = PyProphet().apply_scorer(self.pathes, self.delim_in,
+                                                             self.check_cols,
+                                                             self.persisted_scorer)
+        return (result, scorer, weights)
+
+    def extra_writes(self, dirname):
+        """empty generator, see
+        http://stackoverflow.com/questions/13243766/python-empty-generator-function
+        """
+        return
+        yield
 
 def _main(args):
 
@@ -334,12 +365,20 @@ def _main(args):
             PyProphetLearner(pathes, prefix, merge_results, delim_in, delim_out).run()
 
     elif apply_weights:
-        PyProphetWeightApplier(
-            pathes, prefix, merge_results, apply_weights, delim_in, delim_out).run()
+        if out_of_core:
+            PyProphetOutOfCoreWeightApplier(
+                pathes, prefix, merge_results, apply_weights, delim_in, delim_out).run()
+        else:
+            PyProphetWeightApplier(
+                pathes, prefix, merge_results, apply_weights, delim_in, delim_out).run()
 
     else:
-        PyProphetScorerApplier(
-            pathes, prefix, merge_results, apply_scorer, delim_in, delim_out).run()
+        if out_of_core:
+            PyProphetOutOfCoreScorerApplier(
+                pathes, prefix, merge_results, apply_scorer, delim_in, delim_out).run()
+        else:
+            PyProphetScorerApplier(
+                pathes, prefix, merge_results, apply_scorer, delim_in, delim_out).run()
 
 
 def main():

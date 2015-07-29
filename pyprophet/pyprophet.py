@@ -1,7 +1,6 @@
 # encoding: latin-1
 
 from __future__ import division
-import pdb
 
 # openblas + multiprocessing crashes for OPENBLAS_NUM_THREADS > 1 !!!
 import os
@@ -171,6 +170,11 @@ class Scorer(object):
 
     def score_many_lazy(self, pathes, delim_in):
         return LazyScoredTablesIter(pathes, self.merge_results, self, delim_in=delim_in)
+
+    """
+    TODO: out of core weight applier und alten weight applier von commandline aufrufen
+    und unterschiede finden !!!!
+    """
 
     def get_error_stats(self):
         return final_err_table(self.error_stat.df), summary_err_table(self.error_stat.df)
@@ -362,6 +366,14 @@ class HolyGostQuery(object):
 
         experiment, score_columns = self._setup_experiment(tables)
 
+        final_classifier, all_test_target_scores, all_test_decoy_scores = \
+                                            self._apply_weights_on_exp(experiment, loaded_weights)
+
+        return self._build_result(tables, final_classifier, score_columns, experiment,
+                                  all_test_target_scores, all_test_decoy_scores)
+
+    def _apply_weights_on_exp(self, experiment, loaded_weights):
+
         learner = self.semi_supervised_learner
 
         logging.info("start application of pretrained weights")
@@ -375,8 +387,48 @@ class HolyGostQuery(object):
         ws = [loaded_weights.flatten()]
         final_classifier = self.semi_supervised_learner.averaged_learner(ws)
 
-        return self._build_result(tables, final_classifier, score_columns, experiment,
-                                  all_test_target_scores, all_test_decoy_scores)
+        return final_classifier, all_test_target_scores, all_test_decoy_scores
+
+
+    def apply_weights_out_of_core(self, pathes, delim, check_cols, loaded_weights):
+        self.check_table_headers(pathes, delim, check_cols)
+        with timer():
+
+            logging.info("apply weights out of core")
+            result, scorer, trained_weights = self._apply_weights_out_of_core(pathes, delim,
+                    loaded_weights)
+            logging.info("processing input data finished")
+
+        return result, scorer, trained_weights
+
+    def _apply_weights_out_of_core(self, pathes, delim, loaded_weights):
+
+        sampling_rate = CONFIG.get("out_of_core.sampling_rate")
+        assert 0 < sampling_rate <= 1.0, "invalid sampling rate value"
+        prepared_tables, score_columns = sample_data_tables(pathes, delim, sampling_rate)
+        prepared_table = pd.concat(prepared_tables)
+        experiment = Experiment(prepared_table)
+        experiment.log_summary()
+
+        final_classifier, all_test_target_scores, all_test_decoy_scores = \
+                                            self._apply_weights_on_exp(experiment, loaded_weights)
+
+        return self._build_lazy_result(pathes, final_classifier, score_columns, experiment,
+                                       all_test_target_scores, all_test_decoy_scores)
+
+    @profile
+    def _learn_and_apply_out_of_core(self, pathes, delim):
+
+        sampling_rate = CONFIG.get("out_of_core.sampling_rate")
+        assert 0 < sampling_rate <= 1.0, "invalid sampling rate value"
+        prepared_tables, score_columns = sample_data_tables(pathes, delim, sampling_rate)
+        prepared_table = pd.concat(prepared_tables)
+        experiment = Experiment(prepared_table)
+        experiment.log_summary()
+        final_classifier, all_test_target_scores, all_test_decoy_scores = self._learn(experiment)
+        return self._build_lazy_result(pathes, final_classifier, score_columns, experiment,
+                                       all_test_target_scores, all_test_decoy_scores)
+
 
     @profile
     def apply_scorer(self, pathes, delim, check_cols, loaded_scorer):
@@ -407,19 +459,6 @@ class HolyGostQuery(object):
             logging.info("processing input data finished")
 
         return result, scorer, trained_weights
-
-    @profile
-    def _learn_and_apply_out_of_core(self, pathes, delim):
-
-        sampling_rate = CONFIG.get("out_of_core.sampling_rate")
-        assert 0 < sampling_rate <= 1.0, "invalid sampling rate value"
-        prepared_tables, score_columns = sample_data_tables(pathes, delim, sampling_rate)
-        prepared_table = pd.concat(prepared_tables)
-        experiment = Experiment(prepared_table)
-        experiment.log_summary()
-        final_classifier, all_test_target_scores, all_test_decoy_scores = self._learn(experiment)
-        return self._build_lazy_result(pathes, final_classifier, score_columns, experiment,
-                                       all_test_target_scores, all_test_decoy_scores)
 
 
     @profile
@@ -490,6 +529,7 @@ class HolyGostQuery(object):
         weights = final_classifier.get_parameters()
         scorer = Scorer(final_classifier, score_columns, experiment, all_test_target_scores,
                         all_test_decoy_scores, merge_results)
+
 
         scored_tables = list(scorer.score_many(tables))
 

@@ -79,8 +79,7 @@ DECOY_592_run0	0	1	-2.10957129817	0	0.90 ... 335674837	0	-2.40660836476	0.067999
 DECOY_592_run0	0	1	-2.31560973872	0	0.90 ... 66613662	0	-4.57039204686	0.0679991361723	16
 DECOY_592_run0	0	1	-2.53264045217	0	0.98 ... 96452491	0	-4.12537992605	0.0679991361723	14
 DECOY_592_run0	0	1	-3.44062881815	0	-1.0 ... 	0.0	0.0	0	-3.52963101398	0.0679991361723	11
-
-digest test_data_scorer.bin : f7379fa00604e755aa9e754a78eff18dc70dd0fa
+hex digtest pickled classifier: 22aa886c082f43d03b3eed7e6de33463a1b1043f
 pyprophet test_data.txt --random_seed=42
  config settings:
      apply_scorer: None
@@ -195,7 +194,7 @@ WRITTEN:  test_data_scorer.bin
 WRITTEN:  test_data_weights.txt
 
 
-pyprophet test_data.txt --apply_weights=test_data_weights.txt --target.overwrite --random_seed=42
+pyprophet test_data.txt --apply_weights=test_data_weights.txt --target.overwrite --random_seed=42 --out_of_core.sampling_rate=1.0
  config settings:
      apply_scorer: None
      apply_weights: test_data_weights.txt
@@ -211,7 +210,7 @@ pyprophet test_data.txt --apply_weights=test_data_weights.txt --target.overwrite
      multiple_files.merge_results: 0
      num_processes: 1
      out_of_core: 0
-     out_of_core.sampling_rate: 0.1
+     out_of_core.sampling_rate: 1.0
      random_seed: 42
      semi_supervised_learner.initial_fdr: 0.15
      semi_supervised_learner.initial_lambda: 0.4
@@ -254,7 +253,7 @@ used parameters:
     multiple_files.merge_results               : 0
     num_processes                              : 1
     out_of_core                                : 0
-    out_of_core.sampling_rate                  : 0.1
+    out_of_core.sampling_rate                  : 1.0
     random_seed                                : '42'
     semi_supervised_learner.initial_fdr        : 0.15
     semi_supervised_learner.initial_lambda     : 0.4
@@ -393,5 +392,200 @@ DECOY_592_run0	0	1	-2.10957129817	0	0.90 ... 0335674837	0	-2.40660836476	0.06776
 DECOY_592_run0	0	1	-2.31560973872	0	0.90 ... 766613662	0	-4.57039204686	0.067760744404	16
 DECOY_592_run0	0	1	-2.53264045217	0	0.98 ... 796452491	0	-4.12537992605	0.067760744404	14
 DECOY_592_run0	0	1	-3.44062881815	0	-1.0 ... 0	0.0	0.0	0	-3.52963101398	0.067760744404	11
+pyprophet test_data.txt --out_of_core --apply_weights=test_data_weights.txt --target.overwrite --random_seed=42 --out_of_core.sampling_rate=1.0
+ config settings:
+     apply_scorer: None
+     apply_weights: test_data_weights.txt
+     compute.probabilities: False
+     d_score.cutoff: -1000.0
+     delim.in:
+     delim.out:
+     export.mayu: False
+     final_statistics.fdr_all_pg: False
+     final_statistics.lambda: 0.4
+     ignore.invalid_score_columns: 0
+     is_test: 0
+     multiple_files.merge_results: 0
+     num_processes: 1
+     out_of_core: 1
+     out_of_core.sampling_rate: 1.0
+     random_seed: 42
+     semi_supervised_learner.initial_fdr: 0.15
+     semi_supervised_learner.initial_lambda: 0.4
+     semi_supervised_learner.iteration_fdr: 0.02
+     semi_supervised_learner.iteration_lambda: 0.4
+     semi_supervised_learner.num_iter: 5
+     target.dir: None
+     target.overwrite: 1
+     target.prefix: None
+     xeval.fraction: 0.5
+     xeval.num_iter: 5
+ apply weights out of core
+ data set contains 387 decoy and 387 target transition groups
+ summary input file:
+    9165 lines
+    774 transition groups
+    17 scores including main score
+ start application of pretrained weights
+ finished pretrained scoring
+ calculated scoring and statistics
+ processing input data finished
+ data set contains 387 decoy and 387 target transition groups
+ mean m_score = 6.074490e-02, std_dev m_score = 1.707283e-02
+ mean s_value = 9.801460e-01, std_dev s_value = 1.124500e-01
 
-digest test_data_scorer.bin : daa7e5661172a45902662468d89bdd0195c5a9d4
+used parameters:
+
+    apply_scorer                               : None
+    apply_weights                              : 'test_data_weights.txt'
+    compute.probabilities                      : False
+    d_score.cutoff                             : -1000.0
+    delim.in                                   : '\t'
+    delim.out                                  : '\t'
+    export.mayu                                : False
+    final_statistics.fdr_all_pg                : False
+    final_statistics.lambda                    : 0.4
+    ignore.invalid_score_columns               : 0
+    is_test                                    : 0
+    multiple_files.merge_results               : 0
+    num_processes                              : 1
+    out_of_core                                : 1
+    out_of_core.sampling_rate                  : 1.0
+    random_seed                                : '42'
+    semi_supervised_learner.initial_fdr        : 0.15
+    semi_supervised_learner.initial_lambda     : 0.4
+    semi_supervised_learner.iteration_fdr      : 0.02
+    semi_supervised_learner.iteration_lambda   : 0.4
+    semi_supervised_learner.num_iter           : 5
+    target.dir                                 : None
+    target.overwrite                           : 1
+    target.prefix                              : None
+    xeval.fraction                             : 0.5
+    xeval.num_iter                             : 5
+
+
+==================================================================================================
+
+   qvalue   svalue   TP  FP        TN         FN          FDR     sens   cutoff
+0    0.00  0.01115    4   0  28.33333  354.66667  2.06747e-12  0.01115  7.20423
+1    0.01  1.00000  362   4  24.33333   -3.33333  1.05108e-02  1.00000  1.09950
+2    0.02  1.00000  363   5  23.33333   -4.33333  1.40103e-02  1.00000  0.90789
+3    0.05  1.00000  359  20   8.33333   -0.33333  5.18912e-02  1.00000 -0.50757
+4    0.10  1.00000  361  26   2.33333   -2.33333  6.77607e-02  1.00000 -1.44330
+5    0.20      NaN  NaN NaN       NaN        NaN          NaN      NaN      NaN
+6    0.30      NaN  NaN NaN       NaN        NaN          NaN      NaN      NaN
+7    0.40      NaN  NaN NaN       NaN        NaN          NaN      NaN      NaN
+8    0.50      NaN  NaN NaN       NaN        NaN          NaN      NaN      NaN
+
+==================================================================================================
+
+WRITTEN:  test_data_summary_stat.csv
+WRITTEN:  test_data_full_stat.csv
+WRITTEN:  test_data_with_dscore.csv
+WRITTEN:  test_data_with_dscore_filtered.csv
+WRITTEN:  test_data_report.pdf
+WRITTEN:  test_data_cutoffs.txt
+WRITTEN:  test_data_svalues.txt
+WRITTEN:  test_data_qvalues.txt
+WRITTEN:  test_data_dscores_top_target_peaks.txt
+WRITTEN:  test_data_dscores_top_decoy_peaks.txt
+WRITTEN:  test_data_scorer.bin
+
+
+
+test_data_summary_stat.csv contains 10 lines
+
+qvalue	svalue	TP	FP	TN	FN	FDR	sens	cutoff
+0.0	0.0111524163569	4.0	0.0	28.333333333 ... 6746656832e-12	0.0111524163569	7.20422597754
+0.01	1.0	362.0	4.0	24.3333333333	-3.3333 ... 3333333333	0.0105108390455	1.0	1.09949865996
+0.02	1.0	363.0	5.0	23.3333333333	-4.3333 ... 3333333333	0.014010303109	1.0	0.907886432262
+0.05	1.0	359.0	20.0	8.33333333333	-0.333 ... 333333333	0.051891241551	1.0	-0.507567529086
+0.1	1.0	361.0	26.0	2.33333333333	-2.3333 ... 3333333333	0.067760744404	1.0	-1.44330028365
+0.2
+0.3
+0.4
+0.5
+
+test_data_full_stat.csv contains 52 lines
+
+top 5 lines of test_data_full_stat.csv
+qvalue	svalue	TP	FP	TN	FN	FDR	sens	cutoff
+0.067760744404	1.0	361.0	26.0	2.33333333 ... 3333333333	0.067760744404	1.0	-1.87820971502
+0.067760744404	1.0	361.0	26.0	2.33333333 ... 3333333333	0.067760744404	1.0	-1.68684956521
+0.067760744404	1.0	361.0	26.0	2.33333333 ... 3333333333	0.067760744404	1.0	-1.49548941541
+0.0648521512651	1.0	361.0	25.0	3.3333333 ... 333333333	0.0648521512651	1.0	-1.30412926561
+
+last 5 lines of test_data_full_stat.csv
+4.40792904822e-12	0.0390334572489	14.0	0 ... 0792904822e-12	0.0390334572491	6.92435717599
+3.56085531431e-12	0.013940520446	5.0	0.0 ... 5283214396e-12	0.0139405204461	7.11571732579
+2.06746656832e-12	0.0027881040892	1.0	0. ... 9359374462e-12	0.00278810408922	7.3070774756
+2.06746656832e-12	0.0027881040892	1.0	0. ... 9359374462e-12	0.00278810408922	7.4984376254
+2.06746656832e-12	0.0027881040892	1.0	0. ... 9359374462e-12	0.00278810408922	7.6897977752
+
+test_data_report.pdf contains 549 lines
+
+top 5 lines of test_data_report.pdf
+%PDF-1.4
+%¬Ü «º
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+
+last 5 lines of test_data_report.pdf
+trailer
+<< /Info 66 0 R /Root 1 0 R /Size 67 >>
+startxref
+26116
+%%EOF
+
+test_data_cutoffs.txt contains 1 lines
+
+-1.878210e+00 -1.686850e+00 -1.495489e+0 ... 17e+00 7.307077e+00 7.498438e+00 7.689798e+00
+
+test_data_svalues.txt contains 1 lines
+
+1.000000e+00 1.000000e+00 1.000000e+00 1 ... 52e-02 2.788104e-03 2.788104e-03 2.788104e-03
+
+test_data_qvalues.txt contains 1 lines
+
+6.776074e-02 6.776074e-02 6.776074e-02 6 ... 55e-12 2.067467e-12 2.067467e-12 2.067467e-12
+
+test_data_dscores_top_target_peaks.txt contains 1 lines
+
+5.457489e+00 4.656718e+00 4.445054e+00 5 ... 40e+00 6.044946e+00 6.720795e+00 5.849307e+00
+
+test_data_dscores_top_decoy_peaks.txt contains 1 lines
+
+7.943020e-01 1.965729e+00 -5.237848e-03  ... 7e+00 -3.164007e-01 1.061346e-01 1.184307e+00
+
+test_data_with_dscore.csv contains 9166 lines
+
+top 5 lines of test_data_with_dscore.csv
+transition_group_id	run_id	decoy	main_va ... series_score	d_score	m_score	peak_group_rank
+459_run0	0	0	5.27893963303	5	0.993098149 ... 79341002	6	5.45748934937	3.37009024956e-09	1
+459_run0	0	0	-0.13974375122	0	0.95392456 ... 396888252	0	-1.22546291322	0.0648521512651	2
+459_run0	0	0	-0.77504285962	0	0.66666624 ... 9915833201	0	-5.81590174217	0.067760744404	7
+459_run0	0	0	-1.05454511848	0	0.84734030 ... 0811834697	0	-3.51295271535	0.067760744404	5
+
+last 5 lines of test_data_with_dscore.csv
+DECOY_592_run0	0	1	-1.84945466301	0	0.63 ... 0880632506	0	-3.04579720666	0.067760744404	9
+DECOY_592_run0	0	1	-2.10957129817	0	0.90 ... 0335674837	0	-2.40660836476	0.067760744404	7
+DECOY_592_run0	0	1	-2.31560973872	0	0.90 ... 766613662	0	-4.57039204686	0.067760744404	16
+DECOY_592_run0	0	1	-2.53264045217	0	0.98 ... 796452491	0	-4.12537992605	0.067760744404	14
+DECOY_592_run0	0	1	-3.44062881815	0	-1.0 ... 0	0.0	0.0	0	-3.52963101398	0.067760744404	11
+
+test_data_with_dscore_filtered.csv contains 9166 lines
+
+top 5 lines of test_data_with_dscore_filtered.csv
+transition_group_id	run_id	decoy	main_va ... series_score	d_score	m_score	peak_group_rank
+459_run0	0	0	5.27893963303	5	0.993098149 ... 79341002	6	5.45748934937	3.37009024956e-09	1
+459_run0	0	0	-0.13974375122	0	0.95392456 ... 396888252	0	-1.22546291322	0.0648521512651	2
+459_run0	0	0	-0.77504285962	0	0.66666624 ... 9915833201	0	-5.81590174217	0.067760744404	7
+459_run0	0	0	-1.05454511848	0	0.84734030 ... 0811834697	0	-3.51295271535	0.067760744404	5
+
+last 5 lines of test_data_with_dscore_filtered.csv
+DECOY_592_run0	0	1	-1.84945466301	0	0.63 ... 0880632506	0	-3.04579720666	0.067760744404	9
+DECOY_592_run0	0	1	-2.10957129817	0	0.90 ... 0335674837	0	-2.40660836476	0.067760744404	7
+DECOY_592_run0	0	1	-2.31560973872	0	0.90 ... 766613662	0	-4.57039204686	0.067760744404	16
+DECOY_592_run0	0	1	-2.53264045217	0	0.98 ... 796452491	0	-4.12537992605	0.067760744404	14
+DECOY_592_run0	0	1	-3.44062881815	0	-1.0 ... 0	0.0	0.0	0	-3.52963101398	0.067760744404	11

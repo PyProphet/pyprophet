@@ -79,8 +79,7 @@ DECOY_592_run0	0	1	-2.10957129817	0	0.90 ... 2027826e-05	8.34147216604e-06	0.884
 DECOY_592_run0	0	1	-2.31560973872	0	0.90 ... 1359294e-08	4.00105936284e-08	0.884592182378
 DECOY_592_run0	0	1	-2.53264045217	0	0.98 ... 1117784e-07	1.17096132813e-07	0.884592182378
 DECOY_592_run0	0	1	-3.44062881815	0	-1.0 ... 2551507e-07	5.02872321374e-07	0.884592182378
-
-digest test_data_scorer.bin : f7379fa00604e755aa9e754a78eff18dc70dd0fa
+hex digtest pickled classifier: 22aa886c082f43d03b3eed7e6de33463a1b1043f
 pyprophet test_data.txt --random_seed=42 --compute.probabilities
  config settings:
      apply_scorer: None
