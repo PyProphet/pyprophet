@@ -1,3 +1,4 @@
+import pdb
 # encoding: latin-1
 
 # openblas + multiprocessing crashes for OPENBLAS_NUM_THREADS > 1 !!!
@@ -111,7 +112,7 @@ class PyProphetRunner(object):
 
         extra_writes = dict(self.extra_writes(dirname))
 
-        to_check = list(k for p in out_pathes for k in p.keys())
+        to_check = list(v for p in out_pathes for v in p.values())
         to_check.extend(extra_writes.values())
 
         if not CONFIG.get("target.overwrite"):
@@ -296,34 +297,6 @@ class PyProphetScorerApplier(PyProphetRunner):
 
     def run_algo(self):
         (result, scorer, weights) = PyProphet().apply_scorer(self.pathes, self.delim_in,
-                                                                     self.check_cols,
-                                                                     self.persisted_scorer)
-        return (result, scorer, weights)
-
-    def extra_writes(self, dirname):
-        """empty generator, see
-        http://stackoverflow.com/questions/13243766/python-empty-generator-function
-        """
-        return
-        yield
-
-
-class PyProphetOutOfCoreScorerApplier(PyProphetRunner):
-
-    def __init__(self, pathes, prefix, merge_results, apply_scorer, delim_in, delim_out):
-        super(PyProphetOutOfCoreScorerApplier, self).__init__(pathes, prefix, merge_results,
-                                                              delim_in, delim_out)
-        if not os.path.exists(apply_scorer):
-            raise Exception("persisted scorer file %s does not exist" % apply_scorer)
-        try:
-            self.persisted_scorer = cPickle.loads(zlib.decompress(open(apply_scorer, "rb").read()))
-        except:
-            import traceback
-            traceback.print_exc()
-            raise
-
-    def run_algo(self):
-        (result, scorer, weights) = PyProphet().apply_scorer(self.pathes, self.delim_in,
                                                              self.check_cols,
                                                              self.persisted_scorer)
         return (result, scorer, weights)
@@ -334,6 +307,16 @@ class PyProphetOutOfCoreScorerApplier(PyProphetRunner):
         """
         return
         yield
+
+
+class PyProphetOutOfCoreScorerApplier(PyProphetScorerApplier):
+
+    def run_algo(self):
+        (result, scorer, weights) = PyProphet().apply_scorer_out_of_core(self.pathes, self.delim_in,
+                                                                         self.check_cols,
+                                                                         self.persisted_scorer)
+        return (result, scorer, weights)
+
 
 def _main(args):
 
@@ -351,7 +334,6 @@ def _main(args):
 
     if random_seed is not None:
         random.seed(random_seed)
-
 
     if apply_scorer and apply_weights:
         raise Exception("can not apply scorer and weights at the same time")

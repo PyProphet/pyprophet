@@ -112,6 +112,9 @@ def _fix_config_types(dd):
     if dd["delim.out"] == "tab":
         dd["delim.out"] = "\t"
 
+    if dd["random_seed"] is not None:
+        dd["random_seed"] = int(dd["random_seed"])
+
 
 def set_pandas_print_options():
     # w, h = pd.util.terminal.get_terminal_size()

@@ -417,18 +417,26 @@ class HolyGostQuery(object):
                                        all_test_target_scores, all_test_decoy_scores)
 
     @profile
-    def _learn_and_apply_out_of_core(self, pathes, delim):
+    def apply_scorer_out_of_core(self, pathes, delim, check_cols, loaded_scorer):
+        self.check_table_headers(pathes, delim, check_cols)
+        with timer():
+            logging.info("apply scorer to input data")
+            result, __, used_weights = self._apply_scorer_out_of_core(pathes, delim, loaded_scorer)
+            logging.info("processing input data finished")
+        return result, None, used_weights
 
-        sampling_rate = CONFIG.get("out_of_core.sampling_rate")
-        assert 0 < sampling_rate <= 1.0, "invalid sampling rate value"
-        prepared_tables, score_columns = sample_data_tables(pathes, delim, sampling_rate)
-        prepared_table = pd.concat(prepared_tables)
-        experiment = Experiment(prepared_table)
-        experiment.log_summary()
-        final_classifier, all_test_target_scores, all_test_decoy_scores = self._learn(experiment)
-        return self._build_lazy_result(pathes, final_classifier, score_columns, experiment,
-                                       all_test_target_scores, all_test_decoy_scores)
+    @profile
+    def _apply_scorer_out_of_core(self, pathes, delim, scorer):
 
+        merge_results = CONFIG.get("multiple_files.merge_results")
+        # TODO: merge_resuls has nothing to do with scorer, we need extra class for
+        # writing results, maybe lazy....:
+        scorer.merge_results = merge_results
+        delim_in = CONFIG.get("delim.in")
+        scored_tables_lazy = scorer.score_many_lazy(pathes, delim_in)
+        final_statistics, summary_statistics = scorer.get_error_stats()
+        weights = scorer.classifier.get_parameters()
+        return Result(None, None, scored_tables_lazy), None, weights
 
     @profile
     def apply_scorer(self, pathes, delim, check_cols, loaded_scorer):
@@ -449,6 +457,19 @@ class HolyGostQuery(object):
         return Result(None, None, scored_tables), None, trained_weights
 
     @profile
+    def _learn_and_apply_out_of_core(self, pathes, delim):
+
+        sampling_rate = CONFIG.get("out_of_core.sampling_rate")
+        assert 0 < sampling_rate <= 1.0, "invalid sampling rate value"
+        prepared_tables, score_columns = sample_data_tables(pathes, delim, sampling_rate)
+        prepared_table = pd.concat(prepared_tables)
+        experiment = Experiment(prepared_table)
+        experiment.log_summary()
+        final_classifier, all_test_target_scores, all_test_decoy_scores = self._learn(experiment)
+        return self._build_lazy_result(pathes, final_classifier, score_columns, experiment,
+                                       all_test_target_scores, all_test_decoy_scores)
+
+    @profile
     def learn_and_apply_out_of_core(self, pathes, delim, check_cols):
 
         self.check_table_headers(pathes, delim, check_cols)
@@ -459,7 +480,6 @@ class HolyGostQuery(object):
             logging.info("processing input data finished")
 
         return result, scorer, trained_weights
-
 
     @profile
     def learn_and_apply(self, pathes, delim, check_cols):
@@ -530,11 +550,9 @@ class HolyGostQuery(object):
         scorer = Scorer(final_classifier, score_columns, experiment, all_test_target_scores,
                         all_test_decoy_scores, merge_results)
 
-
         scored_tables = list(scorer.score_many(tables))
 
         final_statistics, summary_statistics = scorer.get_error_stats()
-
 
         result = Result(summary_statistics, final_statistics, scored_tables)
 

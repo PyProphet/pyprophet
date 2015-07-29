@@ -181,7 +181,6 @@ def test_apply_weights(tmpdir, regtest):
     full_path = os.path.join(tmpdir.strpath, "test_data_scorer.bin")
     d_in_core = dump_digest(full_path)
 
-
     stdout = _run_cmdline("pyprophet test_data.txt --out_of_core --apply_weights=test_data_weights.txt "
                           "--target.overwrite --random_seed=42 --out_of_core.sampling_rate=1.0")
 
@@ -206,6 +205,51 @@ def test_apply_weights(tmpdir, regtest):
 
     assert d_in_core == d_out_of_core
 
+
+def test_apply_scorer(tmpdir, regtest):
+
+    stdout = _run_pyprophet_to_learn_model(regtest, tmpdir.strpath, True)
+    _record(stdout, regtest)
+
+    for name in ["test_data_summary_stat.csv",
+                 "test_data_full_stat.csv",
+                 "test_data_report.pdf",
+                 "test_data_cutoffs.txt",
+                 "test_data_svalues.txt",
+                 "test_data_qvalues.txt",
+                 "test_data_dscores_top_target_peaks.txt",
+                 "test_data_dscores_top_decoy_peaks.txt",
+                 "test_data_with_dscore.csv",
+                 "test_data_with_dscore_filtered.csv", ]:
+
+        full_path = os.path.join(tmpdir.strpath, name)
+        os.remove(full_path)
+
+    stdout = _run_cmdline("pyprophet test_data.txt --apply_scorer=test_data_scorer.bin "
+                          "--target.overwrite --random_seed=42 --out_of_core.sampling_rate=1.0")
+
+    _record(stdout, regtest)
+
+    for name in ["test_data_with_dscore.csv",
+                 "test_data_with_dscore_filtered.csv", ]:
+
+        full_path = os.path.join(tmpdir.strpath, name)
+        dump(full_path, regtest)
+
+        # cleanup
+        os.remove(full_path)
+
+    stdout = _run_cmdline("pyprophet test_data.txt --out_of_core "
+                          "--apply_scorer=test_data_scorer.bin "
+                          "--target.overwrite --random_seed=42 --out_of_core.sampling_rate=1.0")
+
+    _record(stdout, regtest)
+
+    for name in ["test_data_with_dscore.csv",
+                 "test_data_with_dscore_filtered.csv", ]:
+
+        full_path = os.path.join(tmpdir.strpath, name)
+        dump(full_path, regtest)
 
 
 def dump_digest(full_path):
@@ -326,6 +370,7 @@ def compare_folders(f1, f2):
         for i, (l1, l2) in enumerate(zip(lines1, lines2)):
             assert l1 == l2, (name, i, l1, l2)
 
+
 def test_out_of_core_apply_weights(tmpdir, regtest):
 
     def setup(subfolder="."):
@@ -338,15 +383,17 @@ def test_out_of_core_apply_weights(tmpdir, regtest):
         shutil.copy(data_path, f)
         return f
 
-    f1 = setup("out_of_core")
+    setup("out_of_core")
     stdout = _run_cmdline("pyprophet test_data_2.txt test_data_3.txt "
                           "--out_of_core "
-                          "--out_of_core.sampling_rate=0.5 --random_seed=42")
+                          "--out_of_core.sampling_rate=1.0 --random_seed=42 "
+                          "--multiple_files.merge_results ")
     _record(stdout, regtest)
 
     stdout = _run_cmdline("pyprophet test_data_2.txt test_data_3.txt "
                           "--out_of_core "
                           "--apply_weights=test_data__weights.txt "
+                          "--out_of_core.sampling_rate=1.0 --random_seed=42 "
                           "--target.overwrite "
                           "--multiple_files.merge_results")
 
