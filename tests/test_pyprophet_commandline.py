@@ -72,6 +72,7 @@ def _run_pyprophet_to_learn_model(regtest, temp_folder, dump_result_files=False,
 
     return stdout
 
+
 def dump(full_path, regtest):
     lines = open(full_path, "r").readlines()
     f = os.path.basename(full_path)
@@ -159,8 +160,29 @@ def test_apply_weights(tmpdir, regtest):
     stdout = _run_pyprophet_to_learn_model(regtest, tmpdir.strpath, True)
     _record(stdout, regtest)
 
+    for name in ["test_data_summary_stat.csv",
+                 "test_data_full_stat.csv",
+                 "test_data_report.pdf",
+                 "test_data_cutoffs.txt",
+                 "test_data_svalues.txt",
+                 "test_data_qvalues.txt",
+                 "test_data_dscores_top_target_peaks.txt",
+                 "test_data_dscores_top_decoy_peaks.txt",
+                 "test_data_with_dscore.csv",
+                 "test_data_with_dscore_filtered.csv", ]:
+
+        full_path = os.path.join(tmpdir.strpath, name)
+        os.remove(full_path)
+
+    """
+    the outputs of the previous run and the next run are sligthly different. during learning
+    we have multiple iterations to collect the scores for the statistics, when applying the
+    weights we only have one run. this should be fixed, I see no reason for this diffference
+    and why to use "impured" score values for the statistics.
+    """
+
     stdout = _run_cmdline("pyprophet test_data.txt --apply_weights=test_data_weights.txt "
-                          "--target.overwrite --random_seed=42 --out_of_core.sampling_rate=1.0")
+                          "--target.overwrite --random_seed=42")
 
     _record(stdout, regtest)
 
@@ -209,7 +231,7 @@ def test_apply_weights(tmpdir, regtest):
 def test_apply_scorer(tmpdir, regtest):
 
     stdout = _run_pyprophet_to_learn_model(regtest, tmpdir.strpath, True)
-    _record(stdout, regtest)
+    # _record(stdout, regtest)
 
     for name in ["test_data_summary_stat.csv",
                  "test_data_full_stat.csv",
@@ -225,8 +247,11 @@ def test_apply_scorer(tmpdir, regtest):
         full_path = os.path.join(tmpdir.strpath, name)
         os.remove(full_path)
 
+    """TODO: run both with multiple files and / or merge results, same for apply weights !
+    """
+
     stdout = _run_cmdline("pyprophet test_data.txt --apply_scorer=test_data_scorer.bin "
-                          "--target.overwrite --random_seed=42 --out_of_core.sampling_rate=1.0")
+                          "--target.overwrite --random_seed=42")
 
     _record(stdout, regtest)
 
@@ -241,7 +266,7 @@ def test_apply_scorer(tmpdir, regtest):
 
     stdout = _run_cmdline("pyprophet test_data.txt --out_of_core "
                           "--apply_scorer=test_data_scorer.bin "
-                          "--target.overwrite --random_seed=42 --out_of_core.sampling_rate=1.0")
+                          "--target.overwrite --random_seed=42")
 
     _record(stdout, regtest)
 
