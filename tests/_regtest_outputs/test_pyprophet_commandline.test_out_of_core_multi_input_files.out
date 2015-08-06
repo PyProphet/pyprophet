@@ -50,11 +50,11 @@ pyprophet test_data_2.txt test_data_3.txt --out_of_core --out_of_core.sampling_r
  calculated scoring and statistics
  processing input data finished
  data set contains 387 decoy and 387 target transition groups
- mean m_score = 6.086655e-02, std_dev m_score = 1.708347e-02
- mean s_value = 9.801130e-01, std_dev s_value = 1.124938e-01
+ mean m_score = 6.130686e-02, std_dev m_score = 1.658475e-02
+ mean s_value = 9.800913e-01, std_dev s_value = 1.125709e-01
  data set contains 387 decoy and 387 target transition groups
- mean m_score = 6.086655e-02, std_dev m_score = 1.708347e-02
- mean s_value = 9.801130e-01, std_dev s_value = 1.124938e-01
+ mean m_score = 6.130686e-02, std_dev m_score = 1.658475e-02
+ mean s_value = 9.800913e-01, std_dev s_value = 1.125709e-01
 
 used parameters:
 
@@ -73,7 +73,7 @@ used parameters:
     num_processes                              : 1
     out_of_core                                : 1
     out_of_core.sampling_rate                  : 1.0
-    random_seed                                : '42'
+    random_seed                                : 42
     semi_supervised_learner.initial_fdr        : 0.15
     semi_supervised_learner.initial_lambda     : 0.4
     semi_supervised_learner.iteration_fdr      : 0.02
@@ -89,11 +89,11 @@ used parameters:
 ==================================================================================================
 
    qvalue   svalue   TP  FP        TN         FN          FDR     sens   cutoff
-0    0.00  0.00223    2   0  56.14508  715.85492  1.21819e-11  0.00279  7.25959
-1    0.01  1.00000  721   7  49.14508   -3.14508  9.28886e-03  1.00000  1.49107
-2    0.02  1.00000  723  13  43.14508   -5.14508  1.82423e-02  1.00000  0.90848
-3    0.05  1.00000  720  38  18.14508   -2.14508  4.94820e-02  1.00000 -0.50789
-4    0.10  1.00000  721  53   3.14508   -3.14508  6.80027e-02  1.00000 -1.44424
+0    0.00  0.00223    2   0  54.80829  717.19171  2.45045e-12  0.00278  7.22939
+1    0.01  1.00000  720   6  48.80829   -0.80829  8.90097e-03  1.00000  1.68096
+2    0.02  1.00000  721  13  41.80829   -1.80829  1.80867e-02  1.00000  1.04557
+3    0.05  1.00000  718  38  16.80829    1.19171  4.97391e-02  0.99834 -0.36332
+4    0.10  1.00000  721  53   1.80829   -1.80829  6.81412e-02  1.00000 -1.58676
 5    0.20      NaN  NaN NaN       NaN        NaN          NaN      NaN      NaN
 6    0.30      NaN  NaN NaN       NaN        NaN          NaN      NaN      NaN
 7    0.40      NaN  NaN NaN       NaN        NaN          NaN      NaN      NaN
@@ -175,11 +175,11 @@ pyprophet test_data_2.txt test_data_3.txt --out_of_core --out_of_core.sampling_r
  calculated scoring and statistics
  processing input data finished
  data set contains 387 decoy and 387 target transition groups
- mean m_score = 6.086655e-02, std_dev m_score = 1.708347e-02
- mean s_value = 9.801130e-01, std_dev s_value = 1.124938e-01
+ mean m_score = 6.130686e-02, std_dev m_score = 1.658475e-02
+ mean s_value = 9.800913e-01, std_dev s_value = 1.125709e-01
  data set contains 387 decoy and 387 target transition groups
- mean m_score = 6.086655e-02, std_dev m_score = 1.708347e-02
- mean s_value = 9.801130e-01, std_dev s_value = 1.124938e-01
+ mean m_score = 6.130686e-02, std_dev m_score = 1.658475e-02
+ mean s_value = 9.800913e-01, std_dev s_value = 1.125709e-01
 
 used parameters:
 
@@ -198,7 +198,7 @@ used parameters:
     num_processes                              : 1
     out_of_core                                : 1
     out_of_core.sampling_rate                  : 1.0
-    random_seed                                : '42'
+    random_seed                                : 42
     semi_supervised_learner.initial_fdr        : 0.15
     semi_supervised_learner.initial_lambda     : 0.4
     semi_supervised_learner.iteration_fdr      : 0.02
@@ -214,11 +214,11 @@ used parameters:
 ==================================================================================================
 
    qvalue   svalue   TP  FP        TN         FN          FDR     sens   cutoff
-0    0.00  0.00223    2   0  56.14508  715.85492  1.21819e-11  0.00279  7.25959
-1    0.01  1.00000  721   7  49.14508   -3.14508  9.28886e-03  1.00000  1.49107
-2    0.02  1.00000  723  13  43.14508   -5.14508  1.82423e-02  1.00000  0.90848
-3    0.05  1.00000  720  38  18.14508   -2.14508  4.94820e-02  1.00000 -0.50789
-4    0.10  1.00000  721  53   3.14508   -3.14508  6.80027e-02  1.00000 -1.44424
+0    0.00  0.00223    2   0  54.80829  717.19171  2.45045e-12  0.00278  7.22939
+1    0.01  1.00000  720   6  48.80829   -0.80829  8.90097e-03  1.00000  1.68096
+2    0.02  1.00000  721  13  41.80829   -1.80829  1.80867e-02  1.00000  1.04557
+3    0.05  1.00000  718  38  16.80829    1.19171  4.97391e-02  0.99834 -0.36332
+4    0.10  1.00000  721  53   1.80829   -1.80829  6.81412e-02  1.00000 -1.58676
 5    0.20      NaN  NaN NaN       NaN        NaN          NaN      NaN      NaN
 6    0.30      NaN  NaN NaN       NaN        NaN          NaN      NaN      NaN
 7    0.40      NaN  NaN NaN       NaN        NaN          NaN      NaN      NaN
@@ -291,11 +291,11 @@ pyprophet test_data_2.txt test_data_3.txt --random_seed=42
  finished cross evals
 
  data set contains 387 decoy and 387 target transition groups
- mean m_score = 6.086655e-02, std_dev m_score = 1.708347e-02
- mean s_value = 9.801130e-01, std_dev s_value = 1.124938e-01
+ mean m_score = 6.130686e-02, std_dev m_score = 1.658475e-02
+ mean s_value = 9.800913e-01, std_dev s_value = 1.125709e-01
  data set contains 387 decoy and 387 target transition groups
- mean m_score = 6.086655e-02, std_dev m_score = 1.708347e-02
- mean s_value = 9.801130e-01, std_dev s_value = 1.124938e-01
+ mean m_score = 6.130686e-02, std_dev m_score = 1.658475e-02
+ mean s_value = 9.800913e-01, std_dev s_value = 1.125709e-01
  calculated scoring and statistics
  processing input data finished
 
@@ -316,7 +316,7 @@ used parameters:
     num_processes                              : 1
     out_of_core                                : 0
     out_of_core.sampling_rate                  : 0.1
-    random_seed                                : '42'
+    random_seed                                : 42
     semi_supervised_learner.initial_fdr        : 0.15
     semi_supervised_learner.initial_lambda     : 0.4
     semi_supervised_learner.iteration_fdr      : 0.02
@@ -332,11 +332,11 @@ used parameters:
 ==================================================================================================
 
    qvalue   svalue   TP  FP        TN         FN          FDR     sens   cutoff
-0    0.00  0.00223    2   0  56.14508  715.85492  1.21819e-11  0.00279  7.25959
-1    0.01  1.00000  721   7  49.14508   -3.14508  9.28886e-03  1.00000  1.49107
-2    0.02  1.00000  723  13  43.14508   -5.14508  1.82423e-02  1.00000  0.90848
-3    0.05  1.00000  720  38  18.14508   -2.14508  4.94820e-02  1.00000 -0.50789
-4    0.10  1.00000  721  53   3.14508   -3.14508  6.80027e-02  1.00000 -1.44424
+0    0.00  0.00223    2   0  54.80829  717.19171  2.45045e-12  0.00278  7.22939
+1    0.01  1.00000  720   6  48.80829   -0.80829  8.90097e-03  1.00000  1.68096
+2    0.02  1.00000  721  13  41.80829   -1.80829  1.80867e-02  1.00000  1.04557
+3    0.05  1.00000  718  38  16.80829    1.19171  4.97391e-02  0.99834 -0.36332
+4    0.10  1.00000  721  53   1.80829   -1.80829  6.81412e-02  1.00000 -1.58676
 5    0.20      NaN  NaN NaN       NaN        NaN          NaN      NaN      NaN
 6    0.30      NaN  NaN NaN       NaN        NaN          NaN      NaN      NaN
 7    0.40      NaN  NaN NaN       NaN        NaN          NaN      NaN      NaN
@@ -417,11 +417,11 @@ pyprophet test_data_2.txt test_data_3.txt --random_seed=42 --multiple_files.merg
  finished cross evals
 
  data set contains 387 decoy and 387 target transition groups
- mean m_score = 6.086655e-02, std_dev m_score = 1.708347e-02
- mean s_value = 9.801130e-01, std_dev s_value = 1.124938e-01
+ mean m_score = 6.130686e-02, std_dev m_score = 1.658475e-02
+ mean s_value = 9.800913e-01, std_dev s_value = 1.125709e-01
  data set contains 387 decoy and 387 target transition groups
- mean m_score = 6.086655e-02, std_dev m_score = 1.708347e-02
- mean s_value = 9.801130e-01, std_dev s_value = 1.124938e-01
+ mean m_score = 6.130686e-02, std_dev m_score = 1.658475e-02
+ mean s_value = 9.800913e-01, std_dev s_value = 1.125709e-01
  calculated scoring and statistics
  processing input data finished
 
@@ -442,7 +442,7 @@ used parameters:
     num_processes                              : 1
     out_of_core                                : 0
     out_of_core.sampling_rate                  : 0.1
-    random_seed                                : '42'
+    random_seed                                : 42
     semi_supervised_learner.initial_fdr        : 0.15
     semi_supervised_learner.initial_lambda     : 0.4
     semi_supervised_learner.iteration_fdr      : 0.02
@@ -458,11 +458,11 @@ used parameters:
 ==================================================================================================
 
    qvalue   svalue   TP  FP        TN         FN          FDR     sens   cutoff
-0    0.00  0.00223    2   0  56.14508  715.85492  1.21819e-11  0.00279  7.25959
-1    0.01  1.00000  721   7  49.14508   -3.14508  9.28886e-03  1.00000  1.49107
-2    0.02  1.00000  723  13  43.14508   -5.14508  1.82423e-02  1.00000  0.90848
-3    0.05  1.00000  720  38  18.14508   -2.14508  4.94820e-02  1.00000 -0.50789
-4    0.10  1.00000  721  53   3.14508   -3.14508  6.80027e-02  1.00000 -1.44424
+0    0.00  0.00223    2   0  54.80829  717.19171  2.45045e-12  0.00278  7.22939
+1    0.01  1.00000  720   6  48.80829   -0.80829  8.90097e-03  1.00000  1.68096
+2    0.02  1.00000  721  13  41.80829   -1.80829  1.80867e-02  1.00000  1.04557
+3    0.05  1.00000  718  38  16.80829    1.19171  4.97391e-02  0.99834 -0.36332
+4    0.10  1.00000  721  53   1.80829   -1.80829  6.81412e-02  1.00000 -1.58676
 5    0.20      NaN  NaN NaN       NaN        NaN          NaN      NaN      NaN
 6    0.30      NaN  NaN NaN       NaN        NaN          NaN      NaN      NaN
 7    0.40      NaN  NaN NaN       NaN        NaN          NaN      NaN      NaN
@@ -516,7 +516,7 @@ pyprophet test_data_2.txt test_data_3.txt --out_of_core --out_of_core.sampling_r
  data set contains 386 decoy and 386 target transition groups
  data set contains 386 decoy and 386 target transition groups
  summary input file:
-    18264 lines
+    18298 lines
     772 transition groups
     17 scores including main score
  learn and apply scorer
@@ -536,11 +536,11 @@ pyprophet test_data_2.txt test_data_3.txt --out_of_core --out_of_core.sampling_r
  calculated scoring and statistics
  processing input data finished
  data set contains 387 decoy and 387 target transition groups
- mean m_score = 5.861929e-02, std_dev m_score = 1.626129e-02
- mean s_value = 9.800496e-01, std_dev s_value = 1.127038e-01
+ mean m_score = 6.906196e-02, std_dev m_score = 1.912728e-02
+ mean s_value = 9.800764e-01, std_dev s_value = 1.123042e-01
  data set contains 387 decoy and 387 target transition groups
- mean m_score = 5.861929e-02, std_dev m_score = 1.626129e-02
- mean s_value = 9.800496e-01, std_dev s_value = 1.127038e-01
+ mean m_score = 6.906196e-02, std_dev m_score = 1.912728e-02
+ mean s_value = 9.800764e-01, std_dev s_value = 1.123042e-01
 
 used parameters:
 
@@ -559,7 +559,7 @@ used parameters:
     num_processes                              : 1
     out_of_core                                : 1
     out_of_core.sampling_rate                  : 0.9999999
-    random_seed                                : '42'
+    random_seed                                : 42
     semi_supervised_learner.initial_fdr        : 0.15
     semi_supervised_learner.initial_lambda     : 0.4
     semi_supervised_learner.iteration_fdr      : 0.02
@@ -574,16 +574,16 @@ used parameters:
 
 ==================================================================================================
 
-   qvalue   svalue   TP  FP        TN         FN          FDR     sens   cutoff
-0    0.00  0.00223    2   0  50.93056  719.06944  3.55789e-11  0.00277  6.75029
-1    0.01  0.99929  721   7  43.93056    0.06944  9.91054e-03  0.99990  1.44447
-2    0.02  1.00000  723  15  35.93056   -1.93056  2.06446e-02  1.00000  0.79440
-3    0.05  1.00000  723  39  11.93056   -1.93056  5.11677e-02  1.00000 -0.48944
-4    0.10  1.00000  722  50   0.93056   -0.93056  6.53605e-02  1.00000 -2.37359
-5    0.20      NaN  NaN NaN       NaN        NaN          NaN      NaN      NaN
-6    0.30      NaN  NaN NaN       NaN        NaN          NaN      NaN      NaN
-7    0.40      NaN  NaN NaN       NaN        NaN          NaN      NaN      NaN
-8    0.50      NaN  NaN NaN       NaN        NaN          NaN      NaN      NaN
+   qvalue   svalue   TP  FP       TN        FN          FDR     sens   cutoff
+0    0.00  0.00226    2   0  60.3125  709.6875  7.42739e-12  0.00281  7.12670
+1    0.01  0.99981  711   7  53.3125    0.6875  9.14811e-03  0.99903  1.79147
+2    0.02  1.00000  717  15  45.3125   -5.3125  1.99606e-02  1.00000  1.19088
+3    0.05  1.00000  710  38  22.3125    1.6875  5.01869e-02  0.99763  0.05112
+4    0.10  1.00000  712  60   0.3125   -0.3125  7.78307e-02  1.00000 -2.11367
+5    0.20      NaN  NaN NaN      NaN       NaN          NaN      NaN      NaN
+6    0.30      NaN  NaN NaN      NaN       NaN          NaN      NaN      NaN
+7    0.40      NaN  NaN NaN      NaN       NaN          NaN      NaN      NaN
+8    0.50      NaN  NaN NaN      NaN       NaN          NaN      NaN      NaN
 
 ==================================================================================================
 
@@ -615,11 +615,11 @@ the next three should be identical:
 test_data__summary_stat.csv contains 10 lines
 
 qvalue	svalue	TP	FP	TN	FN	FDR	sens	cutoff
-0.0	0.00223463687148	2.0	0.0	56.14507772 ... 819221377e-11	0.00278607827003	7.25958514002
-0.01	1.0	721.0	7.0	49.1450777202	-3.1450 ... 14507772021	0.009288859498	1.0	1.49106764047
-0.02	1.0	723.0	13.0	43.1450777202	-5.145 ... 507772021	0.0182423170183	1.0	0.908475566869
-0.05	1.0	720.0	38.0	18.1450777202	-2.145 ... 07772021	0.0494819599035	1.0	-0.507893711624
-0.1	1.0	721.0	53.0	3.14507772021	-3.1450 ... 4507772021	0.0680026860408	1.0	-1.4442357783
+0.0	0.00223048327137	2.0	0.0	54.80829015 ... 044725252e-12	0.00278089968589	7.22938502423
+0.01	1.0	720.0	6.0	48.8082901554	-0.8082 ... 829015544	0.00890097080153	1.0	1.68095623384
+0.02	1.0	721.0	13.0	41.8082901554	-1.808 ... 80829015544	0.018086709442	1.0	1.04557192158
+0.05	1.0	718.0	38.0	16.8082901554	1.1917 ... 0497391171043	0.998342987234	-0.363324456939
+0.1	1.0	721.0	53.0	1.80829015544	-1.8082 ... 829015544	0.0681412220243	1.0	-1.58676240825
 0.2
 0.3
 0.4
@@ -628,11 +628,11 @@ qvalue	svalue	TP	FP	TN	FN	FDR	sens	cutoff
 test_data__summary_stat.csv contains 10 lines
 
 qvalue	svalue	TP	FP	TN	FN	FDR	sens	cutoff
-0.0	0.00223463687148	2.0	0.0	56.14507772 ... 819221377e-11	0.00278607827003	7.25958514002
-0.01	1.0	721.0	7.0	49.1450777202	-3.1450 ... 14507772021	0.009288859498	1.0	1.49106764047
-0.02	1.0	723.0	13.0	43.1450777202	-5.145 ... 507772021	0.0182423170183	1.0	0.908475566869
-0.05	1.0	720.0	38.0	18.1450777202	-2.145 ... 07772021	0.0494819599035	1.0	-0.507893711624
-0.1	1.0	721.0	53.0	3.14507772021	-3.1450 ... 4507772021	0.0680026860408	1.0	-1.4442357783
+0.0	0.00223048327137	2.0	0.0	54.80829015 ... 044725252e-12	0.00278089968589	7.22938502423
+0.01	1.0	720.0	6.0	48.8082901554	-0.8082 ... 829015544	0.00890097080153	1.0	1.68095623384
+0.02	1.0	721.0	13.0	41.8082901554	-1.808 ... 80829015544	0.018086709442	1.0	1.04557192158
+0.05	1.0	718.0	38.0	16.8082901554	1.1917 ... 0497391171043	0.998342987234	-0.363324456939
+0.1	1.0	721.0	53.0	1.80829015544	-1.8082 ... 829015544	0.0681412220243	1.0	-1.58676240825
 0.2
 0.3
 0.4
@@ -641,11 +641,11 @@ qvalue	svalue	TP	FP	TN	FN	FDR	sens	cutoff
 test_data__summary_stat.csv contains 10 lines
 
 qvalue	svalue	TP	FP	TN	FN	FDR	sens	cutoff
-0.0	0.00223463687148	2.0	0.0	56.14507772 ... 819221377e-11	0.00278607827003	7.25958514002
-0.01	1.0	721.0	7.0	49.1450777202	-3.1450 ... 14507772021	0.009288859498	1.0	1.49106764047
-0.02	1.0	723.0	13.0	43.1450777202	-5.145 ... 507772021	0.0182423170183	1.0	0.908475566869
-0.05	1.0	720.0	38.0	18.1450777202	-2.145 ... 07772021	0.0494819599035	1.0	-0.507893711624
-0.1	1.0	721.0	53.0	3.14507772021	-3.1450 ... 4507772021	0.0680026860408	1.0	-1.4442357783
+0.0	0.00223048327137	2.0	0.0	54.80829015 ... 044725252e-12	0.00278089968589	7.22938502423
+0.01	1.0	720.0	6.0	48.8082901554	-0.8082 ... 829015544	0.00890097080153	1.0	1.68095623384
+0.02	1.0	721.0	13.0	41.8082901554	-1.808 ... 80829015544	0.018086709442	1.0	1.04557192158
+0.05	1.0	718.0	38.0	16.8082901554	1.1917 ... 0497391171043	0.998342987234	-0.363324456939
+0.1	1.0	721.0	53.0	1.80829015544	-1.8082 ... 829015544	0.0681412220243	1.0	-1.58676240825
 0.2
 0.3
 0.4
@@ -656,11 +656,11 @@ this might be different:
 test_data__summary_stat.csv contains 10 lines
 
 qvalue	svalue	TP	FP	TN	FN	FDR	sens	cutoff
-0.0	0.0022304832713	2.0	0.0	50.930555555 ... 789471958e-11	0.00277365795404	6.75028511032
-0.01	0.999291039279	721.0	7.0	43.9305555 ... .00991053566813	0.999903692432	1.44447105906
-0.02	1.0	723.0	15.0	35.9305555556	-1.930 ... 055555556	0.0206446439932	1.0	0.794396840435
-0.05	1.0	723.0	39.0	11.9305555556	-1.930 ... 55555556	0.0511677245863	1.0	-0.489440216238
-0.1	1.0	722.0	50.0	0.930555555556	-0.930 ... 0555555556	0.0653605155531	1.0	-2.3735948046
+0.0	0.00225988700563	2.0	0.0	60.3125	709 ... 739203474e-12	0.00281022218319	7.12669646824
+0.01	0.999808739551	711.0	7.0	53.3125	0. ... 	0.0091481136589	0.999033986125	1.7914662404
+0.02	1.0	717.0	15.0	45.3125	-5.3125	0.0199605630374	1.0	1.19088459027
+0.05	1.0	710.0	38.0	22.3125	1.6875	0.050 ... 0501869049046	0.997628875033	0.0511199377948
+0.1	1.0	712.0	60.0	0.3125	-0.3125	0.0778307487404	1.0	-2.11367472734
 0.2
 0.3
 0.4
