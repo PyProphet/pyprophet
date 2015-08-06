@@ -138,6 +138,10 @@ class Scorer(object):
         if CONFIG.get("compute.probabilities"):
             df = self.add_probabilities(df, texp)
 
+        if CONFIG.get("target.compress_results"):
+            to_drop = [n for n in df.columns if n.startswith("var_") or n.startswith("main_")]
+            df.drop(to_drop, axis=1, inplace=True)
+
         return df
 
     def add_probabilities(self, scored_table, texp):

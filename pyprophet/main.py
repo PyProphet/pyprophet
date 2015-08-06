@@ -132,6 +132,8 @@ class PyProphetRunner(object):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             (result, scorer, weights) = self.run_algo()
+
+        compress = CONFIG.get("target.compress_results")
         needed = time.time() - start_at
 
         set_pandas_print_options()
@@ -174,7 +176,6 @@ class PyProphetRunner(object):
             print "WRITTEN: ", full_stat_path
 
         for scored_table, out_path in zip(result.scored_tables, out_pathes):
-
 
             cutoff = CONFIG.get("d_score.cutoff")
             scored_table.to_csv(out_path.scored_table, out_path.filtered_table, cutoff, sep=self.delim_out, index=False)

@@ -54,6 +54,8 @@ def _standard_config(n_cpus=1):
     config["target.dir"] = None
     config["target.prefix"] = None
     config["target.overwrite"] = 0
+    config["target.compress_results"] = 0
+    info["target.compress_results"] = """[remove var_ and main_ columns in output files]"""
 
     config["ignore.invalid_score_columns"] = False
     info["ignore.invalid_score_columns"] =\
@@ -91,6 +93,7 @@ def _fix_config_types(dd):
               "target.overwrite",
               "out_of_core",
               "num_processes",
+              "target.compress_results",
               ]:
         dd[k] = int(dd[k])
 

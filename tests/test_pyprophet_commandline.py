@@ -63,19 +63,19 @@ def _dump(full_path, regtest):
     if len(lines) > 10:
         print >> regtest, "top 5 lines of", f
         for line in lines[:5]:
-            if len(line) > 80:
-                line = line[:40] + " ... " + line[-45:]
+            if len(line) > 200:
+                line = line[:100] + " ... " + line[-95:]
             print >> regtest, line.rstrip()
         print >> regtest
         print >> regtest, "last 5 lines of", f
         for line in lines[-5:]:
-            if len(line) > 80:
-                line = line[:40] + " ... " + line[-45:]
+            if len(line) > 200:
+                line = line[:100] + " ... " + line[-95:]
             print >> regtest, line.rstrip()
     else:
         for line in lines:
-            if len(line) > 80:
-                line = line[:40] + " ... " + line[-45:]
+            if len(line) > 200:
+                line = line[:100] + " ... " + line[-95:]
             print >> regtest, line.rstrip()
 
 
@@ -106,14 +106,21 @@ def _run_cmdline(cmdline):
     return stdout
 
 
-def _run_pyprophet_to_learn_model(regtest, temp_folder, dump_result_files=False, with_probatilities=False):
+def _run_pyprophet_to_learn_model(regtest, temp_folder, dump_result_files=False,
+        with_probatilities=False, compress=False, sampling_rate=None):
     os.chdir(temp_folder)
     data_path = os.path.join(__here__, "test_data.txt")
     shutil.copy(data_path, temp_folder)
+    cmdline = "pyprophet test_data.txt --random_seed=42"
     if with_probatilities:
-        stdout = _run_cmdline("pyprophet test_data.txt --random_seed=42 --compute.probabilities")
-    else:
-        stdout = _run_cmdline("pyprophet test_data.txt --random_seed=42")
+        cmdline += " --compute.probabilities"
+    if compress:
+        cmdline += " --target.compress_results"
+    if sampling_rate is not None:
+        cmdline += " --out_of_core --out_of_core.sampling_rate=%f" % sampling_rate
+    print >> regtest, temp_folder + "/" + cmdline
+    stdout = _run_cmdline(cmdline)
+
     for f in _expected_output_files():
         full_path = os.path.join(temp_folder, f)
         assert os.path.exists(full_path)
@@ -135,6 +142,14 @@ def test_0(tmpdir, regtest):
 
 def test_1(tmpdir, regtest):
     stdout = _run_pyprophet_to_learn_model(regtest, tmpdir.strpath, True, True)
+    _record(stdout, regtest)
+
+
+def test_2(tmpdir, regtest):
+    stdout = _run_pyprophet_to_learn_model(regtest, tmpdir.strpath, True, True, True)
+    _record(stdout, regtest)
+
+    stdout = _run_pyprophet_to_learn_model(regtest, tmpdir.strpath, True, True, True, 1.0)
     _record(stdout, regtest)
 
 
