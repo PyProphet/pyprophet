@@ -1,3 +1,4 @@
+import pdb
 # encoding: latin-1
 
 # openblas + multiprocessing crashes for OPENBLAS_NUM_THREADS > 1 !!!
@@ -56,6 +57,9 @@ def prepare_data_table(table, tg_id_name="transition_group_id",
                        main_score_name=None,
                        score_columns=None,
                        ):
+    N = len(table)
+    if not N:
+        raise Exception("got empty input file")
     header = table.columns.values
     if score_columns is not None:
         missing = set(score_columns) - set(header)
@@ -93,8 +97,6 @@ def prepare_data_table(table, tg_id_name="transition_group_id",
             raise Exception("no column with name var_* in table(s)")
 
     # collect needed data:
-
-    N = len(table)
     empty_col = [0] * N
     empty_none_col = [None] * N
 
@@ -178,15 +180,23 @@ def prepare_data_tables(tables, tg_id_name="transition_group_id",
 
 def sample_data_tables(pathes, delim,  sampling_rate=0.1, tg_id_name="transition_group_id",
                        decoy_name="decoy"):
-    tg_ids = set()
+    tg_target_ids = set()
+    tg_decoy_ids = set()
     for path in pathes:
         for chunk in pd.read_csv(path, delim, iterator=True, chunksize=100000,
                                  usecols=[tg_id_name, decoy_name]):
             ids = chunk[chunk[decoy_name].eq(False)][tg_id_name].values
-            tg_ids.update(ids)
+            tg_target_ids.update(ids)
+            ids = chunk[chunk[decoy_name].eq(True)][tg_id_name].values
+            # remove "DECOY_" in the beginnings:
+            ids = [id_.partition("DECOY_")[2] for id_ in ids]
+            tg_decoy_ids.update(ids)
+
+    tg_ids = tg_target_ids.intersection(tg_decoy_ids)
+    if not len(tg_ids):
+        raise Exception("did not find an intersection of target and decoy ids")
 
     # subsample from targets
-    print(tg_ids)
     if sampling_rate < 1.0:
         tg_ids = random.sample(tg_ids, int(sampling_rate * len(tg_ids)))
     else:
