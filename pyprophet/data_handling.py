@@ -186,6 +186,7 @@ def sample_data_tables(pathes, delim,  sampling_rate=0.1, tg_id_name="transition
             tg_ids.update(ids)
 
     # subsample from targets
+    print(tg_ids)
     if sampling_rate < 1.0:
         tg_ids = random.sample(tg_ids, int(sampling_rate * len(tg_ids)))
     else:
