@@ -1,7 +1,6 @@
 # encoding: latin-1
 
 from __future__ import division
-import pdb
 
 # openblas + multiprocessing crashes for OPENBLAS_NUM_THREADS > 1 !!!
 import os
@@ -381,7 +380,6 @@ def find_cutoff(target_scores, decoy_scores, lambda_, fdr):
 
     error_stat = get_error_stat_from_null(target_scores, decoy_scores, lambda_)
     if not len(error_stat.df):
-        pdb.set_trace()  ############################## Breakpoint  ##############################
         raise Exception("to little data for calculating error statistcs")
     i0 = (error_stat.df.qvalue - fdr).abs().argmin()
     cutoff = error_stat.df.iloc[i0]["cutoff"]

@@ -28,6 +28,22 @@ last 5 lines of test_data_full_stat.csv
 2.48837987253e-12	0.00223048327137	1.0	0 ... 837987253e-12	0.00278089968589	7.47139836025
 2.48837987253e-12	0.00223048327137	1.0	0 ... 837987253e-12	0.00278089968589	7.66522800585
 
+test_data_report.pdf contains 544 lines
+
+top 5 lines of test_data_report.pdf
+%PDF-1.4
+%¬Ü «º
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+
+last 5 lines of test_data_report.pdf
+trailer
+<< /Info 65 0 R /Root 1 0 R /Size 66 >>
+startxref
+25598
+%%EOF
+
 test_data_cutoffs.txt contains 1 lines
 
 -2.026254e+00 -1.832425e+00 -1.638595e+0 ... 39e+00 7.277569e+00 7.471398e+00 7.665228e+00

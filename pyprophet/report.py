@@ -29,15 +29,6 @@ def save_report(report_path, prefix, scored_table, final_stat):
 
     decoys, targets, top_decoys, top_targets = scored_table.scores()
 
-    #decoys = scored_table[scored_table["decoy"] == 1]["d_score"].values
-    #targets = scored_table[scored_table["decoy"] == 0]["d_score"].values
-
-    #tops = scored_table[scored_table["peak_group_rank"] == 1]
-    #top_decoys = tops[tops["decoy"] == 1]["d_score"].values
-    #top_target = tops[tops["decoy"] == 0]["d_score"].values
-
-    # thanks to lorenz blum for the plotting code below:
-
     plt.figure(figsize=(10, 20))
     plt.subplots_adjust(hspace=.5)
 

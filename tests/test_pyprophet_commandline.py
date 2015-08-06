@@ -20,60 +20,41 @@ def _record(stdout, regtest):
         print >> regtest, line
 
 
-def _run_cmdline(cmdline):
-    stdout = cmdline + "\n"
+def _expected_output_files():
+    return ["test_data_summary_stat.csv",
+            "test_data_full_stat.csv",
+            "test_data_report.pdf",
+            "test_data_cutoffs.txt",
+            "test_data_svalues.txt",
+            "test_data_qvalues.txt",
+            "test_data_dscores_top_target_peaks.txt",
+            "test_data_dscores_top_decoy_peaks.txt",
+            "test_data_with_dscore.csv",
+            "test_data_with_dscore_filtered.csv",
+            ]
+
+
+def _remove_output_files(tmpdir, names=None):
+    if names is None:
+        names = _expected_output_files()
+    for name in names:
+        full_path = os.path.join(tmpdir.strpath, name)
+        os.remove(full_path)
+
+
+def _dump_output_files(tmpdir, regtest, names=None):
     try:
-        stdout += subprocess.check_output(cmdline, shell=True,
-                                          stderr=subprocess.STDOUT)
-    except subprocess.CalledProcessError, e:
-        print >> sys.stderr, e.output
-        raise
-    return stdout
+        tmpdir = tmpdir.strpath
+    except:
+        pass
+    if names is None:
+        names = _expected_output_files()
+    for name in names:
+        full_path = os.path.join(tmpdir, name)
+        _dump(full_path, regtest)
 
 
-def _run_pyprophet_to_learn_model(regtest, temp_folder, dump_result_files=False, with_probatilities=False):
-    os.chdir(temp_folder)
-    data_path = os.path.join(__here__, "test_data.txt")
-    shutil.copy(data_path, temp_folder)
-    if with_probatilities:
-        stdout = _run_cmdline("pyprophet test_data.txt --random_seed=42 --compute.probabilities")
-    else:
-        stdout = _run_cmdline("pyprophet test_data.txt --random_seed=42")
-    for f in ["test_data_summary_stat.csv", "test_data_full_stat.csv", "test_data_report.pdf",
-              "test_data_scorer.bin",
-              "test_data_cutoffs.txt",
-              "test_data_svalues.txt",
-              "test_data_qvalues.txt",
-              "test_data_with_dscore.csv",
-              "test_data_with_dscore_filtered.csv",
-              "test_data_dscores_top_target_peaks.txt",
-              "test_data_dscores_top_decoy_peaks.txt",
-              ]:
-        full_path = os.path.join(temp_folder, f)
-        assert os.path.exists(full_path)
-
-    if not dump_result_files:
-        return stdout
-
-    for f in ["test_data_summary_stat.csv", "test_data_full_stat.csv",
-              "test_data_cutoffs.txt",
-              "test_data_svalues.txt",
-              "test_data_qvalues.txt",
-              "test_data_dscores_top_target_peaks.txt",
-              "test_data_dscores_top_decoy_peaks.txt",
-              "test_data_with_dscore.csv",
-              "test_data_with_dscore_filtered.csv",
-              ]:
-        full_path = os.path.join(temp_folder, f)
-        dump(full_path, regtest)
-
-    full_path = os.path.join(temp_folder, "test_data_scorer.bin")
-    print >> regtest, "hex digtest pickled classifier:", dump_digest(full_path)
-
-    return stdout
-
-
-def dump(full_path, regtest):
+def _dump(full_path, regtest):
     lines = open(full_path, "r").readlines()
     f = os.path.basename(full_path)
     print >> regtest
@@ -98,6 +79,54 @@ def dump(full_path, regtest):
             print >> regtest, line.rstrip()
 
 
+def _dump_digest(full_path):
+    """first try: load the pickle as string and compute hexdigests
+       --> does not work. cPickle creates slight differences because of memoizing the
+           elements of the score_columns attribute of the scorer !
+       what works: load pickle and recreate scorer, the _dump (with a "fresh" cPickle, so
+       no memoizing) to string than compute hexdigtest
+    """
+    import hashlib
+    import cPickle
+    import zlib
+    obj = cPickle.loads(zlib.decompress(open(full_path, "rb").read()))
+    h = hashlib.sha1()
+    h.update(cPickle.dumps(obj))
+    return h.hexdigest()
+
+
+def _run_cmdline(cmdline):
+    stdout = cmdline + "\n"
+    try:
+        stdout += subprocess.check_output(cmdline, shell=True,
+                                          stderr=subprocess.STDOUT)
+    except subprocess.CalledProcessError, e:
+        print >> sys.stderr, e.output
+        raise
+    return stdout
+
+
+def _run_pyprophet_to_learn_model(regtest, temp_folder, dump_result_files=False, with_probatilities=False):
+    os.chdir(temp_folder)
+    data_path = os.path.join(__here__, "test_data.txt")
+    shutil.copy(data_path, temp_folder)
+    if with_probatilities:
+        stdout = _run_cmdline("pyprophet test_data.txt --random_seed=42 --compute.probabilities")
+    else:
+        stdout = _run_cmdline("pyprophet test_data.txt --random_seed=42")
+    for f in _expected_output_files():
+        full_path = os.path.join(temp_folder, f)
+        assert os.path.exists(full_path)
+
+    if not dump_result_files:
+        return stdout
+
+    _dump_output_files(temp_folder, regtest)
+
+    full_path = os.path.join(temp_folder, "test_data_scorer.bin")
+    print >> regtest, "hex digtest pickled classifier:", _dump_digest(full_path)
+    return stdout
+
 
 def test_0(tmpdir, regtest):
     stdout = _run_pyprophet_to_learn_model(regtest, tmpdir.strpath, True, False)
@@ -116,10 +145,10 @@ def test_apply_classifier(tmpdir, regtest):
     _record(stdout, regtest)
 
     full_path = os.path.join(tmpdir.strpath, "test_data_with_dscore.csv")
-    dump(full_path, regtest)
+    _dump(full_path, regtest)
 
     full_path = os.path.join(tmpdir.strpath, "test_data_with_dscore_filtered.csv")
-    dump(full_path, regtest)
+    _dump(full_path, regtest)
 
     # collect m score stats
     m_score_stat, = [l for l in stdout.split("\n") if "mean m_score" in l]
@@ -159,20 +188,7 @@ def test_apply_weights(tmpdir, regtest):
 
     stdout = _run_pyprophet_to_learn_model(regtest, tmpdir.strpath, True)
     _record(stdout, regtest)
-
-    for name in ["test_data_summary_stat.csv",
-                 "test_data_full_stat.csv",
-                 "test_data_report.pdf",
-                 "test_data_cutoffs.txt",
-                 "test_data_svalues.txt",
-                 "test_data_qvalues.txt",
-                 "test_data_dscores_top_target_peaks.txt",
-                 "test_data_dscores_top_decoy_peaks.txt",
-                 "test_data_with_dscore.csv",
-                 "test_data_with_dscore_filtered.csv", ]:
-
-        full_path = os.path.join(tmpdir.strpath, name)
-        os.remove(full_path)
+    _remove_output_files(tmpdir)
 
     """
     the outputs of the previous run and the next run are sligthly different. during learning
@@ -185,45 +201,20 @@ def test_apply_weights(tmpdir, regtest):
                           "--target.overwrite --random_seed=42")
 
     _record(stdout, regtest)
-
-    for name in ["test_data_summary_stat.csv",
-                 "test_data_full_stat.csv",
-                 "test_data_report.pdf",
-                 "test_data_cutoffs.txt",
-                 "test_data_svalues.txt",
-                 "test_data_qvalues.txt",
-                 "test_data_dscores_top_target_peaks.txt",
-                 "test_data_dscores_top_decoy_peaks.txt",
-                 "test_data_with_dscore.csv",
-                 "test_data_with_dscore_filtered.csv", ]:
-
-        full_path = os.path.join(tmpdir.strpath, name)
-        dump(full_path, regtest)
+    _dump_output_files(tmpdir, regtest)
+    _remove_output_files(tmpdir)
 
     full_path = os.path.join(tmpdir.strpath, "test_data_scorer.bin")
-    d_in_core = dump_digest(full_path)
+    d_in_core = _dump_digest(full_path)
 
     stdout = _run_cmdline("pyprophet test_data.txt --out_of_core --apply_weights=test_data_weights.txt "
                           "--target.overwrite --random_seed=42 --out_of_core.sampling_rate=1.0")
 
     _record(stdout, regtest)
-
-    for name in ["test_data_summary_stat.csv",
-                 "test_data_full_stat.csv",
-                 "test_data_report.pdf",
-                 "test_data_cutoffs.txt",
-                 "test_data_svalues.txt",
-                 "test_data_qvalues.txt",
-                 "test_data_dscores_top_target_peaks.txt",
-                 "test_data_dscores_top_decoy_peaks.txt",
-                 "test_data_with_dscore.csv",
-                 "test_data_with_dscore_filtered.csv", ]:
-
-        full_path = os.path.join(tmpdir.strpath, name)
-        dump(full_path, regtest)
+    _dump_output_files(tmpdir, regtest)
 
     full_path = os.path.join(tmpdir.strpath, "test_data_scorer.bin")
-    d_out_of_core = dump_digest(full_path)
+    d_out_of_core = _dump_digest(full_path)
 
     assert d_in_core == d_out_of_core
 
@@ -231,21 +222,7 @@ def test_apply_weights(tmpdir, regtest):
 def test_apply_scorer(tmpdir, regtest):
 
     stdout = _run_pyprophet_to_learn_model(regtest, tmpdir.strpath, True)
-    # _record(stdout, regtest)
-
-    for name in ["test_data_summary_stat.csv",
-                 "test_data_full_stat.csv",
-                 "test_data_report.pdf",
-                 "test_data_cutoffs.txt",
-                 "test_data_svalues.txt",
-                 "test_data_qvalues.txt",
-                 "test_data_dscores_top_target_peaks.txt",
-                 "test_data_dscores_top_decoy_peaks.txt",
-                 "test_data_with_dscore.csv",
-                 "test_data_with_dscore_filtered.csv", ]:
-
-        full_path = os.path.join(tmpdir.strpath, name)
-        os.remove(full_path)
+    _remove_output_files(tmpdir)
 
     """TODO: run both with multiple files and / or merge results, same for apply weights !
     """
@@ -255,45 +232,17 @@ def test_apply_scorer(tmpdir, regtest):
 
     _record(stdout, regtest)
 
-    for name in ["test_data_with_dscore.csv",
-                 "test_data_with_dscore_filtered.csv", ]:
+    output_files = ["test_data_with_dscore.csv", "test_data_with_dscore_filtered.csv", ]
+    _dump_output_files(tmpdir, regtest, names=output_files)
+    _remove_output_files(tmpdir, names=output_files)
 
-        full_path = os.path.join(tmpdir.strpath, name)
-        dump(full_path, regtest)
-
-        # cleanup
-        os.remove(full_path)
-
+    # using out of core makes no difference:
     stdout = _run_cmdline("pyprophet test_data.txt --out_of_core "
                           "--apply_scorer=test_data_scorer.bin "
                           "--target.overwrite --random_seed=42")
 
     _record(stdout, regtest)
-
-    for name in ["test_data_with_dscore.csv",
-                 "test_data_with_dscore_filtered.csv", ]:
-
-        full_path = os.path.join(tmpdir.strpath, name)
-        dump(full_path, regtest)
-
-
-def dump_digest(full_path):
-    """first try: load the pickle as string and compute hexdigests
-       --> does not work. cPickle creates slight differences because of memoizing the
-           elements of the score_columns attribute of the scorer !
-       what works: load pickle and recreate scorer, the dump (with a "fresh" cPickle, so
-       no memoizing) to string than compute hexdigtest
-    """
-    import hashlib
-    import cPickle
-    import zlib
-    obj = cPickle.loads(zlib.decompress(open(full_path, "rb").read()))
-    h = hashlib.sha1()
-    h.update(cPickle.dumps(obj))
-    # print >> regtest
-    # print >> regtest, "digest", name, ":", h.hexdigest()
-    return h.hexdigest()
-
+    _dump_output_files(tmpdir, regtest, names=output_files)
 
 
 def test_multiple_input_files(tmpdir, regtest):
@@ -365,15 +314,15 @@ def test_out_of_core_multi_input_files(tmpdir, regtest):
     print >> regtest
     print >> regtest, "the next three should be identical:"
     full_path = os.path.join(f1, "test_data__summary_stat.csv")
-    dump(full_path, regtest)
+    _dump(full_path, regtest)
     full_path = os.path.join(f1merge, "test_data__summary_stat.csv")
-    dump(full_path, regtest)
+    _dump(full_path, regtest)
     full_path = os.path.join(f2, "test_data__summary_stat.csv")
-    dump(full_path, regtest)
+    _dump(full_path, regtest)
     print >> regtest
     print >> regtest, "this might be different:"
     full_path = os.path.join(f3, "test_data__summary_stat.csv")
-    dump(full_path, regtest)
+    _dump(full_path, regtest)
 
     compare_folders(f1, f2)
     compare_folders(f1merge, f2merge)

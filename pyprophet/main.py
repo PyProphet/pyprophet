@@ -261,8 +261,8 @@ class PyProphetWeightApplier(PyProphetRunner):
 
     def run_algo(self):
         (result, scorer, weights) = PyProphet().apply_weights(self.pathes, self.delim_in,
-                                                                      self.check_cols,
-                                                                      self.persisted_weights)
+                                                              self.check_cols,
+                                                              self.persisted_weights)
         return (result, scorer, weights)
 
     def extra_writes(self, dirname):
@@ -280,11 +280,11 @@ class PyProphetOutOfCoreWeightApplier(PyProphetWeightApplier):
         return (result, scorer, weights)
 
 
-class PyProphetScorerApplier(PyProphetRunner):
+class PyProphetOutOfCoreScorerApplier(PyProphetRunner):
 
     def __init__(self, pathes, prefix, merge_results, apply_scorer, delim_in, delim_out):
-        super(PyProphetScorerApplier, self).__init__(pathes, prefix, merge_results, delim_in,
-                                                     delim_out)
+        super(PyProphetOutOfCoreScorerApplier, self).__init__(pathes, prefix, merge_results, delim_in,
+                                                              delim_out)
         if not os.path.exists(apply_scorer):
             raise Exception("persisted scorer file %s does not exist" % apply_scorer)
         try:
@@ -296,9 +296,9 @@ class PyProphetScorerApplier(PyProphetRunner):
             raise
 
     def run_algo(self):
-        (result, scorer, weights) = PyProphet().apply_scorer(self.pathes, self.delim_in,
-                                                             self.check_cols,
-                                                             self.persisted_scorer)
+        (result, scorer, weights) = PyProphet().apply_scorer_out_of_core(self.pathes, self.delim_in,
+                                                                         self.check_cols,
+                                                                         self.persisted_scorer)
         return (result, scorer, weights)
 
     def extra_writes(self, dirname):
@@ -307,15 +307,6 @@ class PyProphetScorerApplier(PyProphetRunner):
         """
         return
         yield
-
-
-class PyProphetOutOfCoreScorerApplier(PyProphetScorerApplier):
-
-    def run_algo(self):
-        (result, scorer, weights) = PyProphet().apply_scorer_out_of_core(self.pathes, self.delim_in,
-                                                                         self.check_cols,
-                                                                         self.persisted_scorer)
-        return (result, scorer, weights)
 
 
 def _main(args):
@@ -356,11 +347,10 @@ def _main(args):
 
     else:
         if out_of_core:
-            PyProphetOutOfCoreScorerApplier(
-                pathes, prefix, merge_results, apply_scorer, delim_in, delim_out).run()
-        else:
-            PyProphetScorerApplier(
-                pathes, prefix, merge_results, apply_scorer, delim_in, delim_out).run()
+            logging.info("out_of_core setting ignored: this parameter has no influence for "
+                         "applying a persisted scorer")
+        PyProphetOutOfCoreScorerApplier(
+            pathes, prefix, merge_results, apply_scorer, delim_in, delim_out).run()
 
 
 def main():
