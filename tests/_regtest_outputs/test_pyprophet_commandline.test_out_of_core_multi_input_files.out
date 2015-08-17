@@ -21,6 +21,9 @@ pyprophet test_data_2.txt test_data_3.txt --out_of_core --out_of_core.sampling_r
      semi_supervised_learner.iteration_fdr: 0.02
      semi_supervised_learner.iteration_lambda: 0.4
      semi_supervised_learner.num_iter: 5
+     semi_supervised_learner.stat_best: 0
+     semi_supervised_learner.use_best: 0
+     target.compress_results: 0
      target.dir: None
      target.overwrite: 0
      target.prefix: None
@@ -79,6 +82,9 @@ used parameters:
     semi_supervised_learner.iteration_fdr      : 0.02
     semi_supervised_learner.iteration_lambda   : 0.4
     semi_supervised_learner.num_iter           : 5
+    semi_supervised_learner.stat_best          : 0
+    semi_supervised_learner.use_best           : 0
+    target.compress_results                    : 0
     target.dir                                 : None
     target.overwrite                           : 0
     target.prefix                              : None
@@ -146,6 +152,9 @@ pyprophet test_data_2.txt test_data_3.txt --out_of_core --out_of_core.sampling_r
      semi_supervised_learner.iteration_fdr: 0.02
      semi_supervised_learner.iteration_lambda: 0.4
      semi_supervised_learner.num_iter: 5
+     semi_supervised_learner.stat_best: 0
+     semi_supervised_learner.use_best: 0
+     target.compress_results: 0
      target.dir: None
      target.overwrite: 0
      target.prefix: None
@@ -204,6 +213,9 @@ used parameters:
     semi_supervised_learner.iteration_fdr      : 0.02
     semi_supervised_learner.iteration_lambda   : 0.4
     semi_supervised_learner.num_iter           : 5
+    semi_supervised_learner.stat_best          : 0
+    semi_supervised_learner.use_best           : 0
+    target.compress_results                    : 0
     target.dir                                 : None
     target.overwrite                           : 0
     target.prefix                              : None
@@ -263,6 +275,9 @@ pyprophet test_data_2.txt test_data_3.txt --random_seed=42
      semi_supervised_learner.iteration_fdr: 0.02
      semi_supervised_learner.iteration_lambda: 0.4
      semi_supervised_learner.num_iter: 5
+     semi_supervised_learner.stat_best: 0
+     semi_supervised_learner.use_best: 0
+     target.compress_results: 0
      target.dir: None
      target.overwrite: 0
      target.prefix: None
@@ -322,6 +337,9 @@ used parameters:
     semi_supervised_learner.iteration_fdr      : 0.02
     semi_supervised_learner.iteration_lambda   : 0.4
     semi_supervised_learner.num_iter           : 5
+    semi_supervised_learner.stat_best          : 0
+    semi_supervised_learner.use_best           : 0
+    target.compress_results                    : 0
     target.dir                                 : None
     target.overwrite                           : 0
     target.prefix                              : None
@@ -389,6 +407,9 @@ pyprophet test_data_2.txt test_data_3.txt --random_seed=42 --multiple_files.merg
      semi_supervised_learner.iteration_fdr: 0.02
      semi_supervised_learner.iteration_lambda: 0.4
      semi_supervised_learner.num_iter: 5
+     semi_supervised_learner.stat_best: 0
+     semi_supervised_learner.use_best: 0
+     target.compress_results: 0
      target.dir: None
      target.overwrite: 0
      target.prefix: None
@@ -448,6 +469,9 @@ used parameters:
     semi_supervised_learner.iteration_fdr      : 0.02
     semi_supervised_learner.iteration_lambda   : 0.4
     semi_supervised_learner.num_iter           : 5
+    semi_supervised_learner.stat_best          : 0
+    semi_supervised_learner.use_best           : 0
+    target.compress_results                    : 0
     target.dir                                 : None
     target.overwrite                           : 0
     target.prefix                              : None
@@ -507,6 +531,9 @@ pyprophet test_data_2.txt test_data_3.txt --out_of_core --out_of_core.sampling_r
      semi_supervised_learner.iteration_fdr: 0.02
      semi_supervised_learner.iteration_lambda: 0.4
      semi_supervised_learner.num_iter: 5
+     semi_supervised_learner.stat_best: 0
+     semi_supervised_learner.use_best: 0
+     target.compress_results: 0
      target.dir: None
      target.overwrite: 0
      target.prefix: None
@@ -565,6 +592,9 @@ used parameters:
     semi_supervised_learner.iteration_fdr      : 0.02
     semi_supervised_learner.iteration_lambda   : 0.4
     semi_supervised_learner.num_iter           : 5
+    semi_supervised_learner.stat_best          : 0
+    semi_supervised_learner.use_best           : 0
+    target.compress_results                    : 0
     target.dir                                 : None
     target.overwrite                           : 0
     target.prefix                              : None
@@ -615,11 +645,11 @@ the next three should be identical:
 test_data__summary_stat.csv contains 10 lines
 
 qvalue	svalue	TP	FP	TN	FN	FDR	sens	cutoff
-0.0	0.00223048327137	2.0	0.0	54.80829015 ... 044725252e-12	0.00278089968589	7.22938502423
-0.01	1.0	720.0	6.0	48.8082901554	-0.8082 ... 829015544	0.00890097080153	1.0	1.68095623384
-0.02	1.0	721.0	13.0	41.8082901554	-1.808 ... 80829015544	0.018086709442	1.0	1.04557192158
-0.05	1.0	718.0	38.0	16.8082901554	1.1917 ... 0497391171043	0.998342987234	-0.363324456939
-0.1	1.0	721.0	53.0	1.80829015544	-1.8082 ... 829015544	0.0681412220243	1.0	-1.58676240825
+0.0	0.00223048327137	2.0	0.0	54.8082901554	717.191709845	2.45044725252e-12	0.00278089968589	7.22938502423
+0.01	1.0	720.0	6.0	48.8082901554	-0.80829015544	0.00890097080153	1.0	1.68095623384
+0.02	1.0	721.0	13.0	41.8082901554	-1.80829015544	0.018086709442	1.0	1.04557192158
+0.05	1.0	718.0	38.0	16.8082901554	1.19170984456	0.0497391171043	0.998342987234	-0.363324456939
+0.1	1.0	721.0	53.0	1.80829015544	-1.80829015544	0.0681412220243	1.0	-1.58676240825
 0.2
 0.3
 0.4
@@ -628,11 +658,11 @@ qvalue	svalue	TP	FP	TN	FN	FDR	sens	cutoff
 test_data__summary_stat.csv contains 10 lines
 
 qvalue	svalue	TP	FP	TN	FN	FDR	sens	cutoff
-0.0	0.00223048327137	2.0	0.0	54.80829015 ... 044725252e-12	0.00278089968589	7.22938502423
-0.01	1.0	720.0	6.0	48.8082901554	-0.8082 ... 829015544	0.00890097080153	1.0	1.68095623384
-0.02	1.0	721.0	13.0	41.8082901554	-1.808 ... 80829015544	0.018086709442	1.0	1.04557192158
-0.05	1.0	718.0	38.0	16.8082901554	1.1917 ... 0497391171043	0.998342987234	-0.363324456939
-0.1	1.0	721.0	53.0	1.80829015544	-1.8082 ... 829015544	0.0681412220243	1.0	-1.58676240825
+0.0	0.00223048327137	2.0	0.0	54.8082901554	717.191709845	2.45044725252e-12	0.00278089968589	7.22938502423
+0.01	1.0	720.0	6.0	48.8082901554	-0.80829015544	0.00890097080153	1.0	1.68095623384
+0.02	1.0	721.0	13.0	41.8082901554	-1.80829015544	0.018086709442	1.0	1.04557192158
+0.05	1.0	718.0	38.0	16.8082901554	1.19170984456	0.0497391171043	0.998342987234	-0.363324456939
+0.1	1.0	721.0	53.0	1.80829015544	-1.80829015544	0.0681412220243	1.0	-1.58676240825
 0.2
 0.3
 0.4
@@ -641,11 +671,11 @@ qvalue	svalue	TP	FP	TN	FN	FDR	sens	cutoff
 test_data__summary_stat.csv contains 10 lines
 
 qvalue	svalue	TP	FP	TN	FN	FDR	sens	cutoff
-0.0	0.00223048327137	2.0	0.0	54.80829015 ... 044725252e-12	0.00278089968589	7.22938502423
-0.01	1.0	720.0	6.0	48.8082901554	-0.8082 ... 829015544	0.00890097080153	1.0	1.68095623384
-0.02	1.0	721.0	13.0	41.8082901554	-1.808 ... 80829015544	0.018086709442	1.0	1.04557192158
-0.05	1.0	718.0	38.0	16.8082901554	1.1917 ... 0497391171043	0.998342987234	-0.363324456939
-0.1	1.0	721.0	53.0	1.80829015544	-1.8082 ... 829015544	0.0681412220243	1.0	-1.58676240825
+0.0	0.00223048327137	2.0	0.0	54.8082901554	717.191709845	2.45044725252e-12	0.00278089968589	7.22938502423
+0.01	1.0	720.0	6.0	48.8082901554	-0.80829015544	0.00890097080153	1.0	1.68095623384
+0.02	1.0	721.0	13.0	41.8082901554	-1.80829015544	0.018086709442	1.0	1.04557192158
+0.05	1.0	718.0	38.0	16.8082901554	1.19170984456	0.0497391171043	0.998342987234	-0.363324456939
+0.1	1.0	721.0	53.0	1.80829015544	-1.80829015544	0.0681412220243	1.0	-1.58676240825
 0.2
 0.3
 0.4
@@ -656,11 +686,11 @@ this might be different:
 test_data__summary_stat.csv contains 10 lines
 
 qvalue	svalue	TP	FP	TN	FN	FDR	sens	cutoff
-0.0	0.00225563909774	2.0	0.0	58.97222222 ... 180654197e-13	0.00280493981067	7.25312605325
-0.01	1.0	718.0	8.0	50.9722222222	-4.9722 ... 7222222222	0.0104764210421	1.0	1.42555344532
-0.02	1.0	719.0	15.0	43.9722222222	-5.972 ... 222222222	0.0201610150606	1.0	0.918531705246
-0.05	1.0	716.0	38.0	20.9722222222	-2.972 ... 97222222222	0.050602787097	1.0	-0.2166246035
-0.1	1.0	713.0	59.0	-0.0277777777778	0.02 ... .0760091032732	0.999961042503	-2.11237264328
+0.0	0.00225563909774	2.0	0.0	58.9722222222	711.027777778	7.00180654197e-13	0.00280493981067	7.25312605325
+0.01	1.0	718.0	8.0	50.9722222222	-4.97222222222	0.0104764210421	1.0	1.42555344532
+0.02	1.0	719.0	15.0	43.9722222222	-5.97222222222	0.0201610150606	1.0	0.918531705246
+0.05	1.0	716.0	38.0	20.9722222222	-2.97222222222	0.050602787097	1.0	-0.2166246035
+0.1	1.0	713.0	59.0	-0.0277777777778	0.0277777777778	0.0760091032732	0.999961042503	-2.11237264328
 0.2
 0.3
 0.4

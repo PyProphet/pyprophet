@@ -118,7 +118,6 @@ def _run_pyprophet_to_learn_model(regtest, temp_folder, dump_result_files=False,
         cmdline += " --target.compress_results"
     if sampling_rate is not None:
         cmdline += " --out_of_core --out_of_core.sampling_rate=%f" % sampling_rate
-    print >> regtest, temp_folder + "/" + cmdline
     stdout = _run_cmdline(cmdline)
 
     for f in _expected_output_files():

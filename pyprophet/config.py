@@ -34,6 +34,12 @@ def _standard_config(n_cpus=1):
 
     config["semi_supervised_learner.num_iter"] = 5
 
+    config["semi_supervised_learner.use_best"] = 0
+    config["semi_supervised_learner.stat_best"] = 0
+
+    info["semi_supervised_learner.use_best"] = """[use only weights from last iteration for final classifier]"""
+    info["semi_supervised_learner.stat_best"] = """[use only stats from final for statistics]"""
+
     config["final_statistics.lambda"] = lambda_
 
     config["final_statistics.fdr_all_pg"] = False
@@ -88,6 +94,8 @@ def _standard_config(n_cpus=1):
 def _fix_config_types(dd):
     for k in ["xeval.num_iter",
               "semi_supervised_learner.num_iter",
+              "semi_supervised_learner.stat_best",
+              "semi_supervised_learner.use_best",
               "is_test",
               "ignore.invalid_score_columns",
               "target.overwrite",

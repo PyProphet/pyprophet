@@ -521,6 +521,7 @@ class HolyGostQuery(object):
 
         logging.info("learn and apply scorer")
         logging.info("start %d cross evals using %d processes" % (neval, num_processes))
+
         if num_processes == 1:
             for k in range(neval):
                 (ttt_scores, ttd_scores, w) = learner.learn_randomized(experiment)
@@ -535,15 +536,25 @@ class HolyGostQuery(object):
                 neval -= todo
                 args = ((learner, "learn_randomized", (experiment, )), ) * todo
                 res = pool.map(unwrap_self_for_multiprocessing, args)
-                top_test_target_scores = [ti for r in res for ti in r[0]]
-                top_test_decoy_scores = [ti for r in res for ti in r[1]]
+                ttt_scores = [ti for r in res for ti in r[0]]
+                ttd_scores = [ti for r in res for ti in r[1]]
                 ws.extend([r[2] for r in res])
-                all_test_target_scores.extend(top_test_target_scores)
-                all_test_decoy_scores.extend(top_test_decoy_scores)
+                all_test_target_scores.extend(ttt_scores)
+                all_test_decoy_scores.extend(ttd_scores)
         logging.info("finished cross evals")
         logging.info("")
 
+        # only use socres from last iteration to build statistical model:
+        if CONFIG.get("semi_supervised.stat_best"):
+            all_test_target_scores = ttt_scores
+            all_test_decoy_scores = ttd_scores
+
+        # we only use weights from last iteration if indicated:
+        if CONFIG.get("semi_supervised.use_best"):
+            ws = ws[-1]
+
         final_classifier = self.semi_supervised_learner.averaged_learner(ws)
+
         return final_classifier, all_test_target_scores, all_test_decoy_scores
 
     def _build_result(self, tables, final_classifier, score_columns, experiment,

@@ -21,6 +21,9 @@ pyprophet test_data_2.txt test_data_3.txt --out_of_core --out_of_core.sampling_r
      semi_supervised_learner.iteration_fdr: 0.02
      semi_supervised_learner.iteration_lambda: 0.4
      semi_supervised_learner.num_iter: 5
+     semi_supervised_learner.stat_best: 0
+     semi_supervised_learner.use_best: 0
+     target.compress_results: 0
      target.dir: None
      target.overwrite: 0
      target.prefix: None
@@ -79,6 +82,9 @@ used parameters:
     semi_supervised_learner.iteration_fdr      : 0.02
     semi_supervised_learner.iteration_lambda   : 0.4
     semi_supervised_learner.num_iter           : 5
+    semi_supervised_learner.stat_best          : 0
+    semi_supervised_learner.use_best           : 0
+    target.compress_results                    : 0
     target.dir                                 : None
     target.overwrite                           : 0
     target.prefix                              : None
@@ -138,6 +144,9 @@ pyprophet test_data_2.txt test_data_3.txt --out_of_core --apply_weights=test_dat
      semi_supervised_learner.iteration_fdr: 0.02
      semi_supervised_learner.iteration_lambda: 0.4
      semi_supervised_learner.num_iter: 5
+     semi_supervised_learner.stat_best: 0
+     semi_supervised_learner.use_best: 0
+     target.compress_results: 0
      target.dir: None
      target.overwrite: 1
      target.prefix: None
@@ -184,6 +193,9 @@ used parameters:
     semi_supervised_learner.iteration_fdr      : 0.02
     semi_supervised_learner.iteration_lambda   : 0.4
     semi_supervised_learner.num_iter           : 5
+    semi_supervised_learner.stat_best          : 0
+    semi_supervised_learner.use_best           : 0
+    target.compress_results                    : 0
     target.dir                                 : None
     target.overwrite                           : 1
     target.prefix                              : None

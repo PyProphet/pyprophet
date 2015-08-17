@@ -304,8 +304,6 @@ def get_error_table_from_pvalues_new(p_values, lambda_=0.4):
     num_null = 1.0 / (1.0 - lambda_) * (p_values >= lambda_).sum()
     num_total = len(p_values)
 
-    # p_values = p_values[:,None]
-
     # optimized with numpys broadcasting: comparing column vector with row
     # vector yields a matrix with pairwise comparison results.  sum(axis=0)
     # sums up each column:
