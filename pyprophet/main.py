@@ -13,7 +13,7 @@ except NameError:
 
 import abc
 import cPickle
-import logging
+from std_logger import logging
 import sys
 import random
 import time
@@ -26,9 +26,6 @@ import pandas as pd
 from pyprophet import PyProphet, Result
 from config import CONFIG, set_pandas_print_options
 from report import save_report, export_mayu, mayu_cols
-
-format_ = "%(levelname)s -- [pid=%(process)s] : %(asctime)s: %(message)s"
-logging.basicConfig(level=logging.INFO, format=format_)
 
 from .main_helpers import (parse_cmdline, create_pathes, check_if_any_exists)
 

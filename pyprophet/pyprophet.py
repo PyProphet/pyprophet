@@ -35,7 +35,7 @@ from semi_supervised import (AbstractSemiSupervisedLearner, StandardSemiSupervis
 
 import multiprocessing
 
-import logging
+from std_logger import logging
 
 import time
 
@@ -217,6 +217,15 @@ class LazyScoredTablesIter(object):
 
 
 def _read_csv(path, delim):
+    header = pd.read_csv(path, delim, nrows=1).columns
+
+    """
+    dtypes = {}
+    for col_name in header:
+        if col_name.startswith("main_") or col_name.startswith("var_"):
+            dtypes[col_name] = np.float32
+    """
+
     return pd.read_csv(path, delim, na_values=["NA", "NaN", "infinite"], engine="c")
 
 

@@ -18,7 +18,7 @@ except NameError:
     def profile(fun):
         return fun
 
-import logging
+from std_logger import logging
 
 
 @profile
@@ -239,7 +239,7 @@ class Experiment(object):
         object.__setattr__(self, name, value)
 
     def set_and_rerank(self, col_name, scores):
-        self.df[col_name] = scores
+        self.df.loc[:, col_name] = scores
         self.rank_by(col_name)
 
     def rank_by(self, score_col_name):
@@ -295,8 +295,8 @@ class Experiment(object):
         target_ids = target_ids[:int(len(target_ids) * fraction) + 1]
         learn_ids = np.concatenate((decoy_ids, target_ids))
         ix_learn = df.tg_id.isin(learn_ids)
-        df.is_train[ix_learn] = True
-        df.is_train[~ix_learn] = False
+        df.is_train.loc[ix_learn] = True
+        df.is_train.loc[~ix_learn] = False
 
     def get_train_peaks(self):
         df = self.df[self.df.is_train == True]

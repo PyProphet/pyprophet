@@ -17,7 +17,7 @@ import numpy as np
 from stats import mean_and_std_dev, find_cutoff
 
 
-import logging
+from std_logger import logging
 
 
 class AbstractSemiSupervisedLearner(object):

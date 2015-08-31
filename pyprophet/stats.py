@@ -27,7 +27,7 @@ from config import CONFIG
 
 import multiprocessing
 
-import logging
+from std_logger import logging
 
 
 ErrorStatistics = namedtuple("ErrorStatistics", "df num_null num_total")
