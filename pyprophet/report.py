@@ -1,8 +1,12 @@
 # needed for headless environment:
-import matplotlib
-matplotlib.use('Agg')
 
-import matplotlib.pyplot as plt
+try:
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+except ImportError:
+    plt = None
+
 from scipy.stats import gaussian_kde
 from numpy import linspace, concatenate
 
@@ -22,6 +26,9 @@ class Protein:
 
 
 def save_report(report_path, prefix, scored_table, final_stat):
+
+    if plt is None:
+        raise ImportError("you need matplotlib package to create a report")
 
     cutoffs = final_stat["cutoff"].values
     svalues = final_stat["svalue"].values
