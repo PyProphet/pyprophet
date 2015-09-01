@@ -554,13 +554,13 @@ class HolyGostQuery(object):
         logging.info("")
 
         # only use socres from last iteration to build statistical model:
-        if CONFIG.get("semi_supervised.stat_best"):
+        if CONFIG.get("semi_supervised_learner.stat_best"):
             all_test_target_scores = ttt_scores
             all_test_decoy_scores = ttd_scores
 
         # we only use weights from last iteration if indicated:
-        if CONFIG.get("semi_supervised.use_best"):
-            ws = ws[-1]
+        if CONFIG.get("semi_supervised_learner.use_best"):
+            ws = [ws[-1]]
 
         final_classifier = self.semi_supervised_learner.averaged_learner(ws)
 

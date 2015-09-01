@@ -107,7 +107,8 @@ def _run_cmdline(cmdline):
 
 
 def _run_pyprophet_to_learn_model(regtest, temp_folder, dump_result_files=False,
-        with_probatilities=False, compress=False, sampling_rate=None):
+        with_probatilities=False, compress=False, sampling_rate=None, use_best=False,
+        stat_best=False):
     os.chdir(temp_folder)
     data_path = os.path.join(__here__, "test_data.txt")
     shutil.copy(data_path, temp_folder)
@@ -116,6 +117,10 @@ def _run_pyprophet_to_learn_model(regtest, temp_folder, dump_result_files=False,
         cmdline += " --compute.probabilities"
     if compress:
         cmdline += " --target.compress_results"
+    if use_best:
+        cmdline += " --semi_supervised_learner.use_best"
+    if stat_best:
+        cmdline += " --semi_supervised_learner.stat_best"
     if sampling_rate is not None:
         cmdline += " --out_of_core --out_of_core.sampling_rate=%f" % sampling_rate
     stdout = _run_cmdline(cmdline)
@@ -149,6 +154,12 @@ def test_2(tmpdir, regtest):
     _record(stdout, regtest)
 
     stdout = _run_pyprophet_to_learn_model(regtest, tmpdir.strpath, True, True, True, 1.0)
+    _record(stdout, regtest)
+
+
+def test_3(tmpdir, regtest):
+    stdout = _run_pyprophet_to_learn_model(regtest, tmpdir.strpath, True, True, True, 
+                                           use_best=True, stat_best=True)
     _record(stdout, regtest)
 
 
