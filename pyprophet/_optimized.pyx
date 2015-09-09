@@ -5,16 +5,19 @@ cimport numpy as np
 import numpy as np
 
 
+ctypedef np.float32_t DATA_TYPE
+
+
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def find_nearest_matches(np.float64_t[:] basis, np.float64_t[:] sample_points, use_sort_order=1):
+def find_nearest_matches(DATA_TYPE[:] basis, DATA_TYPE[:] sample_points, use_sort_order=1):
     cdef size_t num_basis = basis.shape[0]
     cdef size_t num_samples = sample_points.shape[0]
     result = np.zeros((num_samples,), dtype=np.int64)
     cdef np.int64_t[:] view = result
     cdef size_t i, best_j
     cdef size_t low, high, mid
-    cdef double sp_i, best_dist, dist
+    cdef DATA_TYPE sp_i, best_dist, dist
     cdef int sort_order
 
     if not use_sort_order:
@@ -103,7 +106,7 @@ def find_nearest_matches(np.float64_t[:] basis, np.float64_t[:] sample_points, u
     return result
 
 
-cdef int find_sort_order(np.float64_t[:] basis):
+cdef int find_sort_order(DATA_TYPE[:] basis):
     # 0: unsorted
     # 1: ascending
     # 2: descending
@@ -129,9 +132,9 @@ cdef int find_sort_order(np.float64_t[:] basis):
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def count_num_positives(np.float64_t[:] values):
+def count_num_positives(DATA_TYPE[:] values):
     cdef size_t n = values.shape[0]
-    cdef np.float64_t[:] inp_view = values
+    cdef DATA_TYPE[:] inp_view = values
     cdef size_t i0, i1, c
     result = np.zeros_like(values, dtype=np.int64)
     cdef np.int64_t[:] res_view = result
@@ -145,19 +148,20 @@ def count_num_positives(np.float64_t[:] values):
         i0 += 1
     return result
 
+
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def find_top_ranked(np.int64_t[:] tg_ids, np.float64_t[:] scores):
+def find_top_ranked(np.int64_t[:] tg_ids, DATA_TYPE[:] scores):
     cdef size_t n = scores.shape[0]
     flags = np.zeros((n,), dtype=np.int64)
     cdef np.int64_t[:] view = flags
-    cdef double current_max = scores[0]
+    cdef DATA_TYPE current_max = scores[0]
     cdef size_t current_imax = 0
     cdef size_t current_tg_id = tg_ids[0]
     cdef size_t current_write_i = 0
     cdef size_t i
     cdef size_t id_
-    cdef double sc
+    cdef DATA_TYPE sc
     for i in range(tg_ids.shape[0]):
         id_ = tg_ids[i]
         sc = scores[i]
@@ -174,7 +178,8 @@ def find_top_ranked(np.int64_t[:] tg_ids, np.float64_t[:] scores):
     view[current_imax] = 1
     return flags
 
-cdef partial_rank(np.float64_t[:] v, size_t imin, size_t imax, np.int64_t[:] ranks):
+
+cdef partial_rank(DATA_TYPE[:] v, size_t imin, size_t imax, np.int64_t[:] ranks):
     """ imax is exclusive """
     cdef size_t * ix = <size_t * > libc.stdlib.malloc((imax - imin) * sizeof(size_t))
     cdef size_t i, j, pos
@@ -194,7 +199,7 @@ cdef partial_rank(np.float64_t[:] v, size_t imin, size_t imax, np.int64_t[:] ran
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def rank(np.int64_t[:] tg_ids, np.float64_t[:] scores):
+def rank(np.int64_t[:] tg_ids, DATA_TYPE[:] scores):
     cdef size_t n = tg_ids.shape[0]
     result = np.zeros((n,), dtype=np.int64)
     cdef np.int64_t[:] ranks = result

@@ -39,7 +39,8 @@ class LinearLearner(AbstractLearner):
 
     def score(self, peaks, use_main_score):
         X = peaks.get_feature_matrix(use_main_score)
-        return np.dot(X, self.get_parameters())
+        result = np.dot(X, self.get_parameters()).astype(np.float32)
+        return result
 
     @classmethod
     def averaged_learner(clz, params):

@@ -9,7 +9,7 @@ def test_rank():
     values = [2, 7, 0, 5, 3, 7, 2, 1, 3, 9]
 
     groups = np.array(groups, dtype=np.int64)
-    values = np.array(values, dtype=float)
+    values = array32(values)
 
     ranks = o.rank(groups, values)
     assert list(ranks) == [4, 1, 5, 2, 3, 1, 2, 3, 1, 1], ranks
@@ -17,12 +17,13 @@ def test_rank():
     # corner cases:
 
     groups = np.array([1], dtype=np.int64)
-    values = np.array([1.0])
+    values = array32([1.0])
     assert list(o.rank(groups, values)) == [1]
 
     groups = np.array([], dtype=np.int64)
-    values = np.array([], dtype=float)
+    values = array32([])
     assert list(o.rank(groups, values)) == []
+
 
 def test_single_chromatogram_hypothesis_fast():
 
@@ -46,11 +47,12 @@ def test_single_chromatogram_hypothesis_fast():
     result_h0 = result[0]
     result = result[1:]
 
-    np.testing.assert_array_almost_equal(result, [0.00897436, 0.00384615, 0.08076923, 0.88846154] )
-    np.testing.assert_array_almost_equal( [result_h0], [0.0179487179487] )
+    np.testing.assert_array_almost_equal(result, [0.00897436, 0.00384615, 0.08076923, 0.88846154])
+    np.testing.assert_array_almost_equal([result_h0], [0.0179487179487])
+
 
 def _test_match(values):
-    values = np.array(values, dtype=float)
+    values = array32(values)
     ix = list(o.find_nearest_matches(values, values))
     assert [values[i] for i in ix] == list(values)
 
@@ -62,13 +64,12 @@ def _test_match(values):
     assert [values2[i] for i in ix] == [values2[i] for i in ix2]
 
 
-
 def test_find_neared_matches():
 
-    ix = o.find_nearest_matches(np.arange(4.0), np.arange(2.0))
+    ix = o.find_nearest_matches(arange32(4.0), arange32(2.0))
     assert list(ix) == [0, 1]
 
-    ix = o.find_nearest_matches(np.arange(2.0), np.arange(4.0))
+    ix = o.find_nearest_matches(arange32(2.0), arange32(4.0))
     assert list(ix) == [0, 1, 1, 1]
 
     # unsorted with duplicates
@@ -110,13 +111,22 @@ def test_find_neared_matches():
     # nearly constant sequence 4
     _test_match([1, 1, 1, 2])
 
+
+def array32(values):
+    return np.array(values, dtype=np.float32)
+
+
+def arange32(up_to):
+    return np.arange(up_to, dtype=np.float32)
+
+
 def test_count_num_positives():
-    assert list(o.count_num_positives(np.array((9.0, 8, 8, 7, 5)))) == [5, 4, 4, 2, 1]
-    assert list(o.count_num_positives(np.array((9.0, 8, 8, 7, 7)))) == [5, 4, 4, 2, 2]
-    assert list(o.count_num_positives(np.array((9.0, 8, 7, 6, 5)))) == [5, 4, 3, 2, 1]
-    assert list(o.count_num_positives(np.array((9.0, 9, 9, 9, 9)))) == [5, 5, 5, 5, 5]
-    assert list(o.count_num_positives(np.array((9.0,)))) == [1]
-    assert list(o.count_num_positives(np.array(()))) == []
+    assert list(o.count_num_positives(array32((9.0, 8, 8, 7, 5)))) == [5, 4, 4, 2, 1]
+    assert list(o.count_num_positives(array32((9.0, 8, 8, 7, 7)))) == [5, 4, 4, 2, 2]
+    assert list(o.count_num_positives(array32((9.0, 8, 7, 6, 5)))) == [5, 4, 3, 2, 1]
+    assert list(o.count_num_positives(array32((9.0, 9, 9, 9, 9)))) == [5, 5, 5, 5, 5]
+    assert list(o.count_num_positives(array32((9.0,)))) == [1]
+    assert list(o.count_num_positives(array32(()))) == []
 
 
 def _test_find_neared_matches_fuzzy():

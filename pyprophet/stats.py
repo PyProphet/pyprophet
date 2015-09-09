@@ -54,7 +54,7 @@ def to_one_dim_array(values, as_type=None):
     """ converst list or flattnes n-dim array to 1-dim array if possible"""
 
     if isinstance(values, (list, tuple)):
-        values = np.array(values)
+        values = np.array(values, dtype=np.float32)
     elif isinstance(values, pd.Series):
         values = values.values
     values = values.flatten()
@@ -202,7 +202,7 @@ def get_error_table_using_percentile_positives_new(err_df, target_scores, num_nu
     num_positives = count_num_positives(target_scores)
 
     num_negatives = num_total - num_positives
-    pp = num_positives.astype(float) / num_total
+    pp = num_positives.astype(np.float32) / num_total
 
     # find best matching row in err_df for each percentile_positive in pp:
     imax = find_nearest_matches(err_df.percentile_positive.values, pp)
@@ -235,9 +235,8 @@ def get_error_table_using_percentile_positives_new(err_df, target_scores, num_nu
              FDR=fdr,
              sens=sens,
              cutoff=target_scores),
-        columns="qvalue svalue TP FP TN FN FDR sens cutoff".split()
+        columns="qvalue svalue TP FP TN FN FDR sens cutoff".split(),
     )
-
     return df_error
 
 
@@ -258,7 +257,7 @@ def final_err_table(df, num_cut_offs=51):
     max_ = max(cutoffs)
     # extend max_ and min_ by 5 % of full range
     margin = (max_ - min_) * 0.05
-    sampled_cutoffs = np.linspace(min_ - margin, max_ + margin, num_cut_offs)
+    sampled_cutoffs = np.linspace(min_ - margin, max_ + margin, num_cut_offs, dtype=np.float32)
 
     # find best matching row index for each sampled cut off:
     ix = find_nearest_matches(df.cutoff.values, sampled_cutoffs)
@@ -332,19 +331,20 @@ def get_error_table_from_pvalues_new(p_values, lambda_=0.4):
 
     # assemble statistics as data frame
     df = pd.DataFrame(
-        dict(pvalue=p_values.flatten(),
-             percentile_positive=pp.flatten(),
-             positive=num_positives.flatten(),
-             negative=num_negatives.flatten(),
-             TP=tp.flatten(),
-             FP=fp.flatten(),
-             TN=tn.flatten(),
-             FN=fn.flatten(),
-             FDR=fdr.flatten(),
-             sens=sens.flatten(),
-             FPR=fpr.flatten()),
+        dict(pvalue=p_values.flatten().astype(np.float32),
+             percentile_positive=pp.flatten().astype(np.float32),
+             positive=num_positives.flatten().astype(np.float32),
+             negative=num_negatives.flatten().astype(np.float32),
+             TP=tp.flatten().astype(np.float32),
+             FP=fp.flatten().astype(np.float32),
+             TN=tn.flatten().astype(np.float32),
+             FN=fn.flatten().astype(np.float32),
+             FDR=fdr.flatten().astype(np.float32),
+             sens=sens.flatten().astype(np.float32),
+             FPR=fpr.flatten().astype(np.float32),
+             ),
         columns="""pvalue percentile_positive positive negative TP FP
-                        TN FN FDR sens FPR""".split()
+                        TN FN FDR sens FPR""".split(),
     )
 
     # cummin/cummax not available in numpy, so we create them from dataframe
