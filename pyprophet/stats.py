@@ -298,15 +298,18 @@ def get_error_table_from_pvalues_new(p_values, lambda_=0.4):
 
     # sort descending:
     p_values = np.sort(to_one_dim_array(p_values))[::-1]
+    print "!!! p_values", p_values, "\n"
 
     # estimate FDR with storeys method:
     num_null = 1.0 / (1.0 - lambda_) * (p_values >= lambda_).sum()
     num_total = len(p_values)
+    print "!!! num_null", num_null, "\n"
 
     # optimized with numpys broadcasting: comparing column vector with row
     # vector yields a matrix with pairwise comparison results.  sum(axis=0)
     # sums up each column:
     num_positives = count_num_positives(p_values)
+    print "!!! num_positives", num_positives, "\n"
     num_negatives = num_total - num_positives
     pp = 1.0 * num_positives / num_total
     tp = num_positives - num_null * p_values
