@@ -1,4 +1,3 @@
-import pdb
 # encoding: latin-1
 
 # openblas + multiprocessing crashes for OPENBLAS_NUM_THREADS > 1 !!!
@@ -19,6 +18,20 @@ except NameError:
         return fun
 
 from std_logger import logging
+
+
+def setup_csv_dtypes(columns):
+    dtype = {}
+    for col_name in columns:
+        if col_name.startswith("main_") or col_name.startswith("var_"):
+            dtype[col_name] = np.float32
+    return dtype
+
+
+def read_csv(path, delim):
+    header = pd.read_csv(path, delim, nrows=1).columns
+    dtype = setup_csv_dtypes(header)
+    return pd.read_csv(path, delim, na_values=["NA", "NaN", "infinite"], engine="c", dtype=dtype)
 
 
 @profile
@@ -192,6 +205,9 @@ def sample_data_tables(pathes, delim,  sampling_rate=0.1, tg_id_name="transition
             ids = [id_.partition("DECOY_")[2] for id_ in ids]
             tg_decoy_ids.update(ids)
 
+    assert len(pathes) > 0, "no input files !?"
+    header = pd.read_csv(pathes[0], delim, nrows=1).columns
+
     tg_ids = tg_target_ids.intersection(tg_decoy_ids)
     if not len(tg_ids):
         raise Exception("did not find an intersection of target and decoy ids")
@@ -206,9 +222,11 @@ def sample_data_tables(pathes, delim,  sampling_rate=0.1, tg_id_name="transition
     # convert to set for faster lookup below:
     tg_ids = set(tg_ids)
 
+    dtype = setup_csv_dtypes(header)
     chunks = []
     for path in pathes:
-        for chunk in pd.read_csv(path, delim, iterator=True, chunksize=100000):
+        for chunk in pd.read_csv(path, delim, iterator=True, na_values=["NA", "NaN", "infinite"],
+                                 chunksize=100000, dtype=dtype):
             chunk = chunk[chunk[tg_id_name].isin(tg_ids)]
             chunks.append(chunk)
 

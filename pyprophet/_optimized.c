@@ -754,7 +754,7 @@ typedef npy_double __pyx_t_5numpy_double_t;
  */
 typedef npy_longdouble __pyx_t_5numpy_longdouble_t;
 
-/* "pyprophet/_optimized.pyx":8
+/* "pyprophet/_optimized.pyx":10
  * 
  * 
  * ctypedef np.float32_t DATA_TYPE             # <<<<<<<<<<<<<<
@@ -1285,14 +1285,14 @@ static int __Pyx_ValidateAndInit_memviewslice(
 
 static CYTHON_INLINE __Pyx_memviewslice __Pyx_PyObject_to_MemoryviewSlice_ds_nn___pyx_t_9pyprophet_10_optimized_DATA_TYPE(PyObject *);
 
-static CYTHON_INLINE __Pyx_memviewslice __Pyx_PyObject_to_MemoryviewSlice_ds_nn___pyx_t_5numpy_int64_t(PyObject *);
-
 static CYTHON_INLINE __Pyx_memviewslice __Pyx_PyObject_to_MemoryviewSlice_ds_nn___pyx_t_5numpy_float64_t(PyObject *);
+
+static CYTHON_INLINE __Pyx_memviewslice __Pyx_PyObject_to_MemoryviewSlice_ds_nn___pyx_t_5numpy_int64_t(PyObject *);
 
 static CYTHON_INLINE size_t __Pyx_PyInt_As_size_t(PyObject *);
 
-static PyObject *__pyx_memview_get_nn___pyx_t_9pyprophet_10_optimized_DATA_TYPE(const char *itemp);
-static int __pyx_memview_set_nn___pyx_t_9pyprophet_10_optimized_DATA_TYPE(const char *itemp, PyObject *obj);
+static PyObject *__pyx_memview_get_nn___pyx_t_5numpy_float64_t(const char *itemp);
+static int __pyx_memview_set_nn___pyx_t_5numpy_float64_t(const char *itemp, PyObject *obj);
 
 #if CYTHON_CCOMPLEX
   #ifdef __cplusplus
@@ -1521,8 +1521,8 @@ static void __pyx_memoryview_refcount_objects_in_slice(char *, Py_ssize_t *, Py_
 static void __pyx_memoryview_slice_assign_scalar(__Pyx_memviewslice *, int, size_t, void *, int); /*proto*/
 static void __pyx_memoryview__slice_assign_scalar(char *, Py_ssize_t *, Py_ssize_t *, int, size_t, void *); /*proto*/
 static __Pyx_TypeInfo __Pyx_TypeInfo_nn___pyx_t_9pyprophet_10_optimized_DATA_TYPE = { "DATA_TYPE", NULL, sizeof(__pyx_t_9pyprophet_10_optimized_DATA_TYPE), { 0 }, 0, 'R', 0, 0 };
-static __Pyx_TypeInfo __Pyx_TypeInfo_nn___pyx_t_5numpy_int64_t = { "int64_t", NULL, sizeof(__pyx_t_5numpy_int64_t), { 0 }, 0, IS_UNSIGNED(__pyx_t_5numpy_int64_t) ? 'U' : 'I', IS_UNSIGNED(__pyx_t_5numpy_int64_t), 0 };
 static __Pyx_TypeInfo __Pyx_TypeInfo_nn___pyx_t_5numpy_float64_t = { "float64_t", NULL, sizeof(__pyx_t_5numpy_float64_t), { 0 }, 0, 'R', 0, 0 };
+static __Pyx_TypeInfo __Pyx_TypeInfo_nn___pyx_t_5numpy_int64_t = { "int64_t", NULL, sizeof(__pyx_t_5numpy_int64_t), { 0 }, 0, IS_UNSIGNED(__pyx_t_5numpy_int64_t) ? 'U' : 'I', IS_UNSIGNED(__pyx_t_5numpy_int64_t), 0 };
 #define __Pyx_MODULE_NAME "pyprophet._optimized"
 int __pyx_module_is_main_pyprophet___optimized = 0;
 
@@ -1885,7 +1885,7 @@ static PyObject *__pyx_codeobj__24;
 static PyObject *__pyx_codeobj__26;
 static PyObject *__pyx_codeobj__28;
 
-/* "pyprophet/_optimized.pyx":13
+/* "pyprophet/_optimized.pyx":15
  * @cython.boundscheck(False)
  * @cython.wraparound(False)
  * def find_nearest_matches(DATA_TYPE[:] basis, DATA_TYPE[:] sample_points, use_sort_order=1):             # <<<<<<<<<<<<<<
@@ -1928,7 +1928,7 @@ static PyObject *__pyx_pw_9pyprophet_10_optimized_1find_nearest_matches(PyObject
         case  1:
         if (likely((values[1] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_sample_points)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("find_nearest_matches", 0, 2, 3, 1); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 13; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+          __Pyx_RaiseArgtupleInvalid("find_nearest_matches", 0, 2, 3, 1); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 15; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
         }
         case  2:
         if (kw_args > 0) {
@@ -1937,7 +1937,7 @@ static PyObject *__pyx_pw_9pyprophet_10_optimized_1find_nearest_matches(PyObject
         }
       }
       if (unlikely(kw_args > 0)) {
-        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "find_nearest_matches") < 0)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 13; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "find_nearest_matches") < 0)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 15; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
       }
     } else {
       switch (PyTuple_GET_SIZE(__pyx_args)) {
@@ -1948,13 +1948,13 @@ static PyObject *__pyx_pw_9pyprophet_10_optimized_1find_nearest_matches(PyObject
         default: goto __pyx_L5_argtuple_error;
       }
     }
-    __pyx_v_basis = __Pyx_PyObject_to_MemoryviewSlice_ds_nn___pyx_t_9pyprophet_10_optimized_DATA_TYPE(values[0]); if (unlikely(!__pyx_v_basis.memview)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 13; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
-    __pyx_v_sample_points = __Pyx_PyObject_to_MemoryviewSlice_ds_nn___pyx_t_9pyprophet_10_optimized_DATA_TYPE(values[1]); if (unlikely(!__pyx_v_sample_points.memview)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 13; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+    __pyx_v_basis = __Pyx_PyObject_to_MemoryviewSlice_ds_nn___pyx_t_9pyprophet_10_optimized_DATA_TYPE(values[0]); if (unlikely(!__pyx_v_basis.memview)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 15; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+    __pyx_v_sample_points = __Pyx_PyObject_to_MemoryviewSlice_ds_nn___pyx_t_9pyprophet_10_optimized_DATA_TYPE(values[1]); if (unlikely(!__pyx_v_sample_points.memview)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 15; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
     __pyx_v_use_sort_order = values[2];
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("find_nearest_matches", 0, 2, 3, PyTuple_GET_SIZE(__pyx_args)); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 13; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+  __Pyx_RaiseArgtupleInvalid("find_nearest_matches", 0, 2, 3, PyTuple_GET_SIZE(__pyx_args)); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 15; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
   __pyx_L3_error:;
   __Pyx_AddTraceback("pyprophet._optimized.find_nearest_matches", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
@@ -2023,7 +2023,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("find_nearest_matches", 0);
 
-  /* "pyprophet/_optimized.pyx":14
+  /* "pyprophet/_optimized.pyx":16
  * @cython.wraparound(False)
  * def find_nearest_matches(DATA_TYPE[:] basis, DATA_TYPE[:] sample_points, use_sort_order=1):
  *     cdef size_t num_basis = basis.shape[0]             # <<<<<<<<<<<<<<
@@ -2032,7 +2032,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
  */
   __pyx_v_num_basis = (__pyx_v_basis.shape[0]);
 
-  /* "pyprophet/_optimized.pyx":15
+  /* "pyprophet/_optimized.pyx":17
  * def find_nearest_matches(DATA_TYPE[:] basis, DATA_TYPE[:] sample_points, use_sort_order=1):
  *     cdef size_t num_basis = basis.shape[0]
  *     cdef size_t num_samples = sample_points.shape[0]             # <<<<<<<<<<<<<<
@@ -2041,40 +2041,40 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
  */
   __pyx_v_num_samples = (__pyx_v_sample_points.shape[0]);
 
-  /* "pyprophet/_optimized.pyx":16
+  /* "pyprophet/_optimized.pyx":18
  *     cdef size_t num_basis = basis.shape[0]
  *     cdef size_t num_samples = sample_points.shape[0]
  *     result = np.zeros((num_samples,), dtype=np.int64)             # <<<<<<<<<<<<<<
  *     cdef np.int64_t[:] view = result
  *     cdef size_t i, best_j
  */
-  __pyx_t_1 = __Pyx_GetModuleGlobalName(__pyx_n_s_np); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 16; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_1 = __Pyx_GetModuleGlobalName(__pyx_n_s_np); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 18; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_1);
-  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_1, __pyx_n_s_zeros); if (unlikely(!__pyx_t_2)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 16; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_1, __pyx_n_s_zeros); if (unlikely(!__pyx_t_2)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 18; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_2);
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-  __pyx_t_1 = __Pyx_PyInt_FromSize_t(__pyx_v_num_samples); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 16; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_1 = __Pyx_PyInt_FromSize_t(__pyx_v_num_samples); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 18; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_1);
-  __pyx_t_3 = PyTuple_New(1); if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 16; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_3 = PyTuple_New(1); if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 18; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_3);
   __Pyx_GIVEREF(__pyx_t_1);
   PyTuple_SET_ITEM(__pyx_t_3, 0, __pyx_t_1);
   __pyx_t_1 = 0;
-  __pyx_t_1 = PyTuple_New(1); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 16; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_1 = PyTuple_New(1); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 18; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_1);
   __Pyx_GIVEREF(__pyx_t_3);
   PyTuple_SET_ITEM(__pyx_t_1, 0, __pyx_t_3);
   __pyx_t_3 = 0;
-  __pyx_t_3 = PyDict_New(); if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 16; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_3 = PyDict_New(); if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 18; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_3);
-  __pyx_t_4 = __Pyx_GetModuleGlobalName(__pyx_n_s_np); if (unlikely(!__pyx_t_4)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 16; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_4 = __Pyx_GetModuleGlobalName(__pyx_n_s_np); if (unlikely(!__pyx_t_4)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 18; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_4);
-  __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_t_4, __pyx_n_s_int64); if (unlikely(!__pyx_t_5)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 16; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_t_4, __pyx_n_s_int64); if (unlikely(!__pyx_t_5)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 18; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_5);
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-  if (PyDict_SetItem(__pyx_t_3, __pyx_n_s_dtype, __pyx_t_5) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 16; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  if (PyDict_SetItem(__pyx_t_3, __pyx_n_s_dtype, __pyx_t_5) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 18; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-  __pyx_t_5 = __Pyx_PyObject_Call(__pyx_t_2, __pyx_t_1, __pyx_t_3); if (unlikely(!__pyx_t_5)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 16; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_5 = __Pyx_PyObject_Call(__pyx_t_2, __pyx_t_1, __pyx_t_3); if (unlikely(!__pyx_t_5)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 18; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_5);
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
@@ -2082,7 +2082,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
   __pyx_v_result = __pyx_t_5;
   __pyx_t_5 = 0;
 
-  /* "pyprophet/_optimized.pyx":17
+  /* "pyprophet/_optimized.pyx":19
  *     cdef size_t num_samples = sample_points.shape[0]
  *     result = np.zeros((num_samples,), dtype=np.int64)
  *     cdef np.int64_t[:] view = result             # <<<<<<<<<<<<<<
@@ -2090,23 +2090,23 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
  *     cdef size_t low, high, mid
  */
   __pyx_t_6 = __Pyx_PyObject_to_MemoryviewSlice_ds_nn___pyx_t_5numpy_int64_t(__pyx_v_result);
-  if (unlikely(!__pyx_t_6.memview)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 17; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  if (unlikely(!__pyx_t_6.memview)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 19; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __pyx_v_view = __pyx_t_6;
   __pyx_t_6.memview = NULL;
   __pyx_t_6.data = NULL;
 
-  /* "pyprophet/_optimized.pyx":23
+  /* "pyprophet/_optimized.pyx":25
  *     cdef int sort_order
  * 
  *     if not use_sort_order:             # <<<<<<<<<<<<<<
  *         for i in range(num_samples):
  *             sp_i = sample_points[i]
  */
-  __pyx_t_7 = __Pyx_PyObject_IsTrue(__pyx_v_use_sort_order); if (unlikely(__pyx_t_7 < 0)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 23; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_7 = __Pyx_PyObject_IsTrue(__pyx_v_use_sort_order); if (unlikely(__pyx_t_7 < 0)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 25; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __pyx_t_8 = ((!__pyx_t_7) != 0);
   if (__pyx_t_8) {
 
-    /* "pyprophet/_optimized.pyx":24
+    /* "pyprophet/_optimized.pyx":26
  * 
  *     if not use_sort_order:
  *         for i in range(num_samples):             # <<<<<<<<<<<<<<
@@ -2117,7 +2117,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
     for (__pyx_t_10 = 0; __pyx_t_10 < __pyx_t_9; __pyx_t_10+=1) {
       __pyx_v_i = __pyx_t_10;
 
-      /* "pyprophet/_optimized.pyx":25
+      /* "pyprophet/_optimized.pyx":27
  *     if not use_sort_order:
  *         for i in range(num_samples):
  *             sp_i = sample_points[i]             # <<<<<<<<<<<<<<
@@ -2127,7 +2127,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
       __pyx_t_11 = __pyx_v_i;
       __pyx_v_sp_i = (*((__pyx_t_9pyprophet_10_optimized_DATA_TYPE *) ( /* dim=0 */ (__pyx_v_sample_points.data + __pyx_t_11 * __pyx_v_sample_points.strides[0]) )));
 
-      /* "pyprophet/_optimized.pyx":26
+      /* "pyprophet/_optimized.pyx":28
  *         for i in range(num_samples):
  *             sp_i = sample_points[i]
  *             best_j = 0             # <<<<<<<<<<<<<<
@@ -2136,7 +2136,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
  */
       __pyx_v_best_j = 0;
 
-      /* "pyprophet/_optimized.pyx":27
+      /* "pyprophet/_optimized.pyx":29
  *             sp_i = sample_points[i]
  *             best_j = 0
  *             best_dist = abs(basis[0] - sp_i)             # <<<<<<<<<<<<<<
@@ -2146,7 +2146,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
       __pyx_t_12 = 0;
       __pyx_v_best_dist = fabsf(((*((__pyx_t_9pyprophet_10_optimized_DATA_TYPE *) ( /* dim=0 */ (__pyx_v_basis.data + __pyx_t_12 * __pyx_v_basis.strides[0]) ))) - __pyx_v_sp_i));
 
-      /* "pyprophet/_optimized.pyx":28
+      /* "pyprophet/_optimized.pyx":30
  *             best_j = 0
  *             best_dist = abs(basis[0] - sp_i)
  *             for j in range(1, num_basis):             # <<<<<<<<<<<<<<
@@ -2157,7 +2157,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
       for (__pyx_t_14 = 1; __pyx_t_14 < __pyx_t_13; __pyx_t_14+=1) {
         __pyx_v_j = __pyx_t_14;
 
-        /* "pyprophet/_optimized.pyx":29
+        /* "pyprophet/_optimized.pyx":31
  *             best_dist = abs(basis[0] - sp_i)
  *             for j in range(1, num_basis):
  *                 dist = abs(basis[j] - sp_i)             # <<<<<<<<<<<<<<
@@ -2167,7 +2167,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
         __pyx_t_15 = __pyx_v_j;
         __pyx_v_dist = fabsf(((*((__pyx_t_9pyprophet_10_optimized_DATA_TYPE *) ( /* dim=0 */ (__pyx_v_basis.data + __pyx_t_15 * __pyx_v_basis.strides[0]) ))) - __pyx_v_sp_i));
 
-        /* "pyprophet/_optimized.pyx":30
+        /* "pyprophet/_optimized.pyx":32
  *             for j in range(1, num_basis):
  *                 dist = abs(basis[j] - sp_i)
  *                 if dist < best_dist:             # <<<<<<<<<<<<<<
@@ -2177,7 +2177,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
         __pyx_t_8 = ((__pyx_v_dist < __pyx_v_best_dist) != 0);
         if (__pyx_t_8) {
 
-          /* "pyprophet/_optimized.pyx":31
+          /* "pyprophet/_optimized.pyx":33
  *                 dist = abs(basis[j] - sp_i)
  *                 if dist < best_dist:
  *                     best_dist = dist             # <<<<<<<<<<<<<<
@@ -2186,7 +2186,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
  */
           __pyx_v_best_dist = __pyx_v_dist;
 
-          /* "pyprophet/_optimized.pyx":32
+          /* "pyprophet/_optimized.pyx":34
  *                 if dist < best_dist:
  *                     best_dist = dist
  *                     best_j = j             # <<<<<<<<<<<<<<
@@ -2199,7 +2199,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
         __pyx_L8:;
       }
 
-      /* "pyprophet/_optimized.pyx":33
+      /* "pyprophet/_optimized.pyx":35
  *                     best_dist = dist
  *                     best_j = j
  *             view[i] = best_j             # <<<<<<<<<<<<<<
@@ -2210,7 +2210,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
       *((__pyx_t_5numpy_int64_t *) ( /* dim=0 */ (__pyx_v_view.data + __pyx_t_13 * __pyx_v_view.strides[0]) )) = __pyx_v_best_j;
     }
 
-    /* "pyprophet/_optimized.pyx":34
+    /* "pyprophet/_optimized.pyx":36
  *                     best_j = j
  *             view[i] = best_j
  *         return result             # <<<<<<<<<<<<<<
@@ -2223,7 +2223,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
     goto __pyx_L0;
   }
 
-  /* "pyprophet/_optimized.pyx":36
+  /* "pyprophet/_optimized.pyx":38
  *         return result
  * 
  *     sort_order = find_sort_order(basis)             # <<<<<<<<<<<<<<
@@ -2232,7 +2232,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
  */
   __pyx_v_sort_order = __pyx_f_9pyprophet_10_optimized_find_sort_order(__pyx_v_basis);
 
-  /* "pyprophet/_optimized.pyx":37
+  /* "pyprophet/_optimized.pyx":39
  * 
  *     sort_order = find_sort_order(basis)
  *     for i in range(num_samples):             # <<<<<<<<<<<<<<
@@ -2243,7 +2243,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
   for (__pyx_t_10 = 0; __pyx_t_10 < __pyx_t_9; __pyx_t_10+=1) {
     __pyx_v_i = __pyx_t_10;
 
-    /* "pyprophet/_optimized.pyx":38
+    /* "pyprophet/_optimized.pyx":40
  *     sort_order = find_sort_order(basis)
  *     for i in range(num_samples):
  *         sp_i = sample_points[i]             # <<<<<<<<<<<<<<
@@ -2253,7 +2253,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
     __pyx_t_14 = __pyx_v_i;
     __pyx_v_sp_i = (*((__pyx_t_9pyprophet_10_optimized_DATA_TYPE *) ( /* dim=0 */ (__pyx_v_sample_points.data + __pyx_t_14 * __pyx_v_sample_points.strides[0]) )));
 
-    /* "pyprophet/_optimized.pyx":47
+    /* "pyprophet/_optimized.pyx":49
  *                     best_dist = dist
  *                     best_j = j
  *         elif sort_order == 1:             # <<<<<<<<<<<<<<
@@ -2262,7 +2262,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
  */
     switch (__pyx_v_sort_order) {
 
-      /* "pyprophet/_optimized.pyx":39
+      /* "pyprophet/_optimized.pyx":41
  *     for i in range(num_samples):
  *         sp_i = sample_points[i]
  *         if sort_order == 0:             # <<<<<<<<<<<<<<
@@ -2271,7 +2271,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
  */
       case 0:
 
-      /* "pyprophet/_optimized.pyx":40
+      /* "pyprophet/_optimized.pyx":42
  *         sp_i = sample_points[i]
  *         if sort_order == 0:
  *             best_j = 0             # <<<<<<<<<<<<<<
@@ -2280,7 +2280,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
  */
       __pyx_v_best_j = 0;
 
-      /* "pyprophet/_optimized.pyx":41
+      /* "pyprophet/_optimized.pyx":43
  *         if sort_order == 0:
  *             best_j = 0
  *             best_dist = abs(basis[0] - sp_i)             # <<<<<<<<<<<<<<
@@ -2290,7 +2290,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
       __pyx_t_16 = 0;
       __pyx_v_best_dist = fabsf(((*((__pyx_t_9pyprophet_10_optimized_DATA_TYPE *) ( /* dim=0 */ (__pyx_v_basis.data + __pyx_t_16 * __pyx_v_basis.strides[0]) ))) - __pyx_v_sp_i));
 
-      /* "pyprophet/_optimized.pyx":42
+      /* "pyprophet/_optimized.pyx":44
  *             best_j = 0
  *             best_dist = abs(basis[0] - sp_i)
  *             for j in range(1, num_basis):             # <<<<<<<<<<<<<<
@@ -2301,7 +2301,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
       for (__pyx_t_18 = 1; __pyx_t_18 < __pyx_t_17; __pyx_t_18+=1) {
         __pyx_v_j = __pyx_t_18;
 
-        /* "pyprophet/_optimized.pyx":43
+        /* "pyprophet/_optimized.pyx":45
  *             best_dist = abs(basis[0] - sp_i)
  *             for j in range(1, num_basis):
  *                 dist = abs(basis[j] - sp_i)             # <<<<<<<<<<<<<<
@@ -2311,7 +2311,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
         __pyx_t_19 = __pyx_v_j;
         __pyx_v_dist = fabsf(((*((__pyx_t_9pyprophet_10_optimized_DATA_TYPE *) ( /* dim=0 */ (__pyx_v_basis.data + __pyx_t_19 * __pyx_v_basis.strides[0]) ))) - __pyx_v_sp_i));
 
-        /* "pyprophet/_optimized.pyx":44
+        /* "pyprophet/_optimized.pyx":46
  *             for j in range(1, num_basis):
  *                 dist = abs(basis[j] - sp_i)
  *                 if dist < best_dist:             # <<<<<<<<<<<<<<
@@ -2321,7 +2321,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
         __pyx_t_8 = ((__pyx_v_dist < __pyx_v_best_dist) != 0);
         if (__pyx_t_8) {
 
-          /* "pyprophet/_optimized.pyx":45
+          /* "pyprophet/_optimized.pyx":47
  *                 dist = abs(basis[j] - sp_i)
  *                 if dist < best_dist:
  *                     best_dist = dist             # <<<<<<<<<<<<<<
@@ -2330,7 +2330,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
  */
           __pyx_v_best_dist = __pyx_v_dist;
 
-          /* "pyprophet/_optimized.pyx":46
+          /* "pyprophet/_optimized.pyx":48
  *                 if dist < best_dist:
  *                     best_dist = dist
  *                     best_j = j             # <<<<<<<<<<<<<<
@@ -2344,7 +2344,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
       }
       break;
 
-      /* "pyprophet/_optimized.pyx":47
+      /* "pyprophet/_optimized.pyx":49
  *                     best_dist = dist
  *                     best_j = j
  *         elif sort_order == 1:             # <<<<<<<<<<<<<<
@@ -2353,7 +2353,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
  */
       case 1:
 
-      /* "pyprophet/_optimized.pyx":48
+      /* "pyprophet/_optimized.pyx":50
  *                     best_j = j
  *         elif sort_order == 1:
  *             low = 0             # <<<<<<<<<<<<<<
@@ -2362,7 +2362,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
  */
       __pyx_v_low = 0;
 
-      /* "pyprophet/_optimized.pyx":49
+      /* "pyprophet/_optimized.pyx":51
  *         elif sort_order == 1:
  *             low = 0
  *             high = num_basis - 1             # <<<<<<<<<<<<<<
@@ -2371,7 +2371,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
  */
       __pyx_v_high = (__pyx_v_num_basis - 1);
 
-      /* "pyprophet/_optimized.pyx":50
+      /* "pyprophet/_optimized.pyx":52
  *             low = 0
  *             high = num_basis - 1
  *             best_j = -1             # <<<<<<<<<<<<<<
@@ -2380,7 +2380,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
  */
       __pyx_v_best_j = -1;
 
-      /* "pyprophet/_optimized.pyx":51
+      /* "pyprophet/_optimized.pyx":53
  *             high = num_basis - 1
  *             best_j = -1
  *             if basis[low] == sp_i:             # <<<<<<<<<<<<<<
@@ -2391,7 +2391,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
       __pyx_t_8 = (((*((__pyx_t_9pyprophet_10_optimized_DATA_TYPE *) ( /* dim=0 */ (__pyx_v_basis.data + __pyx_t_17 * __pyx_v_basis.strides[0]) ))) == __pyx_v_sp_i) != 0);
       if (__pyx_t_8) {
 
-        /* "pyprophet/_optimized.pyx":52
+        /* "pyprophet/_optimized.pyx":54
  *             best_j = -1
  *             if basis[low] == sp_i:
  *                 best_j = low             # <<<<<<<<<<<<<<
@@ -2402,7 +2402,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
         goto __pyx_L14;
       }
 
-      /* "pyprophet/_optimized.pyx":53
+      /* "pyprophet/_optimized.pyx":55
  *             if basis[low] == sp_i:
  *                 best_j = low
  *             elif basis[high] == sp_i:             # <<<<<<<<<<<<<<
@@ -2413,7 +2413,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
       __pyx_t_8 = (((*((__pyx_t_9pyprophet_10_optimized_DATA_TYPE *) ( /* dim=0 */ (__pyx_v_basis.data + __pyx_t_18 * __pyx_v_basis.strides[0]) ))) == __pyx_v_sp_i) != 0);
       if (__pyx_t_8) {
 
-        /* "pyprophet/_optimized.pyx":54
+        /* "pyprophet/_optimized.pyx":56
  *                 best_j = low
  *             elif basis[high] == sp_i:
  *                 best_j = high             # <<<<<<<<<<<<<<
@@ -2425,7 +2425,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
       }
       /*else*/ {
 
-        /* "pyprophet/_optimized.pyx":56
+        /* "pyprophet/_optimized.pyx":58
  *                 best_j = high
  *             else:
  *                 while low < high - 1:             # <<<<<<<<<<<<<<
@@ -2436,7 +2436,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
           __pyx_t_8 = ((__pyx_v_low < (__pyx_v_high - 1)) != 0);
           if (!__pyx_t_8) break;
 
-          /* "pyprophet/_optimized.pyx":57
+          /* "pyprophet/_optimized.pyx":59
  *             else:
  *                 while low < high - 1:
  *                     mid = (low + high) / 2             # <<<<<<<<<<<<<<
@@ -2445,7 +2445,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
  */
           __pyx_v_mid = ((__pyx_v_low + __pyx_v_high) / 2);
 
-          /* "pyprophet/_optimized.pyx":58
+          /* "pyprophet/_optimized.pyx":60
  *                 while low < high - 1:
  *                     mid = (low + high) / 2
  *                     if basis[mid] == sp_i:             # <<<<<<<<<<<<<<
@@ -2456,7 +2456,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
           __pyx_t_8 = (((*((__pyx_t_9pyprophet_10_optimized_DATA_TYPE *) ( /* dim=0 */ (__pyx_v_basis.data + __pyx_t_20 * __pyx_v_basis.strides[0]) ))) == __pyx_v_sp_i) != 0);
           if (__pyx_t_8) {
 
-            /* "pyprophet/_optimized.pyx":59
+            /* "pyprophet/_optimized.pyx":61
  *                     mid = (low + high) / 2
  *                     if basis[mid] == sp_i:
  *                         best_j = mid             # <<<<<<<<<<<<<<
@@ -2468,7 +2468,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
           }
           __pyx_L17:;
 
-          /* "pyprophet/_optimized.pyx":60
+          /* "pyprophet/_optimized.pyx":62
  *                     if basis[mid] == sp_i:
  *                         best_j = mid
  *                     if basis[mid] < sp_i:             # <<<<<<<<<<<<<<
@@ -2479,7 +2479,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
           __pyx_t_8 = (((*((__pyx_t_9pyprophet_10_optimized_DATA_TYPE *) ( /* dim=0 */ (__pyx_v_basis.data + __pyx_t_21 * __pyx_v_basis.strides[0]) ))) < __pyx_v_sp_i) != 0);
           if (__pyx_t_8) {
 
-            /* "pyprophet/_optimized.pyx":61
+            /* "pyprophet/_optimized.pyx":63
  *                         best_j = mid
  *                     if basis[mid] < sp_i:
  *                         low = mid             # <<<<<<<<<<<<<<
@@ -2491,7 +2491,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
           }
           /*else*/ {
 
-            /* "pyprophet/_optimized.pyx":63
+            /* "pyprophet/_optimized.pyx":65
  *                         low = mid
  *                     else:
  *                         high = mid             # <<<<<<<<<<<<<<
@@ -2503,7 +2503,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
           __pyx_L18:;
         }
 
-        /* "pyprophet/_optimized.pyx":64
+        /* "pyprophet/_optimized.pyx":66
  *                     else:
  *                         high = mid
  *                 if best_j == -1:             # <<<<<<<<<<<<<<
@@ -2513,7 +2513,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
         __pyx_t_8 = ((__pyx_v_best_j == -1) != 0);
         if (__pyx_t_8) {
 
-          /* "pyprophet/_optimized.pyx":65
+          /* "pyprophet/_optimized.pyx":67
  *                         high = mid
  *                 if best_j == -1:
  *                     if abs(basis[low] - sp_i) < abs(basis[high] - sp_i):             # <<<<<<<<<<<<<<
@@ -2525,7 +2525,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
           __pyx_t_8 = ((fabsf(((*((__pyx_t_9pyprophet_10_optimized_DATA_TYPE *) ( /* dim=0 */ (__pyx_v_basis.data + __pyx_t_22 * __pyx_v_basis.strides[0]) ))) - __pyx_v_sp_i)) < fabsf(((*((__pyx_t_9pyprophet_10_optimized_DATA_TYPE *) ( /* dim=0 */ (__pyx_v_basis.data + __pyx_t_23 * __pyx_v_basis.strides[0]) ))) - __pyx_v_sp_i))) != 0);
           if (__pyx_t_8) {
 
-            /* "pyprophet/_optimized.pyx":66
+            /* "pyprophet/_optimized.pyx":68
  *                 if best_j == -1:
  *                     if abs(basis[low] - sp_i) < abs(basis[high] - sp_i):
  *                         best_j = low             # <<<<<<<<<<<<<<
@@ -2537,7 +2537,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
           }
           /*else*/ {
 
-            /* "pyprophet/_optimized.pyx":68
+            /* "pyprophet/_optimized.pyx":70
  *                         best_j = low
  *                     else:
  *                         best_j = high             # <<<<<<<<<<<<<<
@@ -2553,7 +2553,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
       }
       __pyx_L14:;
 
-      /* "pyprophet/_optimized.pyx":70
+      /* "pyprophet/_optimized.pyx":72
  *                         best_j = high
  *             # find first match in list !
  *             while best_j > 0:             # <<<<<<<<<<<<<<
@@ -2564,7 +2564,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
         __pyx_t_8 = ((__pyx_v_best_j > 0) != 0);
         if (!__pyx_t_8) break;
 
-        /* "pyprophet/_optimized.pyx":71
+        /* "pyprophet/_optimized.pyx":73
  *             # find first match in list !
  *             while best_j > 0:
  *                 if basis[best_j - 1] == basis[best_j]:             # <<<<<<<<<<<<<<
@@ -2576,7 +2576,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
         __pyx_t_8 = (((*((__pyx_t_9pyprophet_10_optimized_DATA_TYPE *) ( /* dim=0 */ (__pyx_v_basis.data + __pyx_t_24 * __pyx_v_basis.strides[0]) ))) == (*((__pyx_t_9pyprophet_10_optimized_DATA_TYPE *) ( /* dim=0 */ (__pyx_v_basis.data + __pyx_t_25 * __pyx_v_basis.strides[0]) )))) != 0);
         if (__pyx_t_8) {
 
-          /* "pyprophet/_optimized.pyx":72
+          /* "pyprophet/_optimized.pyx":74
  *             while best_j > 0:
  *                 if basis[best_j - 1] == basis[best_j]:
  *                     best_j = best_j - 1             # <<<<<<<<<<<<<<
@@ -2588,7 +2588,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
         }
         /*else*/ {
 
-          /* "pyprophet/_optimized.pyx":74
+          /* "pyprophet/_optimized.pyx":76
  *                     best_j = best_j - 1
  *                 else:
  *                     break             # <<<<<<<<<<<<<<
@@ -2603,7 +2603,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
       break;
       default:
 
-      /* "pyprophet/_optimized.pyx":76
+      /* "pyprophet/_optimized.pyx":78
  *                     break
  *         else:
  *             low = 0             # <<<<<<<<<<<<<<
@@ -2612,7 +2612,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
  */
       __pyx_v_low = 0;
 
-      /* "pyprophet/_optimized.pyx":77
+      /* "pyprophet/_optimized.pyx":79
  *         else:
  *             low = 0
  *             high = num_basis - 1             # <<<<<<<<<<<<<<
@@ -2621,7 +2621,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
  */
       __pyx_v_high = (__pyx_v_num_basis - 1);
 
-      /* "pyprophet/_optimized.pyx":78
+      /* "pyprophet/_optimized.pyx":80
  *             low = 0
  *             high = num_basis - 1
  *             best_j = -1             # <<<<<<<<<<<<<<
@@ -2630,7 +2630,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
  */
       __pyx_v_best_j = -1;
 
-      /* "pyprophet/_optimized.pyx":79
+      /* "pyprophet/_optimized.pyx":81
  *             high = num_basis - 1
  *             best_j = -1
  *             if basis[low] == sp_i:             # <<<<<<<<<<<<<<
@@ -2641,7 +2641,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
       __pyx_t_8 = (((*((__pyx_t_9pyprophet_10_optimized_DATA_TYPE *) ( /* dim=0 */ (__pyx_v_basis.data + __pyx_t_26 * __pyx_v_basis.strides[0]) ))) == __pyx_v_sp_i) != 0);
       if (__pyx_t_8) {
 
-        /* "pyprophet/_optimized.pyx":80
+        /* "pyprophet/_optimized.pyx":82
  *             best_j = -1
  *             if basis[low] == sp_i:
  *                 best_j = low             # <<<<<<<<<<<<<<
@@ -2652,7 +2652,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
         goto __pyx_L24;
       }
 
-      /* "pyprophet/_optimized.pyx":81
+      /* "pyprophet/_optimized.pyx":83
  *             if basis[low] == sp_i:
  *                 best_j = low
  *             elif basis[high] == sp_i:             # <<<<<<<<<<<<<<
@@ -2663,7 +2663,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
       __pyx_t_8 = (((*((__pyx_t_9pyprophet_10_optimized_DATA_TYPE *) ( /* dim=0 */ (__pyx_v_basis.data + __pyx_t_27 * __pyx_v_basis.strides[0]) ))) == __pyx_v_sp_i) != 0);
       if (__pyx_t_8) {
 
-        /* "pyprophet/_optimized.pyx":82
+        /* "pyprophet/_optimized.pyx":84
  *                 best_j = low
  *             elif basis[high] == sp_i:
  *                 best_j = high             # <<<<<<<<<<<<<<
@@ -2675,7 +2675,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
       }
       /*else*/ {
 
-        /* "pyprophet/_optimized.pyx":84
+        /* "pyprophet/_optimized.pyx":86
  *                 best_j = high
  *             else:
  *                 while low < high - 1:             # <<<<<<<<<<<<<<
@@ -2686,7 +2686,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
           __pyx_t_8 = ((__pyx_v_low < (__pyx_v_high - 1)) != 0);
           if (!__pyx_t_8) break;
 
-          /* "pyprophet/_optimized.pyx":85
+          /* "pyprophet/_optimized.pyx":87
  *             else:
  *                 while low < high - 1:
  *                     mid = (low + high) / 2             # <<<<<<<<<<<<<<
@@ -2695,7 +2695,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
  */
           __pyx_v_mid = ((__pyx_v_low + __pyx_v_high) / 2);
 
-          /* "pyprophet/_optimized.pyx":86
+          /* "pyprophet/_optimized.pyx":88
  *                 while low < high - 1:
  *                     mid = (low + high) / 2
  *                     if basis[mid] == sp_i:             # <<<<<<<<<<<<<<
@@ -2706,7 +2706,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
           __pyx_t_8 = (((*((__pyx_t_9pyprophet_10_optimized_DATA_TYPE *) ( /* dim=0 */ (__pyx_v_basis.data + __pyx_t_28 * __pyx_v_basis.strides[0]) ))) == __pyx_v_sp_i) != 0);
           if (__pyx_t_8) {
 
-            /* "pyprophet/_optimized.pyx":87
+            /* "pyprophet/_optimized.pyx":89
  *                     mid = (low + high) / 2
  *                     if basis[mid] == sp_i:
  *                         best_j = mid             # <<<<<<<<<<<<<<
@@ -2715,7 +2715,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
  */
             __pyx_v_best_j = __pyx_v_mid;
 
-            /* "pyprophet/_optimized.pyx":88
+            /* "pyprophet/_optimized.pyx":90
  *                     if basis[mid] == sp_i:
  *                         best_j = mid
  *                         break             # <<<<<<<<<<<<<<
@@ -2725,7 +2725,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
             goto __pyx_L26_break;
           }
 
-          /* "pyprophet/_optimized.pyx":89
+          /* "pyprophet/_optimized.pyx":91
  *                         best_j = mid
  *                         break
  *                     if basis[mid] > sp_i:             # <<<<<<<<<<<<<<
@@ -2736,7 +2736,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
           __pyx_t_8 = (((*((__pyx_t_9pyprophet_10_optimized_DATA_TYPE *) ( /* dim=0 */ (__pyx_v_basis.data + __pyx_t_29 * __pyx_v_basis.strides[0]) ))) > __pyx_v_sp_i) != 0);
           if (__pyx_t_8) {
 
-            /* "pyprophet/_optimized.pyx":90
+            /* "pyprophet/_optimized.pyx":92
  *                         break
  *                     if basis[mid] > sp_i:
  *                         low = mid             # <<<<<<<<<<<<<<
@@ -2748,7 +2748,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
           }
           /*else*/ {
 
-            /* "pyprophet/_optimized.pyx":92
+            /* "pyprophet/_optimized.pyx":94
  *                         low = mid
  *                     else:
  *                         high = mid             # <<<<<<<<<<<<<<
@@ -2761,7 +2761,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
         }
         __pyx_L26_break:;
 
-        /* "pyprophet/_optimized.pyx":93
+        /* "pyprophet/_optimized.pyx":95
  *                     else:
  *                         high = mid
  *                 if best_j == -1:             # <<<<<<<<<<<<<<
@@ -2771,7 +2771,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
         __pyx_t_8 = ((__pyx_v_best_j == -1) != 0);
         if (__pyx_t_8) {
 
-          /* "pyprophet/_optimized.pyx":94
+          /* "pyprophet/_optimized.pyx":96
  *                         high = mid
  *                 if best_j == -1:
  *                     if abs(basis[low] - sp_i) < abs(basis[high] - sp_i):             # <<<<<<<<<<<<<<
@@ -2783,7 +2783,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
           __pyx_t_8 = ((fabsf(((*((__pyx_t_9pyprophet_10_optimized_DATA_TYPE *) ( /* dim=0 */ (__pyx_v_basis.data + __pyx_t_30 * __pyx_v_basis.strides[0]) ))) - __pyx_v_sp_i)) < fabsf(((*((__pyx_t_9pyprophet_10_optimized_DATA_TYPE *) ( /* dim=0 */ (__pyx_v_basis.data + __pyx_t_31 * __pyx_v_basis.strides[0]) ))) - __pyx_v_sp_i))) != 0);
           if (__pyx_t_8) {
 
-            /* "pyprophet/_optimized.pyx":95
+            /* "pyprophet/_optimized.pyx":97
  *                 if best_j == -1:
  *                     if abs(basis[low] - sp_i) < abs(basis[high] - sp_i):
  *                         best_j = low             # <<<<<<<<<<<<<<
@@ -2795,7 +2795,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
           }
           /*else*/ {
 
-            /* "pyprophet/_optimized.pyx":97
+            /* "pyprophet/_optimized.pyx":99
  *                         best_j = low
  *                     else:
  *                         best_j = high             # <<<<<<<<<<<<<<
@@ -2811,7 +2811,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
       }
       __pyx_L24:;
 
-      /* "pyprophet/_optimized.pyx":99
+      /* "pyprophet/_optimized.pyx":101
  *                         best_j = high
  *             # find first match in list:
  *             while best_j > 0:             # <<<<<<<<<<<<<<
@@ -2822,7 +2822,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
         __pyx_t_8 = ((__pyx_v_best_j > 0) != 0);
         if (!__pyx_t_8) break;
 
-        /* "pyprophet/_optimized.pyx":100
+        /* "pyprophet/_optimized.pyx":102
  *             # find first match in list:
  *             while best_j > 0:
  *                 if basis[best_j - 1] == basis[best_j]:             # <<<<<<<<<<<<<<
@@ -2834,7 +2834,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
         __pyx_t_8 = (((*((__pyx_t_9pyprophet_10_optimized_DATA_TYPE *) ( /* dim=0 */ (__pyx_v_basis.data + __pyx_t_32 * __pyx_v_basis.strides[0]) ))) == (*((__pyx_t_9pyprophet_10_optimized_DATA_TYPE *) ( /* dim=0 */ (__pyx_v_basis.data + __pyx_t_33 * __pyx_v_basis.strides[0]) )))) != 0);
         if (__pyx_t_8) {
 
-          /* "pyprophet/_optimized.pyx":101
+          /* "pyprophet/_optimized.pyx":103
  *             while best_j > 0:
  *                 if basis[best_j - 1] == basis[best_j]:
  *                     best_j = best_j - 1             # <<<<<<<<<<<<<<
@@ -2846,7 +2846,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
         }
         /*else*/ {
 
-          /* "pyprophet/_optimized.pyx":103
+          /* "pyprophet/_optimized.pyx":105
  *                     best_j = best_j - 1
  *                 else:
  *                     break             # <<<<<<<<<<<<<<
@@ -2861,7 +2861,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
       break;
     }
 
-    /* "pyprophet/_optimized.pyx":105
+    /* "pyprophet/_optimized.pyx":107
  *                     break
  * 
  *         view[i] = best_j             # <<<<<<<<<<<<<<
@@ -2872,7 +2872,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
     *((__pyx_t_5numpy_int64_t *) ( /* dim=0 */ (__pyx_v_view.data + __pyx_t_34 * __pyx_v_view.strides[0]) )) = __pyx_v_best_j;
   }
 
-  /* "pyprophet/_optimized.pyx":106
+  /* "pyprophet/_optimized.pyx":108
  * 
  *         view[i] = best_j
  *     return result             # <<<<<<<<<<<<<<
@@ -2884,7 +2884,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
   __pyx_r = __pyx_v_result;
   goto __pyx_L0;
 
-  /* "pyprophet/_optimized.pyx":13
+  /* "pyprophet/_optimized.pyx":15
  * @cython.boundscheck(False)
  * @cython.wraparound(False)
  * def find_nearest_matches(DATA_TYPE[:] basis, DATA_TYPE[:] sample_points, use_sort_order=1):             # <<<<<<<<<<<<<<
@@ -2912,7 +2912,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
   return __pyx_r;
 }
 
-/* "pyprophet/_optimized.pyx":109
+/* "pyprophet/_optimized.pyx":111
  * 
  * 
  * cdef int find_sort_order(DATA_TYPE[:] basis):             # <<<<<<<<<<<<<<
@@ -2943,7 +2943,7 @@ static int __pyx_f_9pyprophet_10_optimized_find_sort_order(__Pyx_memviewslice __
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("find_sort_order", 0);
 
-  /* "pyprophet/_optimized.pyx":114
+  /* "pyprophet/_optimized.pyx":116
  *     # 2: descending
  *     cdef size_t i, n
  *     n = basis.shape[0]             # <<<<<<<<<<<<<<
@@ -2952,7 +2952,7 @@ static int __pyx_f_9pyprophet_10_optimized_find_sort_order(__Pyx_memviewslice __
  */
   __pyx_v_n = (__pyx_v_basis.shape[0]);
 
-  /* "pyprophet/_optimized.pyx":115
+  /* "pyprophet/_optimized.pyx":117
  *     cdef size_t i, n
  *     n = basis.shape[0]
  *     if n <= 1:             # <<<<<<<<<<<<<<
@@ -2962,7 +2962,7 @@ static int __pyx_f_9pyprophet_10_optimized_find_sort_order(__Pyx_memviewslice __
   __pyx_t_1 = ((__pyx_v_n <= 1) != 0);
   if (__pyx_t_1) {
 
-    /* "pyprophet/_optimized.pyx":116
+    /* "pyprophet/_optimized.pyx":118
  *     n = basis.shape[0]
  *     if n <= 1:
  *         return 0             # <<<<<<<<<<<<<<
@@ -2973,7 +2973,7 @@ static int __pyx_f_9pyprophet_10_optimized_find_sort_order(__Pyx_memviewslice __
     goto __pyx_L0;
   }
 
-  /* "pyprophet/_optimized.pyx":117
+  /* "pyprophet/_optimized.pyx":119
  *     if n <= 1:
  *         return 0
  *     i = 0             # <<<<<<<<<<<<<<
@@ -2982,7 +2982,7 @@ static int __pyx_f_9pyprophet_10_optimized_find_sort_order(__Pyx_memviewslice __
  */
   __pyx_v_i = 0;
 
-  /* "pyprophet/_optimized.pyx":118
+  /* "pyprophet/_optimized.pyx":120
  *         return 0
  *     i = 0
  *     while i < n - 1 and basis[i] == basis[i + 1]:             # <<<<<<<<<<<<<<
@@ -3001,21 +3001,21 @@ static int __pyx_f_9pyprophet_10_optimized_find_sort_order(__Pyx_memviewslice __
     if (unlikely(__pyx_t_3 >= (size_t)__pyx_v_basis.shape[0])) __pyx_t_4 = 0;
     if (unlikely(__pyx_t_4 != -1)) {
       __Pyx_RaiseBufferIndexError(__pyx_t_4);
-      {__pyx_filename = __pyx_f[0]; __pyx_lineno = 118; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+      {__pyx_filename = __pyx_f[0]; __pyx_lineno = 120; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
     }
     __pyx_t_5 = (__pyx_v_i + 1);
     __pyx_t_4 = -1;
     if (unlikely(__pyx_t_5 >= (size_t)__pyx_v_basis.shape[0])) __pyx_t_4 = 0;
     if (unlikely(__pyx_t_4 != -1)) {
       __Pyx_RaiseBufferIndexError(__pyx_t_4);
-      {__pyx_filename = __pyx_f[0]; __pyx_lineno = 118; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+      {__pyx_filename = __pyx_f[0]; __pyx_lineno = 120; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
     }
     __pyx_t_2 = (((*((__pyx_t_9pyprophet_10_optimized_DATA_TYPE *) ( /* dim=0 */ (__pyx_v_basis.data + __pyx_t_3 * __pyx_v_basis.strides[0]) ))) == (*((__pyx_t_9pyprophet_10_optimized_DATA_TYPE *) ( /* dim=0 */ (__pyx_v_basis.data + __pyx_t_5 * __pyx_v_basis.strides[0]) )))) != 0);
     __pyx_t_1 = __pyx_t_2;
     __pyx_L6_bool_binop_done:;
     if (!__pyx_t_1) break;
 
-    /* "pyprophet/_optimized.pyx":119
+    /* "pyprophet/_optimized.pyx":121
  *     i = 0
  *     while i < n - 1 and basis[i] == basis[i + 1]:
  *         i += 1             # <<<<<<<<<<<<<<
@@ -3025,7 +3025,7 @@ static int __pyx_f_9pyprophet_10_optimized_find_sort_order(__Pyx_memviewslice __
     __pyx_v_i = (__pyx_v_i + 1);
   }
 
-  /* "pyprophet/_optimized.pyx":120
+  /* "pyprophet/_optimized.pyx":122
  *     while i < n - 1 and basis[i] == basis[i + 1]:
  *         i += 1
  *     if i == n - 1:             # <<<<<<<<<<<<<<
@@ -3035,7 +3035,7 @@ static int __pyx_f_9pyprophet_10_optimized_find_sort_order(__Pyx_memviewslice __
   __pyx_t_1 = ((__pyx_v_i == (__pyx_v_n - 1)) != 0);
   if (__pyx_t_1) {
 
-    /* "pyprophet/_optimized.pyx":121
+    /* "pyprophet/_optimized.pyx":123
  *         i += 1
  *     if i == n - 1:
  *         return 1   # or -1 as list is constant             # <<<<<<<<<<<<<<
@@ -3046,7 +3046,7 @@ static int __pyx_f_9pyprophet_10_optimized_find_sort_order(__Pyx_memviewslice __
     goto __pyx_L0;
   }
 
-  /* "pyprophet/_optimized.pyx":122
+  /* "pyprophet/_optimized.pyx":124
  *     if i == n - 1:
  *         return 1   # or -1 as list is constant
  *     if basis[i] < basis[i + 1]:             # <<<<<<<<<<<<<<
@@ -3058,19 +3058,19 @@ static int __pyx_f_9pyprophet_10_optimized_find_sort_order(__Pyx_memviewslice __
   if (unlikely(__pyx_t_6 >= (size_t)__pyx_v_basis.shape[0])) __pyx_t_4 = 0;
   if (unlikely(__pyx_t_4 != -1)) {
     __Pyx_RaiseBufferIndexError(__pyx_t_4);
-    {__pyx_filename = __pyx_f[0]; __pyx_lineno = 122; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+    {__pyx_filename = __pyx_f[0]; __pyx_lineno = 124; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   }
   __pyx_t_7 = (__pyx_v_i + 1);
   __pyx_t_4 = -1;
   if (unlikely(__pyx_t_7 >= (size_t)__pyx_v_basis.shape[0])) __pyx_t_4 = 0;
   if (unlikely(__pyx_t_4 != -1)) {
     __Pyx_RaiseBufferIndexError(__pyx_t_4);
-    {__pyx_filename = __pyx_f[0]; __pyx_lineno = 122; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+    {__pyx_filename = __pyx_f[0]; __pyx_lineno = 124; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   }
   __pyx_t_1 = (((*((__pyx_t_9pyprophet_10_optimized_DATA_TYPE *) ( /* dim=0 */ (__pyx_v_basis.data + __pyx_t_6 * __pyx_v_basis.strides[0]) ))) < (*((__pyx_t_9pyprophet_10_optimized_DATA_TYPE *) ( /* dim=0 */ (__pyx_v_basis.data + __pyx_t_7 * __pyx_v_basis.strides[0]) )))) != 0);
   if (__pyx_t_1) {
 
-    /* "pyprophet/_optimized.pyx":123
+    /* "pyprophet/_optimized.pyx":125
  *         return 1   # or -1 as list is constant
  *     if basis[i] < basis[i + 1]:
  *         for i in range(i, n - 1):             # <<<<<<<<<<<<<<
@@ -3081,7 +3081,7 @@ static int __pyx_f_9pyprophet_10_optimized_find_sort_order(__Pyx_memviewslice __
     for (__pyx_t_9 = __pyx_v_i; __pyx_t_9 < __pyx_t_8; __pyx_t_9+=1) {
       __pyx_v_i = __pyx_t_9;
 
-      /* "pyprophet/_optimized.pyx":124
+      /* "pyprophet/_optimized.pyx":126
  *     if basis[i] < basis[i + 1]:
  *         for i in range(i, n - 1):
  *             if basis[i] > basis[i + 1]:             # <<<<<<<<<<<<<<
@@ -3093,19 +3093,19 @@ static int __pyx_f_9pyprophet_10_optimized_find_sort_order(__Pyx_memviewslice __
       if (unlikely(__pyx_t_10 >= (size_t)__pyx_v_basis.shape[0])) __pyx_t_4 = 0;
       if (unlikely(__pyx_t_4 != -1)) {
         __Pyx_RaiseBufferIndexError(__pyx_t_4);
-        {__pyx_filename = __pyx_f[0]; __pyx_lineno = 124; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+        {__pyx_filename = __pyx_f[0]; __pyx_lineno = 126; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
       }
       __pyx_t_11 = (__pyx_v_i + 1);
       __pyx_t_4 = -1;
       if (unlikely(__pyx_t_11 >= (size_t)__pyx_v_basis.shape[0])) __pyx_t_4 = 0;
       if (unlikely(__pyx_t_4 != -1)) {
         __Pyx_RaiseBufferIndexError(__pyx_t_4);
-        {__pyx_filename = __pyx_f[0]; __pyx_lineno = 124; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+        {__pyx_filename = __pyx_f[0]; __pyx_lineno = 126; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
       }
       __pyx_t_1 = (((*((__pyx_t_9pyprophet_10_optimized_DATA_TYPE *) ( /* dim=0 */ (__pyx_v_basis.data + __pyx_t_10 * __pyx_v_basis.strides[0]) ))) > (*((__pyx_t_9pyprophet_10_optimized_DATA_TYPE *) ( /* dim=0 */ (__pyx_v_basis.data + __pyx_t_11 * __pyx_v_basis.strides[0]) )))) != 0);
       if (__pyx_t_1) {
 
-        /* "pyprophet/_optimized.pyx":125
+        /* "pyprophet/_optimized.pyx":127
  *         for i in range(i, n - 1):
  *             if basis[i] > basis[i + 1]:
  *                 return 0             # <<<<<<<<<<<<<<
@@ -3117,7 +3117,7 @@ static int __pyx_f_9pyprophet_10_optimized_find_sort_order(__Pyx_memviewslice __
       }
     }
 
-    /* "pyprophet/_optimized.pyx":126
+    /* "pyprophet/_optimized.pyx":128
  *             if basis[i] > basis[i + 1]:
  *                 return 0
  *         return 1             # <<<<<<<<<<<<<<
@@ -3129,7 +3129,7 @@ static int __pyx_f_9pyprophet_10_optimized_find_sort_order(__Pyx_memviewslice __
   }
   /*else*/ {
 
-    /* "pyprophet/_optimized.pyx":128
+    /* "pyprophet/_optimized.pyx":130
  *         return 1
  *     else:
  *         for i in range(i, n - 1):             # <<<<<<<<<<<<<<
@@ -3140,7 +3140,7 @@ static int __pyx_f_9pyprophet_10_optimized_find_sort_order(__Pyx_memviewslice __
     for (__pyx_t_9 = __pyx_v_i; __pyx_t_9 < __pyx_t_8; __pyx_t_9+=1) {
       __pyx_v_i = __pyx_t_9;
 
-      /* "pyprophet/_optimized.pyx":129
+      /* "pyprophet/_optimized.pyx":131
  *     else:
  *         for i in range(i, n - 1):
  *             if basis[i] < basis[i + 1]:             # <<<<<<<<<<<<<<
@@ -3152,19 +3152,19 @@ static int __pyx_f_9pyprophet_10_optimized_find_sort_order(__Pyx_memviewslice __
       if (unlikely(__pyx_t_12 >= (size_t)__pyx_v_basis.shape[0])) __pyx_t_4 = 0;
       if (unlikely(__pyx_t_4 != -1)) {
         __Pyx_RaiseBufferIndexError(__pyx_t_4);
-        {__pyx_filename = __pyx_f[0]; __pyx_lineno = 129; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+        {__pyx_filename = __pyx_f[0]; __pyx_lineno = 131; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
       }
       __pyx_t_13 = (__pyx_v_i + 1);
       __pyx_t_4 = -1;
       if (unlikely(__pyx_t_13 >= (size_t)__pyx_v_basis.shape[0])) __pyx_t_4 = 0;
       if (unlikely(__pyx_t_4 != -1)) {
         __Pyx_RaiseBufferIndexError(__pyx_t_4);
-        {__pyx_filename = __pyx_f[0]; __pyx_lineno = 129; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+        {__pyx_filename = __pyx_f[0]; __pyx_lineno = 131; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
       }
       __pyx_t_1 = (((*((__pyx_t_9pyprophet_10_optimized_DATA_TYPE *) ( /* dim=0 */ (__pyx_v_basis.data + __pyx_t_12 * __pyx_v_basis.strides[0]) ))) < (*((__pyx_t_9pyprophet_10_optimized_DATA_TYPE *) ( /* dim=0 */ (__pyx_v_basis.data + __pyx_t_13 * __pyx_v_basis.strides[0]) )))) != 0);
       if (__pyx_t_1) {
 
-        /* "pyprophet/_optimized.pyx":130
+        /* "pyprophet/_optimized.pyx":132
  *         for i in range(i, n - 1):
  *             if basis[i] < basis[i + 1]:
  *                 return 0             # <<<<<<<<<<<<<<
@@ -3176,18 +3176,18 @@ static int __pyx_f_9pyprophet_10_optimized_find_sort_order(__Pyx_memviewslice __
       }
     }
 
-    /* "pyprophet/_optimized.pyx":131
+    /* "pyprophet/_optimized.pyx":133
  *             if basis[i] < basis[i + 1]:
  *                 return 0
  *         return -1             # <<<<<<<<<<<<<<
  * 
- * @cython.boundscheck(False)
+ * 
  */
     __pyx_r = -1;
     goto __pyx_L0;
   }
 
-  /* "pyprophet/_optimized.pyx":109
+  /* "pyprophet/_optimized.pyx":111
  * 
  * 
  * cdef int find_sort_order(DATA_TYPE[:] basis):             # <<<<<<<<<<<<<<
@@ -3204,12 +3204,12 @@ static int __pyx_f_9pyprophet_10_optimized_find_sort_order(__Pyx_memviewslice __
   return __pyx_r;
 }
 
-/* "pyprophet/_optimized.pyx":135
+/* "pyprophet/_optimized.pyx":138
  * @cython.boundscheck(False)
  * @cython.wraparound(False)
- * def count_num_positives(DATA_TYPE[:] values):             # <<<<<<<<<<<<<<
+ * def count_num_positives(np.float64_t[:] values):             # <<<<<<<<<<<<<<
  *     cdef size_t n = values.shape[0]
- *     cdef DATA_TYPE[:] inp_view = values
+ *     cdef np.float64_t[:] inp_view = values
  */
 
 /* Python wrapper */
@@ -3224,7 +3224,7 @@ static PyObject *__pyx_pw_9pyprophet_10_optimized_3count_num_positives(PyObject 
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("count_num_positives (wrapper)", 0);
   assert(__pyx_arg_values); {
-    __pyx_v_values = __Pyx_PyObject_to_MemoryviewSlice_ds_nn___pyx_t_9pyprophet_10_optimized_DATA_TYPE(__pyx_arg_values); if (unlikely(!__pyx_v_values.memview)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 135; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+    __pyx_v_values = __Pyx_PyObject_to_MemoryviewSlice_ds_nn___pyx_t_5numpy_float64_t(__pyx_arg_values); if (unlikely(!__pyx_v_values.memview)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 138; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L3_error:;
@@ -3265,54 +3265,54 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_2count_num_positives(CYTHON_UN
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("count_num_positives", 0);
 
-  /* "pyprophet/_optimized.pyx":136
+  /* "pyprophet/_optimized.pyx":139
  * @cython.wraparound(False)
- * def count_num_positives(DATA_TYPE[:] values):
+ * def count_num_positives(np.float64_t[:] values):
  *     cdef size_t n = values.shape[0]             # <<<<<<<<<<<<<<
- *     cdef DATA_TYPE[:] inp_view = values
+ *     cdef np.float64_t[:] inp_view = values
  *     cdef size_t i0, i1, c
  */
   __pyx_v_n = (__pyx_v_values.shape[0]);
 
-  /* "pyprophet/_optimized.pyx":137
- * def count_num_positives(DATA_TYPE[:] values):
+  /* "pyprophet/_optimized.pyx":140
+ * def count_num_positives(np.float64_t[:] values):
  *     cdef size_t n = values.shape[0]
- *     cdef DATA_TYPE[:] inp_view = values             # <<<<<<<<<<<<<<
+ *     cdef np.float64_t[:] inp_view = values             # <<<<<<<<<<<<<<
  *     cdef size_t i0, i1, c
  *     result = np.zeros_like(values, dtype=np.int64)
  */
   __PYX_INC_MEMVIEW(&__pyx_v_values, 0);
   __pyx_v_inp_view = __pyx_v_values;
 
-  /* "pyprophet/_optimized.pyx":139
- *     cdef DATA_TYPE[:] inp_view = values
+  /* "pyprophet/_optimized.pyx":142
+ *     cdef np.float64_t[:] inp_view = values
  *     cdef size_t i0, i1, c
  *     result = np.zeros_like(values, dtype=np.int64)             # <<<<<<<<<<<<<<
  *     cdef np.int64_t[:] res_view = result
  *     i0 = i1 = 0
  */
-  __pyx_t_1 = __Pyx_GetModuleGlobalName(__pyx_n_s_np); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 139; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_1 = __Pyx_GetModuleGlobalName(__pyx_n_s_np); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 142; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_1);
-  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_1, __pyx_n_s_zeros_like); if (unlikely(!__pyx_t_2)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 139; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_1, __pyx_n_s_zeros_like); if (unlikely(!__pyx_t_2)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 142; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_2);
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-  __pyx_t_1 = __pyx_memoryview_fromslice(__pyx_v_values, 1, (PyObject *(*)(char *)) __pyx_memview_get_nn___pyx_t_9pyprophet_10_optimized_DATA_TYPE, (int (*)(char *, PyObject *)) __pyx_memview_set_nn___pyx_t_9pyprophet_10_optimized_DATA_TYPE, 0);; if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 139; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_1 = __pyx_memoryview_fromslice(__pyx_v_values, 1, (PyObject *(*)(char *)) __pyx_memview_get_nn___pyx_t_5numpy_float64_t, (int (*)(char *, PyObject *)) __pyx_memview_set_nn___pyx_t_5numpy_float64_t, 0);; if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 142; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_1);
-  __pyx_t_3 = PyTuple_New(1); if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 139; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_3 = PyTuple_New(1); if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 142; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_3);
   __Pyx_GIVEREF(__pyx_t_1);
   PyTuple_SET_ITEM(__pyx_t_3, 0, __pyx_t_1);
   __pyx_t_1 = 0;
-  __pyx_t_1 = PyDict_New(); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 139; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_1 = PyDict_New(); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 142; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_1);
-  __pyx_t_4 = __Pyx_GetModuleGlobalName(__pyx_n_s_np); if (unlikely(!__pyx_t_4)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 139; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_4 = __Pyx_GetModuleGlobalName(__pyx_n_s_np); if (unlikely(!__pyx_t_4)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 142; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_4);
-  __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_t_4, __pyx_n_s_int64); if (unlikely(!__pyx_t_5)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 139; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_t_4, __pyx_n_s_int64); if (unlikely(!__pyx_t_5)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 142; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_5);
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-  if (PyDict_SetItem(__pyx_t_1, __pyx_n_s_dtype, __pyx_t_5) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 139; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  if (PyDict_SetItem(__pyx_t_1, __pyx_n_s_dtype, __pyx_t_5) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 142; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-  __pyx_t_5 = __Pyx_PyObject_Call(__pyx_t_2, __pyx_t_3, __pyx_t_1); if (unlikely(!__pyx_t_5)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 139; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_5 = __Pyx_PyObject_Call(__pyx_t_2, __pyx_t_3, __pyx_t_1); if (unlikely(!__pyx_t_5)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 142; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_5);
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
@@ -3320,7 +3320,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_2count_num_positives(CYTHON_UN
   __pyx_v_result = __pyx_t_5;
   __pyx_t_5 = 0;
 
-  /* "pyprophet/_optimized.pyx":140
+  /* "pyprophet/_optimized.pyx":143
  *     cdef size_t i0, i1, c
  *     result = np.zeros_like(values, dtype=np.int64)
  *     cdef np.int64_t[:] res_view = result             # <<<<<<<<<<<<<<
@@ -3328,12 +3328,12 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_2count_num_positives(CYTHON_UN
  *     c = n
  */
   __pyx_t_6 = __Pyx_PyObject_to_MemoryviewSlice_ds_nn___pyx_t_5numpy_int64_t(__pyx_v_result);
-  if (unlikely(!__pyx_t_6.memview)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 140; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  if (unlikely(!__pyx_t_6.memview)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 143; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __pyx_v_res_view = __pyx_t_6;
   __pyx_t_6.memview = NULL;
   __pyx_t_6.data = NULL;
 
-  /* "pyprophet/_optimized.pyx":141
+  /* "pyprophet/_optimized.pyx":144
  *     result = np.zeros_like(values, dtype=np.int64)
  *     cdef np.int64_t[:] res_view = result
  *     i0 = i1 = 0             # <<<<<<<<<<<<<<
@@ -3343,7 +3343,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_2count_num_positives(CYTHON_UN
   __pyx_v_i0 = 0;
   __pyx_v_i1 = 0;
 
-  /* "pyprophet/_optimized.pyx":142
+  /* "pyprophet/_optimized.pyx":145
  *     cdef np.int64_t[:] res_view = result
  *     i0 = i1 = 0
  *     c = n             # <<<<<<<<<<<<<<
@@ -3352,7 +3352,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_2count_num_positives(CYTHON_UN
  */
   __pyx_v_c = __pyx_v_n;
 
-  /* "pyprophet/_optimized.pyx":143
+  /* "pyprophet/_optimized.pyx":146
  *     i0 = i1 = 0
  *     c = n
  *     while i0 < n:             # <<<<<<<<<<<<<<
@@ -3363,7 +3363,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_2count_num_positives(CYTHON_UN
     __pyx_t_7 = ((__pyx_v_i0 < __pyx_v_n) != 0);
     if (!__pyx_t_7) break;
 
-    /* "pyprophet/_optimized.pyx":144
+    /* "pyprophet/_optimized.pyx":147
  *     c = n
  *     while i0 < n:
  *         while i1 < n and inp_view[i0] == inp_view[i1]:             # <<<<<<<<<<<<<<
@@ -3379,12 +3379,12 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_2count_num_positives(CYTHON_UN
       }
       __pyx_t_9 = __pyx_v_i0;
       __pyx_t_10 = __pyx_v_i1;
-      __pyx_t_8 = (((*((__pyx_t_9pyprophet_10_optimized_DATA_TYPE *) ( /* dim=0 */ (__pyx_v_inp_view.data + __pyx_t_9 * __pyx_v_inp_view.strides[0]) ))) == (*((__pyx_t_9pyprophet_10_optimized_DATA_TYPE *) ( /* dim=0 */ (__pyx_v_inp_view.data + __pyx_t_10 * __pyx_v_inp_view.strides[0]) )))) != 0);
+      __pyx_t_8 = (((*((__pyx_t_5numpy_float64_t *) ( /* dim=0 */ (__pyx_v_inp_view.data + __pyx_t_9 * __pyx_v_inp_view.strides[0]) ))) == (*((__pyx_t_5numpy_float64_t *) ( /* dim=0 */ (__pyx_v_inp_view.data + __pyx_t_10 * __pyx_v_inp_view.strides[0]) )))) != 0);
       __pyx_t_7 = __pyx_t_8;
       __pyx_L7_bool_binop_done:;
       if (!__pyx_t_7) break;
 
-      /* "pyprophet/_optimized.pyx":145
+      /* "pyprophet/_optimized.pyx":148
  *     while i0 < n:
  *         while i1 < n and inp_view[i0] == inp_view[i1]:
  *             res_view[i1] = c             # <<<<<<<<<<<<<<
@@ -3394,7 +3394,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_2count_num_positives(CYTHON_UN
       __pyx_t_11 = __pyx_v_i1;
       *((__pyx_t_5numpy_int64_t *) ( /* dim=0 */ (__pyx_v_res_view.data + __pyx_t_11 * __pyx_v_res_view.strides[0]) )) = __pyx_v_c;
 
-      /* "pyprophet/_optimized.pyx":146
+      /* "pyprophet/_optimized.pyx":149
  *         while i1 < n and inp_view[i0] == inp_view[i1]:
  *             res_view[i1] = c
  *             i1 += 1             # <<<<<<<<<<<<<<
@@ -3404,7 +3404,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_2count_num_positives(CYTHON_UN
       __pyx_v_i1 = (__pyx_v_i1 + 1);
     }
 
-    /* "pyprophet/_optimized.pyx":147
+    /* "pyprophet/_optimized.pyx":150
  *             res_view[i1] = c
  *             i1 += 1
  *         c -= 1             # <<<<<<<<<<<<<<
@@ -3413,7 +3413,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_2count_num_positives(CYTHON_UN
  */
     __pyx_v_c = (__pyx_v_c - 1);
 
-    /* "pyprophet/_optimized.pyx":148
+    /* "pyprophet/_optimized.pyx":151
  *             i1 += 1
  *         c -= 1
  *         i0 += 1             # <<<<<<<<<<<<<<
@@ -3423,7 +3423,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_2count_num_positives(CYTHON_UN
     __pyx_v_i0 = (__pyx_v_i0 + 1);
   }
 
-  /* "pyprophet/_optimized.pyx":149
+  /* "pyprophet/_optimized.pyx":152
  *         c -= 1
  *         i0 += 1
  *     return result             # <<<<<<<<<<<<<<
@@ -3435,12 +3435,12 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_2count_num_positives(CYTHON_UN
   __pyx_r = __pyx_v_result;
   goto __pyx_L0;
 
-  /* "pyprophet/_optimized.pyx":135
+  /* "pyprophet/_optimized.pyx":138
  * @cython.boundscheck(False)
  * @cython.wraparound(False)
- * def count_num_positives(DATA_TYPE[:] values):             # <<<<<<<<<<<<<<
+ * def count_num_positives(np.float64_t[:] values):             # <<<<<<<<<<<<<<
  *     cdef size_t n = values.shape[0]
- *     cdef DATA_TYPE[:] inp_view = values
+ *     cdef np.float64_t[:] inp_view = values
  */
 
   /* function exit code */
@@ -3463,7 +3463,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_2count_num_positives(CYTHON_UN
   return __pyx_r;
 }
 
-/* "pyprophet/_optimized.pyx":154
+/* "pyprophet/_optimized.pyx":157
  * @cython.boundscheck(False)
  * @cython.wraparound(False)
  * def find_top_ranked(np.int64_t[:] tg_ids, DATA_TYPE[:] scores):             # <<<<<<<<<<<<<<
@@ -3503,11 +3503,11 @@ static PyObject *__pyx_pw_9pyprophet_10_optimized_5find_top_ranked(PyObject *__p
         case  1:
         if (likely((values[1] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_scores)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("find_top_ranked", 1, 2, 2, 1); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 154; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+          __Pyx_RaiseArgtupleInvalid("find_top_ranked", 1, 2, 2, 1); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 157; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
         }
       }
       if (unlikely(kw_args > 0)) {
-        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "find_top_ranked") < 0)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 154; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "find_top_ranked") < 0)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 157; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
       }
     } else if (PyTuple_GET_SIZE(__pyx_args) != 2) {
       goto __pyx_L5_argtuple_error;
@@ -3515,12 +3515,12 @@ static PyObject *__pyx_pw_9pyprophet_10_optimized_5find_top_ranked(PyObject *__p
       values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
       values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
     }
-    __pyx_v_tg_ids = __Pyx_PyObject_to_MemoryviewSlice_ds_nn___pyx_t_5numpy_int64_t(values[0]); if (unlikely(!__pyx_v_tg_ids.memview)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 154; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
-    __pyx_v_scores = __Pyx_PyObject_to_MemoryviewSlice_ds_nn___pyx_t_9pyprophet_10_optimized_DATA_TYPE(values[1]); if (unlikely(!__pyx_v_scores.memview)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 154; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+    __pyx_v_tg_ids = __Pyx_PyObject_to_MemoryviewSlice_ds_nn___pyx_t_5numpy_int64_t(values[0]); if (unlikely(!__pyx_v_tg_ids.memview)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 157; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+    __pyx_v_scores = __Pyx_PyObject_to_MemoryviewSlice_ds_nn___pyx_t_9pyprophet_10_optimized_DATA_TYPE(values[1]); if (unlikely(!__pyx_v_scores.memview)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 157; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("find_top_ranked", 1, 2, 2, PyTuple_GET_SIZE(__pyx_args)); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 154; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+  __Pyx_RaiseArgtupleInvalid("find_top_ranked", 1, 2, 2, PyTuple_GET_SIZE(__pyx_args)); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 157; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
   __pyx_L3_error:;
   __Pyx_AddTraceback("pyprophet._optimized.find_top_ranked", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
@@ -3565,7 +3565,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_4find_top_ranked(CYTHON_UNUSED
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("find_top_ranked", 0);
 
-  /* "pyprophet/_optimized.pyx":155
+  /* "pyprophet/_optimized.pyx":158
  * @cython.wraparound(False)
  * def find_top_ranked(np.int64_t[:] tg_ids, DATA_TYPE[:] scores):
  *     cdef size_t n = scores.shape[0]             # <<<<<<<<<<<<<<
@@ -3574,40 +3574,40 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_4find_top_ranked(CYTHON_UNUSED
  */
   __pyx_v_n = (__pyx_v_scores.shape[0]);
 
-  /* "pyprophet/_optimized.pyx":156
+  /* "pyprophet/_optimized.pyx":159
  * def find_top_ranked(np.int64_t[:] tg_ids, DATA_TYPE[:] scores):
  *     cdef size_t n = scores.shape[0]
  *     flags = np.zeros((n,), dtype=np.int64)             # <<<<<<<<<<<<<<
  *     cdef np.int64_t[:] view = flags
  *     cdef DATA_TYPE current_max = scores[0]
  */
-  __pyx_t_1 = __Pyx_GetModuleGlobalName(__pyx_n_s_np); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 156; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_1 = __Pyx_GetModuleGlobalName(__pyx_n_s_np); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 159; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_1);
-  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_1, __pyx_n_s_zeros); if (unlikely(!__pyx_t_2)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 156; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_1, __pyx_n_s_zeros); if (unlikely(!__pyx_t_2)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 159; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_2);
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-  __pyx_t_1 = __Pyx_PyInt_FromSize_t(__pyx_v_n); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 156; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_1 = __Pyx_PyInt_FromSize_t(__pyx_v_n); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 159; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_1);
-  __pyx_t_3 = PyTuple_New(1); if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 156; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_3 = PyTuple_New(1); if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 159; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_3);
   __Pyx_GIVEREF(__pyx_t_1);
   PyTuple_SET_ITEM(__pyx_t_3, 0, __pyx_t_1);
   __pyx_t_1 = 0;
-  __pyx_t_1 = PyTuple_New(1); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 156; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_1 = PyTuple_New(1); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 159; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_1);
   __Pyx_GIVEREF(__pyx_t_3);
   PyTuple_SET_ITEM(__pyx_t_1, 0, __pyx_t_3);
   __pyx_t_3 = 0;
-  __pyx_t_3 = PyDict_New(); if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 156; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_3 = PyDict_New(); if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 159; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_3);
-  __pyx_t_4 = __Pyx_GetModuleGlobalName(__pyx_n_s_np); if (unlikely(!__pyx_t_4)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 156; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_4 = __Pyx_GetModuleGlobalName(__pyx_n_s_np); if (unlikely(!__pyx_t_4)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 159; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_4);
-  __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_t_4, __pyx_n_s_int64); if (unlikely(!__pyx_t_5)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 156; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_t_4, __pyx_n_s_int64); if (unlikely(!__pyx_t_5)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 159; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_5);
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-  if (PyDict_SetItem(__pyx_t_3, __pyx_n_s_dtype, __pyx_t_5) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 156; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  if (PyDict_SetItem(__pyx_t_3, __pyx_n_s_dtype, __pyx_t_5) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 159; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-  __pyx_t_5 = __Pyx_PyObject_Call(__pyx_t_2, __pyx_t_1, __pyx_t_3); if (unlikely(!__pyx_t_5)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 156; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_5 = __Pyx_PyObject_Call(__pyx_t_2, __pyx_t_1, __pyx_t_3); if (unlikely(!__pyx_t_5)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 159; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_5);
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
@@ -3615,7 +3615,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_4find_top_ranked(CYTHON_UNUSED
   __pyx_v_flags = __pyx_t_5;
   __pyx_t_5 = 0;
 
-  /* "pyprophet/_optimized.pyx":157
+  /* "pyprophet/_optimized.pyx":160
  *     cdef size_t n = scores.shape[0]
  *     flags = np.zeros((n,), dtype=np.int64)
  *     cdef np.int64_t[:] view = flags             # <<<<<<<<<<<<<<
@@ -3623,12 +3623,12 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_4find_top_ranked(CYTHON_UNUSED
  *     cdef size_t current_imax = 0
  */
   __pyx_t_6 = __Pyx_PyObject_to_MemoryviewSlice_ds_nn___pyx_t_5numpy_int64_t(__pyx_v_flags);
-  if (unlikely(!__pyx_t_6.memview)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 157; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  if (unlikely(!__pyx_t_6.memview)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 160; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __pyx_v_view = __pyx_t_6;
   __pyx_t_6.memview = NULL;
   __pyx_t_6.data = NULL;
 
-  /* "pyprophet/_optimized.pyx":158
+  /* "pyprophet/_optimized.pyx":161
  *     flags = np.zeros((n,), dtype=np.int64)
  *     cdef np.int64_t[:] view = flags
  *     cdef DATA_TYPE current_max = scores[0]             # <<<<<<<<<<<<<<
@@ -3638,7 +3638,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_4find_top_ranked(CYTHON_UNUSED
   __pyx_t_7 = 0;
   __pyx_v_current_max = (*((__pyx_t_9pyprophet_10_optimized_DATA_TYPE *) ( /* dim=0 */ (__pyx_v_scores.data + __pyx_t_7 * __pyx_v_scores.strides[0]) )));
 
-  /* "pyprophet/_optimized.pyx":159
+  /* "pyprophet/_optimized.pyx":162
  *     cdef np.int64_t[:] view = flags
  *     cdef DATA_TYPE current_max = scores[0]
  *     cdef size_t current_imax = 0             # <<<<<<<<<<<<<<
@@ -3647,7 +3647,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_4find_top_ranked(CYTHON_UNUSED
  */
   __pyx_v_current_imax = 0;
 
-  /* "pyprophet/_optimized.pyx":160
+  /* "pyprophet/_optimized.pyx":163
  *     cdef DATA_TYPE current_max = scores[0]
  *     cdef size_t current_imax = 0
  *     cdef size_t current_tg_id = tg_ids[0]             # <<<<<<<<<<<<<<
@@ -3657,7 +3657,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_4find_top_ranked(CYTHON_UNUSED
   __pyx_t_8 = 0;
   __pyx_v_current_tg_id = (*((__pyx_t_5numpy_int64_t *) ( /* dim=0 */ (__pyx_v_tg_ids.data + __pyx_t_8 * __pyx_v_tg_ids.strides[0]) )));
 
-  /* "pyprophet/_optimized.pyx":161
+  /* "pyprophet/_optimized.pyx":164
  *     cdef size_t current_imax = 0
  *     cdef size_t current_tg_id = tg_ids[0]
  *     cdef size_t current_write_i = 0             # <<<<<<<<<<<<<<
@@ -3666,7 +3666,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_4find_top_ranked(CYTHON_UNUSED
  */
   __pyx_v_current_write_i = 0;
 
-  /* "pyprophet/_optimized.pyx":165
+  /* "pyprophet/_optimized.pyx":168
  *     cdef size_t id_
  *     cdef DATA_TYPE sc
  *     for i in range(tg_ids.shape[0]):             # <<<<<<<<<<<<<<
@@ -3677,7 +3677,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_4find_top_ranked(CYTHON_UNUSED
   for (__pyx_t_10 = 0; __pyx_t_10 < __pyx_t_9; __pyx_t_10+=1) {
     __pyx_v_i = __pyx_t_10;
 
-    /* "pyprophet/_optimized.pyx":166
+    /* "pyprophet/_optimized.pyx":169
  *     cdef DATA_TYPE sc
  *     for i in range(tg_ids.shape[0]):
  *         id_ = tg_ids[i]             # <<<<<<<<<<<<<<
@@ -3687,7 +3687,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_4find_top_ranked(CYTHON_UNUSED
     __pyx_t_11 = __pyx_v_i;
     __pyx_v_id_ = (*((__pyx_t_5numpy_int64_t *) ( /* dim=0 */ (__pyx_v_tg_ids.data + __pyx_t_11 * __pyx_v_tg_ids.strides[0]) )));
 
-    /* "pyprophet/_optimized.pyx":167
+    /* "pyprophet/_optimized.pyx":170
  *     for i in range(tg_ids.shape[0]):
  *         id_ = tg_ids[i]
  *         sc = scores[i]             # <<<<<<<<<<<<<<
@@ -3697,7 +3697,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_4find_top_ranked(CYTHON_UNUSED
     __pyx_t_12 = __pyx_v_i;
     __pyx_v_sc = (*((__pyx_t_9pyprophet_10_optimized_DATA_TYPE *) ( /* dim=0 */ (__pyx_v_scores.data + __pyx_t_12 * __pyx_v_scores.strides[0]) )));
 
-    /* "pyprophet/_optimized.pyx":168
+    /* "pyprophet/_optimized.pyx":171
  *         id_ = tg_ids[i]
  *         sc = scores[i]
  *         if id_ != current_tg_id:             # <<<<<<<<<<<<<<
@@ -3707,7 +3707,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_4find_top_ranked(CYTHON_UNUSED
     __pyx_t_13 = ((__pyx_v_id_ != __pyx_v_current_tg_id) != 0);
     if (__pyx_t_13) {
 
-      /* "pyprophet/_optimized.pyx":169
+      /* "pyprophet/_optimized.pyx":172
  *         sc = scores[i]
  *         if id_ != current_tg_id:
  *             current_tg_id = id_             # <<<<<<<<<<<<<<
@@ -3716,7 +3716,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_4find_top_ranked(CYTHON_UNUSED
  */
       __pyx_v_current_tg_id = __pyx_v_id_;
 
-      /* "pyprophet/_optimized.pyx":170
+      /* "pyprophet/_optimized.pyx":173
  *         if id_ != current_tg_id:
  *             current_tg_id = id_
  *             view[current_imax] = 1             # <<<<<<<<<<<<<<
@@ -3726,7 +3726,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_4find_top_ranked(CYTHON_UNUSED
       __pyx_t_14 = __pyx_v_current_imax;
       *((__pyx_t_5numpy_int64_t *) ( /* dim=0 */ (__pyx_v_view.data + __pyx_t_14 * __pyx_v_view.strides[0]) )) = 1;
 
-      /* "pyprophet/_optimized.pyx":171
+      /* "pyprophet/_optimized.pyx":174
  *             current_tg_id = id_
  *             view[current_imax] = 1
  *             current_write_i += 1             # <<<<<<<<<<<<<<
@@ -3735,7 +3735,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_4find_top_ranked(CYTHON_UNUSED
  */
       __pyx_v_current_write_i = (__pyx_v_current_write_i + 1);
 
-      /* "pyprophet/_optimized.pyx":172
+      /* "pyprophet/_optimized.pyx":175
  *             view[current_imax] = 1
  *             current_write_i += 1
  *             current_max = sc             # <<<<<<<<<<<<<<
@@ -3744,7 +3744,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_4find_top_ranked(CYTHON_UNUSED
  */
       __pyx_v_current_max = __pyx_v_sc;
 
-      /* "pyprophet/_optimized.pyx":173
+      /* "pyprophet/_optimized.pyx":176
  *             current_write_i += 1
  *             current_max = sc
  *             current_imax = i             # <<<<<<<<<<<<<<
@@ -3753,7 +3753,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_4find_top_ranked(CYTHON_UNUSED
  */
       __pyx_v_current_imax = __pyx_v_i;
 
-      /* "pyprophet/_optimized.pyx":174
+      /* "pyprophet/_optimized.pyx":177
  *             current_max = sc
  *             current_imax = i
  *             continue             # <<<<<<<<<<<<<<
@@ -3763,7 +3763,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_4find_top_ranked(CYTHON_UNUSED
       goto __pyx_L3_continue;
     }
 
-    /* "pyprophet/_optimized.pyx":175
+    /* "pyprophet/_optimized.pyx":178
  *             current_imax = i
  *             continue
  *         if sc > current_max:             # <<<<<<<<<<<<<<
@@ -3773,7 +3773,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_4find_top_ranked(CYTHON_UNUSED
     __pyx_t_13 = ((__pyx_v_sc > __pyx_v_current_max) != 0);
     if (__pyx_t_13) {
 
-      /* "pyprophet/_optimized.pyx":176
+      /* "pyprophet/_optimized.pyx":179
  *             continue
  *         if sc > current_max:
  *             current_max = sc             # <<<<<<<<<<<<<<
@@ -3782,7 +3782,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_4find_top_ranked(CYTHON_UNUSED
  */
       __pyx_v_current_max = __pyx_v_sc;
 
-      /* "pyprophet/_optimized.pyx":177
+      /* "pyprophet/_optimized.pyx":180
  *         if sc > current_max:
  *             current_max = sc
  *             current_imax = i             # <<<<<<<<<<<<<<
@@ -3796,7 +3796,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_4find_top_ranked(CYTHON_UNUSED
     __pyx_L3_continue:;
   }
 
-  /* "pyprophet/_optimized.pyx":178
+  /* "pyprophet/_optimized.pyx":181
  *             current_max = sc
  *             current_imax = i
  *     view[current_imax] = 1             # <<<<<<<<<<<<<<
@@ -3806,7 +3806,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_4find_top_ranked(CYTHON_UNUSED
   __pyx_t_10 = __pyx_v_current_imax;
   *((__pyx_t_5numpy_int64_t *) ( /* dim=0 */ (__pyx_v_view.data + __pyx_t_10 * __pyx_v_view.strides[0]) )) = 1;
 
-  /* "pyprophet/_optimized.pyx":179
+  /* "pyprophet/_optimized.pyx":182
  *             current_imax = i
  *     view[current_imax] = 1
  *     return flags             # <<<<<<<<<<<<<<
@@ -3818,7 +3818,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_4find_top_ranked(CYTHON_UNUSED
   __pyx_r = __pyx_v_flags;
   goto __pyx_L0;
 
-  /* "pyprophet/_optimized.pyx":154
+  /* "pyprophet/_optimized.pyx":157
  * @cython.boundscheck(False)
  * @cython.wraparound(False)
  * def find_top_ranked(np.int64_t[:] tg_ids, DATA_TYPE[:] scores):             # <<<<<<<<<<<<<<
@@ -3846,7 +3846,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_4find_top_ranked(CYTHON_UNUSED
   return __pyx_r;
 }
 
-/* "pyprophet/_optimized.pyx":182
+/* "pyprophet/_optimized.pyx":185
  * 
  * 
  * cdef partial_rank(DATA_TYPE[:] v, size_t imin, size_t imax, np.int64_t[:] ranks):             # <<<<<<<<<<<<<<
@@ -3874,7 +3874,7 @@ static PyObject *__pyx_f_9pyprophet_10_optimized_partial_rank(__Pyx_memviewslice
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("partial_rank", 0);
 
-  /* "pyprophet/_optimized.pyx":184
+  /* "pyprophet/_optimized.pyx":187
  * cdef partial_rank(DATA_TYPE[:] v, size_t imin, size_t imax, np.int64_t[:] ranks):
  *     """ imax is exclusive """
  *     cdef size_t * ix = <size_t * > libc.stdlib.malloc((imax - imin) * sizeof(size_t))             # <<<<<<<<<<<<<<
@@ -3883,7 +3883,7 @@ static PyObject *__pyx_f_9pyprophet_10_optimized_partial_rank(__Pyx_memviewslice
  */
   __pyx_v_ix = ((size_t *)malloc(((__pyx_v_imax - __pyx_v_imin) * (sizeof(size_t)))));
 
-  /* "pyprophet/_optimized.pyx":186
+  /* "pyprophet/_optimized.pyx":189
  *     cdef size_t * ix = <size_t * > libc.stdlib.malloc((imax - imin) * sizeof(size_t))
  *     cdef size_t i, j, pos
  *     for i in range(imax - imin):             # <<<<<<<<<<<<<<
@@ -3894,7 +3894,7 @@ static PyObject *__pyx_f_9pyprophet_10_optimized_partial_rank(__Pyx_memviewslice
   for (__pyx_t_2 = 0; __pyx_t_2 < __pyx_t_1; __pyx_t_2+=1) {
     __pyx_v_i = __pyx_t_2;
 
-    /* "pyprophet/_optimized.pyx":187
+    /* "pyprophet/_optimized.pyx":190
  *     cdef size_t i, j, pos
  *     for i in range(imax - imin):
  *         ix[i] = i + imin             # <<<<<<<<<<<<<<
@@ -3904,7 +3904,7 @@ static PyObject *__pyx_f_9pyprophet_10_optimized_partial_rank(__Pyx_memviewslice
     (__pyx_v_ix[__pyx_v_i]) = (__pyx_v_i + __pyx_v_imin);
   }
 
-  /* "pyprophet/_optimized.pyx":188
+  /* "pyprophet/_optimized.pyx":191
  *     for i in range(imax - imin):
  *         ix[i] = i + imin
  *     for i in range(imax - imin - 1):             # <<<<<<<<<<<<<<
@@ -3915,7 +3915,7 @@ static PyObject *__pyx_f_9pyprophet_10_optimized_partial_rank(__Pyx_memviewslice
   for (__pyx_t_2 = 0; __pyx_t_2 < __pyx_t_1; __pyx_t_2+=1) {
     __pyx_v_i = __pyx_t_2;
 
-    /* "pyprophet/_optimized.pyx":189
+    /* "pyprophet/_optimized.pyx":192
  *         ix[i] = i + imin
  *     for i in range(imax - imin - 1):
  *         pos = i             # <<<<<<<<<<<<<<
@@ -3924,7 +3924,7 @@ static PyObject *__pyx_f_9pyprophet_10_optimized_partial_rank(__Pyx_memviewslice
  */
     __pyx_v_pos = __pyx_v_i;
 
-    /* "pyprophet/_optimized.pyx":190
+    /* "pyprophet/_optimized.pyx":193
  *     for i in range(imax - imin - 1):
  *         pos = i
  *         for j in range(i + 1, imax - imin):             # <<<<<<<<<<<<<<
@@ -3935,7 +3935,7 @@ static PyObject *__pyx_f_9pyprophet_10_optimized_partial_rank(__Pyx_memviewslice
     for (__pyx_t_4 = (__pyx_v_i + 1); __pyx_t_4 < __pyx_t_3; __pyx_t_4+=1) {
       __pyx_v_j = __pyx_t_4;
 
-      /* "pyprophet/_optimized.pyx":191
+      /* "pyprophet/_optimized.pyx":194
  *         pos = i
  *         for j in range(i + 1, imax - imin):
  *             if v[ix[j]] > v[ix[pos]]:             # <<<<<<<<<<<<<<
@@ -3947,19 +3947,19 @@ static PyObject *__pyx_f_9pyprophet_10_optimized_partial_rank(__Pyx_memviewslice
       if (unlikely(__pyx_t_5 >= (size_t)__pyx_v_v.shape[0])) __pyx_t_6 = 0;
       if (unlikely(__pyx_t_6 != -1)) {
         __Pyx_RaiseBufferIndexError(__pyx_t_6);
-        {__pyx_filename = __pyx_f[0]; __pyx_lineno = 191; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+        {__pyx_filename = __pyx_f[0]; __pyx_lineno = 194; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
       }
       __pyx_t_7 = (__pyx_v_ix[__pyx_v_pos]);
       __pyx_t_6 = -1;
       if (unlikely(__pyx_t_7 >= (size_t)__pyx_v_v.shape[0])) __pyx_t_6 = 0;
       if (unlikely(__pyx_t_6 != -1)) {
         __Pyx_RaiseBufferIndexError(__pyx_t_6);
-        {__pyx_filename = __pyx_f[0]; __pyx_lineno = 191; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+        {__pyx_filename = __pyx_f[0]; __pyx_lineno = 194; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
       }
       __pyx_t_8 = (((*((__pyx_t_9pyprophet_10_optimized_DATA_TYPE *) ( /* dim=0 */ (__pyx_v_v.data + __pyx_t_5 * __pyx_v_v.strides[0]) ))) > (*((__pyx_t_9pyprophet_10_optimized_DATA_TYPE *) ( /* dim=0 */ (__pyx_v_v.data + __pyx_t_7 * __pyx_v_v.strides[0]) )))) != 0);
       if (__pyx_t_8) {
 
-        /* "pyprophet/_optimized.pyx":192
+        /* "pyprophet/_optimized.pyx":195
  *         for j in range(i + 1, imax - imin):
  *             if v[ix[j]] > v[ix[pos]]:
  *                 pos = j             # <<<<<<<<<<<<<<
@@ -3972,7 +3972,7 @@ static PyObject *__pyx_f_9pyprophet_10_optimized_partial_rank(__Pyx_memviewslice
       __pyx_L9:;
     }
 
-    /* "pyprophet/_optimized.pyx":193
+    /* "pyprophet/_optimized.pyx":196
  *             if v[ix[j]] > v[ix[pos]]:
  *                 pos = j
  *         ix[i], ix[pos] = ix[pos], ix[i]             # <<<<<<<<<<<<<<
@@ -3985,7 +3985,7 @@ static PyObject *__pyx_f_9pyprophet_10_optimized_partial_rank(__Pyx_memviewslice
     (__pyx_v_ix[__pyx_v_pos]) = __pyx_t_4;
   }
 
-  /* "pyprophet/_optimized.pyx":195
+  /* "pyprophet/_optimized.pyx":198
  *         ix[i], ix[pos] = ix[pos], ix[i]
  * 
  *     for j in range(imax - imin):             # <<<<<<<<<<<<<<
@@ -3996,7 +3996,7 @@ static PyObject *__pyx_f_9pyprophet_10_optimized_partial_rank(__Pyx_memviewslice
   for (__pyx_t_2 = 0; __pyx_t_2 < __pyx_t_1; __pyx_t_2+=1) {
     __pyx_v_j = __pyx_t_2;
 
-    /* "pyprophet/_optimized.pyx":196
+    /* "pyprophet/_optimized.pyx":199
  * 
  *     for j in range(imax - imin):
  *         ranks[ix[j]] = j + 1             # <<<<<<<<<<<<<<
@@ -4008,12 +4008,12 @@ static PyObject *__pyx_f_9pyprophet_10_optimized_partial_rank(__Pyx_memviewslice
     if (unlikely(__pyx_t_4 >= (size_t)__pyx_v_ranks.shape[0])) __pyx_t_6 = 0;
     if (unlikely(__pyx_t_6 != -1)) {
       __Pyx_RaiseBufferIndexError(__pyx_t_6);
-      {__pyx_filename = __pyx_f[0]; __pyx_lineno = 196; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+      {__pyx_filename = __pyx_f[0]; __pyx_lineno = 199; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
     }
     *((__pyx_t_5numpy_int64_t *) ( /* dim=0 */ (__pyx_v_ranks.data + __pyx_t_4 * __pyx_v_ranks.strides[0]) )) = (__pyx_v_j + 1);
   }
 
-  /* "pyprophet/_optimized.pyx":197
+  /* "pyprophet/_optimized.pyx":200
  *     for j in range(imax - imin):
  *         ranks[ix[j]] = j + 1
  *     libc.stdlib.free(ix)             # <<<<<<<<<<<<<<
@@ -4022,7 +4022,7 @@ static PyObject *__pyx_f_9pyprophet_10_optimized_partial_rank(__Pyx_memviewslice
  */
   free(__pyx_v_ix);
 
-  /* "pyprophet/_optimized.pyx":182
+  /* "pyprophet/_optimized.pyx":185
  * 
  * 
  * cdef partial_rank(DATA_TYPE[:] v, size_t imin, size_t imax, np.int64_t[:] ranks):             # <<<<<<<<<<<<<<
@@ -4042,7 +4042,7 @@ static PyObject *__pyx_f_9pyprophet_10_optimized_partial_rank(__Pyx_memviewslice
   return __pyx_r;
 }
 
-/* "pyprophet/_optimized.pyx":202
+/* "pyprophet/_optimized.pyx":205
  * @cython.boundscheck(False)
  * @cython.wraparound(False)
  * def rank(np.int64_t[:] tg_ids, DATA_TYPE[:] scores):             # <<<<<<<<<<<<<<
@@ -4082,11 +4082,11 @@ static PyObject *__pyx_pw_9pyprophet_10_optimized_7rank(PyObject *__pyx_self, Py
         case  1:
         if (likely((values[1] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_scores)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("rank", 1, 2, 2, 1); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 202; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+          __Pyx_RaiseArgtupleInvalid("rank", 1, 2, 2, 1); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 205; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
         }
       }
       if (unlikely(kw_args > 0)) {
-        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "rank") < 0)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 202; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "rank") < 0)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 205; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
       }
     } else if (PyTuple_GET_SIZE(__pyx_args) != 2) {
       goto __pyx_L5_argtuple_error;
@@ -4094,12 +4094,12 @@ static PyObject *__pyx_pw_9pyprophet_10_optimized_7rank(PyObject *__pyx_self, Py
       values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
       values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
     }
-    __pyx_v_tg_ids = __Pyx_PyObject_to_MemoryviewSlice_ds_nn___pyx_t_5numpy_int64_t(values[0]); if (unlikely(!__pyx_v_tg_ids.memview)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 202; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
-    __pyx_v_scores = __Pyx_PyObject_to_MemoryviewSlice_ds_nn___pyx_t_9pyprophet_10_optimized_DATA_TYPE(values[1]); if (unlikely(!__pyx_v_scores.memview)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 202; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+    __pyx_v_tg_ids = __Pyx_PyObject_to_MemoryviewSlice_ds_nn___pyx_t_5numpy_int64_t(values[0]); if (unlikely(!__pyx_v_tg_ids.memview)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 205; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+    __pyx_v_scores = __Pyx_PyObject_to_MemoryviewSlice_ds_nn___pyx_t_9pyprophet_10_optimized_DATA_TYPE(values[1]); if (unlikely(!__pyx_v_scores.memview)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 205; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("rank", 1, 2, 2, PyTuple_GET_SIZE(__pyx_args)); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 202; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+  __Pyx_RaiseArgtupleInvalid("rank", 1, 2, 2, PyTuple_GET_SIZE(__pyx_args)); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 205; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
   __pyx_L3_error:;
   __Pyx_AddTraceback("pyprophet._optimized.rank", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
@@ -4136,7 +4136,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_6rank(CYTHON_UNUSED PyObject *
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("rank", 0);
 
-  /* "pyprophet/_optimized.pyx":203
+  /* "pyprophet/_optimized.pyx":206
  * @cython.wraparound(False)
  * def rank(np.int64_t[:] tg_ids, DATA_TYPE[:] scores):
  *     cdef size_t n = tg_ids.shape[0]             # <<<<<<<<<<<<<<
@@ -4145,40 +4145,40 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_6rank(CYTHON_UNUSED PyObject *
  */
   __pyx_v_n = (__pyx_v_tg_ids.shape[0]);
 
-  /* "pyprophet/_optimized.pyx":204
+  /* "pyprophet/_optimized.pyx":207
  * def rank(np.int64_t[:] tg_ids, DATA_TYPE[:] scores):
  *     cdef size_t n = tg_ids.shape[0]
  *     result = np.zeros((n,), dtype=np.int64)             # <<<<<<<<<<<<<<
  *     cdef np.int64_t[:] ranks = result
  *     cdef size_t imin = 0
  */
-  __pyx_t_1 = __Pyx_GetModuleGlobalName(__pyx_n_s_np); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 204; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_1 = __Pyx_GetModuleGlobalName(__pyx_n_s_np); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 207; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_1);
-  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_1, __pyx_n_s_zeros); if (unlikely(!__pyx_t_2)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 204; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_1, __pyx_n_s_zeros); if (unlikely(!__pyx_t_2)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 207; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_2);
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-  __pyx_t_1 = __Pyx_PyInt_FromSize_t(__pyx_v_n); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 204; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_1 = __Pyx_PyInt_FromSize_t(__pyx_v_n); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 207; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_1);
-  __pyx_t_3 = PyTuple_New(1); if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 204; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_3 = PyTuple_New(1); if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 207; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_3);
   __Pyx_GIVEREF(__pyx_t_1);
   PyTuple_SET_ITEM(__pyx_t_3, 0, __pyx_t_1);
   __pyx_t_1 = 0;
-  __pyx_t_1 = PyTuple_New(1); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 204; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_1 = PyTuple_New(1); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 207; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_1);
   __Pyx_GIVEREF(__pyx_t_3);
   PyTuple_SET_ITEM(__pyx_t_1, 0, __pyx_t_3);
   __pyx_t_3 = 0;
-  __pyx_t_3 = PyDict_New(); if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 204; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_3 = PyDict_New(); if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 207; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_3);
-  __pyx_t_4 = __Pyx_GetModuleGlobalName(__pyx_n_s_np); if (unlikely(!__pyx_t_4)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 204; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_4 = __Pyx_GetModuleGlobalName(__pyx_n_s_np); if (unlikely(!__pyx_t_4)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 207; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_4);
-  __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_t_4, __pyx_n_s_int64); if (unlikely(!__pyx_t_5)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 204; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_t_4, __pyx_n_s_int64); if (unlikely(!__pyx_t_5)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 207; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_5);
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-  if (PyDict_SetItem(__pyx_t_3, __pyx_n_s_dtype, __pyx_t_5) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 204; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  if (PyDict_SetItem(__pyx_t_3, __pyx_n_s_dtype, __pyx_t_5) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 207; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-  __pyx_t_5 = __Pyx_PyObject_Call(__pyx_t_2, __pyx_t_1, __pyx_t_3); if (unlikely(!__pyx_t_5)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 204; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_5 = __Pyx_PyObject_Call(__pyx_t_2, __pyx_t_1, __pyx_t_3); if (unlikely(!__pyx_t_5)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 207; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_5);
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
@@ -4186,7 +4186,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_6rank(CYTHON_UNUSED PyObject *
   __pyx_v_result = __pyx_t_5;
   __pyx_t_5 = 0;
 
-  /* "pyprophet/_optimized.pyx":205
+  /* "pyprophet/_optimized.pyx":208
  *     cdef size_t n = tg_ids.shape[0]
  *     result = np.zeros((n,), dtype=np.int64)
  *     cdef np.int64_t[:] ranks = result             # <<<<<<<<<<<<<<
@@ -4194,12 +4194,12 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_6rank(CYTHON_UNUSED PyObject *
  *     cdef size_t imax
  */
   __pyx_t_6 = __Pyx_PyObject_to_MemoryviewSlice_ds_nn___pyx_t_5numpy_int64_t(__pyx_v_result);
-  if (unlikely(!__pyx_t_6.memview)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 205; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  if (unlikely(!__pyx_t_6.memview)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 208; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __pyx_v_ranks = __pyx_t_6;
   __pyx_t_6.memview = NULL;
   __pyx_t_6.data = NULL;
 
-  /* "pyprophet/_optimized.pyx":206
+  /* "pyprophet/_optimized.pyx":209
  *     result = np.zeros((n,), dtype=np.int64)
  *     cdef np.int64_t[:] ranks = result
  *     cdef size_t imin = 0             # <<<<<<<<<<<<<<
@@ -4208,7 +4208,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_6rank(CYTHON_UNUSED PyObject *
  */
   __pyx_v_imin = 0;
 
-  /* "pyprophet/_optimized.pyx":209
+  /* "pyprophet/_optimized.pyx":212
  *     cdef size_t imax
  *     cdef np.float64_t g0
  *     while imin < n:             # <<<<<<<<<<<<<<
@@ -4219,7 +4219,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_6rank(CYTHON_UNUSED PyObject *
     __pyx_t_7 = ((__pyx_v_imin < __pyx_v_n) != 0);
     if (!__pyx_t_7) break;
 
-    /* "pyprophet/_optimized.pyx":210
+    /* "pyprophet/_optimized.pyx":213
  *     cdef np.float64_t g0
  *     while imin < n:
  *         imax = imin + 1             # <<<<<<<<<<<<<<
@@ -4228,7 +4228,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_6rank(CYTHON_UNUSED PyObject *
  */
     __pyx_v_imax = (__pyx_v_imin + 1);
 
-    /* "pyprophet/_optimized.pyx":211
+    /* "pyprophet/_optimized.pyx":214
  *     while imin < n:
  *         imax = imin + 1
  *         g0 = tg_ids[imin]             # <<<<<<<<<<<<<<
@@ -4238,7 +4238,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_6rank(CYTHON_UNUSED PyObject *
     __pyx_t_8 = __pyx_v_imin;
     __pyx_v_g0 = (*((__pyx_t_5numpy_int64_t *) ( /* dim=0 */ (__pyx_v_tg_ids.data + __pyx_t_8 * __pyx_v_tg_ids.strides[0]) )));
 
-    /* "pyprophet/_optimized.pyx":212
+    /* "pyprophet/_optimized.pyx":215
  *         imax = imin + 1
  *         g0 = tg_ids[imin]
  *         while imax < n and tg_ids[imax] == g0:             # <<<<<<<<<<<<<<
@@ -4258,7 +4258,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_6rank(CYTHON_UNUSED PyObject *
       __pyx_L7_bool_binop_done:;
       if (!__pyx_t_7) break;
 
-      /* "pyprophet/_optimized.pyx":213
+      /* "pyprophet/_optimized.pyx":216
  *         g0 = tg_ids[imin]
  *         while imax < n and tg_ids[imax] == g0:
  *             imax += 1             # <<<<<<<<<<<<<<
@@ -4268,18 +4268,18 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_6rank(CYTHON_UNUSED PyObject *
       __pyx_v_imax = (__pyx_v_imax + 1);
     }
 
-    /* "pyprophet/_optimized.pyx":214
+    /* "pyprophet/_optimized.pyx":217
  *         while imax < n and tg_ids[imax] == g0:
  *             imax += 1
  *         partial_rank(scores, imin, imax, ranks)             # <<<<<<<<<<<<<<
  *         imin = imax
  *     return result
  */
-    __pyx_t_5 = __pyx_f_9pyprophet_10_optimized_partial_rank(__pyx_v_scores, __pyx_v_imin, __pyx_v_imax, __pyx_v_ranks); if (unlikely(!__pyx_t_5)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 214; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+    __pyx_t_5 = __pyx_f_9pyprophet_10_optimized_partial_rank(__pyx_v_scores, __pyx_v_imin, __pyx_v_imax, __pyx_v_ranks); if (unlikely(!__pyx_t_5)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 217; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
     __Pyx_GOTREF(__pyx_t_5);
     __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
 
-    /* "pyprophet/_optimized.pyx":215
+    /* "pyprophet/_optimized.pyx":218
  *             imax += 1
  *         partial_rank(scores, imin, imax, ranks)
  *         imin = imax             # <<<<<<<<<<<<<<
@@ -4289,7 +4289,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_6rank(CYTHON_UNUSED PyObject *
     __pyx_v_imin = __pyx_v_imax;
   }
 
-  /* "pyprophet/_optimized.pyx":216
+  /* "pyprophet/_optimized.pyx":219
  *         partial_rank(scores, imin, imax, ranks)
  *         imin = imax
  *     return result             # <<<<<<<<<<<<<<
@@ -4301,7 +4301,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_6rank(CYTHON_UNUSED PyObject *
   __pyx_r = __pyx_v_result;
   goto __pyx_L0;
 
-  /* "pyprophet/_optimized.pyx":202
+  /* "pyprophet/_optimized.pyx":205
  * @cython.boundscheck(False)
  * @cython.wraparound(False)
  * def rank(np.int64_t[:] tg_ids, DATA_TYPE[:] scores):             # <<<<<<<<<<<<<<
@@ -4329,7 +4329,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_6rank(CYTHON_UNUSED PyObject *
   return __pyx_r;
 }
 
-/* "pyprophet/_optimized.pyx":223
+/* "pyprophet/_optimized.pyx":224
  * @cython.boundscheck(False)
  * @cython.wraparound(False)
  * def single_chromatogram_hypothesis_fast(np.float64_t[:] inv_pg_pp_true, np.float64_t prior_chrom_null, np.float64_t prior_pg_true):             # <<<<<<<<<<<<<<
@@ -4371,16 +4371,16 @@ static PyObject *__pyx_pw_9pyprophet_10_optimized_9single_chromatogram_hypothesi
         case  1:
         if (likely((values[1] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_prior_chrom_null)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("single_chromatogram_hypothesis_fast", 1, 3, 3, 1); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 223; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+          __Pyx_RaiseArgtupleInvalid("single_chromatogram_hypothesis_fast", 1, 3, 3, 1); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 224; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
         }
         case  2:
         if (likely((values[2] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_prior_pg_true)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("single_chromatogram_hypothesis_fast", 1, 3, 3, 2); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 223; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+          __Pyx_RaiseArgtupleInvalid("single_chromatogram_hypothesis_fast", 1, 3, 3, 2); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 224; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
         }
       }
       if (unlikely(kw_args > 0)) {
-        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "single_chromatogram_hypothesis_fast") < 0)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 223; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "single_chromatogram_hypothesis_fast") < 0)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 224; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
       }
     } else if (PyTuple_GET_SIZE(__pyx_args) != 3) {
       goto __pyx_L5_argtuple_error;
@@ -4389,13 +4389,13 @@ static PyObject *__pyx_pw_9pyprophet_10_optimized_9single_chromatogram_hypothesi
       values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
       values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
     }
-    __pyx_v_inv_pg_pp_true = __Pyx_PyObject_to_MemoryviewSlice_ds_nn___pyx_t_5numpy_float64_t(values[0]); if (unlikely(!__pyx_v_inv_pg_pp_true.memview)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 223; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
-    __pyx_v_prior_chrom_null = __pyx_PyFloat_AsDouble(values[1]); if (unlikely((__pyx_v_prior_chrom_null == (npy_float64)-1) && PyErr_Occurred())) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 223; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
-    __pyx_v_prior_pg_true = __pyx_PyFloat_AsDouble(values[2]); if (unlikely((__pyx_v_prior_pg_true == (npy_float64)-1) && PyErr_Occurred())) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 223; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+    __pyx_v_inv_pg_pp_true = __Pyx_PyObject_to_MemoryviewSlice_ds_nn___pyx_t_5numpy_float64_t(values[0]); if (unlikely(!__pyx_v_inv_pg_pp_true.memview)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 224; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+    __pyx_v_prior_chrom_null = __pyx_PyFloat_AsDouble(values[1]); if (unlikely((__pyx_v_prior_chrom_null == (npy_float64)-1) && PyErr_Occurred())) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 224; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+    __pyx_v_prior_pg_true = __pyx_PyFloat_AsDouble(values[2]); if (unlikely((__pyx_v_prior_pg_true == (npy_float64)-1) && PyErr_Occurred())) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 224; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("single_chromatogram_hypothesis_fast", 1, 3, 3, PyTuple_GET_SIZE(__pyx_args)); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 223; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+  __Pyx_RaiseArgtupleInvalid("single_chromatogram_hypothesis_fast", 1, 3, 3, PyTuple_GET_SIZE(__pyx_args)); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 224; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
   __pyx_L3_error:;
   __Pyx_AddTraceback("pyprophet._optimized.single_chromatogram_hypothesis_fast", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
@@ -4441,7 +4441,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("single_chromatogram_hypothesis_fast", 0);
 
-  /* "pyprophet/_optimized.pyx":227
+  /* "pyprophet/_optimized.pyx":228
  *     # inv_pg_pp_true contains the probabilities that the peaks are false
  * 
  *     cdef size_t n = inv_pg_pp_true.shape[0]             # <<<<<<<<<<<<<<
@@ -4450,7 +4450,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
  */
   __pyx_v_n = (__pyx_v_inv_pg_pp_true.shape[0]);
 
-  /* "pyprophet/_optimized.pyx":230
+  /* "pyprophet/_optimized.pyx":231
  *     cdef np.float64_t final_val
  *     cdef np.float64_t val
  *     cdef np.float64_t sum_all = 0.0             # <<<<<<<<<<<<<<
@@ -4459,40 +4459,40 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
  */
   __pyx_v_sum_all = 0.0;
 
-  /* "pyprophet/_optimized.pyx":231
+  /* "pyprophet/_optimized.pyx":232
  *     cdef np.float64_t val
  *     cdef np.float64_t sum_all = 0.0
  *     result = np.zeros((n+1,), dtype=np.float64)             # <<<<<<<<<<<<<<
  *     cdef np.float64_t[:] cresult = result
  * 
  */
-  __pyx_t_1 = __Pyx_GetModuleGlobalName(__pyx_n_s_np); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 231; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_1 = __Pyx_GetModuleGlobalName(__pyx_n_s_np); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 232; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_1);
-  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_1, __pyx_n_s_zeros); if (unlikely(!__pyx_t_2)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 231; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_1, __pyx_n_s_zeros); if (unlikely(!__pyx_t_2)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 232; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_2);
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-  __pyx_t_1 = __Pyx_PyInt_FromSize_t((__pyx_v_n + 1)); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 231; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_1 = __Pyx_PyInt_FromSize_t((__pyx_v_n + 1)); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 232; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_1);
-  __pyx_t_3 = PyTuple_New(1); if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 231; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_3 = PyTuple_New(1); if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 232; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_3);
   __Pyx_GIVEREF(__pyx_t_1);
   PyTuple_SET_ITEM(__pyx_t_3, 0, __pyx_t_1);
   __pyx_t_1 = 0;
-  __pyx_t_1 = PyTuple_New(1); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 231; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_1 = PyTuple_New(1); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 232; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_1);
   __Pyx_GIVEREF(__pyx_t_3);
   PyTuple_SET_ITEM(__pyx_t_1, 0, __pyx_t_3);
   __pyx_t_3 = 0;
-  __pyx_t_3 = PyDict_New(); if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 231; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_3 = PyDict_New(); if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 232; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_3);
-  __pyx_t_4 = __Pyx_GetModuleGlobalName(__pyx_n_s_np); if (unlikely(!__pyx_t_4)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 231; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_4 = __Pyx_GetModuleGlobalName(__pyx_n_s_np); if (unlikely(!__pyx_t_4)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 232; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_4);
-  __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_t_4, __pyx_n_s_float64); if (unlikely(!__pyx_t_5)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 231; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_t_4, __pyx_n_s_float64); if (unlikely(!__pyx_t_5)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 232; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_5);
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-  if (PyDict_SetItem(__pyx_t_3, __pyx_n_s_dtype, __pyx_t_5) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 231; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  if (PyDict_SetItem(__pyx_t_3, __pyx_n_s_dtype, __pyx_t_5) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 232; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-  __pyx_t_5 = __Pyx_PyObject_Call(__pyx_t_2, __pyx_t_1, __pyx_t_3); if (unlikely(!__pyx_t_5)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 231; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_5 = __Pyx_PyObject_Call(__pyx_t_2, __pyx_t_1, __pyx_t_3); if (unlikely(!__pyx_t_5)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 232; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_5);
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
@@ -4500,7 +4500,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
   __pyx_v_result = __pyx_t_5;
   __pyx_t_5 = 0;
 
-  /* "pyprophet/_optimized.pyx":232
+  /* "pyprophet/_optimized.pyx":233
  *     cdef np.float64_t sum_all = 0.0
  *     result = np.zeros((n+1,), dtype=np.float64)
  *     cdef np.float64_t[:] cresult = result             # <<<<<<<<<<<<<<
@@ -4508,12 +4508,12 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
  *     cdef int i
  */
   __pyx_t_6 = __Pyx_PyObject_to_MemoryviewSlice_ds_nn___pyx_t_5numpy_float64_t(__pyx_v_result);
-  if (unlikely(!__pyx_t_6.memview)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 232; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  if (unlikely(!__pyx_t_6.memview)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 233; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __pyx_v_cresult = __pyx_t_6;
   __pyx_t_6.memview = NULL;
   __pyx_t_6.data = NULL;
 
-  /* "pyprophet/_optimized.pyx":236
+  /* "pyprophet/_optimized.pyx":237
  *     cdef int i
  *     cdef int j
  *     cdef double af = 1.0             # <<<<<<<<<<<<<<
@@ -4522,7 +4522,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
  */
   __pyx_v_af = 1.0;
 
-  /* "pyprophet/_optimized.pyx":239
+  /* "pyprophet/_optimized.pyx":240
  * 
  *     # Compute the null hypothesis (e.g. all peaks are false)
  *     i = 0             # <<<<<<<<<<<<<<
@@ -4531,7 +4531,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
  */
   __pyx_v_i = 0;
 
-  /* "pyprophet/_optimized.pyx":240
+  /* "pyprophet/_optimized.pyx":241
  *     # Compute the null hypothesis (e.g. all peaks are false)
  *     i = 0
  *     while i < n:             # <<<<<<<<<<<<<<
@@ -4542,7 +4542,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
     __pyx_t_7 = ((__pyx_v_i < __pyx_v_n) != 0);
     if (!__pyx_t_7) break;
 
-    /* "pyprophet/_optimized.pyx":241
+    /* "pyprophet/_optimized.pyx":242
  *     i = 0
  *     while i < n:
  *         af *= inv_pg_pp_true[i]             # <<<<<<<<<<<<<<
@@ -4552,7 +4552,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
     __pyx_t_8 = __pyx_v_i;
     __pyx_v_af = (__pyx_v_af * (*((__pyx_t_5numpy_float64_t *) ( /* dim=0 */ (__pyx_v_inv_pg_pp_true.data + __pyx_t_8 * __pyx_v_inv_pg_pp_true.strides[0]) ))));
 
-    /* "pyprophet/_optimized.pyx":242
+    /* "pyprophet/_optimized.pyx":243
  *     while i < n:
  *         af *= inv_pg_pp_true[i]
  *         i += 1             # <<<<<<<<<<<<<<
@@ -4562,7 +4562,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
     __pyx_v_i = (__pyx_v_i + 1);
   }
 
-  /* "pyprophet/_optimized.pyx":244
+  /* "pyprophet/_optimized.pyx":245
  *         i += 1
  * 
  *     cresult[0] = af * prior_chrom_null             # <<<<<<<<<<<<<<
@@ -4572,7 +4572,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
   __pyx_t_9 = 0;
   *((__pyx_t_5numpy_float64_t *) ( /* dim=0 */ (__pyx_v_cresult.data + __pyx_t_9 * __pyx_v_cresult.strides[0]) )) = (__pyx_v_af * __pyx_v_prior_chrom_null);
 
-  /* "pyprophet/_optimized.pyx":248
+  /* "pyprophet/_optimized.pyx":249
  *     # Compute the alternative hypotheses (e.g. one peak is true and all other
  *     # peaks are false)
  *     i = 0             # <<<<<<<<<<<<<<
@@ -4581,7 +4581,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
  */
   __pyx_v_i = 0;
 
-  /* "pyprophet/_optimized.pyx":249
+  /* "pyprophet/_optimized.pyx":250
  *     # peaks are false)
  *     i = 0
  *     while i < n:             # <<<<<<<<<<<<<<
@@ -4592,7 +4592,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
     __pyx_t_7 = ((__pyx_v_i < __pyx_v_n) != 0);
     if (!__pyx_t_7) break;
 
-    /* "pyprophet/_optimized.pyx":250
+    /* "pyprophet/_optimized.pyx":251
  *     i = 0
  *     while i < n:
  *         val = inv_pg_pp_true[i]             # <<<<<<<<<<<<<<
@@ -4602,7 +4602,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
     __pyx_t_10 = __pyx_v_i;
     __pyx_v_val = (*((__pyx_t_5numpy_float64_t *) ( /* dim=0 */ (__pyx_v_inv_pg_pp_true.data + __pyx_t_10 * __pyx_v_inv_pg_pp_true.strides[0]) )));
 
-    /* "pyprophet/_optimized.pyx":251
+    /* "pyprophet/_optimized.pyx":252
  *     while i < n:
  *         val = inv_pg_pp_true[i]
  *         j = 0             # <<<<<<<<<<<<<<
@@ -4611,7 +4611,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
  */
     __pyx_v_j = 0;
 
-    /* "pyprophet/_optimized.pyx":252
+    /* "pyprophet/_optimized.pyx":253
  *         val = inv_pg_pp_true[i]
  *         j = 0
  *         af = 1.0             # <<<<<<<<<<<<<<
@@ -4620,7 +4620,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
  */
     __pyx_v_af = 1.0;
 
-    /* "pyprophet/_optimized.pyx":254
+    /* "pyprophet/_optimized.pyx":255
  *         af = 1.0
  *         # Compute the product of all peaks being false except i
  *         while j < n:             # <<<<<<<<<<<<<<
@@ -4631,7 +4631,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
       __pyx_t_7 = ((__pyx_v_j < __pyx_v_n) != 0);
       if (!__pyx_t_7) break;
 
-      /* "pyprophet/_optimized.pyx":255
+      /* "pyprophet/_optimized.pyx":256
  *         # Compute the product of all peaks being false except i
  *         while j < n:
  *             if i != j:             # <<<<<<<<<<<<<<
@@ -4641,7 +4641,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
       __pyx_t_7 = ((__pyx_v_i != __pyx_v_j) != 0);
       if (__pyx_t_7) {
 
-        /* "pyprophet/_optimized.pyx":256
+        /* "pyprophet/_optimized.pyx":257
  *         while j < n:
  *             if i != j:
  *                 af *= inv_pg_pp_true[j]             # <<<<<<<<<<<<<<
@@ -4654,7 +4654,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
       }
       __pyx_L9:;
 
-      /* "pyprophet/_optimized.pyx":257
+      /* "pyprophet/_optimized.pyx":258
  *             if i != j:
  *                 af *= inv_pg_pp_true[j]
  *             j += 1             # <<<<<<<<<<<<<<
@@ -4664,7 +4664,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
       __pyx_v_j = (__pyx_v_j + 1);
     }
 
-    /* "pyprophet/_optimized.pyx":259
+    /* "pyprophet/_optimized.pyx":260
  *             j += 1
  * 
  *         final_val = <np.float64_t>( (1-val) * af) # value i is true             # <<<<<<<<<<<<<<
@@ -4673,7 +4673,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
  */
     __pyx_v_final_val = ((__pyx_t_5numpy_float64_t)((1.0 - __pyx_v_val) * __pyx_v_af));
 
-    /* "pyprophet/_optimized.pyx":261
+    /* "pyprophet/_optimized.pyx":262
  *         final_val = <np.float64_t>( (1-val) * af) # value i is true
  * 
  *         cresult[i+1] = final_val * prior_pg_true             # <<<<<<<<<<<<<<
@@ -4683,7 +4683,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
     __pyx_t_12 = (__pyx_v_i + 1);
     *((__pyx_t_5numpy_float64_t *) ( /* dim=0 */ (__pyx_v_cresult.data + __pyx_t_12 * __pyx_v_cresult.strides[0]) )) = (__pyx_v_final_val * __pyx_v_prior_pg_true);
 
-    /* "pyprophet/_optimized.pyx":262
+    /* "pyprophet/_optimized.pyx":263
  * 
  *         cresult[i+1] = final_val * prior_pg_true
  *         i += 1             # <<<<<<<<<<<<<<
@@ -4693,7 +4693,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
     __pyx_v_i = (__pyx_v_i + 1);
   }
 
-  /* "pyprophet/_optimized.pyx":265
+  /* "pyprophet/_optimized.pyx":266
  * 
  *     # Compute sum over all hypothesis
  *     i = 0             # <<<<<<<<<<<<<<
@@ -4702,7 +4702,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
  */
   __pyx_v_i = 0;
 
-  /* "pyprophet/_optimized.pyx":266
+  /* "pyprophet/_optimized.pyx":267
  *     # Compute sum over all hypothesis
  *     i = 0
  *     while i < n+1:             # <<<<<<<<<<<<<<
@@ -4713,7 +4713,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
     __pyx_t_7 = ((__pyx_v_i < (__pyx_v_n + 1)) != 0);
     if (!__pyx_t_7) break;
 
-    /* "pyprophet/_optimized.pyx":267
+    /* "pyprophet/_optimized.pyx":268
  *     i = 0
  *     while i < n+1:
  *         sum_all += cresult[i]             # <<<<<<<<<<<<<<
@@ -4723,7 +4723,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
     __pyx_t_13 = __pyx_v_i;
     __pyx_v_sum_all = (__pyx_v_sum_all + (*((__pyx_t_5numpy_float64_t *) ( /* dim=0 */ (__pyx_v_cresult.data + __pyx_t_13 * __pyx_v_cresult.strides[0]) ))));
 
-    /* "pyprophet/_optimized.pyx":268
+    /* "pyprophet/_optimized.pyx":269
  *     while i < n+1:
  *         sum_all += cresult[i]
  *         i += 1             # <<<<<<<<<<<<<<
@@ -4733,7 +4733,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
     __pyx_v_i = (__pyx_v_i + 1);
   }
 
-  /* "pyprophet/_optimized.pyx":271
+  /* "pyprophet/_optimized.pyx":272
  * 
  *     # Divide by sum over all hypothesis (normalize)
  *     i = 0             # <<<<<<<<<<<<<<
@@ -4742,7 +4742,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
  */
   __pyx_v_i = 0;
 
-  /* "pyprophet/_optimized.pyx":272
+  /* "pyprophet/_optimized.pyx":273
  *     # Divide by sum over all hypothesis (normalize)
  *     i = 0
  *     while i < n+1:             # <<<<<<<<<<<<<<
@@ -4753,7 +4753,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
     __pyx_t_7 = ((__pyx_v_i < (__pyx_v_n + 1)) != 0);
     if (!__pyx_t_7) break;
 
-    /* "pyprophet/_optimized.pyx":273
+    /* "pyprophet/_optimized.pyx":274
  *     i = 0
  *     while i < n+1:
  *         cresult[i] = cresult[i] / sum_all             # <<<<<<<<<<<<<<
@@ -4770,12 +4770,12 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
       #ifdef WITH_THREAD
       PyGILState_Release(__pyx_gilstate_save);
       #endif
-      {__pyx_filename = __pyx_f[0]; __pyx_lineno = 273; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+      {__pyx_filename = __pyx_f[0]; __pyx_lineno = 274; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
     }
     __pyx_t_16 = __pyx_v_i;
     *((__pyx_t_5numpy_float64_t *) ( /* dim=0 */ (__pyx_v_cresult.data + __pyx_t_16 * __pyx_v_cresult.strides[0]) )) = (__pyx_t_15 / __pyx_v_sum_all);
 
-    /* "pyprophet/_optimized.pyx":274
+    /* "pyprophet/_optimized.pyx":275
  *     while i < n+1:
  *         cresult[i] = cresult[i] / sum_all
  *         i += 1             # <<<<<<<<<<<<<<
@@ -4785,7 +4785,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
     __pyx_v_i = (__pyx_v_i + 1);
   }
 
-  /* "pyprophet/_optimized.pyx":276
+  /* "pyprophet/_optimized.pyx":277
  *         i += 1
  * 
  *     return result             # <<<<<<<<<<<<<<
@@ -4795,7 +4795,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
   __pyx_r = __pyx_v_result;
   goto __pyx_L0;
 
-  /* "pyprophet/_optimized.pyx":223
+  /* "pyprophet/_optimized.pyx":224
  * @cython.boundscheck(False)
  * @cython.wraparound(False)
  * def single_chromatogram_hypothesis_fast(np.float64_t[:] inv_pg_pp_true, np.float64_t prior_chrom_null, np.float64_t prior_pg_true):             # <<<<<<<<<<<<<<
@@ -18269,7 +18269,7 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {0, 0, 0, 0, 0, 0, 0}
 };
 static int __Pyx_InitCachedBuiltins(void) {
-  __pyx_builtin_range = __Pyx_GetBuiltinName(__pyx_n_s_range); if (!__pyx_builtin_range) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 24; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_builtin_range = __Pyx_GetBuiltinName(__pyx_n_s_range); if (!__pyx_builtin_range) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 26; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __pyx_builtin_ValueError = __Pyx_GetBuiltinName(__pyx_n_s_ValueError); if (!__pyx_builtin_ValueError) {__pyx_filename = __pyx_f[1]; __pyx_lineno = 218; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __pyx_builtin_RuntimeError = __Pyx_GetBuiltinName(__pyx_n_s_RuntimeError); if (!__pyx_builtin_RuntimeError) {__pyx_filename = __pyx_f[1]; __pyx_lineno = 802; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __pyx_builtin_MemoryError = __Pyx_GetBuiltinName(__pyx_n_s_MemoryError); if (!__pyx_builtin_MemoryError) {__pyx_filename = __pyx_f[2]; __pyx_lineno = 142; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
@@ -18488,65 +18488,65 @@ static int __Pyx_InitCachedConstants(void) {
   __Pyx_GOTREF(__pyx_tuple__18);
   __Pyx_GIVEREF(__pyx_tuple__18);
 
-  /* "pyprophet/_optimized.pyx":13
+  /* "pyprophet/_optimized.pyx":15
  * @cython.boundscheck(False)
  * @cython.wraparound(False)
  * def find_nearest_matches(DATA_TYPE[:] basis, DATA_TYPE[:] sample_points, use_sort_order=1):             # <<<<<<<<<<<<<<
  *     cdef size_t num_basis = basis.shape[0]
  *     cdef size_t num_samples = sample_points.shape[0]
  */
-  __pyx_tuple__19 = PyTuple_Pack(17, __pyx_n_s_basis, __pyx_n_s_sample_points, __pyx_n_s_use_sort_order, __pyx_n_s_num_basis, __pyx_n_s_num_samples, __pyx_n_s_result, __pyx_n_s_view, __pyx_n_s_i, __pyx_n_s_best_j, __pyx_n_s_low, __pyx_n_s_high, __pyx_n_s_mid, __pyx_n_s_sp_i, __pyx_n_s_best_dist, __pyx_n_s_dist, __pyx_n_s_sort_order, __pyx_n_s_j); if (unlikely(!__pyx_tuple__19)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 13; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_tuple__19 = PyTuple_Pack(17, __pyx_n_s_basis, __pyx_n_s_sample_points, __pyx_n_s_use_sort_order, __pyx_n_s_num_basis, __pyx_n_s_num_samples, __pyx_n_s_result, __pyx_n_s_view, __pyx_n_s_i, __pyx_n_s_best_j, __pyx_n_s_low, __pyx_n_s_high, __pyx_n_s_mid, __pyx_n_s_sp_i, __pyx_n_s_best_dist, __pyx_n_s_dist, __pyx_n_s_sort_order, __pyx_n_s_j); if (unlikely(!__pyx_tuple__19)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 15; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_tuple__19);
   __Pyx_GIVEREF(__pyx_tuple__19);
-  __pyx_codeobj__20 = (PyObject*)__Pyx_PyCode_New(3, 0, 17, 0, 0, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__19, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_Users_uweschmitt_Projects_pypro, __pyx_n_s_find_nearest_matches, 13, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__20)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 13; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_codeobj__20 = (PyObject*)__Pyx_PyCode_New(3, 0, 17, 0, 0, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__19, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_Users_uweschmitt_Projects_pypro, __pyx_n_s_find_nearest_matches, 15, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__20)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 15; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
 
-  /* "pyprophet/_optimized.pyx":135
+  /* "pyprophet/_optimized.pyx":138
  * @cython.boundscheck(False)
  * @cython.wraparound(False)
- * def count_num_positives(DATA_TYPE[:] values):             # <<<<<<<<<<<<<<
+ * def count_num_positives(np.float64_t[:] values):             # <<<<<<<<<<<<<<
  *     cdef size_t n = values.shape[0]
- *     cdef DATA_TYPE[:] inp_view = values
+ *     cdef np.float64_t[:] inp_view = values
  */
-  __pyx_tuple__21 = PyTuple_Pack(9, __pyx_n_s_values, __pyx_n_s_values, __pyx_n_s_n, __pyx_n_s_inp_view, __pyx_n_s_i0, __pyx_n_s_i1, __pyx_n_s_c, __pyx_n_s_result, __pyx_n_s_res_view); if (unlikely(!__pyx_tuple__21)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 135; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_tuple__21 = PyTuple_Pack(9, __pyx_n_s_values, __pyx_n_s_values, __pyx_n_s_n, __pyx_n_s_inp_view, __pyx_n_s_i0, __pyx_n_s_i1, __pyx_n_s_c, __pyx_n_s_result, __pyx_n_s_res_view); if (unlikely(!__pyx_tuple__21)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 138; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_tuple__21);
   __Pyx_GIVEREF(__pyx_tuple__21);
-  __pyx_codeobj__22 = (PyObject*)__Pyx_PyCode_New(1, 0, 9, 0, 0, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__21, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_Users_uweschmitt_Projects_pypro, __pyx_n_s_count_num_positives, 135, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__22)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 135; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_codeobj__22 = (PyObject*)__Pyx_PyCode_New(1, 0, 9, 0, 0, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__21, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_Users_uweschmitt_Projects_pypro, __pyx_n_s_count_num_positives, 138, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__22)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 138; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
 
-  /* "pyprophet/_optimized.pyx":154
+  /* "pyprophet/_optimized.pyx":157
  * @cython.boundscheck(False)
  * @cython.wraparound(False)
  * def find_top_ranked(np.int64_t[:] tg_ids, DATA_TYPE[:] scores):             # <<<<<<<<<<<<<<
  *     cdef size_t n = scores.shape[0]
  *     flags = np.zeros((n,), dtype=np.int64)
  */
-  __pyx_tuple__23 = PyTuple_Pack(12, __pyx_n_s_tg_ids, __pyx_n_s_scores, __pyx_n_s_n, __pyx_n_s_flags, __pyx_n_s_view, __pyx_n_s_current_max, __pyx_n_s_current_imax, __pyx_n_s_current_tg_id, __pyx_n_s_current_write_i, __pyx_n_s_i, __pyx_n_s_id_2, __pyx_n_s_sc); if (unlikely(!__pyx_tuple__23)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 154; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_tuple__23 = PyTuple_Pack(12, __pyx_n_s_tg_ids, __pyx_n_s_scores, __pyx_n_s_n, __pyx_n_s_flags, __pyx_n_s_view, __pyx_n_s_current_max, __pyx_n_s_current_imax, __pyx_n_s_current_tg_id, __pyx_n_s_current_write_i, __pyx_n_s_i, __pyx_n_s_id_2, __pyx_n_s_sc); if (unlikely(!__pyx_tuple__23)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 157; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_tuple__23);
   __Pyx_GIVEREF(__pyx_tuple__23);
-  __pyx_codeobj__24 = (PyObject*)__Pyx_PyCode_New(2, 0, 12, 0, 0, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__23, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_Users_uweschmitt_Projects_pypro, __pyx_n_s_find_top_ranked, 154, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__24)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 154; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_codeobj__24 = (PyObject*)__Pyx_PyCode_New(2, 0, 12, 0, 0, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__23, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_Users_uweschmitt_Projects_pypro, __pyx_n_s_find_top_ranked, 157, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__24)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 157; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
 
-  /* "pyprophet/_optimized.pyx":202
+  /* "pyprophet/_optimized.pyx":205
  * @cython.boundscheck(False)
  * @cython.wraparound(False)
  * def rank(np.int64_t[:] tg_ids, DATA_TYPE[:] scores):             # <<<<<<<<<<<<<<
  *     cdef size_t n = tg_ids.shape[0]
  *     result = np.zeros((n,), dtype=np.int64)
  */
-  __pyx_tuple__25 = PyTuple_Pack(8, __pyx_n_s_tg_ids, __pyx_n_s_scores, __pyx_n_s_n, __pyx_n_s_result, __pyx_n_s_ranks, __pyx_n_s_imin, __pyx_n_s_imax, __pyx_n_s_g0); if (unlikely(!__pyx_tuple__25)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 202; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_tuple__25 = PyTuple_Pack(8, __pyx_n_s_tg_ids, __pyx_n_s_scores, __pyx_n_s_n, __pyx_n_s_result, __pyx_n_s_ranks, __pyx_n_s_imin, __pyx_n_s_imax, __pyx_n_s_g0); if (unlikely(!__pyx_tuple__25)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 205; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_tuple__25);
   __Pyx_GIVEREF(__pyx_tuple__25);
-  __pyx_codeobj__26 = (PyObject*)__Pyx_PyCode_New(2, 0, 8, 0, 0, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__25, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_Users_uweschmitt_Projects_pypro, __pyx_n_s_rank, 202, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__26)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 202; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_codeobj__26 = (PyObject*)__Pyx_PyCode_New(2, 0, 8, 0, 0, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__25, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_Users_uweschmitt_Projects_pypro, __pyx_n_s_rank, 205, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__26)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 205; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
 
-  /* "pyprophet/_optimized.pyx":223
+  /* "pyprophet/_optimized.pyx":224
  * @cython.boundscheck(False)
  * @cython.wraparound(False)
  * def single_chromatogram_hypothesis_fast(np.float64_t[:] inv_pg_pp_true, np.float64_t prior_chrom_null, np.float64_t prior_pg_true):             # <<<<<<<<<<<<<<
  * 
  *     # inv_pg_pp_true contains the probabilities that the peaks are false
  */
-  __pyx_tuple__27 = PyTuple_Pack(12, __pyx_n_s_inv_pg_pp_true, __pyx_n_s_prior_chrom_null, __pyx_n_s_prior_pg_true, __pyx_n_s_n, __pyx_n_s_final_val, __pyx_n_s_val, __pyx_n_s_sum_all, __pyx_n_s_result, __pyx_n_s_cresult, __pyx_n_s_i, __pyx_n_s_j, __pyx_n_s_af); if (unlikely(!__pyx_tuple__27)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 223; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_tuple__27 = PyTuple_Pack(12, __pyx_n_s_inv_pg_pp_true, __pyx_n_s_prior_chrom_null, __pyx_n_s_prior_pg_true, __pyx_n_s_n, __pyx_n_s_final_val, __pyx_n_s_val, __pyx_n_s_sum_all, __pyx_n_s_result, __pyx_n_s_cresult, __pyx_n_s_i, __pyx_n_s_j, __pyx_n_s_af); if (unlikely(!__pyx_tuple__27)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 224; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_tuple__27);
   __Pyx_GIVEREF(__pyx_tuple__27);
-  __pyx_codeobj__28 = (PyObject*)__Pyx_PyCode_New(3, 0, 12, 0, 0, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__27, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_Users_uweschmitt_Projects_pypro, __pyx_n_s_single_chromatogram_hypothesis_f, 223, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__28)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 223; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_codeobj__28 = (PyObject*)__Pyx_PyCode_New(3, 0, 12, 0, 0, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__27, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_Users_uweschmitt_Projects_pypro, __pyx_n_s_single_chromatogram_hypothesis_f, 224, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__28)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 224; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
 
   /* "View.MemoryView":276
  *         return self.name
@@ -18748,88 +18748,88 @@ PyMODINIT_FUNC PyInit__optimized(void)
   /*--- Function import code ---*/
   /*--- Execution code ---*/
 
-  /* "pyprophet/_optimized.pyx":5
- * cimport libc.stdlib
+  /* "pyprophet/_optimized.pyx":6
  * cimport numpy as np
+ * 
  * import numpy as np             # <<<<<<<<<<<<<<
+ * import operator
+ * 
+ */
+  __pyx_t_1 = __Pyx_Import(__pyx_n_s_numpy, 0, -1); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 6; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __Pyx_GOTREF(__pyx_t_1);
+  if (PyDict_SetItem(__pyx_d, __pyx_n_s_np, __pyx_t_1) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 6; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+
+  /* "pyprophet/_optimized.pyx":7
+ * 
+ * import numpy as np
+ * import operator             # <<<<<<<<<<<<<<
  * 
  * 
  */
-  __pyx_t_1 = __Pyx_Import(__pyx_n_s_numpy, 0, -1); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 5; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_1 = __Pyx_Import(__pyx_n_s_operator, 0, -1); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 7; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_1);
-  if (PyDict_SetItem(__pyx_d, __pyx_n_s_np, __pyx_t_1) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 5; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  if (PyDict_SetItem(__pyx_d, __pyx_n_s_operator, __pyx_t_1) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 7; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "pyprophet/_optimized.pyx":13
+  /* "pyprophet/_optimized.pyx":15
  * @cython.boundscheck(False)
  * @cython.wraparound(False)
  * def find_nearest_matches(DATA_TYPE[:] basis, DATA_TYPE[:] sample_points, use_sort_order=1):             # <<<<<<<<<<<<<<
  *     cdef size_t num_basis = basis.shape[0]
  *     cdef size_t num_samples = sample_points.shape[0]
  */
-  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_9pyprophet_10_optimized_1find_nearest_matches, NULL, __pyx_n_s_pyprophet__optimized); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 13; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_9pyprophet_10_optimized_1find_nearest_matches, NULL, __pyx_n_s_pyprophet__optimized); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 15; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_1);
-  if (PyDict_SetItem(__pyx_d, __pyx_n_s_find_nearest_matches, __pyx_t_1) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 13; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  if (PyDict_SetItem(__pyx_d, __pyx_n_s_find_nearest_matches, __pyx_t_1) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 15; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "pyprophet/_optimized.pyx":135
+  /* "pyprophet/_optimized.pyx":138
  * @cython.boundscheck(False)
  * @cython.wraparound(False)
- * def count_num_positives(DATA_TYPE[:] values):             # <<<<<<<<<<<<<<
+ * def count_num_positives(np.float64_t[:] values):             # <<<<<<<<<<<<<<
  *     cdef size_t n = values.shape[0]
- *     cdef DATA_TYPE[:] inp_view = values
+ *     cdef np.float64_t[:] inp_view = values
  */
-  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_9pyprophet_10_optimized_3count_num_positives, NULL, __pyx_n_s_pyprophet__optimized); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 135; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_9pyprophet_10_optimized_3count_num_positives, NULL, __pyx_n_s_pyprophet__optimized); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 138; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_1);
-  if (PyDict_SetItem(__pyx_d, __pyx_n_s_count_num_positives, __pyx_t_1) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 135; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  if (PyDict_SetItem(__pyx_d, __pyx_n_s_count_num_positives, __pyx_t_1) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 138; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "pyprophet/_optimized.pyx":154
+  /* "pyprophet/_optimized.pyx":157
  * @cython.boundscheck(False)
  * @cython.wraparound(False)
  * def find_top_ranked(np.int64_t[:] tg_ids, DATA_TYPE[:] scores):             # <<<<<<<<<<<<<<
  *     cdef size_t n = scores.shape[0]
  *     flags = np.zeros((n,), dtype=np.int64)
  */
-  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_9pyprophet_10_optimized_5find_top_ranked, NULL, __pyx_n_s_pyprophet__optimized); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 154; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_9pyprophet_10_optimized_5find_top_ranked, NULL, __pyx_n_s_pyprophet__optimized); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 157; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_1);
-  if (PyDict_SetItem(__pyx_d, __pyx_n_s_find_top_ranked, __pyx_t_1) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 154; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  if (PyDict_SetItem(__pyx_d, __pyx_n_s_find_top_ranked, __pyx_t_1) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 157; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "pyprophet/_optimized.pyx":202
+  /* "pyprophet/_optimized.pyx":205
  * @cython.boundscheck(False)
  * @cython.wraparound(False)
  * def rank(np.int64_t[:] tg_ids, DATA_TYPE[:] scores):             # <<<<<<<<<<<<<<
  *     cdef size_t n = tg_ids.shape[0]
  *     result = np.zeros((n,), dtype=np.int64)
  */
-  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_9pyprophet_10_optimized_7rank, NULL, __pyx_n_s_pyprophet__optimized); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 202; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_9pyprophet_10_optimized_7rank, NULL, __pyx_n_s_pyprophet__optimized); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 205; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_1);
-  if (PyDict_SetItem(__pyx_d, __pyx_n_s_rank, __pyx_t_1) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 202; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  if (PyDict_SetItem(__pyx_d, __pyx_n_s_rank, __pyx_t_1) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 205; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "pyprophet/_optimized.pyx":219
- * 
- * 
- * import operator             # <<<<<<<<<<<<<<
- * 
- * @cython.boundscheck(False)
- */
-  __pyx_t_1 = __Pyx_Import(__pyx_n_s_operator, 0, -1); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 219; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
-  __Pyx_GOTREF(__pyx_t_1);
-  if (PyDict_SetItem(__pyx_d, __pyx_n_s_operator, __pyx_t_1) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 219; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
-  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-
-  /* "pyprophet/_optimized.pyx":223
+  /* "pyprophet/_optimized.pyx":224
  * @cython.boundscheck(False)
  * @cython.wraparound(False)
  * def single_chromatogram_hypothesis_fast(np.float64_t[:] inv_pg_pp_true, np.float64_t prior_chrom_null, np.float64_t prior_pg_true):             # <<<<<<<<<<<<<<
  * 
  *     # inv_pg_pp_true contains the probabilities that the peaks are false
  */
-  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_9pyprophet_10_optimized_9single_chromatogram_hypothesis_fast, NULL, __pyx_n_s_pyprophet__optimized); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 223; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_9pyprophet_10_optimized_9single_chromatogram_hypothesis_fast, NULL, __pyx_n_s_pyprophet__optimized); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 224; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_1);
-  if (PyDict_SetItem(__pyx_d, __pyx_n_s_single_chromatogram_hypothesis_f, __pyx_t_1) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 223; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  if (PyDict_SetItem(__pyx_d, __pyx_n_s_single_chromatogram_hypothesis_f, __pyx_t_1) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 224; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
   /* "pyprophet/_optimized.pyx":1
@@ -21083,28 +21083,6 @@ __pyx_fail:
     return result;
 }
 
-static CYTHON_INLINE __Pyx_memviewslice __Pyx_PyObject_to_MemoryviewSlice_ds_nn___pyx_t_5numpy_int64_t(PyObject *obj) {
-    __Pyx_memviewslice result = { 0, 0, { 0 }, { 0 }, { 0 } };
-    __Pyx_BufFmt_StackElem stack[1];
-    int axes_specs[] = { (__Pyx_MEMVIEW_DIRECT | __Pyx_MEMVIEW_STRIDED) };
-    int retcode;
-    if (obj == Py_None) {
-        result.memview = (struct __pyx_memoryview_obj *) Py_None;
-        return result;
-    }
-    retcode = __Pyx_ValidateAndInit_memviewslice(axes_specs, 0,
-                                                 PyBUF_RECORDS, 1,
-                                                 &__Pyx_TypeInfo_nn___pyx_t_5numpy_int64_t, stack,
-                                                 &result, obj);
-    if (unlikely(retcode == -1))
-        goto __pyx_fail;
-    return result;
-__pyx_fail:
-    result.memview = NULL;
-    result.data = NULL;
-    return result;
-}
-
 static CYTHON_INLINE __Pyx_memviewslice __Pyx_PyObject_to_MemoryviewSlice_ds_nn___pyx_t_5numpy_float64_t(PyObject *obj) {
     __Pyx_memviewslice result = { 0, 0, { 0 }, { 0 }, { 0 } };
     __Pyx_BufFmt_StackElem stack[1];
@@ -21117,6 +21095,28 @@ static CYTHON_INLINE __Pyx_memviewslice __Pyx_PyObject_to_MemoryviewSlice_ds_nn_
     retcode = __Pyx_ValidateAndInit_memviewslice(axes_specs, 0,
                                                  PyBUF_RECORDS, 1,
                                                  &__Pyx_TypeInfo_nn___pyx_t_5numpy_float64_t, stack,
+                                                 &result, obj);
+    if (unlikely(retcode == -1))
+        goto __pyx_fail;
+    return result;
+__pyx_fail:
+    result.memview = NULL;
+    result.data = NULL;
+    return result;
+}
+
+static CYTHON_INLINE __Pyx_memviewslice __Pyx_PyObject_to_MemoryviewSlice_ds_nn___pyx_t_5numpy_int64_t(PyObject *obj) {
+    __Pyx_memviewslice result = { 0, 0, { 0 }, { 0 }, { 0 } };
+    __Pyx_BufFmt_StackElem stack[1];
+    int axes_specs[] = { (__Pyx_MEMVIEW_DIRECT | __Pyx_MEMVIEW_STRIDED) };
+    int retcode;
+    if (obj == Py_None) {
+        result.memview = (struct __pyx_memoryview_obj *) Py_None;
+        return result;
+    }
+    retcode = __Pyx_ValidateAndInit_memviewslice(axes_specs, 0,
+                                                 PyBUF_RECORDS, 1,
+                                                 &__Pyx_TypeInfo_nn___pyx_t_5numpy_int64_t, stack,
                                                  &result, obj);
     if (unlikely(retcode == -1))
         goto __pyx_fail;
@@ -21253,14 +21253,14 @@ raise_neg_overflow:
     return (size_t) -1;
 }
 
-static PyObject *__pyx_memview_get_nn___pyx_t_9pyprophet_10_optimized_DATA_TYPE(const char *itemp) {
-    return (PyObject *) PyFloat_FromDouble(*(__pyx_t_9pyprophet_10_optimized_DATA_TYPE *) itemp);
+static PyObject *__pyx_memview_get_nn___pyx_t_5numpy_float64_t(const char *itemp) {
+    return (PyObject *) PyFloat_FromDouble(*(__pyx_t_5numpy_float64_t *) itemp);
 }
-static int __pyx_memview_set_nn___pyx_t_9pyprophet_10_optimized_DATA_TYPE(const char *itemp, PyObject *obj) {
-    __pyx_t_9pyprophet_10_optimized_DATA_TYPE value = __pyx_PyFloat_AsFloat(obj);
-    if ((value == (npy_float32)-1) && PyErr_Occurred())
+static int __pyx_memview_set_nn___pyx_t_5numpy_float64_t(const char *itemp, PyObject *obj) {
+    __pyx_t_5numpy_float64_t value = __pyx_PyFloat_AsDouble(obj);
+    if ((value == (npy_float64)-1) && PyErr_Occurred())
         return 0;
-    *(__pyx_t_9pyprophet_10_optimized_DATA_TYPE *) itemp = value;
+    *(__pyx_t_5numpy_float64_t *) itemp = value;
     return 1;
 }
 

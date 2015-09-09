@@ -52,7 +52,7 @@ pyprophet test_data_2.txt test_data_3.txt --random_seed=42 --target.overwrite --
  finished cross evals
 
  data set contains 387 decoy and 387 target transition groups
- mean m_score = 6.130686e-02, std_dev m_score = 1.658475e-02
+ mean m_score = 6.130689e-02, std_dev m_score = 1.658476e-02
  mean s_value = 9.800913e-01, std_dev s_value = 1.125709e-01
  Posterior Probability estimation:
  Estimated number of null 136.67 out of a total of 1930.
@@ -62,7 +62,7 @@ pyprophet test_data_2.txt test_data_3.txt --random_seed=42 --target.overwrite --
  Number of target data: 7020
 
  data set contains 387 decoy and 387 target transition groups
- mean m_score = 6.130686e-02, std_dev m_score = 1.658475e-02
+ mean m_score = 6.130689e-02, std_dev m_score = 1.658476e-02
  mean s_value = 9.800913e-01, std_dev s_value = 1.125709e-01
  Posterior Probability estimation:
  Estimated number of null 136.67 out of a total of 1930.
@@ -110,11 +110,11 @@ used parameters:
 ==================================================================================================
 
    qvalue   svalue   TP  FP        TN         FN          FDR     sens   cutoff
-0    0.00  0.00223    2   0  54.80829  717.19171  2.45045e-12  0.00278  7.22939
-1    0.01  1.00000  720   6  48.80829   -0.80829  8.90097e-03  1.00000  1.68096
-2    0.02  1.00000  721  13  41.80829   -1.80829  1.80867e-02  1.00000  1.04557
-3    0.05  1.00000  718  38  16.80829    1.19171  4.97391e-02  0.99834 -0.36332
-4    0.10  1.00000  721  53   1.80829   -1.80829  6.81412e-02  1.00000 -1.58676
+0    0.00  0.00223    2   0  54.80829  717.19171  2.45045e-12  0.00278  7.22938
+1    0.01  1.00000  720   6  48.80829   -0.80829  8.90103e-03  1.00000  1.68095
+2    0.02  1.00000  721  13  41.80829   -1.80829  1.80866e-02  1.00000  1.04557
+3    0.05  1.00000  718  38  16.80829    1.19171  4.97392e-02  0.99834 -0.36332
+4    0.10  1.00000  721  53   1.80829   -1.80829  6.81413e-02  1.00000 -1.58676
 5    0.20      NaN  NaN NaN       NaN        NaN          NaN      NaN      NaN
 6    0.30      NaN  NaN NaN       NaN        NaN          NaN      NaN      NaN
 7    0.40      NaN  NaN NaN       NaN        NaN          NaN      NaN      NaN

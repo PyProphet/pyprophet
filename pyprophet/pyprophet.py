@@ -29,7 +29,7 @@ from stats import (lookup_s_and_q_values_from_error_table, calculate_final_stati
 from config import CONFIG
 
 from data_handling import (prepare_data_tables, prepare_data_table, Experiment, check_header,
-                           sample_data_tables)
+                           sample_data_tables, read_csv)
 from classifiers import (LDALearner)
 from semi_supervised import (AbstractSemiSupervisedLearner, StandardSemiSupervisedLearner)
 
@@ -216,15 +216,6 @@ class LazyScoredTablesIter(object):
                 yield LazyScoredTable(p, self.scorer, self.options)
 
 
-def _read_csv(path, delim):
-    header = pd.read_csv(path, delim, nrows=1).columns
-
-    dtype = {}
-    for col_name in header:
-        if col_name.startswith("main_") or col_name.startswith("var_"):
-            dtype[col_name] = np.float32
-
-    return pd.read_csv(path, delim, na_values=["NA", "NaN", "infinite"], engine="c", dtype=dtype)
 
 
 class ScoredTable(object):
@@ -259,7 +250,7 @@ class LazyScoredTable(object):
         self.decoys = self.targets = self.top_decoys = self.top_targets = None
 
     def to_csv(self, out_path, out_path_filtered, cutoff, sep, **kw):
-        table = _read_csv(self.path, self.options.get("delim_in"))
+        table = read_csv(self.path, self.options.get("delim_in"))
         df = self.scorer.score(table)
         df.to_csv(out_path, sep, **kw)
         df = df[df.d_score > cutoff]
@@ -289,7 +280,7 @@ class MergedLazyScoredTables(object):
     def to_csv(self, out_path, out_path_filtered, cutoff, sep, **kw):
         # write first table with header
         path = self.pathes[0]
-        table = _read_csv(path, self.options.get("delim_in"))
+        table = read_csv(path, self.options.get("delim_in"))
 
         df = self.scorer.score(table)
         df.to_csv(out_path, sep, header=True, **kw)
@@ -300,7 +291,7 @@ class MergedLazyScoredTables(object):
         # now append and do not write headers again:
         for path in self.pathes[1:]:
             with open(out_path, "a") as fp, open(out_path_filtered, "a") as fp2:
-                table = _read_csv(path, self.options.get("delim_in"))
+                table = read_csv(path, self.options.get("delim_in"))
 
                 df = self.scorer.score(table)
                 df.to_csv(fp, sep, header=True, **kw)
@@ -345,7 +336,7 @@ class HolyGostQuery(object):
     def read_tables_iter(self, pathes, delim):
         logging.info("process %s" % ", ".join(pathes))
         for path in pathes:
-            part = _read_csv(path, delim)
+            part = read_csv(path, delim)
             yield part
 
     def check_table_headers(self, pathes, delim, check_cols):
@@ -418,6 +409,7 @@ class HolyGostQuery(object):
         assert 0 < sampling_rate <= 1.0, "invalid sampling rate value"
         prepared_tables, score_columns = sample_data_tables(pathes, delim, sampling_rate)
         prepared_table = pd.concat(prepared_tables)
+
         experiment = Experiment(prepared_table)
         experiment.log_summary()
 

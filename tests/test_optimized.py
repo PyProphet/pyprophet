@@ -30,18 +30,16 @@ def test_single_chromatogram_hypothesis_fast():
     prior_chrom_null = 0.2
     prior_pg = 0.1
 
-    probabilities = [0.7] # probability that the peaks are false
-    probabilities = np.array(probabilities, dtype=np.float64)
+    probabilities = array64([.7])  # probability that the peaks are false
 
     result = o.single_chromatogram_hypothesis_fast(probabilities, prior_chrom_null, prior_pg)
     result_h0 = result[0]
     result = result[1:]
 
-    np.testing.assert_array_almost_equal(result, [0.17647059] )
-    np.testing.assert_array_almost_equal( [result_h0], [0.823529411765] )
+    np.testing.assert_array_almost_equal(result, [0.17647059])
+    np.testing.assert_array_almost_equal([result_h0], [0.823529411765])
 
-    probabilities = [0.5, 0.7, 0.1, 0.01] # probability that the peaks are false
-    probabilities = np.array(probabilities, dtype=np.float64)
+    probabilities = array64([0.5, 0.7, 0.1, 0.01])  # probability that the peaks are false
 
     result = o.single_chromatogram_hypothesis_fast(probabilities, prior_chrom_null, prior_pg)
     result_h0 = result[0]
@@ -116,17 +114,21 @@ def array32(values):
     return np.array(values, dtype=np.float32)
 
 
+def array64(values):
+    return np.array(values, dtype=np.float64)
+
+
 def arange32(up_to):
     return np.arange(up_to, dtype=np.float32)
 
 
 def test_count_num_positives():
-    assert list(o.count_num_positives(array32((9.0, 8, 8, 7, 5)))) == [5, 4, 4, 2, 1]
-    assert list(o.count_num_positives(array32((9.0, 8, 8, 7, 7)))) == [5, 4, 4, 2, 2]
-    assert list(o.count_num_positives(array32((9.0, 8, 7, 6, 5)))) == [5, 4, 3, 2, 1]
-    assert list(o.count_num_positives(array32((9.0, 9, 9, 9, 9)))) == [5, 5, 5, 5, 5]
-    assert list(o.count_num_positives(array32((9.0,)))) == [1]
-    assert list(o.count_num_positives(array32(()))) == []
+    assert list(o.count_num_positives(array64((9.0, 8, 8, 7, 5)))) == [5, 4, 4, 2, 1]
+    assert list(o.count_num_positives(array64((9.0, 8, 8, 7, 7)))) == [5, 4, 4, 2, 2]
+    assert list(o.count_num_positives(array64((9.0, 8, 7, 6, 5)))) == [5, 4, 3, 2, 1]
+    assert list(o.count_num_positives(array64((9.0, 9, 9, 9, 9)))) == [5, 5, 5, 5, 5]
+    assert list(o.count_num_positives(array64((9.0,)))) == [1]
+    assert list(o.count_num_positives(array64(()))) == []
 
 
 def _test_find_neared_matches_fuzzy():

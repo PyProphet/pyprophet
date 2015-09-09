@@ -2,7 +2,9 @@
 cimport cython
 cimport libc.stdlib
 cimport numpy as np
+
 import numpy as np
+import operator
 
 
 ctypedef np.float32_t DATA_TYPE
@@ -130,11 +132,12 @@ cdef int find_sort_order(DATA_TYPE[:] basis):
                 return 0
         return -1
 
+
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def count_num_positives(DATA_TYPE[:] values):
+def count_num_positives(np.float64_t[:] values):
     cdef size_t n = values.shape[0]
-    cdef DATA_TYPE[:] inp_view = values
+    cdef np.float64_t[:] inp_view = values
     cdef size_t i0, i1, c
     result = np.zeros_like(values, dtype=np.int64)
     cdef np.int64_t[:] res_view = result
@@ -216,8 +219,6 @@ def rank(np.int64_t[:] tg_ids, DATA_TYPE[:] scores):
     return result
 
 
-import operator
-
 @cython.boundscheck(False)
 @cython.wraparound(False)
 def single_chromatogram_hypothesis_fast(np.float64_t[:] inv_pg_pp_true, np.float64_t prior_chrom_null, np.float64_t prior_pg_true):
@@ -241,7 +242,7 @@ def single_chromatogram_hypothesis_fast(np.float64_t[:] inv_pg_pp_true, np.float
         af *= inv_pg_pp_true[i]
         i += 1
 
-    cresult[0] = af * prior_chrom_null 
+    cresult[0] = af * prior_chrom_null
 
     # Compute the alternative hypotheses (e.g. one peak is true and all other
     # peaks are false)
@@ -258,7 +259,7 @@ def single_chromatogram_hypothesis_fast(np.float64_t[:] inv_pg_pp_true, np.float
 
         final_val = <np.float64_t>( (1-val) * af) # value i is true
 
-        cresult[i+1] = final_val * prior_pg_true 
+        cresult[i+1] = final_val * prior_pg_true
         i += 1
 
     # Compute sum over all hypothesis

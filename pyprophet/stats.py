@@ -17,8 +17,7 @@ except NameError:
     profile = lambda x: x
 
 from optimized import (find_nearest_matches as _find_nearest_matches,
-                       count_num_positives,
-                       single_chromatogram_hypothesis_fast)
+                       count_num_positives, single_chromatogram_hypothesis_fast)
 import scipy.special
 import math
 import scipy.stats
@@ -68,7 +67,7 @@ def posterior_pg_prob(dvals, target_scores, decoy_scores, error_stat, number_tar
                       number_target_pg,
                       given_scores, lambda_=0.5, fdr_estimate=0.15):
 
-    """ Compute posterior probabilities for each peakgroup
+    """Compute posterior probabilities for each peakgroup
 
     - Estimate the true distribution by using all target peakgroups above the
       given the cutoff (estimated FDR as given as input). Assume gaussian distribution.
@@ -84,9 +83,8 @@ def posterior_pg_prob(dvals, target_scores, decoy_scores, error_stat, number_tar
     #   len(data) /  xeval.fraction * xeval.num_iter
     #
     logging.info("Posterior Probability estimation:")
-    logging.info("Estimated number of null %.2f out of a total of %s." \
+    logging.info("Estimated number of null %.2f out of a total of %s."
                  % (error_stat.num_null, error_stat.num_total))
-
 
     prior_chrom_null = error_stat.num_null / error_stat.num_total
     number_true_chromatograms = (1.0 - prior_chrom_null) * number_target_peaks
@@ -181,7 +179,7 @@ def pnorm(pvalues, mu, sigma):
     """ [P(X>pi, mu, sigma) for pi in pvalues] for normal distributed P with
     expectation value mu and std deviation sigma """
 
-    pvalues = to_one_dim_array(pvalues)
+    pvalues = to_one_dim_array(pvalues, np.float64)
     args = (pvalues - mu) / sigma
     return 0.5 * (1.0 + scipy.special.erf(args / np.sqrt(2.0)))
 
@@ -199,7 +197,7 @@ def get_error_table_using_percentile_positives_new(err_df, target_scores, num_nu
     target_scores = np.sort(to_one_dim_array(target_scores))  # ascending
 
     # optimized
-    num_positives = count_num_positives(target_scores)
+    num_positives = count_num_positives(target_scores.astype(np.float64))
 
     num_negatives = num_total - num_positives
     pp = num_positives.astype(np.float32) / num_total
@@ -298,18 +296,15 @@ def get_error_table_from_pvalues_new(p_values, lambda_=0.4):
 
     # sort descending:
     p_values = np.sort(to_one_dim_array(p_values))[::-1]
-    print "!!! p_values", p_values, "\n"
 
     # estimate FDR with storeys method:
     num_null = 1.0 / (1.0 - lambda_) * (p_values >= lambda_).sum()
     num_total = len(p_values)
-    print "!!! num_null", num_null, "\n"
 
     # optimized with numpys broadcasting: comparing column vector with row
     # vector yields a matrix with pairwise comparison results.  sum(axis=0)
     # sums up each column:
     num_positives = count_num_positives(p_values)
-    print "!!! num_positives", num_positives, "\n"
     num_negatives = num_total - num_positives
     pp = 1.0 * num_positives / num_total
     tp = num_positives - num_null * p_values

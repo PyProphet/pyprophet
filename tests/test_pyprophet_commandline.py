@@ -158,7 +158,7 @@ def test_2(tmpdir, regtest):
 
 
 def test_3(tmpdir, regtest):
-    stdout = _run_pyprophet_to_learn_model(regtest, tmpdir.strpath, True, True, True, 
+    stdout = _run_pyprophet_to_learn_model(regtest, tmpdir.strpath, True, True, True,
                                            use_best=True, stat_best=True)
     _record(stdout, regtest)
 
