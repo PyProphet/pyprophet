@@ -241,7 +241,7 @@ def get_error_table_using_percentile_positives_new(err_df, target_scores, num_nu
 @profile
 def lookup_s_and_q_values_from_error_table(scores, err_df):
     """ find best matching q-value for each score in 'scores' """
-    ix = find_nearest_matches(err_df.cutoff.values, scores.values)
+    ix = find_nearest_matches(err_df.cutoff.values, scores)
     return err_df.svalue.iloc[ix].values, err_df.qvalue.iloc[ix].values
 
 

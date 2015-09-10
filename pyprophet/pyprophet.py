@@ -123,7 +123,7 @@ class Scorer(object):
         score = self.classifier.score(texp, True)
         texp["d_score"] = (score - self.mu) / self.nu
 
-        s_values, q_values = lookup_s_and_q_values_from_error_table(texp["d_score"],
+        s_values, q_values = lookup_s_and_q_values_from_error_table(texp["d_score"].values,
                                                                     self.error_stat.df)
         texp["m_score"] = q_values
         texp["s_value"] = s_values
