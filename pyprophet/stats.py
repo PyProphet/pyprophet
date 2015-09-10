@@ -200,7 +200,10 @@ def get_error_table_using_percentile_positives_new(err_df, target_scores, num_nu
     num_positives = count_num_positives(target_scores.astype(np.float64))
 
     num_negatives = num_total - num_positives
-    pp = num_positives.astype(np.float32) / num_total
+
+    # the last coertion is needed because depending on the scale of num_total
+    # numpy switched to 64 bit floats
+    pp = (num_positives.astype(np.float32) / num_total).astype(np.float32)
 
     # find best matching row in err_df for each percentile_positive in pp:
     imax = find_nearest_matches(err_df.percentile_positive.values, pp)
