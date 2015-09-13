@@ -25,16 +25,10 @@ class Protein:
         return "".join(self.peptides)
 
 
-def save_report(report_path, prefix, scored_table, final_stat):
+def save_report(report_path, prefix, decoys, targets, top_decoys, top_targets, cutoffs, svalues, qvalues):
 
     if plt is None:
         raise ImportError("you need matplotlib package to create a report")
-
-    cutoffs = final_stat["cutoff"].values
-    svalues = final_stat["svalue"].values
-    qvalues = final_stat["qvalue"].values
-
-    decoys, targets, top_decoys, top_targets = scored_table.scores()
 
     plt.figure(figsize=(10, 20))
     plt.subplots_adjust(hspace=.5)

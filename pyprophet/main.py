@@ -181,8 +181,12 @@ class PyProphetRunner(object):
 
             if result.final_statistics is not None:
 
+                cutoffs = result.final_statistics["cutoff"].values
+                svalues = result.final_statistics["svalue"].values
+                qvalues = result.final_statistics["qvalue"].values
+                decoys, targets, top_decoys, top_targets = scored_table.scores()
                 plot_data = save_report(
-                    out_path.report, self.prefix, scored_table, result.final_statistics)
+                    out_path.report, self.prefix, decoys, targets, top_decoys, top_targets, cutoffs, svalues, qvalues)
                 print "WRITTEN: ", out_path.report
 
                 cutoffs, svalues, qvalues, top_targets, top_decoys = plot_data
