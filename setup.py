@@ -4,7 +4,7 @@ from distutils.extension import Extension
 
 import numpy
 
-version = (0, 15, 3)
+version = (0, 16, 0)
 
 ext_modules = [Extension("pyprophet._optimized", ["pyprophet/_optimized.c"])]
 
@@ -34,6 +34,8 @@ setup(name='pyprophet',
           "scipy >= 0.9.0",
           "numexpr >= 2.1",
           "scikit-learn >= 0.13",
+          "matplotlib",
+          "seaborn"
       ],
       test_suite="nose.collector",
       tests_require="nose",
