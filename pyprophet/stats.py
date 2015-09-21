@@ -293,7 +293,7 @@ def summary_err_table(df, qvalues=[0, 0.01, 0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5]
 
 
 @profile
-def get_error_table_from_pvalues_new(p_values, lambda_=0.4):
+def get_error_table_from_pvalues_new(p_values, lambda_=0.4, use_pfdr=False):
     """ estimate error table from p_values with method of storey for estimating fdrs and q-values
     """
 
@@ -316,6 +316,13 @@ def get_error_table_from_pvalues_new(p_values, lambda_=0.4):
     fn = num_negatives - num_null * (1.0 - p_values)
 
     fdr = fp / num_positives
+
+    # storey published pFDR as an improvement over FDR,
+    # see http://www.genomine.org/papers/directfdr.pdf:
+
+    if use_pfdr:
+        fdr /= (1.0 - (1.0 - p_values) ** num_total)
+
     # cut off values to range 0..1
     fdr[fdr < 0.0] = 0.0
     fdr[fdr > 1.0] = 1.0
@@ -357,7 +364,7 @@ def get_error_table_from_pvalues_new(p_values, lambda_=0.4):
 
 
 @profile
-def get_error_stat_from_null(target_scores, decoy_scores, lambda_):
+def get_error_stat_from_null(target_scores, decoy_scores, lambda_, use_pfdr=False):
     """ takes list of decoy and master scores and creates error statistics for target values based
     on mean and std dev of decoy scores"""
 
@@ -369,15 +376,15 @@ def get_error_stat_from_null(target_scores, decoy_scores, lambda_):
 
     target_pvalues = 1.0 - pnorm(target_scores, mu, nu)
 
-    error_stat = get_error_table_from_pvalues_new(target_pvalues, lambda_)
+    error_stat = get_error_table_from_pvalues_new(target_pvalues, lambda_, use_pfdr)
     error_stat.df["cutoff"] = target_scores
     return error_stat
 
 
-def find_cutoff(target_scores, decoy_scores, lambda_, fdr):
+def find_cutoff(target_scores, decoy_scores, lambda_, fdr, use_pfdr=False):
     """ finds cut off target score for specified false discovery rate fdr """
 
-    error_stat = get_error_stat_from_null(target_scores, decoy_scores, lambda_)
+    error_stat = get_error_stat_from_null(target_scores, decoy_scores, lambda_, use_pfdr)
     if not len(error_stat.df):
         raise Exception("to little data for calculating error statistcs")
     i0 = (error_stat.df.qvalue - fdr).abs().argmin()
@@ -389,13 +396,15 @@ def find_cutoff(target_scores, decoy_scores, lambda_, fdr):
 def calculate_final_statistics(all_top_target_scores,
                                test_target_scores,
                                test_decoy_scores,
-                               lambda_):
+                               lambda_,
+                               use_pfdr=False):
     """ estimates error statistics for given samples target_scores and
     decoy scores and extends them to the full table of peak scores in table
     'exp' """
 
     # estimate error statistics from given samples
-    error_stat = get_error_stat_from_null(test_target_scores, test_decoy_scores, lambda_)
+    error_stat = get_error_stat_from_null(test_target_scores, test_decoy_scores, lambda_,
+                                          use_pfdr)
 
     # fraction of null hypothesises in sample values
     summed_test_fraction_null = error_stat.num_null / error_stat.num_total
