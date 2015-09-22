@@ -5,7 +5,7 @@ import sys
 
 import pytest
 
-__here__ = os.path.dirname(os.path.abspath(__file__))
+DATA_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 
 
 def _record(stdout, regtest):
@@ -110,7 +110,7 @@ def _run_pyprophet_to_learn_model(regtest, temp_folder, dump_result_files=False,
         with_probatilities=False, compress=False, sampling_rate=None, use_best=False,
         stat_best=False):
     os.chdir(temp_folder)
-    data_path = os.path.join(__here__, "test_data.txt")
+    data_path = os.path.join(DATA_FOLDER, "test_data.txt")
     shutil.copy(data_path, temp_folder)
     cmdline = "pyprophet test_data.txt --random_seed=42"
     if with_probatilities:
@@ -273,9 +273,9 @@ def test_apply_scorer(tmpdir, regtest):
 def test_multiple_input_files(tmpdir, regtest):
     os.chdir(tmpdir.strpath)
 
-    data_path = os.path.join(__here__, "test_data_3.txt")
+    data_path = os.path.join(DATA_FOLDER, "test_data_3.txt")
     shutil.copy(data_path, tmpdir.strpath)
-    data_path = os.path.join(__here__, "test_data_2.txt")
+    data_path = os.path.join(DATA_FOLDER, "test_data_2.txt")
     shutil.copy(data_path, tmpdir.strpath)
 
     stdout = _run_cmdline("pyprophet test_data_2.txt test_data_3.txt --random_seed=42 --target.overwrite")
@@ -285,9 +285,9 @@ def test_multiple_input_files(tmpdir, regtest):
 def test_multiple_input_files_with_merge(tmpdir, regtest):
     os.chdir(tmpdir.strpath)
 
-    data_path = os.path.join(__here__, "test_data_3.txt")
+    data_path = os.path.join(DATA_FOLDER, "test_data_3.txt")
     shutil.copy(data_path, tmpdir.strpath)
-    data_path = os.path.join(__here__, "test_data_2.txt")
+    data_path = os.path.join(DATA_FOLDER, "test_data_2.txt")
     shutil.copy(data_path, tmpdir.strpath)
 
     stdout = _run_cmdline("pyprophet test_data_2.txt test_data_3.txt --random_seed=42 --target.overwrite "
@@ -302,9 +302,9 @@ def test_out_of_core_multi_input_files(tmpdir, regtest):
         f = tmpdir.join(subfolder).strpath
         os.makedirs(f)
         os.chdir(f)
-        data_path = os.path.join(__here__, "test_data_3.txt")
+        data_path = os.path.join(DATA_FOLDER, "test_data_3.txt")
         shutil.copy(data_path, f)
-        data_path = os.path.join(__here__, "test_data_2.txt")
+        data_path = os.path.join(DATA_FOLDER, "test_data_2.txt")
         shutil.copy(data_path, f)
         return f
 
@@ -376,9 +376,9 @@ def test_out_of_core_apply_weights(tmpdir, regtest):
         f = tmpdir.join(subfolder).strpath
         os.makedirs(f)
         os.chdir(f)
-        data_path = os.path.join(__here__, "test_data_3.txt")
+        data_path = os.path.join(DATA_FOLDER, "test_data_3.txt")
         shutil.copy(data_path, f)
-        data_path = os.path.join(__here__, "test_data_2.txt")
+        data_path = os.path.join(DATA_FOLDER, "test_data_2.txt")
         shutil.copy(data_path, f)
         return f
 
