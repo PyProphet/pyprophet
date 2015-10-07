@@ -182,11 +182,10 @@ def find_top_ranked(np.int64_t[:] tg_ids, DATA_TYPE[:] scores):
     return flags
 
 
-cdef partial_rank(DATA_TYPE[:] scores, size_t imin, size_t imax, np.int32_t[:] ranks, np.int32_t * ix):
+cdef partial_rank(DATA_TYPE[:] scores, size_t imin, size_t imax, np.uint32_t[:] ranks, np.uint32_t * ix):
     """ imax is exclusive, imax-imin is the size of a target group, so 32 bit int should
     be sufficient"""
-    #cdef np.int32_t * ix = <np.int32_t * > libc.stdlib.malloc((imax - imin) * sizeof(np.int32_t))
-    cdef np.int32_t i, j, pos
+    cdef np.uint32_t i, j, pos
     for i in range(imax - imin):
         ix[i] = i
     for i in range(imax - imin - 1):
@@ -198,18 +197,16 @@ cdef partial_rank(DATA_TYPE[:] scores, size_t imin, size_t imax, np.int32_t[:] r
 
     for j in range(imax - imin):
         ranks[ix[j] + imin] = j + 1
-    #libc.stdlib.free(ix)
-
 
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
 def rank(np.int64_t[:] tg_ids, DATA_TYPE[:] scores):
     # we assume a transition group has always max 1000 entries:
-    cdef np.int32_t * ix = <np.int32_t * > libc.stdlib.malloc(1000 * sizeof(np.int32_t))
+    cdef np.uint32_t * ix = <np.uint32_t * > libc.stdlib.malloc(1000 * sizeof(np.uint32_t))
     cdef size_t n = tg_ids.shape[0]
-    result = np.zeros((n,), dtype=np.int32)
-    cdef np.int32_t[:] ranks = result
+    result = np.zeros((n,), dtype=np.uint32)
+    cdef np.uint32_t[:] ranks = result
     cdef size_t imin = 0
     cdef size_t imax
     cdef np.int64_t g0
@@ -226,12 +223,12 @@ def rank(np.int64_t[:] tg_ids, DATA_TYPE[:] scores):
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def rank32(np.int32_t[:] tg_ids, DATA_TYPE[:] scores):
+def rank32(np.uint32_t[:] tg_ids, DATA_TYPE[:] scores):
     # we assume a transition group has always max 1000 entries:
-    cdef np.int32_t * ix = <np.int32_t * > libc.stdlib.malloc(1000 * sizeof(np.int32_t))
+    cdef np.uint32_t * ix = <np.uint32_t * > libc.stdlib.malloc(1000 * sizeof(np.uint32_t))
     cdef size_t n = tg_ids.shape[0]
-    result = np.zeros((n,), dtype=np.int32)
-    cdef np.int32_t[:] ranks = result
+    result = np.zeros((n,), dtype=np.uint32)
+    cdef np.uint32_t[:] ranks = result
     cdef size_t imin = 0
     cdef size_t imax
     cdef np.float32_t g0

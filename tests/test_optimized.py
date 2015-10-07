@@ -30,7 +30,7 @@ def test_rank32():
     groups = [1, 1, 1, 1, 1, 2, 3, 3, 3, 0]
     values = [2, 7, 0, 5, 3, 7, 2, 1, 3, 9]
 
-    groups = np.array(groups, dtype=np.int32)
+    groups = np.array(groups, dtype=np.uint32)
     values = array32(values)
 
     ranks = o.rank32(groups, values)
@@ -38,11 +38,11 @@ def test_rank32():
 
     # corner cases:
 
-    groups = np.array([1], dtype=np.int32)
+    groups = np.array([1], dtype=np.uint32)
     values = array32([1.0])
     assert list(o.rank32(groups, values)) == [1]
 
-    groups = np.array([], dtype=np.int32)
+    groups = np.array([], dtype=np.uint32)
     values = array32([])
     assert list(o.rank32(groups, values)) == []
 
