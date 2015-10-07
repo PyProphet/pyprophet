@@ -182,40 +182,67 @@ def find_top_ranked(np.int64_t[:] tg_ids, DATA_TYPE[:] scores):
     return flags
 
 
-cdef partial_rank(DATA_TYPE[:] v, size_t imin, size_t imax, np.int64_t[:] ranks):
-    """ imax is exclusive """
-    cdef size_t * ix = <size_t * > libc.stdlib.malloc((imax - imin) * sizeof(size_t))
-    cdef size_t i, j, pos
+cdef partial_rank(DATA_TYPE[:] scores, size_t imin, size_t imax, np.int32_t[:] ranks, np.int32_t * ix):
+    """ imax is exclusive, imax-imin is the size of a target group, so 32 bit int should
+    be sufficient"""
+    #cdef np.int32_t * ix = <np.int32_t * > libc.stdlib.malloc((imax - imin) * sizeof(np.int32_t))
+    cdef np.int32_t i, j, pos
     for i in range(imax - imin):
-        ix[i] = i + imin
+        ix[i] = i
     for i in range(imax - imin - 1):
         pos = i
         for j in range(i + 1, imax - imin):
-            if v[ix[j]] > v[ix[pos]]:
+            if scores[ix[j] + imin] > scores[ix[pos] + imin]:
                 pos = j
         ix[i], ix[pos] = ix[pos], ix[i]
 
     for j in range(imax - imin):
-        ranks[ix[j]] = j + 1
-    libc.stdlib.free(ix)
+        ranks[ix[j] + imin] = j + 1
+    #libc.stdlib.free(ix)
+
 
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
 def rank(np.int64_t[:] tg_ids, DATA_TYPE[:] scores):
+    # we assume a transition group has always max 1000 entries:
+    cdef np.int32_t * ix = <np.int32_t * > libc.stdlib.malloc(1000 * sizeof(np.int32_t))
     cdef size_t n = tg_ids.shape[0]
-    result = np.zeros((n,), dtype=np.int64)
-    cdef np.int64_t[:] ranks = result
+    result = np.zeros((n,), dtype=np.int32)
+    cdef np.int32_t[:] ranks = result
     cdef size_t imin = 0
     cdef size_t imax
-    cdef np.float64_t g0
+    cdef np.int64_t g0
     while imin < n:
         imax = imin + 1
         g0 = tg_ids[imin]
         while imax < n and tg_ids[imax] == g0:
             imax += 1
-        partial_rank(scores, imin, imax, ranks)
+        partial_rank(scores, imin, imax, ranks, ix)
         imin = imax
+    libc.stdlib.free(ix)
+    return result
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def rank32(np.int32_t[:] tg_ids, DATA_TYPE[:] scores):
+    # we assume a transition group has always max 1000 entries:
+    cdef np.int32_t * ix = <np.int32_t * > libc.stdlib.malloc(1000 * sizeof(np.int32_t))
+    cdef size_t n = tg_ids.shape[0]
+    result = np.zeros((n,), dtype=np.int32)
+    cdef np.int32_t[:] ranks = result
+    cdef size_t imin = 0
+    cdef size_t imax
+    cdef np.float32_t g0
+    while imin < n:
+        imax = imin + 1
+        g0 = tg_ids[imin]
+        while imax < n and tg_ids[imax] == g0:
+            imax += 1
+        partial_rank(scores, imin, imax, ranks, ix)
+        imin = imax
+    libc.stdlib.free(ix)
     return result
 
 

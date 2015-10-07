@@ -1289,10 +1289,16 @@ static CYTHON_INLINE __Pyx_memviewslice __Pyx_PyObject_to_MemoryviewSlice_ds_nn_
 
 static CYTHON_INLINE __Pyx_memviewslice __Pyx_PyObject_to_MemoryviewSlice_ds_nn___pyx_t_5numpy_int64_t(PyObject *);
 
+static CYTHON_INLINE __Pyx_memviewslice __Pyx_PyObject_to_MemoryviewSlice_ds_nn___pyx_t_5numpy_int32_t(PyObject *);
+
 static CYTHON_INLINE size_t __Pyx_PyInt_As_size_t(PyObject *);
 
 static PyObject *__pyx_memview_get_nn___pyx_t_5numpy_float64_t(const char *itemp);
 static int __pyx_memview_set_nn___pyx_t_5numpy_float64_t(const char *itemp, PyObject *obj);
+
+static CYTHON_INLINE npy_int32 __Pyx_PyInt_As_npy_int32(PyObject *);
+
+static CYTHON_INLINE PyObject* __Pyx_PyInt_From_long(long value);
 
 #if CYTHON_CCOMPLEX
   #ifdef __cplusplus
@@ -1411,8 +1417,6 @@ __pyx_memoryview_copy_new_contig(const __Pyx_memviewslice *from_mvs,
 
 static CYTHON_INLINE PyObject *__pyx_capsule_create(void *p, const char *sig);
 
-static CYTHON_INLINE PyObject* __Pyx_PyInt_From_long(long value);
-
 static CYTHON_INLINE char __Pyx_PyInt_As_char(PyObject *);
 
 static CYTHON_INLINE long __Pyx_PyInt_As_long(PyObject *);
@@ -1487,7 +1491,7 @@ static PyObject *indirect = 0;
 static PyObject *contiguous = 0;
 static PyObject *indirect_contiguous = 0;
 static int __pyx_f_9pyprophet_10_optimized_find_sort_order(__Pyx_memviewslice); /*proto*/
-static PyObject *__pyx_f_9pyprophet_10_optimized_partial_rank(__Pyx_memviewslice, size_t, size_t, __Pyx_memviewslice); /*proto*/
+static PyObject *__pyx_f_9pyprophet_10_optimized_partial_rank(__Pyx_memviewslice, size_t, size_t, __Pyx_memviewslice, __pyx_t_5numpy_int32_t *); /*proto*/
 static struct __pyx_array_obj *__pyx_array_new(PyObject *, Py_ssize_t, char *, char *, char *); /*proto*/
 static void *__pyx_align_pointer(void *, size_t); /*proto*/
 static PyObject *__pyx_memoryview_new(PyObject *, int, int, __Pyx_TypeInfo *); /*proto*/
@@ -1523,6 +1527,7 @@ static void __pyx_memoryview__slice_assign_scalar(char *, Py_ssize_t *, Py_ssize
 static __Pyx_TypeInfo __Pyx_TypeInfo_nn___pyx_t_9pyprophet_10_optimized_DATA_TYPE = { "DATA_TYPE", NULL, sizeof(__pyx_t_9pyprophet_10_optimized_DATA_TYPE), { 0 }, 0, 'R', 0, 0 };
 static __Pyx_TypeInfo __Pyx_TypeInfo_nn___pyx_t_5numpy_float64_t = { "float64_t", NULL, sizeof(__pyx_t_5numpy_float64_t), { 0 }, 0, 'R', 0, 0 };
 static __Pyx_TypeInfo __Pyx_TypeInfo_nn___pyx_t_5numpy_int64_t = { "int64_t", NULL, sizeof(__pyx_t_5numpy_int64_t), { 0 }, 0, IS_UNSIGNED(__pyx_t_5numpy_int64_t) ? 'U' : 'I', IS_UNSIGNED(__pyx_t_5numpy_int64_t), 0 };
+static __Pyx_TypeInfo __Pyx_TypeInfo_nn___pyx_t_5numpy_int32_t = { "int32_t", NULL, sizeof(__pyx_t_5numpy_int32_t), { 0 }, 0, IS_UNSIGNED(__pyx_t_5numpy_int32_t) ? 'U' : 'I', IS_UNSIGNED(__pyx_t_5numpy_int32_t), 0 };
 #define __Pyx_MODULE_NAME "pyprophet._optimized"
 int __pyx_module_is_main_pyprophet___optimized = 0;
 
@@ -1540,7 +1545,8 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_find_nearest_matches(CYTHON_UN
 static PyObject *__pyx_pf_9pyprophet_10_optimized_2count_num_positives(CYTHON_UNUSED PyObject *__pyx_self, __Pyx_memviewslice __pyx_v_values); /* proto */
 static PyObject *__pyx_pf_9pyprophet_10_optimized_4find_top_ranked(CYTHON_UNUSED PyObject *__pyx_self, __Pyx_memviewslice __pyx_v_tg_ids, __Pyx_memviewslice __pyx_v_scores); /* proto */
 static PyObject *__pyx_pf_9pyprophet_10_optimized_6rank(CYTHON_UNUSED PyObject *__pyx_self, __Pyx_memviewslice __pyx_v_tg_ids, __Pyx_memviewslice __pyx_v_scores); /* proto */
-static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesis_fast(CYTHON_UNUSED PyObject *__pyx_self, __Pyx_memviewslice __pyx_v_inv_pg_pp_true, __pyx_t_5numpy_float64_t __pyx_v_prior_chrom_null, __pyx_t_5numpy_float64_t __pyx_v_prior_pg_true); /* proto */
+static PyObject *__pyx_pf_9pyprophet_10_optimized_8rank32(CYTHON_UNUSED PyObject *__pyx_self, __Pyx_memviewslice __pyx_v_tg_ids, __Pyx_memviewslice __pyx_v_scores); /* proto */
+static PyObject *__pyx_pf_9pyprophet_10_optimized_10single_chromatogram_hypothesis_fast(CYTHON_UNUSED PyObject *__pyx_self, __Pyx_memviewslice __pyx_v_inv_pg_pp_true, __pyx_t_5numpy_float64_t __pyx_v_prior_chrom_null, __pyx_t_5numpy_float64_t __pyx_v_prior_pg_true); /* proto */
 static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, Py_buffer *__pyx_v_info, int __pyx_v_flags); /* proto */
 static void __pyx_pf_5numpy_7ndarray_2__releasebuffer__(PyArrayObject *__pyx_v_self, Py_buffer *__pyx_v_info); /* proto */
 static int __pyx_array___pyx_pf_15View_dot_MemoryView_5array___cinit__(struct __pyx_array_obj *__pyx_v_self, PyObject *__pyx_v_shape, Py_ssize_t __pyx_v_itemsize, PyObject *__pyx_v_format, PyObject *__pyx_v_mode, int __pyx_v_allocate_buffer); /* proto */
@@ -1604,6 +1610,7 @@ static char __pyx_k_g0[] = "g0";
 static char __pyx_k_i0[] = "i0";
 static char __pyx_k_i1[] = "i1";
 static char __pyx_k_id[] = "id";
+static char __pyx_k_ix[] = "ix";
 static char __pyx_k_np[] = "np";
 static char __pyx_k_sc[] = "sc";
 static char __pyx_k_low[] = "low";
@@ -1633,6 +1640,7 @@ static char __pyx_k_class[] = "__class__";
 static char __pyx_k_dtype[] = "dtype";
 static char __pyx_k_error[] = "error";
 static char __pyx_k_flags[] = "flags";
+static char __pyx_k_int32[] = "int32";
 static char __pyx_k_int64[] = "int64";
 static char __pyx_k_numpy[] = "numpy";
 static char __pyx_k_range[] = "range";
@@ -1644,6 +1652,7 @@ static char __pyx_k_best_j[] = "best_j";
 static char __pyx_k_format[] = "format";
 static char __pyx_k_import[] = "__import__";
 static char __pyx_k_name_2[] = "__name__";
+static char __pyx_k_rank32[] = "rank32";
 static char __pyx_k_result[] = "result";
 static char __pyx_k_scores[] = "scores";
 static char __pyx_k_struct[] = "struct";
@@ -1787,10 +1796,12 @@ static PyObject *__pyx_n_s_imax;
 static PyObject *__pyx_n_s_imin;
 static PyObject *__pyx_n_s_import;
 static PyObject *__pyx_n_s_inp_view;
+static PyObject *__pyx_n_s_int32;
 static PyObject *__pyx_n_s_int64;
 static PyObject *__pyx_n_s_inv_pg_pp_true;
 static PyObject *__pyx_n_s_itemsize;
 static PyObject *__pyx_kp_s_itemsize_0_for_cython_array;
+static PyObject *__pyx_n_s_ix;
 static PyObject *__pyx_n_s_j;
 static PyObject *__pyx_n_s_low;
 static PyObject *__pyx_n_s_main;
@@ -1817,6 +1828,7 @@ static PyObject *__pyx_n_s_pyx_getbuffer;
 static PyObject *__pyx_n_s_pyx_vtable;
 static PyObject *__pyx_n_s_range;
 static PyObject *__pyx_n_s_rank;
+static PyObject *__pyx_n_s_rank32;
 static PyObject *__pyx_n_s_ranks;
 static PyObject *__pyx_n_s_res_view;
 static PyObject *__pyx_n_s_result;
@@ -1875,15 +1887,17 @@ static PyObject *__pyx_tuple__23;
 static PyObject *__pyx_tuple__25;
 static PyObject *__pyx_tuple__27;
 static PyObject *__pyx_tuple__29;
-static PyObject *__pyx_tuple__30;
 static PyObject *__pyx_tuple__31;
 static PyObject *__pyx_tuple__32;
 static PyObject *__pyx_tuple__33;
+static PyObject *__pyx_tuple__34;
+static PyObject *__pyx_tuple__35;
 static PyObject *__pyx_codeobj__20;
 static PyObject *__pyx_codeobj__22;
 static PyObject *__pyx_codeobj__24;
 static PyObject *__pyx_codeobj__26;
 static PyObject *__pyx_codeobj__28;
+static PyObject *__pyx_codeobj__30;
 
 /* "pyprophet/_optimized.pyx":15
  * @cython.boundscheck(False)
@@ -3849,64 +3863,55 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_4find_top_ranked(CYTHON_UNUSED
 /* "pyprophet/_optimized.pyx":185
  * 
  * 
- * cdef partial_rank(DATA_TYPE[:] v, size_t imin, size_t imax, np.int64_t[:] ranks):             # <<<<<<<<<<<<<<
- *     """ imax is exclusive """
- *     cdef size_t * ix = <size_t * > libc.stdlib.malloc((imax - imin) * sizeof(size_t))
+ * cdef partial_rank(DATA_TYPE[:] scores, size_t imin, size_t imax, np.int32_t[:] ranks, np.int32_t * ix):             # <<<<<<<<<<<<<<
+ *     """ imax is exclusive, imax-imin is the size of a target group, so 32 bit int should
+ *     be sufficient"""
  */
 
-static PyObject *__pyx_f_9pyprophet_10_optimized_partial_rank(__Pyx_memviewslice __pyx_v_v, size_t __pyx_v_imin, size_t __pyx_v_imax, __Pyx_memviewslice __pyx_v_ranks) {
-  size_t *__pyx_v_ix;
-  size_t __pyx_v_i;
-  size_t __pyx_v_j;
-  size_t __pyx_v_pos;
+static PyObject *__pyx_f_9pyprophet_10_optimized_partial_rank(__Pyx_memviewslice __pyx_v_scores, size_t __pyx_v_imin, size_t __pyx_v_imax, __Pyx_memviewslice __pyx_v_ranks, __pyx_t_5numpy_int32_t *__pyx_v_ix) {
+  __pyx_t_5numpy_int32_t __pyx_v_i;
+  __pyx_t_5numpy_int32_t __pyx_v_j;
+  __pyx_t_5numpy_int32_t __pyx_v_pos;
   PyObject *__pyx_r = NULL;
   __Pyx_RefNannyDeclarations
   size_t __pyx_t_1;
-  size_t __pyx_t_2;
+  __pyx_t_5numpy_int32_t __pyx_t_2;
   size_t __pyx_t_3;
-  size_t __pyx_t_4;
+  __pyx_t_5numpy_int32_t __pyx_t_4;
   size_t __pyx_t_5;
   int __pyx_t_6;
   size_t __pyx_t_7;
   int __pyx_t_8;
+  __pyx_t_5numpy_int32_t __pyx_t_9;
   int __pyx_lineno = 0;
   const char *__pyx_filename = NULL;
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("partial_rank", 0);
 
-  /* "pyprophet/_optimized.pyx":187
- * cdef partial_rank(DATA_TYPE[:] v, size_t imin, size_t imax, np.int64_t[:] ranks):
- *     """ imax is exclusive """
- *     cdef size_t * ix = <size_t * > libc.stdlib.malloc((imax - imin) * sizeof(size_t))             # <<<<<<<<<<<<<<
- *     cdef size_t i, j, pos
- *     for i in range(imax - imin):
- */
-  __pyx_v_ix = ((size_t *)malloc(((__pyx_v_imax - __pyx_v_imin) * (sizeof(size_t)))));
-
-  /* "pyprophet/_optimized.pyx":189
- *     cdef size_t * ix = <size_t * > libc.stdlib.malloc((imax - imin) * sizeof(size_t))
- *     cdef size_t i, j, pos
+  /* "pyprophet/_optimized.pyx":190
+ *     #cdef np.int32_t * ix = <np.int32_t * > libc.stdlib.malloc((imax - imin) * sizeof(np.int32_t))
+ *     cdef np.int32_t i, j, pos
  *     for i in range(imax - imin):             # <<<<<<<<<<<<<<
- *         ix[i] = i + imin
+ *         ix[i] = i
  *     for i in range(imax - imin - 1):
  */
   __pyx_t_1 = (__pyx_v_imax - __pyx_v_imin);
   for (__pyx_t_2 = 0; __pyx_t_2 < __pyx_t_1; __pyx_t_2+=1) {
     __pyx_v_i = __pyx_t_2;
 
-    /* "pyprophet/_optimized.pyx":190
- *     cdef size_t i, j, pos
+    /* "pyprophet/_optimized.pyx":191
+ *     cdef np.int32_t i, j, pos
  *     for i in range(imax - imin):
- *         ix[i] = i + imin             # <<<<<<<<<<<<<<
+ *         ix[i] = i             # <<<<<<<<<<<<<<
  *     for i in range(imax - imin - 1):
  *         pos = i
  */
-    (__pyx_v_ix[__pyx_v_i]) = (__pyx_v_i + __pyx_v_imin);
+    (__pyx_v_ix[__pyx_v_i]) = __pyx_v_i;
   }
 
-  /* "pyprophet/_optimized.pyx":191
+  /* "pyprophet/_optimized.pyx":192
  *     for i in range(imax - imin):
- *         ix[i] = i + imin
+ *         ix[i] = i
  *     for i in range(imax - imin - 1):             # <<<<<<<<<<<<<<
  *         pos = i
  *         for j in range(i + 1, imax - imin):
@@ -3915,53 +3920,53 @@ static PyObject *__pyx_f_9pyprophet_10_optimized_partial_rank(__Pyx_memviewslice
   for (__pyx_t_2 = 0; __pyx_t_2 < __pyx_t_1; __pyx_t_2+=1) {
     __pyx_v_i = __pyx_t_2;
 
-    /* "pyprophet/_optimized.pyx":192
- *         ix[i] = i + imin
+    /* "pyprophet/_optimized.pyx":193
+ *         ix[i] = i
  *     for i in range(imax - imin - 1):
  *         pos = i             # <<<<<<<<<<<<<<
  *         for j in range(i + 1, imax - imin):
- *             if v[ix[j]] > v[ix[pos]]:
+ *             if scores[ix[j] + imin] > scores[ix[pos] + imin]:
  */
     __pyx_v_pos = __pyx_v_i;
 
-    /* "pyprophet/_optimized.pyx":193
+    /* "pyprophet/_optimized.pyx":194
  *     for i in range(imax - imin - 1):
  *         pos = i
  *         for j in range(i + 1, imax - imin):             # <<<<<<<<<<<<<<
- *             if v[ix[j]] > v[ix[pos]]:
+ *             if scores[ix[j] + imin] > scores[ix[pos] + imin]:
  *                 pos = j
  */
     __pyx_t_3 = (__pyx_v_imax - __pyx_v_imin);
     for (__pyx_t_4 = (__pyx_v_i + 1); __pyx_t_4 < __pyx_t_3; __pyx_t_4+=1) {
       __pyx_v_j = __pyx_t_4;
 
-      /* "pyprophet/_optimized.pyx":194
+      /* "pyprophet/_optimized.pyx":195
  *         pos = i
  *         for j in range(i + 1, imax - imin):
- *             if v[ix[j]] > v[ix[pos]]:             # <<<<<<<<<<<<<<
+ *             if scores[ix[j] + imin] > scores[ix[pos] + imin]:             # <<<<<<<<<<<<<<
  *                 pos = j
  *         ix[i], ix[pos] = ix[pos], ix[i]
  */
-      __pyx_t_5 = (__pyx_v_ix[__pyx_v_j]);
+      __pyx_t_5 = ((__pyx_v_ix[__pyx_v_j]) + __pyx_v_imin);
       __pyx_t_6 = -1;
-      if (unlikely(__pyx_t_5 >= (size_t)__pyx_v_v.shape[0])) __pyx_t_6 = 0;
+      if (unlikely(__pyx_t_5 >= (size_t)__pyx_v_scores.shape[0])) __pyx_t_6 = 0;
       if (unlikely(__pyx_t_6 != -1)) {
         __Pyx_RaiseBufferIndexError(__pyx_t_6);
-        {__pyx_filename = __pyx_f[0]; __pyx_lineno = 194; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+        {__pyx_filename = __pyx_f[0]; __pyx_lineno = 195; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
       }
-      __pyx_t_7 = (__pyx_v_ix[__pyx_v_pos]);
+      __pyx_t_7 = ((__pyx_v_ix[__pyx_v_pos]) + __pyx_v_imin);
       __pyx_t_6 = -1;
-      if (unlikely(__pyx_t_7 >= (size_t)__pyx_v_v.shape[0])) __pyx_t_6 = 0;
+      if (unlikely(__pyx_t_7 >= (size_t)__pyx_v_scores.shape[0])) __pyx_t_6 = 0;
       if (unlikely(__pyx_t_6 != -1)) {
         __Pyx_RaiseBufferIndexError(__pyx_t_6);
-        {__pyx_filename = __pyx_f[0]; __pyx_lineno = 194; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+        {__pyx_filename = __pyx_f[0]; __pyx_lineno = 195; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
       }
-      __pyx_t_8 = (((*((__pyx_t_9pyprophet_10_optimized_DATA_TYPE *) ( /* dim=0 */ (__pyx_v_v.data + __pyx_t_5 * __pyx_v_v.strides[0]) ))) > (*((__pyx_t_9pyprophet_10_optimized_DATA_TYPE *) ( /* dim=0 */ (__pyx_v_v.data + __pyx_t_7 * __pyx_v_v.strides[0]) )))) != 0);
+      __pyx_t_8 = (((*((__pyx_t_9pyprophet_10_optimized_DATA_TYPE *) ( /* dim=0 */ (__pyx_v_scores.data + __pyx_t_5 * __pyx_v_scores.strides[0]) ))) > (*((__pyx_t_9pyprophet_10_optimized_DATA_TYPE *) ( /* dim=0 */ (__pyx_v_scores.data + __pyx_t_7 * __pyx_v_scores.strides[0]) )))) != 0);
       if (__pyx_t_8) {
 
-        /* "pyprophet/_optimized.pyx":195
+        /* "pyprophet/_optimized.pyx":196
  *         for j in range(i + 1, imax - imin):
- *             if v[ix[j]] > v[ix[pos]]:
+ *             if scores[ix[j] + imin] > scores[ix[pos] + imin]:
  *                 pos = j             # <<<<<<<<<<<<<<
  *         ix[i], ix[pos] = ix[pos], ix[i]
  * 
@@ -3972,62 +3977,53 @@ static PyObject *__pyx_f_9pyprophet_10_optimized_partial_rank(__Pyx_memviewslice
       __pyx_L9:;
     }
 
-    /* "pyprophet/_optimized.pyx":196
- *             if v[ix[j]] > v[ix[pos]]:
+    /* "pyprophet/_optimized.pyx":197
+ *             if scores[ix[j] + imin] > scores[ix[pos] + imin]:
  *                 pos = j
  *         ix[i], ix[pos] = ix[pos], ix[i]             # <<<<<<<<<<<<<<
  * 
  *     for j in range(imax - imin):
  */
-    __pyx_t_3 = (__pyx_v_ix[__pyx_v_pos]);
-    __pyx_t_4 = (__pyx_v_ix[__pyx_v_i]);
-    (__pyx_v_ix[__pyx_v_i]) = __pyx_t_3;
-    (__pyx_v_ix[__pyx_v_pos]) = __pyx_t_4;
+    __pyx_t_4 = (__pyx_v_ix[__pyx_v_pos]);
+    __pyx_t_9 = (__pyx_v_ix[__pyx_v_i]);
+    (__pyx_v_ix[__pyx_v_i]) = __pyx_t_4;
+    (__pyx_v_ix[__pyx_v_pos]) = __pyx_t_9;
   }
 
-  /* "pyprophet/_optimized.pyx":198
+  /* "pyprophet/_optimized.pyx":199
  *         ix[i], ix[pos] = ix[pos], ix[i]
  * 
  *     for j in range(imax - imin):             # <<<<<<<<<<<<<<
- *         ranks[ix[j]] = j + 1
- *     libc.stdlib.free(ix)
+ *         ranks[ix[j] + imin] = j + 1
+ *     #libc.stdlib.free(ix)
  */
   __pyx_t_1 = (__pyx_v_imax - __pyx_v_imin);
   for (__pyx_t_2 = 0; __pyx_t_2 < __pyx_t_1; __pyx_t_2+=1) {
     __pyx_v_j = __pyx_t_2;
 
-    /* "pyprophet/_optimized.pyx":199
+    /* "pyprophet/_optimized.pyx":200
  * 
  *     for j in range(imax - imin):
- *         ranks[ix[j]] = j + 1             # <<<<<<<<<<<<<<
- *     libc.stdlib.free(ix)
+ *         ranks[ix[j] + imin] = j + 1             # <<<<<<<<<<<<<<
+ *     #libc.stdlib.free(ix)
  * 
  */
-    __pyx_t_4 = (__pyx_v_ix[__pyx_v_j]);
+    __pyx_t_3 = ((__pyx_v_ix[__pyx_v_j]) + __pyx_v_imin);
     __pyx_t_6 = -1;
-    if (unlikely(__pyx_t_4 >= (size_t)__pyx_v_ranks.shape[0])) __pyx_t_6 = 0;
+    if (unlikely(__pyx_t_3 >= (size_t)__pyx_v_ranks.shape[0])) __pyx_t_6 = 0;
     if (unlikely(__pyx_t_6 != -1)) {
       __Pyx_RaiseBufferIndexError(__pyx_t_6);
-      {__pyx_filename = __pyx_f[0]; __pyx_lineno = 199; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+      {__pyx_filename = __pyx_f[0]; __pyx_lineno = 200; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
     }
-    *((__pyx_t_5numpy_int64_t *) ( /* dim=0 */ (__pyx_v_ranks.data + __pyx_t_4 * __pyx_v_ranks.strides[0]) )) = (__pyx_v_j + 1);
+    *((__pyx_t_5numpy_int32_t *) ( /* dim=0 */ (__pyx_v_ranks.data + __pyx_t_3 * __pyx_v_ranks.strides[0]) )) = (__pyx_v_j + 1);
   }
-
-  /* "pyprophet/_optimized.pyx":200
- *     for j in range(imax - imin):
- *         ranks[ix[j]] = j + 1
- *     libc.stdlib.free(ix)             # <<<<<<<<<<<<<<
- * 
- * 
- */
-  free(__pyx_v_ix);
 
   /* "pyprophet/_optimized.pyx":185
  * 
  * 
- * cdef partial_rank(DATA_TYPE[:] v, size_t imin, size_t imax, np.int64_t[:] ranks):             # <<<<<<<<<<<<<<
- *     """ imax is exclusive """
- *     cdef size_t * ix = <size_t * > libc.stdlib.malloc((imax - imin) * sizeof(size_t))
+ * cdef partial_rank(DATA_TYPE[:] scores, size_t imin, size_t imax, np.int32_t[:] ranks, np.int32_t * ix):             # <<<<<<<<<<<<<<
+ *     """ imax is exclusive, imax-imin is the size of a target group, so 32 bit int should
+ *     be sufficient"""
  */
 
   /* function exit code */
@@ -4042,12 +4038,12 @@ static PyObject *__pyx_f_9pyprophet_10_optimized_partial_rank(__Pyx_memviewslice
   return __pyx_r;
 }
 
-/* "pyprophet/_optimized.pyx":205
+/* "pyprophet/_optimized.pyx":207
  * @cython.boundscheck(False)
  * @cython.wraparound(False)
  * def rank(np.int64_t[:] tg_ids, DATA_TYPE[:] scores):             # <<<<<<<<<<<<<<
- *     cdef size_t n = tg_ids.shape[0]
- *     result = np.zeros((n,), dtype=np.int64)
+ *     # we assume a transition group has always max 1000 entries:
+ *     cdef np.int32_t * ix = <np.int32_t * > libc.stdlib.malloc(1000 * sizeof(np.int32_t))
  */
 
 /* Python wrapper */
@@ -4082,11 +4078,11 @@ static PyObject *__pyx_pw_9pyprophet_10_optimized_7rank(PyObject *__pyx_self, Py
         case  1:
         if (likely((values[1] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_scores)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("rank", 1, 2, 2, 1); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 205; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+          __Pyx_RaiseArgtupleInvalid("rank", 1, 2, 2, 1); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 207; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
         }
       }
       if (unlikely(kw_args > 0)) {
-        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "rank") < 0)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 205; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "rank") < 0)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 207; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
       }
     } else if (PyTuple_GET_SIZE(__pyx_args) != 2) {
       goto __pyx_L5_argtuple_error;
@@ -4094,12 +4090,12 @@ static PyObject *__pyx_pw_9pyprophet_10_optimized_7rank(PyObject *__pyx_self, Py
       values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
       values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
     }
-    __pyx_v_tg_ids = __Pyx_PyObject_to_MemoryviewSlice_ds_nn___pyx_t_5numpy_int64_t(values[0]); if (unlikely(!__pyx_v_tg_ids.memview)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 205; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
-    __pyx_v_scores = __Pyx_PyObject_to_MemoryviewSlice_ds_nn___pyx_t_9pyprophet_10_optimized_DATA_TYPE(values[1]); if (unlikely(!__pyx_v_scores.memview)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 205; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+    __pyx_v_tg_ids = __Pyx_PyObject_to_MemoryviewSlice_ds_nn___pyx_t_5numpy_int64_t(values[0]); if (unlikely(!__pyx_v_tg_ids.memview)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 207; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+    __pyx_v_scores = __Pyx_PyObject_to_MemoryviewSlice_ds_nn___pyx_t_9pyprophet_10_optimized_DATA_TYPE(values[1]); if (unlikely(!__pyx_v_scores.memview)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 207; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("rank", 1, 2, 2, PyTuple_GET_SIZE(__pyx_args)); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 205; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+  __Pyx_RaiseArgtupleInvalid("rank", 1, 2, 2, PyTuple_GET_SIZE(__pyx_args)); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 207; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
   __pyx_L3_error:;
   __Pyx_AddTraceback("pyprophet._optimized.rank", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
@@ -4113,12 +4109,13 @@ static PyObject *__pyx_pw_9pyprophet_10_optimized_7rank(PyObject *__pyx_self, Py
 }
 
 static PyObject *__pyx_pf_9pyprophet_10_optimized_6rank(CYTHON_UNUSED PyObject *__pyx_self, __Pyx_memviewslice __pyx_v_tg_ids, __Pyx_memviewslice __pyx_v_scores) {
+  __pyx_t_5numpy_int32_t *__pyx_v_ix;
   size_t __pyx_v_n;
   PyObject *__pyx_v_result = NULL;
   __Pyx_memviewslice __pyx_v_ranks = { 0, 0, { 0 }, { 0 }, { 0 } };
   size_t __pyx_v_imin;
   size_t __pyx_v_imax;
-  __pyx_t_5numpy_float64_t __pyx_v_g0;
+  __pyx_t_5numpy_int64_t __pyx_v_g0;
   PyObject *__pyx_r = NULL;
   __Pyx_RefNannyDeclarations
   PyObject *__pyx_t_1 = NULL;
@@ -4136,49 +4133,58 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_6rank(CYTHON_UNUSED PyObject *
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("rank", 0);
 
-  /* "pyprophet/_optimized.pyx":206
- * @cython.wraparound(False)
+  /* "pyprophet/_optimized.pyx":209
  * def rank(np.int64_t[:] tg_ids, DATA_TYPE[:] scores):
+ *     # we assume a transition group has always max 1000 entries:
+ *     cdef np.int32_t * ix = <np.int32_t * > libc.stdlib.malloc(1000 * sizeof(np.int32_t))             # <<<<<<<<<<<<<<
+ *     cdef size_t n = tg_ids.shape[0]
+ *     result = np.zeros((n,), dtype=np.int32)
+ */
+  __pyx_v_ix = ((__pyx_t_5numpy_int32_t *)malloc((1000 * (sizeof(__pyx_t_5numpy_int32_t)))));
+
+  /* "pyprophet/_optimized.pyx":210
+ *     # we assume a transition group has always max 1000 entries:
+ *     cdef np.int32_t * ix = <np.int32_t * > libc.stdlib.malloc(1000 * sizeof(np.int32_t))
  *     cdef size_t n = tg_ids.shape[0]             # <<<<<<<<<<<<<<
- *     result = np.zeros((n,), dtype=np.int64)
- *     cdef np.int64_t[:] ranks = result
+ *     result = np.zeros((n,), dtype=np.int32)
+ *     cdef np.int32_t[:] ranks = result
  */
   __pyx_v_n = (__pyx_v_tg_ids.shape[0]);
 
-  /* "pyprophet/_optimized.pyx":207
- * def rank(np.int64_t[:] tg_ids, DATA_TYPE[:] scores):
+  /* "pyprophet/_optimized.pyx":211
+ *     cdef np.int32_t * ix = <np.int32_t * > libc.stdlib.malloc(1000 * sizeof(np.int32_t))
  *     cdef size_t n = tg_ids.shape[0]
- *     result = np.zeros((n,), dtype=np.int64)             # <<<<<<<<<<<<<<
- *     cdef np.int64_t[:] ranks = result
+ *     result = np.zeros((n,), dtype=np.int32)             # <<<<<<<<<<<<<<
+ *     cdef np.int32_t[:] ranks = result
  *     cdef size_t imin = 0
  */
-  __pyx_t_1 = __Pyx_GetModuleGlobalName(__pyx_n_s_np); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 207; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_1 = __Pyx_GetModuleGlobalName(__pyx_n_s_np); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 211; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_1);
-  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_1, __pyx_n_s_zeros); if (unlikely(!__pyx_t_2)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 207; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_1, __pyx_n_s_zeros); if (unlikely(!__pyx_t_2)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 211; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_2);
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-  __pyx_t_1 = __Pyx_PyInt_FromSize_t(__pyx_v_n); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 207; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_1 = __Pyx_PyInt_FromSize_t(__pyx_v_n); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 211; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_1);
-  __pyx_t_3 = PyTuple_New(1); if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 207; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_3 = PyTuple_New(1); if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 211; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_3);
   __Pyx_GIVEREF(__pyx_t_1);
   PyTuple_SET_ITEM(__pyx_t_3, 0, __pyx_t_1);
   __pyx_t_1 = 0;
-  __pyx_t_1 = PyTuple_New(1); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 207; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_1 = PyTuple_New(1); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 211; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_1);
   __Pyx_GIVEREF(__pyx_t_3);
   PyTuple_SET_ITEM(__pyx_t_1, 0, __pyx_t_3);
   __pyx_t_3 = 0;
-  __pyx_t_3 = PyDict_New(); if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 207; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_3 = PyDict_New(); if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 211; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_3);
-  __pyx_t_4 = __Pyx_GetModuleGlobalName(__pyx_n_s_np); if (unlikely(!__pyx_t_4)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 207; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_4 = __Pyx_GetModuleGlobalName(__pyx_n_s_np); if (unlikely(!__pyx_t_4)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 211; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_4);
-  __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_t_4, __pyx_n_s_int64); if (unlikely(!__pyx_t_5)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 207; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_t_4, __pyx_n_s_int32); if (unlikely(!__pyx_t_5)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 211; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_5);
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-  if (PyDict_SetItem(__pyx_t_3, __pyx_n_s_dtype, __pyx_t_5) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 207; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  if (PyDict_SetItem(__pyx_t_3, __pyx_n_s_dtype, __pyx_t_5) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 211; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-  __pyx_t_5 = __Pyx_PyObject_Call(__pyx_t_2, __pyx_t_1, __pyx_t_3); if (unlikely(!__pyx_t_5)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 207; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_5 = __Pyx_PyObject_Call(__pyx_t_2, __pyx_t_1, __pyx_t_3); if (unlikely(!__pyx_t_5)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 211; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_5);
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
@@ -4186,31 +4192,31 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_6rank(CYTHON_UNUSED PyObject *
   __pyx_v_result = __pyx_t_5;
   __pyx_t_5 = 0;
 
-  /* "pyprophet/_optimized.pyx":208
+  /* "pyprophet/_optimized.pyx":212
  *     cdef size_t n = tg_ids.shape[0]
- *     result = np.zeros((n,), dtype=np.int64)
- *     cdef np.int64_t[:] ranks = result             # <<<<<<<<<<<<<<
+ *     result = np.zeros((n,), dtype=np.int32)
+ *     cdef np.int32_t[:] ranks = result             # <<<<<<<<<<<<<<
  *     cdef size_t imin = 0
  *     cdef size_t imax
  */
-  __pyx_t_6 = __Pyx_PyObject_to_MemoryviewSlice_ds_nn___pyx_t_5numpy_int64_t(__pyx_v_result);
-  if (unlikely(!__pyx_t_6.memview)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 208; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_6 = __Pyx_PyObject_to_MemoryviewSlice_ds_nn___pyx_t_5numpy_int32_t(__pyx_v_result);
+  if (unlikely(!__pyx_t_6.memview)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 212; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __pyx_v_ranks = __pyx_t_6;
   __pyx_t_6.memview = NULL;
   __pyx_t_6.data = NULL;
 
-  /* "pyprophet/_optimized.pyx":209
- *     result = np.zeros((n,), dtype=np.int64)
- *     cdef np.int64_t[:] ranks = result
+  /* "pyprophet/_optimized.pyx":213
+ *     result = np.zeros((n,), dtype=np.int32)
+ *     cdef np.int32_t[:] ranks = result
  *     cdef size_t imin = 0             # <<<<<<<<<<<<<<
  *     cdef size_t imax
- *     cdef np.float64_t g0
+ *     cdef np.int64_t g0
  */
   __pyx_v_imin = 0;
 
-  /* "pyprophet/_optimized.pyx":212
+  /* "pyprophet/_optimized.pyx":216
  *     cdef size_t imax
- *     cdef np.float64_t g0
+ *     cdef np.int64_t g0
  *     while imin < n:             # <<<<<<<<<<<<<<
  *         imax = imin + 1
  *         g0 = tg_ids[imin]
@@ -4219,8 +4225,8 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_6rank(CYTHON_UNUSED PyObject *
     __pyx_t_7 = ((__pyx_v_imin < __pyx_v_n) != 0);
     if (!__pyx_t_7) break;
 
-    /* "pyprophet/_optimized.pyx":213
- *     cdef np.float64_t g0
+    /* "pyprophet/_optimized.pyx":217
+ *     cdef np.int64_t g0
  *     while imin < n:
  *         imax = imin + 1             # <<<<<<<<<<<<<<
  *         g0 = tg_ids[imin]
@@ -4228,7 +4234,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_6rank(CYTHON_UNUSED PyObject *
  */
     __pyx_v_imax = (__pyx_v_imin + 1);
 
-    /* "pyprophet/_optimized.pyx":214
+    /* "pyprophet/_optimized.pyx":218
  *     while imin < n:
  *         imax = imin + 1
  *         g0 = tg_ids[imin]             # <<<<<<<<<<<<<<
@@ -4238,12 +4244,12 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_6rank(CYTHON_UNUSED PyObject *
     __pyx_t_8 = __pyx_v_imin;
     __pyx_v_g0 = (*((__pyx_t_5numpy_int64_t *) ( /* dim=0 */ (__pyx_v_tg_ids.data + __pyx_t_8 * __pyx_v_tg_ids.strides[0]) )));
 
-    /* "pyprophet/_optimized.pyx":215
+    /* "pyprophet/_optimized.pyx":219
  *         imax = imin + 1
  *         g0 = tg_ids[imin]
  *         while imax < n and tg_ids[imax] == g0:             # <<<<<<<<<<<<<<
  *             imax += 1
- *         partial_rank(scores, imin, imax, ranks)
+ *         partial_rank(scores, imin, imax, ranks, ix)
  */
     while (1) {
       __pyx_t_9 = ((__pyx_v_imax < __pyx_v_n) != 0);
@@ -4258,40 +4264,49 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_6rank(CYTHON_UNUSED PyObject *
       __pyx_L7_bool_binop_done:;
       if (!__pyx_t_7) break;
 
-      /* "pyprophet/_optimized.pyx":216
+      /* "pyprophet/_optimized.pyx":220
  *         g0 = tg_ids[imin]
  *         while imax < n and tg_ids[imax] == g0:
  *             imax += 1             # <<<<<<<<<<<<<<
- *         partial_rank(scores, imin, imax, ranks)
+ *         partial_rank(scores, imin, imax, ranks, ix)
  *         imin = imax
  */
       __pyx_v_imax = (__pyx_v_imax + 1);
     }
 
-    /* "pyprophet/_optimized.pyx":217
+    /* "pyprophet/_optimized.pyx":221
  *         while imax < n and tg_ids[imax] == g0:
  *             imax += 1
- *         partial_rank(scores, imin, imax, ranks)             # <<<<<<<<<<<<<<
+ *         partial_rank(scores, imin, imax, ranks, ix)             # <<<<<<<<<<<<<<
  *         imin = imax
- *     return result
+ *     libc.stdlib.free(ix)
  */
-    __pyx_t_5 = __pyx_f_9pyprophet_10_optimized_partial_rank(__pyx_v_scores, __pyx_v_imin, __pyx_v_imax, __pyx_v_ranks); if (unlikely(!__pyx_t_5)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 217; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+    __pyx_t_5 = __pyx_f_9pyprophet_10_optimized_partial_rank(__pyx_v_scores, __pyx_v_imin, __pyx_v_imax, __pyx_v_ranks, __pyx_v_ix); if (unlikely(!__pyx_t_5)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 221; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
     __Pyx_GOTREF(__pyx_t_5);
     __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
 
-    /* "pyprophet/_optimized.pyx":218
+    /* "pyprophet/_optimized.pyx":222
  *             imax += 1
- *         partial_rank(scores, imin, imax, ranks)
+ *         partial_rank(scores, imin, imax, ranks, ix)
  *         imin = imax             # <<<<<<<<<<<<<<
+ *     libc.stdlib.free(ix)
  *     return result
- * 
  */
     __pyx_v_imin = __pyx_v_imax;
   }
 
-  /* "pyprophet/_optimized.pyx":219
- *         partial_rank(scores, imin, imax, ranks)
+  /* "pyprophet/_optimized.pyx":223
+ *         partial_rank(scores, imin, imax, ranks, ix)
  *         imin = imax
+ *     libc.stdlib.free(ix)             # <<<<<<<<<<<<<<
+ *     return result
+ * 
+ */
+  free(__pyx_v_ix);
+
+  /* "pyprophet/_optimized.pyx":224
+ *         imin = imax
+ *     libc.stdlib.free(ix)
  *     return result             # <<<<<<<<<<<<<<
  * 
  * 
@@ -4301,12 +4316,12 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_6rank(CYTHON_UNUSED PyObject *
   __pyx_r = __pyx_v_result;
   goto __pyx_L0;
 
-  /* "pyprophet/_optimized.pyx":205
+  /* "pyprophet/_optimized.pyx":207
  * @cython.boundscheck(False)
  * @cython.wraparound(False)
  * def rank(np.int64_t[:] tg_ids, DATA_TYPE[:] scores):             # <<<<<<<<<<<<<<
- *     cdef size_t n = tg_ids.shape[0]
- *     result = np.zeros((n,), dtype=np.int64)
+ *     # we assume a transition group has always max 1000 entries:
+ *     cdef np.int32_t * ix = <np.int32_t * > libc.stdlib.malloc(1000 * sizeof(np.int32_t))
  */
 
   /* function exit code */
@@ -4329,7 +4344,313 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_6rank(CYTHON_UNUSED PyObject *
   return __pyx_r;
 }
 
-/* "pyprophet/_optimized.pyx":224
+/* "pyprophet/_optimized.pyx":229
+ * @cython.boundscheck(False)
+ * @cython.wraparound(False)
+ * def rank32(np.int32_t[:] tg_ids, DATA_TYPE[:] scores):             # <<<<<<<<<<<<<<
+ *     # we assume a transition group has always max 1000 entries:
+ *     cdef np.int32_t * ix = <np.int32_t * > libc.stdlib.malloc(1000 * sizeof(np.int32_t))
+ */
+
+/* Python wrapper */
+static PyObject *__pyx_pw_9pyprophet_10_optimized_9rank32(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static PyMethodDef __pyx_mdef_9pyprophet_10_optimized_9rank32 = {"rank32", (PyCFunction)__pyx_pw_9pyprophet_10_optimized_9rank32, METH_VARARGS|METH_KEYWORDS, 0};
+static PyObject *__pyx_pw_9pyprophet_10_optimized_9rank32(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
+  __Pyx_memviewslice __pyx_v_tg_ids = { 0, 0, { 0 }, { 0 }, { 0 } };
+  __Pyx_memviewslice __pyx_v_scores = { 0, 0, { 0 }, { 0 }, { 0 } };
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  PyObject *__pyx_r = 0;
+  __Pyx_RefNannyDeclarations
+  __Pyx_RefNannySetupContext("rank32 (wrapper)", 0);
+  {
+    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_tg_ids,&__pyx_n_s_scores,0};
+    PyObject* values[2] = {0,0};
+    if (unlikely(__pyx_kwds)) {
+      Py_ssize_t kw_args;
+      const Py_ssize_t pos_args = PyTuple_GET_SIZE(__pyx_args);
+      switch (pos_args) {
+        case  2: values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
+        case  1: values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
+        case  0: break;
+        default: goto __pyx_L5_argtuple_error;
+      }
+      kw_args = PyDict_Size(__pyx_kwds);
+      switch (pos_args) {
+        case  0:
+        if (likely((values[0] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_tg_ids)) != 0)) kw_args--;
+        else goto __pyx_L5_argtuple_error;
+        case  1:
+        if (likely((values[1] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_scores)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("rank32", 1, 2, 2, 1); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 229; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+        }
+      }
+      if (unlikely(kw_args > 0)) {
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "rank32") < 0)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 229; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+      }
+    } else if (PyTuple_GET_SIZE(__pyx_args) != 2) {
+      goto __pyx_L5_argtuple_error;
+    } else {
+      values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
+      values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
+    }
+    __pyx_v_tg_ids = __Pyx_PyObject_to_MemoryviewSlice_ds_nn___pyx_t_5numpy_int32_t(values[0]); if (unlikely(!__pyx_v_tg_ids.memview)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 229; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+    __pyx_v_scores = __Pyx_PyObject_to_MemoryviewSlice_ds_nn___pyx_t_9pyprophet_10_optimized_DATA_TYPE(values[1]); if (unlikely(!__pyx_v_scores.memview)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 229; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+  }
+  goto __pyx_L4_argument_unpacking_done;
+  __pyx_L5_argtuple_error:;
+  __Pyx_RaiseArgtupleInvalid("rank32", 1, 2, 2, PyTuple_GET_SIZE(__pyx_args)); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 229; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+  __pyx_L3_error:;
+  __Pyx_AddTraceback("pyprophet._optimized.rank32", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_RefNannyFinishContext();
+  return NULL;
+  __pyx_L4_argument_unpacking_done:;
+  __pyx_r = __pyx_pf_9pyprophet_10_optimized_8rank32(__pyx_self, __pyx_v_tg_ids, __pyx_v_scores);
+
+  /* function exit code */
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+static PyObject *__pyx_pf_9pyprophet_10_optimized_8rank32(CYTHON_UNUSED PyObject *__pyx_self, __Pyx_memviewslice __pyx_v_tg_ids, __Pyx_memviewslice __pyx_v_scores) {
+  __pyx_t_5numpy_int32_t *__pyx_v_ix;
+  size_t __pyx_v_n;
+  PyObject *__pyx_v_result = NULL;
+  __Pyx_memviewslice __pyx_v_ranks = { 0, 0, { 0 }, { 0 }, { 0 } };
+  size_t __pyx_v_imin;
+  size_t __pyx_v_imax;
+  __pyx_t_5numpy_float32_t __pyx_v_g0;
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  PyObject *__pyx_t_1 = NULL;
+  PyObject *__pyx_t_2 = NULL;
+  PyObject *__pyx_t_3 = NULL;
+  PyObject *__pyx_t_4 = NULL;
+  PyObject *__pyx_t_5 = NULL;
+  __Pyx_memviewslice __pyx_t_6 = { 0, 0, { 0 }, { 0 }, { 0 } };
+  int __pyx_t_7;
+  size_t __pyx_t_8;
+  int __pyx_t_9;
+  size_t __pyx_t_10;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  __Pyx_RefNannySetupContext("rank32", 0);
+
+  /* "pyprophet/_optimized.pyx":231
+ * def rank32(np.int32_t[:] tg_ids, DATA_TYPE[:] scores):
+ *     # we assume a transition group has always max 1000 entries:
+ *     cdef np.int32_t * ix = <np.int32_t * > libc.stdlib.malloc(1000 * sizeof(np.int32_t))             # <<<<<<<<<<<<<<
+ *     cdef size_t n = tg_ids.shape[0]
+ *     result = np.zeros((n,), dtype=np.int32)
+ */
+  __pyx_v_ix = ((__pyx_t_5numpy_int32_t *)malloc((1000 * (sizeof(__pyx_t_5numpy_int32_t)))));
+
+  /* "pyprophet/_optimized.pyx":232
+ *     # we assume a transition group has always max 1000 entries:
+ *     cdef np.int32_t * ix = <np.int32_t * > libc.stdlib.malloc(1000 * sizeof(np.int32_t))
+ *     cdef size_t n = tg_ids.shape[0]             # <<<<<<<<<<<<<<
+ *     result = np.zeros((n,), dtype=np.int32)
+ *     cdef np.int32_t[:] ranks = result
+ */
+  __pyx_v_n = (__pyx_v_tg_ids.shape[0]);
+
+  /* "pyprophet/_optimized.pyx":233
+ *     cdef np.int32_t * ix = <np.int32_t * > libc.stdlib.malloc(1000 * sizeof(np.int32_t))
+ *     cdef size_t n = tg_ids.shape[0]
+ *     result = np.zeros((n,), dtype=np.int32)             # <<<<<<<<<<<<<<
+ *     cdef np.int32_t[:] ranks = result
+ *     cdef size_t imin = 0
+ */
+  __pyx_t_1 = __Pyx_GetModuleGlobalName(__pyx_n_s_np); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 233; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_1, __pyx_n_s_zeros); if (unlikely(!__pyx_t_2)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 233; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __Pyx_GOTREF(__pyx_t_2);
+  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+  __pyx_t_1 = __Pyx_PyInt_FromSize_t(__pyx_v_n); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 233; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_t_3 = PyTuple_New(1); if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 233; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __Pyx_GOTREF(__pyx_t_3);
+  __Pyx_GIVEREF(__pyx_t_1);
+  PyTuple_SET_ITEM(__pyx_t_3, 0, __pyx_t_1);
+  __pyx_t_1 = 0;
+  __pyx_t_1 = PyTuple_New(1); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 233; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __Pyx_GOTREF(__pyx_t_1);
+  __Pyx_GIVEREF(__pyx_t_3);
+  PyTuple_SET_ITEM(__pyx_t_1, 0, __pyx_t_3);
+  __pyx_t_3 = 0;
+  __pyx_t_3 = PyDict_New(); if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 233; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __Pyx_GOTREF(__pyx_t_3);
+  __pyx_t_4 = __Pyx_GetModuleGlobalName(__pyx_n_s_np); if (unlikely(!__pyx_t_4)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 233; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __Pyx_GOTREF(__pyx_t_4);
+  __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_t_4, __pyx_n_s_int32); if (unlikely(!__pyx_t_5)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 233; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __Pyx_GOTREF(__pyx_t_5);
+  __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
+  if (PyDict_SetItem(__pyx_t_3, __pyx_n_s_dtype, __pyx_t_5) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 233; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
+  __pyx_t_5 = __Pyx_PyObject_Call(__pyx_t_2, __pyx_t_1, __pyx_t_3); if (unlikely(!__pyx_t_5)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 233; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __Pyx_GOTREF(__pyx_t_5);
+  __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
+  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+  __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
+  __pyx_v_result = __pyx_t_5;
+  __pyx_t_5 = 0;
+
+  /* "pyprophet/_optimized.pyx":234
+ *     cdef size_t n = tg_ids.shape[0]
+ *     result = np.zeros((n,), dtype=np.int32)
+ *     cdef np.int32_t[:] ranks = result             # <<<<<<<<<<<<<<
+ *     cdef size_t imin = 0
+ *     cdef size_t imax
+ */
+  __pyx_t_6 = __Pyx_PyObject_to_MemoryviewSlice_ds_nn___pyx_t_5numpy_int32_t(__pyx_v_result);
+  if (unlikely(!__pyx_t_6.memview)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 234; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_v_ranks = __pyx_t_6;
+  __pyx_t_6.memview = NULL;
+  __pyx_t_6.data = NULL;
+
+  /* "pyprophet/_optimized.pyx":235
+ *     result = np.zeros((n,), dtype=np.int32)
+ *     cdef np.int32_t[:] ranks = result
+ *     cdef size_t imin = 0             # <<<<<<<<<<<<<<
+ *     cdef size_t imax
+ *     cdef np.float32_t g0
+ */
+  __pyx_v_imin = 0;
+
+  /* "pyprophet/_optimized.pyx":238
+ *     cdef size_t imax
+ *     cdef np.float32_t g0
+ *     while imin < n:             # <<<<<<<<<<<<<<
+ *         imax = imin + 1
+ *         g0 = tg_ids[imin]
+ */
+  while (1) {
+    __pyx_t_7 = ((__pyx_v_imin < __pyx_v_n) != 0);
+    if (!__pyx_t_7) break;
+
+    /* "pyprophet/_optimized.pyx":239
+ *     cdef np.float32_t g0
+ *     while imin < n:
+ *         imax = imin + 1             # <<<<<<<<<<<<<<
+ *         g0 = tg_ids[imin]
+ *         while imax < n and tg_ids[imax] == g0:
+ */
+    __pyx_v_imax = (__pyx_v_imin + 1);
+
+    /* "pyprophet/_optimized.pyx":240
+ *     while imin < n:
+ *         imax = imin + 1
+ *         g0 = tg_ids[imin]             # <<<<<<<<<<<<<<
+ *         while imax < n and tg_ids[imax] == g0:
+ *             imax += 1
+ */
+    __pyx_t_8 = __pyx_v_imin;
+    __pyx_v_g0 = (*((__pyx_t_5numpy_int32_t *) ( /* dim=0 */ (__pyx_v_tg_ids.data + __pyx_t_8 * __pyx_v_tg_ids.strides[0]) )));
+
+    /* "pyprophet/_optimized.pyx":241
+ *         imax = imin + 1
+ *         g0 = tg_ids[imin]
+ *         while imax < n and tg_ids[imax] == g0:             # <<<<<<<<<<<<<<
+ *             imax += 1
+ *         partial_rank(scores, imin, imax, ranks, ix)
+ */
+    while (1) {
+      __pyx_t_9 = ((__pyx_v_imax < __pyx_v_n) != 0);
+      if (__pyx_t_9) {
+      } else {
+        __pyx_t_7 = __pyx_t_9;
+        goto __pyx_L7_bool_binop_done;
+      }
+      __pyx_t_10 = __pyx_v_imax;
+      __pyx_t_9 = (((*((__pyx_t_5numpy_int32_t *) ( /* dim=0 */ (__pyx_v_tg_ids.data + __pyx_t_10 * __pyx_v_tg_ids.strides[0]) ))) == __pyx_v_g0) != 0);
+      __pyx_t_7 = __pyx_t_9;
+      __pyx_L7_bool_binop_done:;
+      if (!__pyx_t_7) break;
+
+      /* "pyprophet/_optimized.pyx":242
+ *         g0 = tg_ids[imin]
+ *         while imax < n and tg_ids[imax] == g0:
+ *             imax += 1             # <<<<<<<<<<<<<<
+ *         partial_rank(scores, imin, imax, ranks, ix)
+ *         imin = imax
+ */
+      __pyx_v_imax = (__pyx_v_imax + 1);
+    }
+
+    /* "pyprophet/_optimized.pyx":243
+ *         while imax < n and tg_ids[imax] == g0:
+ *             imax += 1
+ *         partial_rank(scores, imin, imax, ranks, ix)             # <<<<<<<<<<<<<<
+ *         imin = imax
+ *     libc.stdlib.free(ix)
+ */
+    __pyx_t_5 = __pyx_f_9pyprophet_10_optimized_partial_rank(__pyx_v_scores, __pyx_v_imin, __pyx_v_imax, __pyx_v_ranks, __pyx_v_ix); if (unlikely(!__pyx_t_5)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 243; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+    __Pyx_GOTREF(__pyx_t_5);
+    __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
+
+    /* "pyprophet/_optimized.pyx":244
+ *             imax += 1
+ *         partial_rank(scores, imin, imax, ranks, ix)
+ *         imin = imax             # <<<<<<<<<<<<<<
+ *     libc.stdlib.free(ix)
+ *     return result
+ */
+    __pyx_v_imin = __pyx_v_imax;
+  }
+
+  /* "pyprophet/_optimized.pyx":245
+ *         partial_rank(scores, imin, imax, ranks, ix)
+ *         imin = imax
+ *     libc.stdlib.free(ix)             # <<<<<<<<<<<<<<
+ *     return result
+ * 
+ */
+  free(__pyx_v_ix);
+
+  /* "pyprophet/_optimized.pyx":246
+ *         imin = imax
+ *     libc.stdlib.free(ix)
+ *     return result             # <<<<<<<<<<<<<<
+ * 
+ * 
+ */
+  __Pyx_XDECREF(__pyx_r);
+  __Pyx_INCREF(__pyx_v_result);
+  __pyx_r = __pyx_v_result;
+  goto __pyx_L0;
+
+  /* "pyprophet/_optimized.pyx":229
+ * @cython.boundscheck(False)
+ * @cython.wraparound(False)
+ * def rank32(np.int32_t[:] tg_ids, DATA_TYPE[:] scores):             # <<<<<<<<<<<<<<
+ *     # we assume a transition group has always max 1000 entries:
+ *     cdef np.int32_t * ix = <np.int32_t * > libc.stdlib.malloc(1000 * sizeof(np.int32_t))
+ */
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_1);
+  __Pyx_XDECREF(__pyx_t_2);
+  __Pyx_XDECREF(__pyx_t_3);
+  __Pyx_XDECREF(__pyx_t_4);
+  __Pyx_XDECREF(__pyx_t_5);
+  __PYX_XDEC_MEMVIEW(&__pyx_t_6, 1);
+  __Pyx_AddTraceback("pyprophet._optimized.rank32", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = NULL;
+  __pyx_L0:;
+  __Pyx_XDECREF(__pyx_v_result);
+  __PYX_XDEC_MEMVIEW(&__pyx_v_ranks, 1);
+  __PYX_XDEC_MEMVIEW(&__pyx_v_tg_ids, 1);
+  __PYX_XDEC_MEMVIEW(&__pyx_v_scores, 1);
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* "pyprophet/_optimized.pyx":251
  * @cython.boundscheck(False)
  * @cython.wraparound(False)
  * def single_chromatogram_hypothesis_fast(np.float64_t[:] inv_pg_pp_true, np.float64_t prior_chrom_null, np.float64_t prior_pg_true):             # <<<<<<<<<<<<<<
@@ -4338,9 +4659,9 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_6rank(CYTHON_UNUSED PyObject *
  */
 
 /* Python wrapper */
-static PyObject *__pyx_pw_9pyprophet_10_optimized_9single_chromatogram_hypothesis_fast(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static PyMethodDef __pyx_mdef_9pyprophet_10_optimized_9single_chromatogram_hypothesis_fast = {"single_chromatogram_hypothesis_fast", (PyCFunction)__pyx_pw_9pyprophet_10_optimized_9single_chromatogram_hypothesis_fast, METH_VARARGS|METH_KEYWORDS, 0};
-static PyObject *__pyx_pw_9pyprophet_10_optimized_9single_chromatogram_hypothesis_fast(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
+static PyObject *__pyx_pw_9pyprophet_10_optimized_11single_chromatogram_hypothesis_fast(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static PyMethodDef __pyx_mdef_9pyprophet_10_optimized_11single_chromatogram_hypothesis_fast = {"single_chromatogram_hypothesis_fast", (PyCFunction)__pyx_pw_9pyprophet_10_optimized_11single_chromatogram_hypothesis_fast, METH_VARARGS|METH_KEYWORDS, 0};
+static PyObject *__pyx_pw_9pyprophet_10_optimized_11single_chromatogram_hypothesis_fast(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   __Pyx_memviewslice __pyx_v_inv_pg_pp_true = { 0, 0, { 0 }, { 0 }, { 0 } };
   __pyx_t_5numpy_float64_t __pyx_v_prior_chrom_null;
   __pyx_t_5numpy_float64_t __pyx_v_prior_pg_true;
@@ -4371,16 +4692,16 @@ static PyObject *__pyx_pw_9pyprophet_10_optimized_9single_chromatogram_hypothesi
         case  1:
         if (likely((values[1] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_prior_chrom_null)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("single_chromatogram_hypothesis_fast", 1, 3, 3, 1); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 224; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+          __Pyx_RaiseArgtupleInvalid("single_chromatogram_hypothesis_fast", 1, 3, 3, 1); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 251; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
         }
         case  2:
         if (likely((values[2] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_prior_pg_true)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("single_chromatogram_hypothesis_fast", 1, 3, 3, 2); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 224; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+          __Pyx_RaiseArgtupleInvalid("single_chromatogram_hypothesis_fast", 1, 3, 3, 2); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 251; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
         }
       }
       if (unlikely(kw_args > 0)) {
-        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "single_chromatogram_hypothesis_fast") < 0)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 224; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "single_chromatogram_hypothesis_fast") < 0)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 251; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
       }
     } else if (PyTuple_GET_SIZE(__pyx_args) != 3) {
       goto __pyx_L5_argtuple_error;
@@ -4389,26 +4710,26 @@ static PyObject *__pyx_pw_9pyprophet_10_optimized_9single_chromatogram_hypothesi
       values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
       values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
     }
-    __pyx_v_inv_pg_pp_true = __Pyx_PyObject_to_MemoryviewSlice_ds_nn___pyx_t_5numpy_float64_t(values[0]); if (unlikely(!__pyx_v_inv_pg_pp_true.memview)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 224; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
-    __pyx_v_prior_chrom_null = __pyx_PyFloat_AsDouble(values[1]); if (unlikely((__pyx_v_prior_chrom_null == (npy_float64)-1) && PyErr_Occurred())) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 224; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
-    __pyx_v_prior_pg_true = __pyx_PyFloat_AsDouble(values[2]); if (unlikely((__pyx_v_prior_pg_true == (npy_float64)-1) && PyErr_Occurred())) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 224; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+    __pyx_v_inv_pg_pp_true = __Pyx_PyObject_to_MemoryviewSlice_ds_nn___pyx_t_5numpy_float64_t(values[0]); if (unlikely(!__pyx_v_inv_pg_pp_true.memview)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 251; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+    __pyx_v_prior_chrom_null = __pyx_PyFloat_AsDouble(values[1]); if (unlikely((__pyx_v_prior_chrom_null == (npy_float64)-1) && PyErr_Occurred())) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 251; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+    __pyx_v_prior_pg_true = __pyx_PyFloat_AsDouble(values[2]); if (unlikely((__pyx_v_prior_pg_true == (npy_float64)-1) && PyErr_Occurred())) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 251; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("single_chromatogram_hypothesis_fast", 1, 3, 3, PyTuple_GET_SIZE(__pyx_args)); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 224; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+  __Pyx_RaiseArgtupleInvalid("single_chromatogram_hypothesis_fast", 1, 3, 3, PyTuple_GET_SIZE(__pyx_args)); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 251; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
   __pyx_L3_error:;
   __Pyx_AddTraceback("pyprophet._optimized.single_chromatogram_hypothesis_fast", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
-  __pyx_r = __pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesis_fast(__pyx_self, __pyx_v_inv_pg_pp_true, __pyx_v_prior_chrom_null, __pyx_v_prior_pg_true);
+  __pyx_r = __pyx_pf_9pyprophet_10_optimized_10single_chromatogram_hypothesis_fast(__pyx_self, __pyx_v_inv_pg_pp_true, __pyx_v_prior_chrom_null, __pyx_v_prior_pg_true);
 
   /* function exit code */
   __Pyx_RefNannyFinishContext();
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesis_fast(CYTHON_UNUSED PyObject *__pyx_self, __Pyx_memviewslice __pyx_v_inv_pg_pp_true, __pyx_t_5numpy_float64_t __pyx_v_prior_chrom_null, __pyx_t_5numpy_float64_t __pyx_v_prior_pg_true) {
+static PyObject *__pyx_pf_9pyprophet_10_optimized_10single_chromatogram_hypothesis_fast(CYTHON_UNUSED PyObject *__pyx_self, __Pyx_memviewslice __pyx_v_inv_pg_pp_true, __pyx_t_5numpy_float64_t __pyx_v_prior_chrom_null, __pyx_t_5numpy_float64_t __pyx_v_prior_pg_true) {
   size_t __pyx_v_n;
   __pyx_t_5numpy_float64_t __pyx_v_final_val;
   __pyx_t_5numpy_float64_t __pyx_v_val;
@@ -4441,7 +4762,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("single_chromatogram_hypothesis_fast", 0);
 
-  /* "pyprophet/_optimized.pyx":228
+  /* "pyprophet/_optimized.pyx":255
  *     # inv_pg_pp_true contains the probabilities that the peaks are false
  * 
  *     cdef size_t n = inv_pg_pp_true.shape[0]             # <<<<<<<<<<<<<<
@@ -4450,7 +4771,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
  */
   __pyx_v_n = (__pyx_v_inv_pg_pp_true.shape[0]);
 
-  /* "pyprophet/_optimized.pyx":231
+  /* "pyprophet/_optimized.pyx":258
  *     cdef np.float64_t final_val
  *     cdef np.float64_t val
  *     cdef np.float64_t sum_all = 0.0             # <<<<<<<<<<<<<<
@@ -4459,40 +4780,40 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
  */
   __pyx_v_sum_all = 0.0;
 
-  /* "pyprophet/_optimized.pyx":232
+  /* "pyprophet/_optimized.pyx":259
  *     cdef np.float64_t val
  *     cdef np.float64_t sum_all = 0.0
  *     result = np.zeros((n+1,), dtype=np.float64)             # <<<<<<<<<<<<<<
  *     cdef np.float64_t[:] cresult = result
  * 
  */
-  __pyx_t_1 = __Pyx_GetModuleGlobalName(__pyx_n_s_np); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 232; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_1 = __Pyx_GetModuleGlobalName(__pyx_n_s_np); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 259; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_1);
-  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_1, __pyx_n_s_zeros); if (unlikely(!__pyx_t_2)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 232; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_1, __pyx_n_s_zeros); if (unlikely(!__pyx_t_2)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 259; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_2);
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-  __pyx_t_1 = __Pyx_PyInt_FromSize_t((__pyx_v_n + 1)); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 232; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_1 = __Pyx_PyInt_FromSize_t((__pyx_v_n + 1)); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 259; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_1);
-  __pyx_t_3 = PyTuple_New(1); if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 232; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_3 = PyTuple_New(1); if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 259; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_3);
   __Pyx_GIVEREF(__pyx_t_1);
   PyTuple_SET_ITEM(__pyx_t_3, 0, __pyx_t_1);
   __pyx_t_1 = 0;
-  __pyx_t_1 = PyTuple_New(1); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 232; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_1 = PyTuple_New(1); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 259; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_1);
   __Pyx_GIVEREF(__pyx_t_3);
   PyTuple_SET_ITEM(__pyx_t_1, 0, __pyx_t_3);
   __pyx_t_3 = 0;
-  __pyx_t_3 = PyDict_New(); if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 232; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_3 = PyDict_New(); if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 259; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_3);
-  __pyx_t_4 = __Pyx_GetModuleGlobalName(__pyx_n_s_np); if (unlikely(!__pyx_t_4)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 232; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_4 = __Pyx_GetModuleGlobalName(__pyx_n_s_np); if (unlikely(!__pyx_t_4)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 259; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_4);
-  __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_t_4, __pyx_n_s_float64); if (unlikely(!__pyx_t_5)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 232; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_t_4, __pyx_n_s_float64); if (unlikely(!__pyx_t_5)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 259; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_5);
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-  if (PyDict_SetItem(__pyx_t_3, __pyx_n_s_dtype, __pyx_t_5) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 232; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  if (PyDict_SetItem(__pyx_t_3, __pyx_n_s_dtype, __pyx_t_5) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 259; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-  __pyx_t_5 = __Pyx_PyObject_Call(__pyx_t_2, __pyx_t_1, __pyx_t_3); if (unlikely(!__pyx_t_5)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 232; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_5 = __Pyx_PyObject_Call(__pyx_t_2, __pyx_t_1, __pyx_t_3); if (unlikely(!__pyx_t_5)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 259; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_5);
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
@@ -4500,7 +4821,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
   __pyx_v_result = __pyx_t_5;
   __pyx_t_5 = 0;
 
-  /* "pyprophet/_optimized.pyx":233
+  /* "pyprophet/_optimized.pyx":260
  *     cdef np.float64_t sum_all = 0.0
  *     result = np.zeros((n+1,), dtype=np.float64)
  *     cdef np.float64_t[:] cresult = result             # <<<<<<<<<<<<<<
@@ -4508,12 +4829,12 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
  *     cdef int i
  */
   __pyx_t_6 = __Pyx_PyObject_to_MemoryviewSlice_ds_nn___pyx_t_5numpy_float64_t(__pyx_v_result);
-  if (unlikely(!__pyx_t_6.memview)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 233; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  if (unlikely(!__pyx_t_6.memview)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 260; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __pyx_v_cresult = __pyx_t_6;
   __pyx_t_6.memview = NULL;
   __pyx_t_6.data = NULL;
 
-  /* "pyprophet/_optimized.pyx":237
+  /* "pyprophet/_optimized.pyx":264
  *     cdef int i
  *     cdef int j
  *     cdef double af = 1.0             # <<<<<<<<<<<<<<
@@ -4522,7 +4843,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
  */
   __pyx_v_af = 1.0;
 
-  /* "pyprophet/_optimized.pyx":240
+  /* "pyprophet/_optimized.pyx":267
  * 
  *     # Compute the null hypothesis (e.g. all peaks are false)
  *     i = 0             # <<<<<<<<<<<<<<
@@ -4531,7 +4852,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
  */
   __pyx_v_i = 0;
 
-  /* "pyprophet/_optimized.pyx":241
+  /* "pyprophet/_optimized.pyx":268
  *     # Compute the null hypothesis (e.g. all peaks are false)
  *     i = 0
  *     while i < n:             # <<<<<<<<<<<<<<
@@ -4542,7 +4863,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
     __pyx_t_7 = ((__pyx_v_i < __pyx_v_n) != 0);
     if (!__pyx_t_7) break;
 
-    /* "pyprophet/_optimized.pyx":242
+    /* "pyprophet/_optimized.pyx":269
  *     i = 0
  *     while i < n:
  *         af *= inv_pg_pp_true[i]             # <<<<<<<<<<<<<<
@@ -4552,7 +4873,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
     __pyx_t_8 = __pyx_v_i;
     __pyx_v_af = (__pyx_v_af * (*((__pyx_t_5numpy_float64_t *) ( /* dim=0 */ (__pyx_v_inv_pg_pp_true.data + __pyx_t_8 * __pyx_v_inv_pg_pp_true.strides[0]) ))));
 
-    /* "pyprophet/_optimized.pyx":243
+    /* "pyprophet/_optimized.pyx":270
  *     while i < n:
  *         af *= inv_pg_pp_true[i]
  *         i += 1             # <<<<<<<<<<<<<<
@@ -4562,7 +4883,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
     __pyx_v_i = (__pyx_v_i + 1);
   }
 
-  /* "pyprophet/_optimized.pyx":245
+  /* "pyprophet/_optimized.pyx":272
  *         i += 1
  * 
  *     cresult[0] = af * prior_chrom_null             # <<<<<<<<<<<<<<
@@ -4572,7 +4893,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
   __pyx_t_9 = 0;
   *((__pyx_t_5numpy_float64_t *) ( /* dim=0 */ (__pyx_v_cresult.data + __pyx_t_9 * __pyx_v_cresult.strides[0]) )) = (__pyx_v_af * __pyx_v_prior_chrom_null);
 
-  /* "pyprophet/_optimized.pyx":249
+  /* "pyprophet/_optimized.pyx":276
  *     # Compute the alternative hypotheses (e.g. one peak is true and all other
  *     # peaks are false)
  *     i = 0             # <<<<<<<<<<<<<<
@@ -4581,7 +4902,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
  */
   __pyx_v_i = 0;
 
-  /* "pyprophet/_optimized.pyx":250
+  /* "pyprophet/_optimized.pyx":277
  *     # peaks are false)
  *     i = 0
  *     while i < n:             # <<<<<<<<<<<<<<
@@ -4592,7 +4913,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
     __pyx_t_7 = ((__pyx_v_i < __pyx_v_n) != 0);
     if (!__pyx_t_7) break;
 
-    /* "pyprophet/_optimized.pyx":251
+    /* "pyprophet/_optimized.pyx":278
  *     i = 0
  *     while i < n:
  *         val = inv_pg_pp_true[i]             # <<<<<<<<<<<<<<
@@ -4602,7 +4923,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
     __pyx_t_10 = __pyx_v_i;
     __pyx_v_val = (*((__pyx_t_5numpy_float64_t *) ( /* dim=0 */ (__pyx_v_inv_pg_pp_true.data + __pyx_t_10 * __pyx_v_inv_pg_pp_true.strides[0]) )));
 
-    /* "pyprophet/_optimized.pyx":252
+    /* "pyprophet/_optimized.pyx":279
  *     while i < n:
  *         val = inv_pg_pp_true[i]
  *         j = 0             # <<<<<<<<<<<<<<
@@ -4611,7 +4932,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
  */
     __pyx_v_j = 0;
 
-    /* "pyprophet/_optimized.pyx":253
+    /* "pyprophet/_optimized.pyx":280
  *         val = inv_pg_pp_true[i]
  *         j = 0
  *         af = 1.0             # <<<<<<<<<<<<<<
@@ -4620,7 +4941,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
  */
     __pyx_v_af = 1.0;
 
-    /* "pyprophet/_optimized.pyx":255
+    /* "pyprophet/_optimized.pyx":282
  *         af = 1.0
  *         # Compute the product of all peaks being false except i
  *         while j < n:             # <<<<<<<<<<<<<<
@@ -4631,7 +4952,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
       __pyx_t_7 = ((__pyx_v_j < __pyx_v_n) != 0);
       if (!__pyx_t_7) break;
 
-      /* "pyprophet/_optimized.pyx":256
+      /* "pyprophet/_optimized.pyx":283
  *         # Compute the product of all peaks being false except i
  *         while j < n:
  *             if i != j:             # <<<<<<<<<<<<<<
@@ -4641,7 +4962,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
       __pyx_t_7 = ((__pyx_v_i != __pyx_v_j) != 0);
       if (__pyx_t_7) {
 
-        /* "pyprophet/_optimized.pyx":257
+        /* "pyprophet/_optimized.pyx":284
  *         while j < n:
  *             if i != j:
  *                 af *= inv_pg_pp_true[j]             # <<<<<<<<<<<<<<
@@ -4654,7 +4975,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
       }
       __pyx_L9:;
 
-      /* "pyprophet/_optimized.pyx":258
+      /* "pyprophet/_optimized.pyx":285
  *             if i != j:
  *                 af *= inv_pg_pp_true[j]
  *             j += 1             # <<<<<<<<<<<<<<
@@ -4664,7 +4985,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
       __pyx_v_j = (__pyx_v_j + 1);
     }
 
-    /* "pyprophet/_optimized.pyx":260
+    /* "pyprophet/_optimized.pyx":287
  *             j += 1
  * 
  *         final_val = <np.float64_t>( (1-val) * af) # value i is true             # <<<<<<<<<<<<<<
@@ -4673,7 +4994,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
  */
     __pyx_v_final_val = ((__pyx_t_5numpy_float64_t)((1.0 - __pyx_v_val) * __pyx_v_af));
 
-    /* "pyprophet/_optimized.pyx":262
+    /* "pyprophet/_optimized.pyx":289
  *         final_val = <np.float64_t>( (1-val) * af) # value i is true
  * 
  *         cresult[i+1] = final_val * prior_pg_true             # <<<<<<<<<<<<<<
@@ -4683,7 +5004,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
     __pyx_t_12 = (__pyx_v_i + 1);
     *((__pyx_t_5numpy_float64_t *) ( /* dim=0 */ (__pyx_v_cresult.data + __pyx_t_12 * __pyx_v_cresult.strides[0]) )) = (__pyx_v_final_val * __pyx_v_prior_pg_true);
 
-    /* "pyprophet/_optimized.pyx":263
+    /* "pyprophet/_optimized.pyx":290
  * 
  *         cresult[i+1] = final_val * prior_pg_true
  *         i += 1             # <<<<<<<<<<<<<<
@@ -4693,7 +5014,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
     __pyx_v_i = (__pyx_v_i + 1);
   }
 
-  /* "pyprophet/_optimized.pyx":266
+  /* "pyprophet/_optimized.pyx":293
  * 
  *     # Compute sum over all hypothesis
  *     i = 0             # <<<<<<<<<<<<<<
@@ -4702,7 +5023,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
  */
   __pyx_v_i = 0;
 
-  /* "pyprophet/_optimized.pyx":267
+  /* "pyprophet/_optimized.pyx":294
  *     # Compute sum over all hypothesis
  *     i = 0
  *     while i < n+1:             # <<<<<<<<<<<<<<
@@ -4713,7 +5034,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
     __pyx_t_7 = ((__pyx_v_i < (__pyx_v_n + 1)) != 0);
     if (!__pyx_t_7) break;
 
-    /* "pyprophet/_optimized.pyx":268
+    /* "pyprophet/_optimized.pyx":295
  *     i = 0
  *     while i < n+1:
  *         sum_all += cresult[i]             # <<<<<<<<<<<<<<
@@ -4723,7 +5044,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
     __pyx_t_13 = __pyx_v_i;
     __pyx_v_sum_all = (__pyx_v_sum_all + (*((__pyx_t_5numpy_float64_t *) ( /* dim=0 */ (__pyx_v_cresult.data + __pyx_t_13 * __pyx_v_cresult.strides[0]) ))));
 
-    /* "pyprophet/_optimized.pyx":269
+    /* "pyprophet/_optimized.pyx":296
  *     while i < n+1:
  *         sum_all += cresult[i]
  *         i += 1             # <<<<<<<<<<<<<<
@@ -4733,7 +5054,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
     __pyx_v_i = (__pyx_v_i + 1);
   }
 
-  /* "pyprophet/_optimized.pyx":272
+  /* "pyprophet/_optimized.pyx":299
  * 
  *     # Divide by sum over all hypothesis (normalize)
  *     i = 0             # <<<<<<<<<<<<<<
@@ -4742,7 +5063,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
  */
   __pyx_v_i = 0;
 
-  /* "pyprophet/_optimized.pyx":273
+  /* "pyprophet/_optimized.pyx":300
  *     # Divide by sum over all hypothesis (normalize)
  *     i = 0
  *     while i < n+1:             # <<<<<<<<<<<<<<
@@ -4753,7 +5074,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
     __pyx_t_7 = ((__pyx_v_i < (__pyx_v_n + 1)) != 0);
     if (!__pyx_t_7) break;
 
-    /* "pyprophet/_optimized.pyx":274
+    /* "pyprophet/_optimized.pyx":301
  *     i = 0
  *     while i < n+1:
  *         cresult[i] = cresult[i] / sum_all             # <<<<<<<<<<<<<<
@@ -4770,12 +5091,12 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
       #ifdef WITH_THREAD
       PyGILState_Release(__pyx_gilstate_save);
       #endif
-      {__pyx_filename = __pyx_f[0]; __pyx_lineno = 274; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+      {__pyx_filename = __pyx_f[0]; __pyx_lineno = 301; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
     }
     __pyx_t_16 = __pyx_v_i;
     *((__pyx_t_5numpy_float64_t *) ( /* dim=0 */ (__pyx_v_cresult.data + __pyx_t_16 * __pyx_v_cresult.strides[0]) )) = (__pyx_t_15 / __pyx_v_sum_all);
 
-    /* "pyprophet/_optimized.pyx":275
+    /* "pyprophet/_optimized.pyx":302
  *     while i < n+1:
  *         cresult[i] = cresult[i] / sum_all
  *         i += 1             # <<<<<<<<<<<<<<
@@ -4785,7 +5106,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
     __pyx_v_i = (__pyx_v_i + 1);
   }
 
-  /* "pyprophet/_optimized.pyx":277
+  /* "pyprophet/_optimized.pyx":304
  *         i += 1
  * 
  *     return result             # <<<<<<<<<<<<<<
@@ -4795,7 +5116,7 @@ static PyObject *__pyx_pf_9pyprophet_10_optimized_8single_chromatogram_hypothesi
   __pyx_r = __pyx_v_result;
   goto __pyx_L0;
 
-  /* "pyprophet/_optimized.pyx":224
+  /* "pyprophet/_optimized.pyx":251
  * @cython.boundscheck(False)
  * @cython.wraparound(False)
  * def single_chromatogram_hypothesis_fast(np.float64_t[:] inv_pg_pp_true, np.float64_t prior_chrom_null, np.float64_t prior_pg_true):             # <<<<<<<<<<<<<<
@@ -18205,10 +18526,12 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_imin, __pyx_k_imin, sizeof(__pyx_k_imin), 0, 0, 1, 1},
   {&__pyx_n_s_import, __pyx_k_import, sizeof(__pyx_k_import), 0, 0, 1, 1},
   {&__pyx_n_s_inp_view, __pyx_k_inp_view, sizeof(__pyx_k_inp_view), 0, 0, 1, 1},
+  {&__pyx_n_s_int32, __pyx_k_int32, sizeof(__pyx_k_int32), 0, 0, 1, 1},
   {&__pyx_n_s_int64, __pyx_k_int64, sizeof(__pyx_k_int64), 0, 0, 1, 1},
   {&__pyx_n_s_inv_pg_pp_true, __pyx_k_inv_pg_pp_true, sizeof(__pyx_k_inv_pg_pp_true), 0, 0, 1, 1},
   {&__pyx_n_s_itemsize, __pyx_k_itemsize, sizeof(__pyx_k_itemsize), 0, 0, 1, 1},
   {&__pyx_kp_s_itemsize_0_for_cython_array, __pyx_k_itemsize_0_for_cython_array, sizeof(__pyx_k_itemsize_0_for_cython_array), 0, 0, 1, 0},
+  {&__pyx_n_s_ix, __pyx_k_ix, sizeof(__pyx_k_ix), 0, 0, 1, 1},
   {&__pyx_n_s_j, __pyx_k_j, sizeof(__pyx_k_j), 0, 0, 1, 1},
   {&__pyx_n_s_low, __pyx_k_low, sizeof(__pyx_k_low), 0, 0, 1, 1},
   {&__pyx_n_s_main, __pyx_k_main, sizeof(__pyx_k_main), 0, 0, 1, 1},
@@ -18235,6 +18558,7 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_pyx_vtable, __pyx_k_pyx_vtable, sizeof(__pyx_k_pyx_vtable), 0, 0, 1, 1},
   {&__pyx_n_s_range, __pyx_k_range, sizeof(__pyx_k_range), 0, 0, 1, 1},
   {&__pyx_n_s_rank, __pyx_k_rank, sizeof(__pyx_k_rank), 0, 0, 1, 1},
+  {&__pyx_n_s_rank32, __pyx_k_rank32, sizeof(__pyx_k_rank32), 0, 0, 1, 1},
   {&__pyx_n_s_ranks, __pyx_k_ranks, sizeof(__pyx_k_ranks), 0, 0, 1, 1},
   {&__pyx_n_s_res_view, __pyx_k_res_view, sizeof(__pyx_k_res_view), 0, 0, 1, 1},
   {&__pyx_n_s_result, __pyx_k_result, sizeof(__pyx_k_result), 0, 0, 1, 1},
@@ -18524,29 +18848,41 @@ static int __Pyx_InitCachedConstants(void) {
   __Pyx_GIVEREF(__pyx_tuple__23);
   __pyx_codeobj__24 = (PyObject*)__Pyx_PyCode_New(2, 0, 12, 0, 0, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__23, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_Users_uweschmitt_Projects_pypro, __pyx_n_s_find_top_ranked, 157, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__24)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 157; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
 
-  /* "pyprophet/_optimized.pyx":205
+  /* "pyprophet/_optimized.pyx":207
  * @cython.boundscheck(False)
  * @cython.wraparound(False)
  * def rank(np.int64_t[:] tg_ids, DATA_TYPE[:] scores):             # <<<<<<<<<<<<<<
- *     cdef size_t n = tg_ids.shape[0]
- *     result = np.zeros((n,), dtype=np.int64)
+ *     # we assume a transition group has always max 1000 entries:
+ *     cdef np.int32_t * ix = <np.int32_t * > libc.stdlib.malloc(1000 * sizeof(np.int32_t))
  */
-  __pyx_tuple__25 = PyTuple_Pack(8, __pyx_n_s_tg_ids, __pyx_n_s_scores, __pyx_n_s_n, __pyx_n_s_result, __pyx_n_s_ranks, __pyx_n_s_imin, __pyx_n_s_imax, __pyx_n_s_g0); if (unlikely(!__pyx_tuple__25)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 205; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_tuple__25 = PyTuple_Pack(9, __pyx_n_s_tg_ids, __pyx_n_s_scores, __pyx_n_s_ix, __pyx_n_s_n, __pyx_n_s_result, __pyx_n_s_ranks, __pyx_n_s_imin, __pyx_n_s_imax, __pyx_n_s_g0); if (unlikely(!__pyx_tuple__25)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 207; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_tuple__25);
   __Pyx_GIVEREF(__pyx_tuple__25);
-  __pyx_codeobj__26 = (PyObject*)__Pyx_PyCode_New(2, 0, 8, 0, 0, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__25, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_Users_uweschmitt_Projects_pypro, __pyx_n_s_rank, 205, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__26)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 205; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_codeobj__26 = (PyObject*)__Pyx_PyCode_New(2, 0, 9, 0, 0, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__25, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_Users_uweschmitt_Projects_pypro, __pyx_n_s_rank, 207, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__26)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 207; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
 
-  /* "pyprophet/_optimized.pyx":224
+  /* "pyprophet/_optimized.pyx":229
+ * @cython.boundscheck(False)
+ * @cython.wraparound(False)
+ * def rank32(np.int32_t[:] tg_ids, DATA_TYPE[:] scores):             # <<<<<<<<<<<<<<
+ *     # we assume a transition group has always max 1000 entries:
+ *     cdef np.int32_t * ix = <np.int32_t * > libc.stdlib.malloc(1000 * sizeof(np.int32_t))
+ */
+  __pyx_tuple__27 = PyTuple_Pack(9, __pyx_n_s_tg_ids, __pyx_n_s_scores, __pyx_n_s_ix, __pyx_n_s_n, __pyx_n_s_result, __pyx_n_s_ranks, __pyx_n_s_imin, __pyx_n_s_imax, __pyx_n_s_g0); if (unlikely(!__pyx_tuple__27)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 229; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __Pyx_GOTREF(__pyx_tuple__27);
+  __Pyx_GIVEREF(__pyx_tuple__27);
+  __pyx_codeobj__28 = (PyObject*)__Pyx_PyCode_New(2, 0, 9, 0, 0, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__27, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_Users_uweschmitt_Projects_pypro, __pyx_n_s_rank32, 229, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__28)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 229; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+
+  /* "pyprophet/_optimized.pyx":251
  * @cython.boundscheck(False)
  * @cython.wraparound(False)
  * def single_chromatogram_hypothesis_fast(np.float64_t[:] inv_pg_pp_true, np.float64_t prior_chrom_null, np.float64_t prior_pg_true):             # <<<<<<<<<<<<<<
  * 
  *     # inv_pg_pp_true contains the probabilities that the peaks are false
  */
-  __pyx_tuple__27 = PyTuple_Pack(12, __pyx_n_s_inv_pg_pp_true, __pyx_n_s_prior_chrom_null, __pyx_n_s_prior_pg_true, __pyx_n_s_n, __pyx_n_s_final_val, __pyx_n_s_val, __pyx_n_s_sum_all, __pyx_n_s_result, __pyx_n_s_cresult, __pyx_n_s_i, __pyx_n_s_j, __pyx_n_s_af); if (unlikely(!__pyx_tuple__27)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 224; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
-  __Pyx_GOTREF(__pyx_tuple__27);
-  __Pyx_GIVEREF(__pyx_tuple__27);
-  __pyx_codeobj__28 = (PyObject*)__Pyx_PyCode_New(3, 0, 12, 0, 0, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__27, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_Users_uweschmitt_Projects_pypro, __pyx_n_s_single_chromatogram_hypothesis_f, 224, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__28)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 224; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_tuple__29 = PyTuple_Pack(12, __pyx_n_s_inv_pg_pp_true, __pyx_n_s_prior_chrom_null, __pyx_n_s_prior_pg_true, __pyx_n_s_n, __pyx_n_s_final_val, __pyx_n_s_val, __pyx_n_s_sum_all, __pyx_n_s_result, __pyx_n_s_cresult, __pyx_n_s_i, __pyx_n_s_j, __pyx_n_s_af); if (unlikely(!__pyx_tuple__29)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 251; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __Pyx_GOTREF(__pyx_tuple__29);
+  __Pyx_GIVEREF(__pyx_tuple__29);
+  __pyx_codeobj__30 = (PyObject*)__Pyx_PyCode_New(3, 0, 12, 0, 0, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__29, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_Users_uweschmitt_Projects_pypro, __pyx_n_s_single_chromatogram_hypothesis_f, 251, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__30)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 251; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
 
   /* "View.MemoryView":276
  *         return self.name
@@ -18555,9 +18891,9 @@ static int __Pyx_InitCachedConstants(void) {
  * cdef strided = Enum("<strided and direct>") # default
  * cdef indirect = Enum("<strided and indirect>")
  */
-  __pyx_tuple__29 = PyTuple_Pack(1, __pyx_kp_s_strided_and_direct_or_indirect); if (unlikely(!__pyx_tuple__29)) {__pyx_filename = __pyx_f[2]; __pyx_lineno = 276; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
-  __Pyx_GOTREF(__pyx_tuple__29);
-  __Pyx_GIVEREF(__pyx_tuple__29);
+  __pyx_tuple__31 = PyTuple_Pack(1, __pyx_kp_s_strided_and_direct_or_indirect); if (unlikely(!__pyx_tuple__31)) {__pyx_filename = __pyx_f[2]; __pyx_lineno = 276; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __Pyx_GOTREF(__pyx_tuple__31);
+  __Pyx_GIVEREF(__pyx_tuple__31);
 
   /* "View.MemoryView":277
  * 
@@ -18566,9 +18902,9 @@ static int __Pyx_InitCachedConstants(void) {
  * cdef indirect = Enum("<strided and indirect>")
  * 
  */
-  __pyx_tuple__30 = PyTuple_Pack(1, __pyx_kp_s_strided_and_direct); if (unlikely(!__pyx_tuple__30)) {__pyx_filename = __pyx_f[2]; __pyx_lineno = 277; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
-  __Pyx_GOTREF(__pyx_tuple__30);
-  __Pyx_GIVEREF(__pyx_tuple__30);
+  __pyx_tuple__32 = PyTuple_Pack(1, __pyx_kp_s_strided_and_direct); if (unlikely(!__pyx_tuple__32)) {__pyx_filename = __pyx_f[2]; __pyx_lineno = 277; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __Pyx_GOTREF(__pyx_tuple__32);
+  __Pyx_GIVEREF(__pyx_tuple__32);
 
   /* "View.MemoryView":278
  * cdef generic = Enum("<strided and direct or indirect>")
@@ -18577,9 +18913,9 @@ static int __Pyx_InitCachedConstants(void) {
  * 
  * 
  */
-  __pyx_tuple__31 = PyTuple_Pack(1, __pyx_kp_s_strided_and_indirect); if (unlikely(!__pyx_tuple__31)) {__pyx_filename = __pyx_f[2]; __pyx_lineno = 278; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
-  __Pyx_GOTREF(__pyx_tuple__31);
-  __Pyx_GIVEREF(__pyx_tuple__31);
+  __pyx_tuple__33 = PyTuple_Pack(1, __pyx_kp_s_strided_and_indirect); if (unlikely(!__pyx_tuple__33)) {__pyx_filename = __pyx_f[2]; __pyx_lineno = 278; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __Pyx_GOTREF(__pyx_tuple__33);
+  __Pyx_GIVEREF(__pyx_tuple__33);
 
   /* "View.MemoryView":281
  * 
@@ -18588,9 +18924,9 @@ static int __Pyx_InitCachedConstants(void) {
  * cdef indirect_contiguous = Enum("<contiguous and indirect>")
  * 
  */
-  __pyx_tuple__32 = PyTuple_Pack(1, __pyx_kp_s_contiguous_and_direct); if (unlikely(!__pyx_tuple__32)) {__pyx_filename = __pyx_f[2]; __pyx_lineno = 281; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
-  __Pyx_GOTREF(__pyx_tuple__32);
-  __Pyx_GIVEREF(__pyx_tuple__32);
+  __pyx_tuple__34 = PyTuple_Pack(1, __pyx_kp_s_contiguous_and_direct); if (unlikely(!__pyx_tuple__34)) {__pyx_filename = __pyx_f[2]; __pyx_lineno = 281; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __Pyx_GOTREF(__pyx_tuple__34);
+  __Pyx_GIVEREF(__pyx_tuple__34);
 
   /* "View.MemoryView":282
  * 
@@ -18599,9 +18935,9 @@ static int __Pyx_InitCachedConstants(void) {
  * 
  * 
  */
-  __pyx_tuple__33 = PyTuple_Pack(1, __pyx_kp_s_contiguous_and_indirect); if (unlikely(!__pyx_tuple__33)) {__pyx_filename = __pyx_f[2]; __pyx_lineno = 282; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
-  __Pyx_GOTREF(__pyx_tuple__33);
-  __Pyx_GIVEREF(__pyx_tuple__33);
+  __pyx_tuple__35 = PyTuple_Pack(1, __pyx_kp_s_contiguous_and_indirect); if (unlikely(!__pyx_tuple__35)) {__pyx_filename = __pyx_f[2]; __pyx_lineno = 282; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __Pyx_GOTREF(__pyx_tuple__35);
+  __Pyx_GIVEREF(__pyx_tuple__35);
   __Pyx_RefNannyFinishContext();
   return 0;
   __pyx_L1_error:;
@@ -18808,28 +19144,40 @@ PyMODINIT_FUNC PyInit__optimized(void)
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_find_top_ranked, __pyx_t_1) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 157; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "pyprophet/_optimized.pyx":205
+  /* "pyprophet/_optimized.pyx":207
  * @cython.boundscheck(False)
  * @cython.wraparound(False)
  * def rank(np.int64_t[:] tg_ids, DATA_TYPE[:] scores):             # <<<<<<<<<<<<<<
- *     cdef size_t n = tg_ids.shape[0]
- *     result = np.zeros((n,), dtype=np.int64)
+ *     # we assume a transition group has always max 1000 entries:
+ *     cdef np.int32_t * ix = <np.int32_t * > libc.stdlib.malloc(1000 * sizeof(np.int32_t))
  */
-  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_9pyprophet_10_optimized_7rank, NULL, __pyx_n_s_pyprophet__optimized); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 205; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_9pyprophet_10_optimized_7rank, NULL, __pyx_n_s_pyprophet__optimized); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 207; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_1);
-  if (PyDict_SetItem(__pyx_d, __pyx_n_s_rank, __pyx_t_1) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 205; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  if (PyDict_SetItem(__pyx_d, __pyx_n_s_rank, __pyx_t_1) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 207; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "pyprophet/_optimized.pyx":224
+  /* "pyprophet/_optimized.pyx":229
+ * @cython.boundscheck(False)
+ * @cython.wraparound(False)
+ * def rank32(np.int32_t[:] tg_ids, DATA_TYPE[:] scores):             # <<<<<<<<<<<<<<
+ *     # we assume a transition group has always max 1000 entries:
+ *     cdef np.int32_t * ix = <np.int32_t * > libc.stdlib.malloc(1000 * sizeof(np.int32_t))
+ */
+  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_9pyprophet_10_optimized_9rank32, NULL, __pyx_n_s_pyprophet__optimized); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 229; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __Pyx_GOTREF(__pyx_t_1);
+  if (PyDict_SetItem(__pyx_d, __pyx_n_s_rank32, __pyx_t_1) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 229; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+
+  /* "pyprophet/_optimized.pyx":251
  * @cython.boundscheck(False)
  * @cython.wraparound(False)
  * def single_chromatogram_hypothesis_fast(np.float64_t[:] inv_pg_pp_true, np.float64_t prior_chrom_null, np.float64_t prior_pg_true):             # <<<<<<<<<<<<<<
  * 
  *     # inv_pg_pp_true contains the probabilities that the peaks are false
  */
-  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_9pyprophet_10_optimized_9single_chromatogram_hypothesis_fast, NULL, __pyx_n_s_pyprophet__optimized); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 224; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_9pyprophet_10_optimized_11single_chromatogram_hypothesis_fast, NULL, __pyx_n_s_pyprophet__optimized); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 251; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_1);
-  if (PyDict_SetItem(__pyx_d, __pyx_n_s_single_chromatogram_hypothesis_f, __pyx_t_1) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 224; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  if (PyDict_SetItem(__pyx_d, __pyx_n_s_single_chromatogram_hypothesis_f, __pyx_t_1) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 251; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
   /* "pyprophet/_optimized.pyx":1
@@ -18862,7 +19210,7 @@ PyMODINIT_FUNC PyInit__optimized(void)
  * cdef strided = Enum("<strided and direct>") # default
  * cdef indirect = Enum("<strided and indirect>")
  */
-  __pyx_t_1 = __Pyx_PyObject_Call(((PyObject *)((PyObject *)__pyx_MemviewEnum_type)), __pyx_tuple__29, NULL); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[2]; __pyx_lineno = 276; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_1 = __Pyx_PyObject_Call(((PyObject *)((PyObject *)__pyx_MemviewEnum_type)), __pyx_tuple__31, NULL); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[2]; __pyx_lineno = 276; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_1);
   __Pyx_XGOTREF(generic);
   __Pyx_DECREF_SET(generic, __pyx_t_1);
@@ -18876,7 +19224,7 @@ PyMODINIT_FUNC PyInit__optimized(void)
  * cdef indirect = Enum("<strided and indirect>")
  * 
  */
-  __pyx_t_1 = __Pyx_PyObject_Call(((PyObject *)((PyObject *)__pyx_MemviewEnum_type)), __pyx_tuple__30, NULL); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[2]; __pyx_lineno = 277; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_1 = __Pyx_PyObject_Call(((PyObject *)((PyObject *)__pyx_MemviewEnum_type)), __pyx_tuple__32, NULL); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[2]; __pyx_lineno = 277; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_1);
   __Pyx_XGOTREF(strided);
   __Pyx_DECREF_SET(strided, __pyx_t_1);
@@ -18890,7 +19238,7 @@ PyMODINIT_FUNC PyInit__optimized(void)
  * 
  * 
  */
-  __pyx_t_1 = __Pyx_PyObject_Call(((PyObject *)((PyObject *)__pyx_MemviewEnum_type)), __pyx_tuple__31, NULL); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[2]; __pyx_lineno = 278; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_1 = __Pyx_PyObject_Call(((PyObject *)((PyObject *)__pyx_MemviewEnum_type)), __pyx_tuple__33, NULL); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[2]; __pyx_lineno = 278; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_1);
   __Pyx_XGOTREF(indirect);
   __Pyx_DECREF_SET(indirect, __pyx_t_1);
@@ -18904,7 +19252,7 @@ PyMODINIT_FUNC PyInit__optimized(void)
  * cdef indirect_contiguous = Enum("<contiguous and indirect>")
  * 
  */
-  __pyx_t_1 = __Pyx_PyObject_Call(((PyObject *)((PyObject *)__pyx_MemviewEnum_type)), __pyx_tuple__32, NULL); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[2]; __pyx_lineno = 281; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_1 = __Pyx_PyObject_Call(((PyObject *)((PyObject *)__pyx_MemviewEnum_type)), __pyx_tuple__34, NULL); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[2]; __pyx_lineno = 281; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_1);
   __Pyx_XGOTREF(contiguous);
   __Pyx_DECREF_SET(contiguous, __pyx_t_1);
@@ -18918,7 +19266,7 @@ PyMODINIT_FUNC PyInit__optimized(void)
  * 
  * 
  */
-  __pyx_t_1 = __Pyx_PyObject_Call(((PyObject *)((PyObject *)__pyx_MemviewEnum_type)), __pyx_tuple__33, NULL); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[2]; __pyx_lineno = 282; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_1 = __Pyx_PyObject_Call(((PyObject *)((PyObject *)__pyx_MemviewEnum_type)), __pyx_tuple__35, NULL); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[2]; __pyx_lineno = 282; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_1);
   __Pyx_XGOTREF(indirect_contiguous);
   __Pyx_DECREF_SET(indirect_contiguous, __pyx_t_1);
@@ -21127,6 +21475,28 @@ __pyx_fail:
     return result;
 }
 
+static CYTHON_INLINE __Pyx_memviewslice __Pyx_PyObject_to_MemoryviewSlice_ds_nn___pyx_t_5numpy_int32_t(PyObject *obj) {
+    __Pyx_memviewslice result = { 0, 0, { 0 }, { 0 }, { 0 } };
+    __Pyx_BufFmt_StackElem stack[1];
+    int axes_specs[] = { (__Pyx_MEMVIEW_DIRECT | __Pyx_MEMVIEW_STRIDED) };
+    int retcode;
+    if (obj == Py_None) {
+        result.memview = (struct __pyx_memoryview_obj *) Py_None;
+        return result;
+    }
+    retcode = __Pyx_ValidateAndInit_memviewslice(axes_specs, 0,
+                                                 PyBUF_RECORDS, 1,
+                                                 &__Pyx_TypeInfo_nn___pyx_t_5numpy_int32_t, stack,
+                                                 &result, obj);
+    if (unlikely(retcode == -1))
+        goto __pyx_fail;
+    return result;
+__pyx_fail:
+    result.memview = NULL;
+    result.data = NULL;
+    return result;
+}
+
 #define __PYX_VERIFY_RETURN_INT(target_type, func_type, func_value)       \
     {                                                                     \
         func_type value = func_value;                                     \
@@ -21262,6 +21632,137 @@ static int __pyx_memview_set_nn___pyx_t_5numpy_float64_t(const char *itemp, PyOb
         return 0;
     *(__pyx_t_5numpy_float64_t *) itemp = value;
     return 1;
+}
+
+static CYTHON_INLINE npy_int32 __Pyx_PyInt_As_npy_int32(PyObject *x) {
+    const npy_int32 neg_one = (npy_int32) -1, const_zero = 0;
+    const int is_unsigned = neg_one > const_zero;
+#if PY_MAJOR_VERSION < 3
+    if (likely(PyInt_Check(x))) {
+        if (sizeof(npy_int32) < sizeof(long)) {
+            __PYX_VERIFY_RETURN_INT(npy_int32, long, PyInt_AS_LONG(x))
+        } else {
+            long val = PyInt_AS_LONG(x);
+            if (is_unsigned && unlikely(val < 0)) {
+                goto raise_neg_overflow;
+            }
+            return (npy_int32) val;
+        }
+    } else
+#endif
+    if (likely(PyLong_Check(x))) {
+        if (is_unsigned) {
+#if CYTHON_COMPILING_IN_CPYTHON && PY_MAJOR_VERSION >= 3
+ #if CYTHON_USE_PYLONG_INTERNALS
+            switch (Py_SIZE(x)) {
+                case  0: return 0;
+                case  1: __PYX_VERIFY_RETURN_INT(npy_int32, digit, ((PyLongObject*)x)->ob_digit[0]);
+            }
+ #endif
+#endif
+#if CYTHON_COMPILING_IN_CPYTHON
+            if (unlikely(Py_SIZE(x) < 0)) {
+                goto raise_neg_overflow;
+            }
+#else
+            {
+                int result = PyObject_RichCompareBool(x, Py_False, Py_LT);
+                if (unlikely(result < 0))
+                    return (npy_int32) -1;
+                if (unlikely(result == 1))
+                    goto raise_neg_overflow;
+            }
+#endif
+            if (sizeof(npy_int32) <= sizeof(unsigned long)) {
+                __PYX_VERIFY_RETURN_INT(npy_int32, unsigned long, PyLong_AsUnsignedLong(x))
+            } else if (sizeof(npy_int32) <= sizeof(unsigned PY_LONG_LONG)) {
+                __PYX_VERIFY_RETURN_INT(npy_int32, unsigned PY_LONG_LONG, PyLong_AsUnsignedLongLong(x))
+            }
+        } else {
+#if CYTHON_COMPILING_IN_CPYTHON && PY_MAJOR_VERSION >= 3
+ #if CYTHON_USE_PYLONG_INTERNALS
+            switch (Py_SIZE(x)) {
+                case  0: return 0;
+                case  1: __PYX_VERIFY_RETURN_INT(npy_int32,  digit, +(((PyLongObject*)x)->ob_digit[0]));
+                case -1: __PYX_VERIFY_RETURN_INT(npy_int32, sdigit, -(sdigit) ((PyLongObject*)x)->ob_digit[0]);
+            }
+ #endif
+#endif
+            if (sizeof(npy_int32) <= sizeof(long)) {
+                __PYX_VERIFY_RETURN_INT(npy_int32, long, PyLong_AsLong(x))
+            } else if (sizeof(npy_int32) <= sizeof(PY_LONG_LONG)) {
+                __PYX_VERIFY_RETURN_INT(npy_int32, PY_LONG_LONG, PyLong_AsLongLong(x))
+            }
+        }
+        {
+#if CYTHON_COMPILING_IN_PYPY && !defined(_PyLong_AsByteArray)
+            PyErr_SetString(PyExc_RuntimeError,
+                            "_PyLong_AsByteArray() not available in PyPy, cannot convert large numbers");
+#else
+            npy_int32 val;
+            PyObject *v = __Pyx_PyNumber_Int(x);
+ #if PY_MAJOR_VERSION < 3
+            if (likely(v) && !PyLong_Check(v)) {
+                PyObject *tmp = v;
+                v = PyNumber_Long(tmp);
+                Py_DECREF(tmp);
+            }
+ #endif
+            if (likely(v)) {
+                int one = 1; int is_little = (int)*(unsigned char *)&one;
+                unsigned char *bytes = (unsigned char *)&val;
+                int ret = _PyLong_AsByteArray((PyLongObject *)v,
+                                              bytes, sizeof(val),
+                                              is_little, !is_unsigned);
+                Py_DECREF(v);
+                if (likely(!ret))
+                    return val;
+            }
+#endif
+            return (npy_int32) -1;
+        }
+    } else {
+        npy_int32 val;
+        PyObject *tmp = __Pyx_PyNumber_Int(x);
+        if (!tmp) return (npy_int32) -1;
+        val = __Pyx_PyInt_As_npy_int32(tmp);
+        Py_DECREF(tmp);
+        return val;
+    }
+raise_overflow:
+    PyErr_SetString(PyExc_OverflowError,
+        "value too large to convert to npy_int32");
+    return (npy_int32) -1;
+raise_neg_overflow:
+    PyErr_SetString(PyExc_OverflowError,
+        "can't convert negative value to npy_int32");
+    return (npy_int32) -1;
+}
+
+static CYTHON_INLINE PyObject* __Pyx_PyInt_From_long(long value) {
+    const long neg_one = (long) -1, const_zero = 0;
+    const int is_unsigned = neg_one > const_zero;
+    if (is_unsigned) {
+        if (sizeof(long) < sizeof(long)) {
+            return PyInt_FromLong((long) value);
+        } else if (sizeof(long) <= sizeof(unsigned long)) {
+            return PyLong_FromUnsignedLong((unsigned long) value);
+        } else if (sizeof(long) <= sizeof(unsigned PY_LONG_LONG)) {
+            return PyLong_FromUnsignedLongLong((unsigned PY_LONG_LONG) value);
+        }
+    } else {
+        if (sizeof(long) <= sizeof(long)) {
+            return PyInt_FromLong((long) value);
+        } else if (sizeof(long) <= sizeof(PY_LONG_LONG)) {
+            return PyLong_FromLongLong((PY_LONG_LONG) value);
+        }
+    }
+    {
+        int one = 1; int little = (int)*(unsigned char *)&one;
+        unsigned char *bytes = (unsigned char *)&value;
+        return _PyLong_FromByteArray(bytes, sizeof(long),
+                                     little, !is_unsigned);
+    }
 }
 
 #if CYTHON_CCOMPLEX
@@ -21768,32 +22269,6 @@ __pyx_capsule_create(void *p, CYTHON_UNUSED const char *sig)
     cobj = PyCObject_FromVoidPtr(p, NULL);
 #endif
     return cobj;
-}
-
-static CYTHON_INLINE PyObject* __Pyx_PyInt_From_long(long value) {
-    const long neg_one = (long) -1, const_zero = 0;
-    const int is_unsigned = neg_one > const_zero;
-    if (is_unsigned) {
-        if (sizeof(long) < sizeof(long)) {
-            return PyInt_FromLong((long) value);
-        } else if (sizeof(long) <= sizeof(unsigned long)) {
-            return PyLong_FromUnsignedLong((unsigned long) value);
-        } else if (sizeof(long) <= sizeof(unsigned PY_LONG_LONG)) {
-            return PyLong_FromUnsignedLongLong((unsigned PY_LONG_LONG) value);
-        }
-    } else {
-        if (sizeof(long) <= sizeof(long)) {
-            return PyInt_FromLong((long) value);
-        } else if (sizeof(long) <= sizeof(PY_LONG_LONG)) {
-            return PyLong_FromLongLong((PY_LONG_LONG) value);
-        }
-    }
-    {
-        int one = 1; int little = (int)*(unsigned char *)&one;
-        unsigned char *bytes = (unsigned char *)&value;
-        return _PyLong_FromByteArray(bytes, sizeof(long),
-                                     little, !is_unsigned);
-    }
 }
 
 static CYTHON_INLINE char __Pyx_PyInt_As_char(PyObject *x) {
