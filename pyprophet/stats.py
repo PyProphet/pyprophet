@@ -323,8 +323,8 @@ def get_error_table_from_pvalues_new(p_values, lambda_=0.4, use_pfdr=False):
     if use_pfdr:
         fac = 1.0 - (1.0 - p_values) ** num_total
         fdr /= fac
-        # see storey section 8:
-        fdr[p_values == 0] = num_null / num_total 
+        # if we take the limit p->1 we achieve the following factor:
+        fdr[p_values == 0] = 1.0 / num_total
 
     # cut off values to range 0..1
     fdr[fdr < 0.0] = 0.0
