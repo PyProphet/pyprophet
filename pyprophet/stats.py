@@ -19,8 +19,9 @@ except NameError:
 from optimized import (find_nearest_matches as _find_nearest_matches,
                        count_num_positives, single_chromatogram_hypothesis_fast)
 import scipy.special
-import math
 import scipy.stats
+import scipy.interpolate
+import math
 
 from config import CONFIG
 
@@ -28,6 +29,8 @@ import multiprocessing
 
 from std_logger import logging
 
+import subprocess
+import tempfile
 
 ErrorStatistics = namedtuple("ErrorStatistics", "df num_null num_total")
 
@@ -62,6 +65,50 @@ def to_one_dim_array(values, as_type=None):
         return values.astype(as_type)
     return values
 
+def qvality_posterior_pg_prob(experiment):
+    # All target values and all decoy values
+    df = experiment.get_top_peaks().df.sort(['d_score'],ascending=[0])
+    df = df.reset_index()
+
+    tf_targets = tempfile.NamedTemporaryFile()
+    tf_decoys = tempfile.NamedTemporaryFile()
+    tf_results = tempfile.NamedTemporaryFile()
+
+    df.loc[(df.is_decoy == False), "d_score" ].to_csv(tf_targets.name,sep="\t",header=False, index=False)
+    df.loc[(df.is_decoy == True), "d_score" ].to_csv(tf_decoys.name,sep="\t", header=False, index=False)
+
+    qvality_args = ["qvality"]
+    qvality_args += ["-s", str(CONFIG.get("qvality.epsilon-step")), "-c", str(CONFIG.get("qvality.epsilon-cross-validation")), "-n", str(CONFIG.get("qvality.number-of-bins")), "-d", "-v", str(CONFIG.get("qvality.verbose"))]
+    if (CONFIG.get("qvality.generalized")):
+        qvality_args += ["-g"]
+    qvality_args += ["-o", tf_results.name, tf_targets.name, tf_decoys.name]
+
+    logging.info("start QVALITY PEP estimation")
+    try:
+        subprocess.check_call(qvality_args)
+    except subprocess.CalledProcessError:
+         raise Exception("QVALITY was not run successfully. Consider adjusting the QVALITY parameters within pyprophet.")
+    except OSError:
+         raise Exception("QVALITY could not be found! Please install Percolator (http://percolator.ms) and export the qvality executable to your system path.")
+    logging.info("end QVALITY PEP estimation")
+
+    qvality_results = pd.read_csv(tf_results, sep = "\t")
+
+    tf_targets.close()
+    tf_decoys.close()
+    tf_results.close()
+
+    df['pg_score'] = 1 - qvality_results['PEP']
+    df['pg_score_qv'] = qvality_results['q-value']
+
+    f_pg_score = scipy.interpolate.interp1d(df['d_score'],df['pg_score'], bounds_error=False, fill_value=np.min(df['pg_score']))
+    f_pg_score_qv = scipy.interpolate.interp1d(df['d_score'],df['pg_score_qv'],bounds_error=False,fill_value=np.max(df['pg_score_qv']))
+
+    edf = experiment.df
+    edf['pg_score'] = f_pg_score(edf['d_score'])
+    edf['pg_score_qv'] = f_pg_score_qv(edf['d_score'])
+
+    return edf[['pg_score','pg_score_qv']]
 
 def posterior_pg_prob(dvals, target_scores, decoy_scores, error_stat, number_target_peaks,
                       number_target_pg,

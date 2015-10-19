@@ -295,7 +295,8 @@ def single_chromatogram_hypothesis_fast(np.float64_t[:] inv_pg_pp_true, np.float
     # Divide by sum over all hypothesis (normalize)
     i = 0
     while i < n+1:
-        cresult[i] = cresult[i] / sum_all
+        if sum_all > 0:
+            cresult[i] = cresult[i] / sum_all
         i += 1
 
     return result

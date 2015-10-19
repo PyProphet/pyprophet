@@ -21,11 +21,13 @@ import zlib
 
 import numpy as np
 
-from pyprophet import PyProphet
-from config import CONFIG, set_pandas_print_options
+from pyprophet import PyProphet, Result
+from config import CONFIG, MS1_CONFIG, MS2_CONFIG, UIS_CONFIG, set_pandas_print_options
 from report import save_report, export_mayu, mayu_cols
 
 from .main_helpers import (parse_cmdline, create_pathes, check_if_any_exists)
+from ms1_scoring import prepare_ms1_tables, postprocess_ms1_tables
+from uis_scoring import prepare_uis_tables, postprocess_uis_tables
 
 
 class PyProphetRunner(object):
@@ -76,11 +78,22 @@ class PyProphetRunner(object):
         if self.prefix is None:
             prefixes = [os.path.splitext(os.path.basename(path))[0] for path in self.pathes]
             common_prefix = os.path.commonprefix(prefixes)
+
+            suffixes = []
+            for prefix in prefixes:
+                suffixes.append(prefix[::-1])
+            common_suffix = os.path.commonprefix(suffixes)[::-1]
+
             # is always ok for not learning_mode, which includes that pathes has only one entry
-            if not common_prefix:
+            if not (common_prefix or common_suffix):
                 raise Exception("could not derive common prefix of input file names, please use "
                                 "--target.prefix option")
-            prefix = common_prefix
+            if common_prefix != common_suffix:
+                prefix = common_prefix + common_suffix
+            else:
+                prefix = common_prefix
+        else:
+            prefix = self.prefix
         return prefix
 
     def create_out_pathes(self, dirname):
@@ -146,10 +159,16 @@ class PyProphetRunner(object):
 
         print "NEEDED",
         if minutes:
-            print minutes, "minutes and",
+            print minutes, "minutes or",
 
         print "%d seconds and %d msecs wall time" % (seconds, msecs)
         print
+
+        return_pathes = []
+        for out_path in out_pathes:
+            return_pathes.append(out_path.scored_table)
+
+        return return_pathes
 
     def print_summary(self, result):
         if result.summary_statistics is not None:
@@ -343,25 +362,58 @@ def _main(args):
 
     if learning_mode:
         if out_of_core:
-            PyProphetOutOfCoreLearner(pathes, prefix, merge_results, delim_in, delim_out).run()
+            out_pathes = PyProphetOutOfCoreLearner(pathes, prefix, merge_results, delim_in, delim_out).run()
         else:
-            PyProphetLearner(pathes, prefix, merge_results, delim_in, delim_out).run()
+            out_pathes = PyProphetLearner(pathes, prefix, merge_results, delim_in, delim_out).run()
 
     elif apply_weights:
         if out_of_core:
-            PyProphetOutOfCoreWeightApplier(
+            out_pathes = PyProphetOutOfCoreWeightApplier(
                 pathes, prefix, merge_results, apply_weights, delim_in, delim_out).run()
         else:
-            PyProphetWeightApplier(
+            out_pathes = PyProphetWeightApplier(
                 pathes, prefix, merge_results, apply_weights, delim_in, delim_out).run()
 
     else:
         if out_of_core:
             logging.info("out_of_core setting ignored: this parameter has no influence for "
                          "applying a persisted scorer")
-        PyProphetOutOfCoreScorerApplier(
+        out_pathes = PyProphetOutOfCoreScorerApplier(
             pathes, prefix, merge_results, apply_scorer, delim_in, delim_out).run()
+
+    return out_pathes
 
 
 def main():
-    _main(sys.argv[1:])
+
+    pathes = parse_cmdline(sys.argv[1:])
+
+    main_config = CONFIG.config
+
+    if CONFIG.get("ms1_scoring.enable"):
+        print "=" * 98
+        print "pyprophet on MS1-level"
+        print "=" * 98
+        CONFIG.update(MS1_CONFIG.config)
+        ms1_pathes = prepare_ms1_tables(pathes)
+        ms1_res_pathes = _main(ms1_pathes)
+        pathes = postprocess_ms1_tables(pathes, ms1_res_pathes)
+        print pathes
+
+    if CONFIG.get("ms2_scoring.enable"):
+        print "=" * 98
+        print "pyprophet on MS2-level"
+        print "=" * 98
+        CONFIG.update(MS2_CONFIG.config)
+        ms2_res_pathes = _main(pathes)
+
+    if CONFIG.get("uis_scoring.enable"):
+        print "=" * 98
+        print "pyprophet on UIS-level"
+        print "=" * 98
+        CONFIG.update(UIS_CONFIG.config)
+        uis_pathes = prepare_uis_tables(ms2_res_pathes)
+        uis_res_pathes = _main(uis_pathes)
+        uis_pathes = postprocess_uis_tables(ms2_res_pathes, uis_res_pathes)
+
+    logging.info("DONE! All pyprophet steps have been successfully conducted.")

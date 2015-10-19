@@ -20,6 +20,7 @@ except NameError:
 from std_logger import logging
 
 
+
 def setup_csv_dtypes(columns):
     dtype = {}
     for col_name in columns:
@@ -288,6 +289,10 @@ class Experiment(object):
 
     def get_target_peaks(self):
         return Experiment(self.df[self.df.is_decoy == False])
+
+    def get_top_peaks(self):
+        ix_top = self.df.peak_group_rank == 1
+        return Experiment(self.df[ix_top])
 
     def get_top_decoy_peaks(self):
         ix_top = self.df.is_top_peak == True

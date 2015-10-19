@@ -3,7 +3,7 @@
 import os
 import sys
 
-from config import CONFIG
+from config import CONFIG, MS1_CONFIG, MS2_CONFIG, UIS_CONFIG
 
 
 def print_help():
@@ -15,12 +15,16 @@ def print_help():
     print "       %s --help" % script
     print "   or "
     print "       %s --version" % script
+    print "   or prepend flag (ms1, ms2, uis) to parameters to specifically make changes for that level:"
+    print "       %s --ms1.final_statistics.nonparam_null_dist input_file [input_file ...]" % script
     dump_config_info(CONFIG.config, CONFIG.info)
+    sys.exit()
 
 
 def print_version():
     import version
     print "%d.%d.%d" % version.version
+    sys.exit()
 
 
 def dump_config_info(config, info):
@@ -45,6 +49,10 @@ def dump_config(config):
 def parse_cmdline(args):
 
     options = dict()
+    ms1_options = dict()
+    ms2_options = dict()
+    uis_options = dict()
+
     pathes = []
 
     if "--help" in args:
@@ -56,7 +64,25 @@ def parse_cmdline(args):
         sys.exit(0)
 
     for arg in args:
-        if arg.startswith("--"):
+        if arg.startswith("--ms1."):
+            if "=" in arg:
+                pre, __, post = arg.partition("=")
+                ms1_options[pre[6:]] = post
+            else:
+                ms1_options[arg[6:]] = True
+        elif arg.startswith("--ms2."):
+            if "=" in arg:
+                pre, __, post = arg.partition("=")
+                ms2_options[pre[6:]] = post
+            else:
+                ms2_options[arg[6:]] = True
+        elif arg.startswith("--uis."):
+            if "=" in arg:
+                pre, __, post = arg.partition("=")
+                uis_options[pre[6:]] = post
+            else:
+                uis_options[arg[6:]] = True
+        elif arg.startswith("--"):
             if "=" in arg:
                 pre, __, post = arg.partition("=")
                 options[pre[2:]] = post
@@ -70,7 +96,26 @@ def parse_cmdline(args):
         raise Exception("no input file given")
 
     CONFIG.update(options)
+    print "General configuration:"
     dump_config(CONFIG.config)
+
+    MS1_CONFIG.update(options)
+    MS1_CONFIG.update(ms1_options)
+    if (MS1_CONFIG.get("ms1_scoring.enable")):
+        print "MS1 configuration:"
+        dump_config(MS1_CONFIG.config)
+
+    MS2_CONFIG.update(options)
+    MS2_CONFIG.update(ms2_options)
+    if (MS2_CONFIG.get("ms2_scoring.enable")):
+        print "MS2 configuration:"
+        dump_config(MS2_CONFIG.config)
+
+    UIS_CONFIG.update(options)
+    UIS_CONFIG.update(uis_options)
+    if (UIS_CONFIG.get("uis_scoring.enable")):
+        print "UIS configuration:"
+        dump_config(UIS_CONFIG.config)
 
     return pathes
 

@@ -24,7 +24,7 @@ pd.set_option('display.precision', 6)
 from stats import (lookup_s_and_q_values_from_error_table, calculate_final_statistics,
                    mean_and_std_dev, final_err_table, summary_err_table,
                    posterior_pg_prob, posterior_chromatogram_hypotheses_fast,
-                   ErrorStatistics)
+                   qvality_posterior_pg_prob, ErrorStatistics)
 
 from config import CONFIG
 
@@ -142,6 +142,8 @@ class Scorer(object):
 
         if CONFIG.get("compute.probabilities"):
             df = self.add_probabilities(df, texp)
+        elif CONFIG.get("qvality.enable"):
+            df = self.add_qvality_probabilities(df, texp)
 
         if CONFIG.get("target.compress_results"):
             to_drop = [n for n in df.columns if n.startswith("var_") or n.startswith("main_")]
@@ -164,6 +166,26 @@ class Scorer(object):
         allhypothesis, h0 = posterior_chromatogram_hypotheses_fast(texp, prior_chrom_null)
         texp.df["h_score"] = allhypothesis
         texp.df["h0_score"] = h0
+        scored_table = scored_table.join(texp[["h_score", "h0_score"]])
+
+        return scored_table
+
+    def add_qvality_probabilities(self, scored_table, texp):
+        texp.df[["pg_score","qvality_m_score"]] = qvality_posterior_pg_prob(texp)
+        texp.df["pyprophet_m_score"] = texp.df["m_score"]
+
+        scored_table.drop('m_score', axis=1, inplace=True)
+        if CONFIG.get("qvality.q-value"):
+            texp.df["m_score"] = texp.df["qvality_m_score"]
+        else:
+            texp.df["m_score"] = texp.df["pyprophet_m_score"]
+
+        scored_table = scored_table.join(texp[["m_score", "pg_score", "qvality_m_score", "pyprophet_m_score"]])
+
+        prior_chrom_null = self.error_stat.num_null / self.error_stat.num_total
+        allhypothesis, h0 = posterior_chromatogram_hypotheses_fast(texp, prior_chrom_null)
+        texp.df[ "h_score"]  = allhypothesis
+        texp.df[ "h0_score"]  = h0
         scored_table = scored_table.join(texp[["h_score", "h0_score"]])
 
         return scored_table
