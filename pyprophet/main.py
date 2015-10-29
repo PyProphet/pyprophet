@@ -86,7 +86,6 @@ class PyProphetRunner(object):
         return prefix
 
     def create_out_pathes(self, dirname):
-
         if self.merge_results:
             assert self.prefix is not None
             out_pathes = [create_pathes(self.prefix, dirname)]
@@ -120,6 +119,9 @@ class PyProphetRunner(object):
         self.check_cols = ["transition_group_id", "run_id", "decoy"]
         if CONFIG.get("export.mayu"):
             self.check_cols += mayu_cols()
+            if 'm_score' in self.check_cols:
+                self.check_cols.remove('m_score') #The m_score is calculated by the learner
+                #and should not be in the OpenSwathWorkflow output
 
         logging.info("config settings:")
         for k, v in sorted(CONFIG.config.items()):
@@ -199,12 +201,12 @@ class PyProphetRunner(object):
                     print "WRITTEN: ", path
 
             if CONFIG.get("export.mayu"):
-                if result.final_statistics:
-                    export_mayu(out_pathes.mayu_cutoff, out_pathes.mayu_fasta,
-                                out_pathes.mayu_csv, scored_table, result.final_statistics)
-                    print "WRITTEN: ", out_pathes.mayu_cutoff
-                    print "WRITTEN: ", out_pathes.mayu_fasta
-                    print "WRITTEN: ", out_pathes.mayu_csv
+                if result.final_statistics is not None:
+                    export_mayu(out_pathes[0]['mayu_cutoff'], out_pathes[0]['mayu_fasta'],
+                                out_pathes[0]['mayu_csv'], scored_table, result.final_statistics)
+                    print "WRITTEN: ", out_pathes[0]['mayu_cutoff']
+                    print "WRITTEN: ", out_pathes[0]['mayu_fasta']
+                    print "WRITTEN: ", out_pathes[0]['mayu_csv']
                 else:
                     logging.warn("can not write mayu table in this case")
 
