@@ -112,7 +112,7 @@ def export_mayu(mayu_cutoff_file, mayu_fasta_file, mayu_csv_file, scored_table, 
 
     interesting_cols = mayu_cols()
     # write MAYU CSV input file
-    mayu_csv = scored_table[scored_table["peak_group_rank"] == 1][interesting_cols]
+    mayu_csv = scored_table.df[scored_table.df["peak_group_rank"] == 1][interesting_cols]
     row_index = [str(i) for i in range(len(mayu_csv.index))]
     mayu_csv['Identifier'] = ("run" + mayu_csv['run_id'].astype('|S10') + "." + row_index
                               + "." + row_index + "." + mayu_csv['Charge'].astype('|S10'))
@@ -123,7 +123,7 @@ def export_mayu(mayu_cutoff_file, mayu_fasta_file, mayu_csv_file, scored_table, 
     mayu_csv.to_csv(mayu_csv_file, sep=",", index=False)
 
     # write MAYU FASTA input file
-    mayu_fasta = scored_table[scored_table["peak_group_rank"] == 1]
+    mayu_fasta = scored_table.df[scored_table.df["peak_group_rank"] == 1]
     mayu_fasta_file_out = open(mayu_fasta_file, "w")
 
     protein_dic = {}
