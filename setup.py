@@ -4,7 +4,7 @@ from distutils.extension import Extension
 
 import numpy
 
-version = (0, 18, 4)
+version = (0, 19, 0)
 
 ext_modules = [Extension("pyprophet._optimized", ["pyprophet/_optimized.c"])]
 
