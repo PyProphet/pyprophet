@@ -3,7 +3,13 @@ import subprocess
 import shutil
 import sys
 
+import pandas as pd
+
 import pytest
+
+d = pd.options.display
+d.width = 220
+d.precision = 6
 
 DATA_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 
@@ -51,14 +57,23 @@ def _dump_output_files(tmpdir, regtest, names=None):
         names = _expected_output_files()
     for name in names:
         full_path = os.path.join(tmpdir, name)
-        _dump(full_path, regtest)
+        if not name.endswith(".pdf"):
+            _dump(full_path, regtest)
 
 
 def _dump(full_path, regtest):
-    lines = open(full_path, "r").readlines()
-    f = os.path.basename(full_path)
+    head = open(full_path).readline()
+    if "\t" in head:
+        df = pd.read_csv(full_path, sep="\t", header=None)
+    else:
+        df = pd.read_csv(full_path, sep=" ", header=None)
+
+    # lines = open(full_path, "r").readlines()
+    # f = os.path.basename(full_path)
+    print >> regtest, df
+    return 
     print >> regtest
-    print >> regtest, f, "contains", len(lines), "lines"
+    print >> regtest, f, "contains", len(df), "lines"
     print >> regtest
     if len(lines) > 10:
         print >> regtest, "top 5 lines of", f

@@ -210,6 +210,8 @@ def get_error_table_using_percentile_positives_new(err_df, target_scores, num_nu
 
     qvalues = err_df.qvalue.iloc[imax].values
     svalues = err_df.svalue.iloc[imax].values
+    pvalues = err_df.pvalue.iloc[imax].values
+
     fdr = err_df.FDR.iloc[imax].values
     fdr[fdr < 0.0] = 0.0
     fdr[fdr > 1.0] = 1.0
@@ -229,6 +231,7 @@ def get_error_table_using_percentile_positives_new(err_df, target_scores, num_nu
     df_error = pd.DataFrame(
         dict(qvalue=qvalues,
              svalue=svalues,
+             pvalue=pvalues,
              TP=tp,
              FP=fp,
              TN=tn,

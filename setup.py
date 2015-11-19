@@ -33,7 +33,7 @@ setup(name='pyprophet',
           "pandas >= 0.13",
           "scipy >= 0.9.0",
           "numexpr >= 2.1",
-          "scikit-learn >= 0.13",
+          "scikit-learn >= 0.17",
           "matplotlib",
           "seaborn"
       ],

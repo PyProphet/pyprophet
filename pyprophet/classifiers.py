@@ -9,7 +9,7 @@ try:
 except NameError:
     profile = lambda x: x
 
-import sklearn.lda
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 import numpy as np
 import inspect
 
@@ -66,7 +66,7 @@ class LDALearner(LinearLearner):
         X = np.vstack((X0, X1))
         y = np.zeros((X.shape[0],))
         y[X0.shape[0]:] = 1.0
-        classifier = sklearn.lda.LDA()
+        classifier = LinearDiscriminantAnalysis()
         classifier.fit(X, y)
         self.classifier = classifier
         self.scalings = classifier.scalings_.flatten()
