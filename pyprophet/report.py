@@ -25,7 +25,8 @@ class Protein:
         return "".join(self.peptides)
 
 
-def save_report(report_path, prefix, decoys, targets, top_decoys, top_targets, cutoffs, svalues, qvalues):
+def save_report(report_path, prefix, decoys, targets, top_decoys, top_targets, cutoffs, svalues,
+                qvalues, pvalues, lambda_):
 
     if plt is None:
         raise ImportError("you need matplotlib package to create a report")
@@ -33,7 +34,7 @@ def save_report(report_path, prefix, decoys, targets, top_decoys, top_targets, c
     plt.figure(figsize=(10, 20))
     plt.subplots_adjust(hspace=.5)
 
-    plt.subplot(411)
+    plt.subplot(511)
     plt.title(prefix + "\n\nROC")
     plt.xlabel('False Positive Rate (qvalue)')
     plt.ylabel('True Positive Rate (svalue)')
@@ -41,7 +42,7 @@ def save_report(report_path, prefix, decoys, targets, top_decoys, top_targets, c
     plt.scatter(qvalues, svalues, s=3)
     plt.plot(qvalues, svalues)
 
-    plt.subplot(412)
+    plt.subplot(512)
     plt.title('d_score Performance')
     plt.xlabel('dscore cutoff')
     plt.ylabel('rates')
@@ -51,7 +52,7 @@ def save_report(report_path, prefix, decoys, targets, top_decoys, top_targets, c
     plt.scatter(cutoffs, qvalues, color='r', s=3)
     plt.plot(cutoffs, qvalues, color='r', label="FPR (qvalue)")
 
-    plt.subplot(413)
+    plt.subplot(513)
     if (CONFIG.get("final_statistics.fdr_all_pg")):
         plt.title("All Peak Groups' d_score Distributions")
         plt.xlabel("d_score")
@@ -67,7 +68,7 @@ def save_report(report_path, prefix, decoys, targets, top_decoys, top_targets, c
             [top_targets, top_decoys], 20, color=['w', 'r'], label=['target', 'decoy'], histtype='bar')
         plt.legend(loc=2)
 
-    plt.subplot(414)
+    plt.subplot(514)
     if (CONFIG.get("final_statistics.fdr_all_pg")):
         atdensity = gaussian_kde(targets)
         atdensity.covariance_factor = lambda : .25
@@ -96,6 +97,12 @@ def save_report(report_path, prefix, decoys, targets, top_decoys, top_targets, c
         plt.plot(xs, tdensity(xs), color='g', label='target')
         plt.plot(xs, ddensity(xs), color='r', label='decoy')
         plt.legend(loc=2)
+
+    plt.subplot(515)
+    counts, __, __ = plt.hist(pvalues, bins=40)
+    y_max = max(counts)
+    plt.plot([lambda_, lambda_], [0, y_max], "r")
+    plt.title("histogram pvalues")
 
     plt.savefig(report_path)
 

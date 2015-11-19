@@ -186,9 +186,12 @@ class PyProphetRunner(object):
                 cutoffs = result.final_statistics["cutoff"].values
                 svalues = result.final_statistics["svalue"].values
                 qvalues = result.final_statistics["qvalue"].values
+                pvalues = result.final_statistics["pvalue"].values
                 decoys, targets, top_decoys, top_targets = scored_table.scores()
+                lambda_ = CONFIG.get("final_statistics.lambda")
                 plot_data = save_report(
-                    out_path.report, self.prefix, decoys, targets, top_decoys, top_targets, cutoffs, svalues, qvalues)
+                    out_path.report, self.prefix, decoys, targets, top_decoys, top_targets,
+                    cutoffs, svalues, qvalues, pvalues, lambda_)
                 print "WRITTEN: ", out_path.report
 
                 cutoffs, svalues, qvalues, top_targets, top_decoys = plot_data

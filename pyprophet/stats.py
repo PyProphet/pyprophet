@@ -239,7 +239,7 @@ def get_error_table_using_percentile_positives_new(err_df, target_scores, num_nu
              FDR=fdr,
              sens=sens,
              cutoff=target_scores),
-        columns="qvalue svalue TP FP TN FN FDR sens cutoff".split(),
+        columns="qvalue svalue pvalue TP FP TN FN FDR sens cutoff".split(),
     )
     return df_error
 
@@ -249,6 +249,13 @@ def lookup_s_and_q_values_from_error_table(scores, err_df):
     """ find best matching q-value for each score in 'scores' """
     ix = find_nearest_matches(err_df.cutoff.values, scores)
     return err_df.svalue.iloc[ix].values, err_df.qvalue.iloc[ix].values
+
+
+@profile
+def lookup_p_values_from_error_table(scores, err_df):
+    """ find best matching q-value for each score in 'scores' """
+    ix = find_nearest_matches(err_df.cutoff.values, scores)
+    return err_df.svalue.iloc[ix].pvalues
 
 
 @profile
@@ -425,5 +432,4 @@ def calculate_final_statistics(all_top_target_scores,
     raw_error_stat = get_error_table_using_percentile_positives_new(error_stat.df,
                                                                     all_top_target_scores,
                                                                     num_null_top_target)
-
     return ErrorStatistics(raw_error_stat, error_stat.num_null, error_stat.num_total)
