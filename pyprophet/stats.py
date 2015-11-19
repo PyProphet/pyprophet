@@ -255,7 +255,7 @@ def lookup_s_and_q_values_from_error_table(scores, err_df):
 def lookup_p_values_from_error_table(scores, err_df):
     """ find best matching q-value for each score in 'scores' """
     ix = find_nearest_matches(err_df.cutoff.values, scores)
-    return err_df.svalue.iloc[ix].pvalues
+    return err_df.pvalue.iloc[ix].values
 
 
 @profile
