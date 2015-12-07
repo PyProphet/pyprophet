@@ -148,7 +148,7 @@ def prepare_data_table(table, tg_id_name="transition_group_id",
     # build data frame:
     df = pd.DataFrame(data, columns=column_names)
 
-    all_score_columns = tuple(var_column_names) + (main_score_name,)
+    all_score_columns = (main_score_name,) + tuple(var_column_names)
     df = cleanup_and_check(df)
     return df, all_score_columns
 
