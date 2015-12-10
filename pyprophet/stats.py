@@ -184,6 +184,30 @@ def pnorm(pvalues, mu, sigma):
     return 0.5 * (1.0 + scipy.special.erf(args / np.sqrt(2.0)))
 
 
+def pemp(stat, stat0):
+    """ Computes empirical values identically to bioconductor/qvalue empPvals """
+
+    stat = np.array(stat)
+    stat0 = np.array(stat0)
+    
+    m = len(stat)
+    m0 = len(stat0)
+
+    v = np.array([True] * m + [False] * m0)
+    statc = np.concatenate((stat, stat0))
+    v = np.array([v[i] for i in sorted(range(len(statc)), key=statc.__getitem__, reverse=True)])
+
+    u = range(len(v))
+    w = range(m)
+
+    p = (np.array([u[i] for i in np.where(v == True)[0]]) - np.array(w)) / float(m0)
+
+    p = p[np.floor(scipy.stats.rankdata(-1*stat)).astype(int)-1]
+    p = np.maximum(p, 1/float(m0))
+
+    return p
+
+
 def mean_and_std_dev(values):
     return np.mean(values), np.std(values, ddof=1)
 
@@ -387,7 +411,10 @@ def get_error_stat_from_null(target_scores, decoy_scores, lambda_, use_pfdr=Fals
     target_scores = to_one_dim_array(target_scores)
     target_scores = np.sort(target_scores[~np.isnan(target_scores)])
 
-    target_pvalues = 1.0 - pnorm(target_scores, mu, nu)
+    if CONFIG.get("final_statistics.emp_p"):
+        target_pvalues = pemp(target_scores,decoy_scores)
+    else:
+        target_pvalues = 1.0 - pnorm(target_scores, mu, nu)
 
     error_stat = get_error_table_from_pvalues_new(target_pvalues, lambda_, use_pfdr)
     error_stat.df["cutoff"] = target_scores
