@@ -45,6 +45,9 @@ def _standard_config(n_cpus=1):
     config["final_statistics.fdr_all_pg"] = False
     info["final_statistics.fdr_all_pg"] = """[use all peak groups for score & q-value calculation]"""
 
+    config["final_statistics.emp_p"] = False
+    info["final_statistics.emp_p"] = """[use empirical p-values for scoring]"""
+
     config["num_processes"] = n_cpus
     info["num_processes"] = "[-1 means 'all available cpus']"
 
