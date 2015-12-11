@@ -26,9 +26,20 @@ def test_0(regtest):
     print(df.head(), file=regtest)
     print(df.tail(), file=regtest)
 
+
 def test_1():
-    stat = np.array([0,1,3,2,0.1,0.5,0.6,0.3,0.5,0.6,0.2,0.5])
-    stat0 = np.array([0.4,0.2,0.5,1,0.5,0.7,0.2,0.4])
+    stat = np.array([0, 1, 3, 2, 0.1, 0.5, 0.6, 0.3, 0.5, 0.6, 0.2, 0.5])
+    stat0 = np.array([0.4, 0.2, 0.5, 1, 0.5, 0.7, 0.2, 0.4])
 
-    np.testing.assert_almost_equal(pemp(stat,stat0), np.array([1.0, 0.125, 0.125, 0.125, 1.0, 0.25, 0.25, 0.75, 0.25, 0.25, 0.75, 0.25]))
+    np.testing.assert_almost_equal(pemp(stat, stat0),
+                                   np.array([1.0, 0.125, 0.125, 0.125, 1.0, 0.25, 0.25, 0.75, 0.25, 0.25, 0.75, 0.25]))
 
+
+def test_random(regtest):
+    np.random.seed(1)
+    for i in (1, 2, 5, 10, 100):
+        for j in (1, 2, 5, 10, 100):
+            stat = np.random.random((i,))
+            stat0 = np.random.random((j,))
+            print(i, j, file=regtest)
+            print(pemp(stat, stat0), file=regtest)

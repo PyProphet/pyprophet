@@ -185,25 +185,32 @@ def pnorm(pvalues, mu, sigma):
 
 
 def pemp(stat, stat0):
-    """ Computes empirical values identically to bioconductor/qvalue empPvals """
+    """ Computes empirical values identically to bioconductor/qvalue empPvals
+    returns the pvalues of stat based on the distribution of stat0.
+    """
+
+    assert len(stat0) > 0
+    assert len(stat) > 0
 
     stat = np.array(stat)
     stat0 = np.array(stat0)
-    
+
     m = len(stat)
     m0 = len(stat0)
 
-    v = np.array([True] * m + [False] * m0)
     statc = np.concatenate((stat, stat0))
-    v = np.array([v[i] for i in sorted(range(len(statc)), key=statc.__getitem__, reverse=True)])
+    v = np.array([True] * m + [False] * m0)
+    perm = np.argsort(-statc, kind="mergesort")  # reversed sort, mergesort is stable
+    v = v[perm]
 
-    u = range(len(v))
-    w = range(m)
+    u = np.where(v)[0]
+    p = (u - np.arange(m)) / float(m0)
 
-    p = (np.array([u[i] for i in np.where(v == True)[0]]) - np.array(w)) / float(m0)
-
-    p = p[np.floor(scipy.stats.rankdata(-1*stat)).astype(int)-1]
-    p = np.maximum(p, 1/float(m0))
+    # ranks can be fractional, we round down to the next integer, ranking returns values starting
+    # with 1, not 0:
+    ranks = np.floor(scipy.stats.rankdata(-stat)).astype(int) - 1
+    p = p[ranks]
+    p[p <= 1.0 / m0] = 1.0 / m0
 
     return p
 
