@@ -1,4 +1,3 @@
-import pdb
 # encoding: latin-1
 
 # openblas + multiprocessing crashes for OPENBLAS_NUM_THREADS > 1 !!!
@@ -137,7 +136,8 @@ class PyProphetRunner(object):
 
         set_pandas_print_options()
         self.print_summary(result)
-        self.save_results(result, extra_writes, out_pathes)
+        pvalues = None if scorer is None else scorer.target_pvalues
+        self.save_results(result, extra_writes, out_pathes, pvalues)
 
         self.save_scorer(scorer, extra_writes)
         self.save_weights(weights, extra_writes)
@@ -163,7 +163,7 @@ class PyProphetRunner(object):
             print "=" * 98
         print
 
-    def save_results(self, result, extra_writes, out_pathes):
+    def save_results(self, result, extra_writes, out_pathes, pvalues):
         summ_stat_path = extra_writes.get("summ_stat_path")
         if summ_stat_path is not None:
             result.summary_statistics.to_csv(summ_stat_path, self.delim_out, index=False)
@@ -186,7 +186,7 @@ class PyProphetRunner(object):
                 cutoffs = result.final_statistics["cutoff"].values
                 svalues = result.final_statistics["svalue"].values
                 qvalues = result.final_statistics["qvalue"].values
-                pvalues = result.final_statistics["pvalue"].values
+                # pvalues = result.final_statistics["pvalue"].values
                 decoys, targets, top_decoys, top_targets = scored_table.scores()
                 lambda_ = CONFIG.get("final_statistics.lambda")
                 plot_data = save_report(

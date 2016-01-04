@@ -99,10 +99,11 @@ def save_report(report_path, prefix, decoys, targets, top_decoys, top_targets, c
         plt.legend(loc=2)
 
     plt.subplot(515)
-    counts, __, __ = plt.hist(pvalues, bins=40)
-    y_max = max(counts)
-    plt.plot([lambda_, lambda_], [0, y_max], "r")
-    plt.title("histogram pvalues")
+    if pvalues is not None:
+        counts, __, __ = plt.hist(pvalues, bins=40)
+        y_max = max(counts)
+        plt.plot([lambda_, lambda_], [0, y_max], "r")
+        plt.title("histogram pvalues")
 
     plt.savefig(report_path)
 

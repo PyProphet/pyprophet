@@ -425,13 +425,13 @@ def get_error_stat_from_null(target_scores, decoy_scores, lambda_, use_pfdr=Fals
 
     error_stat = get_error_table_from_pvalues_new(target_pvalues, lambda_, use_pfdr)
     error_stat.df["cutoff"] = target_scores
-    return error_stat
+    return error_stat, target_pvalues
 
 
 def find_cutoff(target_scores, decoy_scores, lambda_, fdr, use_pfdr=False):
     """ finds cut off target score for specified false discovery rate fdr """
 
-    error_stat = get_error_stat_from_null(target_scores, decoy_scores, lambda_, use_pfdr)
+    error_stat, __ = get_error_stat_from_null(target_scores, decoy_scores, lambda_, use_pfdr)
     if not len(error_stat.df):
         raise Exception("to little data for calculating error statistcs")
     i0 = (error_stat.df.qvalue - fdr).abs().argmin()
@@ -450,8 +450,8 @@ def calculate_final_statistics(all_top_target_scores,
     'exp' """
 
     # estimate error statistics from given samples
-    error_stat = get_error_stat_from_null(test_target_scores, test_decoy_scores, lambda_,
-                                          use_pfdr)
+    error_stat, target_pvalues = get_error_stat_from_null(test_target_scores, test_decoy_scores,
+                                                          lambda_, use_pfdr)
 
     # fraction of null hypothesises in sample values
     summed_test_fraction_null = error_stat.num_null / error_stat.num_total
@@ -466,4 +466,5 @@ def calculate_final_statistics(all_top_target_scores,
     raw_error_stat = get_error_table_using_percentile_positives_new(error_stat.df,
                                                                     all_top_target_scores,
                                                                     num_null_top_target)
-    return ErrorStatistics(raw_error_stat, error_stat.num_null, error_stat.num_total)
+    return ErrorStatistics(raw_error_stat, error_stat.num_null,
+                           error_stat.num_total), target_pvalues
