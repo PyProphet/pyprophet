@@ -65,7 +65,7 @@ def to_one_dim_array(values, as_type=None):
 
 def posterior_pg_prob(dvals, target_scores, decoy_scores, error_stat, number_target_peaks,
                       number_target_pg,
-                      given_scores, lambda_=0.5, fdr_estimate=0.15):
+                      given_scores, lambda_):
 
     """Compute posterior probabilities for each peakgroup
 
@@ -100,7 +100,7 @@ def posterior_pg_prob(dvals, target_scores, decoy_scores, error_stat, number_tar
     # Estimate a suitable cutoff in discriminant score (d_score)
     # target_scores = experiment.get_top_target_peaks().df["d_score"]
     # decoy_scores = experiment.get_top_decoy_peaks().df["d_score"]
-    estimated_cutoff = find_cutoff(target_scores, decoy_scores, lambda_, fdr_estimate)
+    estimated_cutoff = find_cutoff(target_scores, decoy_scores, lambda_, 0.15, False, False)
 
     target_scores_above = target_scores[target_scores > estimated_cutoff]
 
@@ -408,7 +408,7 @@ def get_error_table_from_pvalues_new(p_values, lambda_=0.4, use_pfdr=False):
 
 
 @profile
-def get_error_stat_from_null(target_scores, decoy_scores, lambda_, use_pfdr=False):
+def get_error_stat_from_null(target_scores, decoy_scores, lambda_, use_pemp, use_pfdr):
     """ takes list of decoy and master scores and creates error statistics for target values based
     on mean and std dev of decoy scores"""
 
@@ -418,8 +418,8 @@ def get_error_stat_from_null(target_scores, decoy_scores, lambda_, use_pfdr=Fals
     target_scores = to_one_dim_array(target_scores)
     target_scores = np.sort(target_scores[~np.isnan(target_scores)])
 
-    if CONFIG.get("final_statistics.emp_p"):
-        target_pvalues = pemp(target_scores,decoy_scores)
+    if use_pemp:
+        target_pvalues = pemp(target_scores, decoy_scores)
     else:
         target_pvalues = 1.0 - pnorm(target_scores, mu, nu)
 
@@ -428,10 +428,10 @@ def get_error_stat_from_null(target_scores, decoy_scores, lambda_, use_pfdr=Fals
     return error_stat, target_pvalues
 
 
-def find_cutoff(target_scores, decoy_scores, lambda_, fdr, use_pfdr=False):
+def find_cutoff(target_scores, decoy_scores, lambda_, fdr, use_pemp, use_pfdr):
     """ finds cut off target score for specified false discovery rate fdr """
 
-    error_stat, __ = get_error_stat_from_null(target_scores, decoy_scores, lambda_, use_pfdr)
+    error_stat, __ = get_error_stat_from_null(target_scores, decoy_scores, lambda_, use_pemp, use_pfdr)
     if not len(error_stat.df):
         raise Exception("to little data for calculating error statistcs")
     i0 = (error_stat.df.qvalue - fdr).abs().argmin()
@@ -444,6 +444,7 @@ def calculate_final_statistics(all_top_target_scores,
                                test_target_scores,
                                test_decoy_scores,
                                lambda_,
+                               use_pemp,
                                use_pfdr=False):
     """ estimates error statistics for given samples target_scores and
     decoy scores and extends them to the full table of peak scores in table
@@ -451,7 +452,7 @@ def calculate_final_statistics(all_top_target_scores,
 
     # estimate error statistics from given samples
     error_stat, target_pvalues = get_error_stat_from_null(test_target_scores, test_decoy_scores,
-                                                          lambda_, use_pfdr)
+                                                          lambda_, use_pemp, use_pfdr)
 
     # fraction of null hypothesises in sample values
     summed_test_fraction_null = error_stat.num_null / error_stat.num_total
