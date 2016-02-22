@@ -34,6 +34,18 @@ def read_csv(path, delim):
     return pd.read_csv(path, delim, na_values=["NA", "NaN", "infinite"], engine="c", dtype=dtype)
 
 
+def check_for_unique_blocks(tg_ids):
+    seen = set()
+    last_tg_id = None
+    for tg_id in tg_ids:
+        if last_tg_id != tg_id:
+            last_tg_id = tg_id
+            if tg_id in seen:
+                return False
+            seen.add(tg_id)
+    return True
+
+
 @profile
 def cleanup_and_check(df):
     score_columns = ["main_score"] + [c for c in df.columns if c.startswith("var_")]
@@ -114,6 +126,9 @@ def prepare_data_table(table, tg_id_name="transition_group_id",
     empty_none_col = [None] * N
 
     tg_ids = table[tg_id_name]
+
+    if not check_for_unique_blocks(tg_ids):
+        raise Exception("transition group ids do not form unique blocks in data file")
 
     tg_map = dict()
     for i, tg_id in enumerate(tg_ids.unique()):

@@ -7,6 +7,7 @@ import pandas as pd
 
 import pytest
 
+
 d = pd.options.display
 d.width = 220
 d.precision = 6
@@ -51,7 +52,7 @@ def _remove_output_files(tmpdir, names=None):
 def _dump_output_files(tmpdir, regtest, names=None):
     try:
         tmpdir = tmpdir.strpath
-    except:
+    except AttributeError:
         pass
     if names is None:
         names = _expected_output_files()
@@ -71,27 +72,6 @@ def _dump(full_path, regtest):
     # lines = open(full_path, "r").readlines()
     # f = os.path.basename(full_path)
     print >> regtest, df
-    return 
-    print >> regtest
-    print >> regtest, f, "contains", len(df), "lines"
-    print >> regtest
-    if len(lines) > 10:
-        print >> regtest, "top 5 lines of", f
-        for line in lines[:5]:
-            if len(line) > 200:
-                line = line[:100] + " ... " + line[-95:]
-            print >> regtest, line.rstrip()
-        print >> regtest
-        print >> regtest, "last 5 lines of", f
-        for line in lines[-5:]:
-            if len(line) > 200:
-                line = line[:100] + " ... " + line[-95:]
-            print >> regtest, line.rstrip()
-    else:
-        for line in lines:
-            if len(line) > 200:
-                line = line[:100] + " ... " + line[-95:]
-            print >> regtest, line.rstrip()
 
 
 def _dump_digest(full_path):
@@ -122,8 +102,8 @@ def _run_cmdline(cmdline):
 
 
 def _run_pyprophet_to_learn_model(regtest, temp_folder, dump_result_files=False,
-        with_probatilities=False, compress=False, sampling_rate=None, use_best=False,
-        stat_best=False):
+                                  with_probatilities=False, compress=False, sampling_rate=None, use_best=False,
+                                  stat_best=False):
     os.chdir(temp_folder)
     data_path = os.path.join(DATA_FOLDER, "test_data.txt")
     shutil.copy(data_path, temp_folder)
@@ -293,7 +273,8 @@ def test_multiple_input_files(tmpdir, regtest):
     data_path = os.path.join(DATA_FOLDER, "test_data_2.txt")
     shutil.copy(data_path, tmpdir.strpath)
 
-    stdout = _run_cmdline("pyprophet test_data_2.txt test_data_3.txt --random_seed=42 --target.overwrite")
+    stdout = _run_cmdline(
+        "pyprophet test_data_2.txt test_data_3.txt --random_seed=42 --target.overwrite")
     _record(stdout, regtest)
 
 
@@ -412,3 +393,17 @@ def test_out_of_core_apply_weights(tmpdir, regtest):
                           "--multiple_files.merge_results")
 
     _record(stdout, regtest)
+
+
+def test_not_unique_tg_id_blocks(tmpdir):
+
+    os.chdir(tmpdir.strpath)
+    data_path = os.path.join(DATA_FOLDER, "test_invalid_data.txt")
+    shutil.copy(data_path, tmpdir.strpath)
+    cmdline = "pyprophet test_invalid_data.txt --random_seed=42"
+
+    with pytest.raises(subprocess.CalledProcessError) as exc_info:
+        subprocess.check_output(cmdline, shell=True, stderr=subprocess.STDOUT)
+
+    e = exc_info.value
+    assert "transition group ids do not form unique blocks in data file" in e.output
