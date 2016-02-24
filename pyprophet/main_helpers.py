@@ -49,11 +49,11 @@ def parse_cmdline(args):
 
     if "--help" in args:
         print_help()
-        return
+        sys.exit(0)
 
     if "--version" in args:
         print_version()
-        return
+        sys.exit(0)
 
     for arg in args:
         if arg.startswith("--"):
