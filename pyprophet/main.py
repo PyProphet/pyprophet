@@ -20,9 +20,8 @@ import warnings
 import zlib
 
 import numpy as np
-import pandas as pd
 
-from pyprophet import PyProphet, Result
+from pyprophet import PyProphet
 from config import CONFIG, set_pandas_print_options
 from report import save_report, export_mayu, mayu_cols
 
@@ -119,8 +118,8 @@ class PyProphetRunner(object):
         if CONFIG.get("export.mayu"):
             self.check_cols += mayu_cols()
             if 'm_score' in self.check_cols:
-                self.check_cols.remove('m_score') #The m_score is calculated by the learner
-                #and should not be in the OpenSwathWorkflow output
+                self.check_cols.remove('m_score')  # The m_score is calculated by the learner
+                #  and should not be in the OpenSwathWorkflow output
 
         logging.info("config settings:")
         for k, v in sorted(CONFIG.config.items()):
@@ -131,7 +130,6 @@ class PyProphetRunner(object):
             warnings.simplefilter("ignore")
             (result, scorer, weights) = self.run_algo()
 
-        compress = CONFIG.get("target.compress_results")
         needed = time.time() - start_at
 
         set_pandas_print_options()
@@ -233,7 +231,7 @@ class PyProphetLearner(PyProphetRunner):
 
     def run_algo(self):
         (result, scorer, weights) = PyProphet().learn_and_apply(self.pathes, self.delim_in,
-                                                                        self.check_cols)
+                                                                self.check_cols)
         return (result, scorer, weights)
 
     def extra_writes(self, dirname):
@@ -261,7 +259,7 @@ class PyProphetWeightApplier(PyProphetRunner):
             raise Exception("weights file %s does not exist" % apply_weights)
         try:
             self.persisted_weights = np.loadtxt(apply_weights)
-        except:
+        except Exception:
             import traceback
             traceback.print_exc()
             raise
@@ -297,7 +295,7 @@ class PyProphetOutOfCoreScorerApplier(PyProphetRunner):
         try:
             self.persisted_scorer = cPickle.loads(zlib.decompress(open(apply_scorer, "rb").read()))
             self.persisted_scorer.merge_results = merge_results
-        except:
+        except Exception:
             import traceback
             traceback.print_exc()
             raise
@@ -329,6 +327,11 @@ def _main(args):
     out_of_core = CONFIG.get("out_of_core")
 
     random_seed = CONFIG.get("random_seed")
+    num_processes = CONFIG.get("num_processes")
+
+    if random_seed is not None and num_processes != 1:
+        raise Exception("Setting random seed does not work if you run pyprophet with multiple "
+                        "processes. Using more than one process is rarely faster.")
 
     if random_seed is not None:
         random.seed(random_seed)
