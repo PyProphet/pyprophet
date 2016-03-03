@@ -6,7 +6,7 @@ import numpy
 
 
 ######################################################################
-version = (0, 21, 2)  # NEVER FORGET TO UPDATE version.py AS WELL !!!
+version = (0, 21, 3)  # NEVER FORGET TO UPDATE version.py AS WELL !!!
 ######################################################################
 
 
