@@ -46,6 +46,11 @@ def prepare_precursor_bm(data):
             data_matrix.append({'prior': tr['ms2_pg_score'], 'evidence': tr['ms2_prec_score'], 'hypothesis': True})
             data_matrix.append({'prior': 1-tr['ms2_pg_score'], 'evidence': 1-tr['ms2_prec_score'], 'hypothesis': False})
 
+    # There is no evidence for a precursor so we set the evidence to 0.
+    if len(data_matrix) == 0:
+            data_matrix.append({'prior': tr['ms2_pg_score'], 'evidence': 0, 'hypothesis': True})
+            data_matrix.append({'prior': 1-tr['ms2_pg_score'], 'evidence': 1, 'hypothesis': False})
+
     return pd.DataFrame(data_matrix)
     
 def prepare_transition_bm(data):
@@ -77,7 +82,7 @@ def apply_bm(data):
     # compute posterior hypothesis probability
     pp_data['posterior'] = pp_data['likelihood_prior'] / pp_data['likelihood_sum']
 
-    return pp_data
+    return pp_data.fillna(value = 0)
 
 def precursor_inference(data):
     # get MS1-level precursor data
