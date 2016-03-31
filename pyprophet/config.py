@@ -103,6 +103,9 @@ def _standard_config(n_cpus=1):
     config["uis_scoring.peakgroup_id_probability"] = 0.3
     info["uis_scoring.peakgroup_id_probability"] = """[set minimum MS2 peakgroup probability for IPF]"""
 
+    config["uis_scoring.prec_pg_id_probability"] = 0.6
+    info["uis_scoring.prec_pg_id_probability"] = """[set minimum BHM layer 1 integrated precursor peakgroup probability for IPF]"""
+
     config["uis_scoring.transition_id_probability"] = 0.4
     info["uis_scoring.transition_id_probability"] = """[set minimum UIS transition probability for IPF]"""
 
@@ -201,6 +204,7 @@ def _fix_config_types(dd):
               "ms2_scoring.precursor_id_probability",
               "uis_scoring.precursor_id_probability",
               "uis_scoring.peakgroup_id_probability",
+              "uis_scoring.prec_pg_id_probability",
               "uis_scoring.transition_id_probability",
               "uis_scoring.isotope_overlap_threshold",
               "qvality.epsilon-step",

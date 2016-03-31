@@ -238,17 +238,18 @@ def postprocess_uis_tables(pathes, uis_res_pathes):
     uis_scored_table = pd.concat([pd.read_csv(uis_path, CONFIG.get("delim.in")) for uis_path in uis_res_pathes])
 
     # only apply inference to targets
-    uis_transition_data = uis_scored_table[uis_scored_table['decoy'] == 0]
-    uis_transition_data['peptidoforms'] = uis_transition_data['transition_group_id'].str.extract("\{(.*?)\}")
+    uis_scored_table = uis_scored_table[uis_scored_table['decoy'] == 0]
+    uis_scored_table['peptidoforms'] = uis_scored_table['transition_group_id'].str.extract("\{(.*?)\}")
 
     # precursor-level inference
     logging.info("start precursor-level inference")
-    uis_transition_data = precursor_inference(uis_transition_data)
+    uis_precursor_data = precursor_inference(uis_scored_table)
+    uis_precursor_data = uis_precursor_data[(uis_precursor_data['prec_pg_score'] >= CONFIG.get("uis_scoring.prec_pg_id_probability"))]
     logging.info("end precursor-level inference")
 
     # start posterior peptidoform-level inference
     logging.info("start peptidoform-level inference")
-    td_data = peptidoform_inference(uis_transition_data)
+    uis_peptidoform_data = peptidoform_inference(uis_precursor_data)
     logging.info("end peptidoform-level inference")
     # end posterior peptidoform-level inference
 
@@ -257,7 +258,7 @@ def postprocess_uis_tables(pathes, uis_res_pathes):
         for path in pathes:
             table = pd.read_csv(path, CONFIG.get("delim.in"))
             
-            expanded_table = table.merge(td_data[['id','PosteriorFullPeptideName','prec_pg_score','pf_score','pfqm_score']], on=['id'], how='inner')
+            expanded_table = table.merge(uis_peptidoform_data[['id','PosteriorFullPeptideName','prec_pg_score','pf_score','pfqm_score']], on=['id'], how='inner')
             expanded_table['transition_group_id'] = expanded_table['PosteriorFullPeptideName'] + '_' + expanded_table['transition_group_id']
             expanded_table['detection_m_score'] = expanded_table['m_score']
             expanded_table['m_score'] = expanded_table['pfqm_score']
@@ -268,19 +269,19 @@ def postprocess_uis_tables(pathes, uis_res_pathes):
             new_pathes.append(new_path)
     else:
         # collapse alternative peptidoforms with pf_scores
-        td_data['AlternativeFullPeptideName'] = td_data['hypothesis'] + ":" +td_data['pf_score'].map(str)
-        td_data['AlternativeFullPeptideName'] = td_data.sort_values(by=['id','pf_score','hypothesis'],ascending=False).groupby(['id'])['AlternativeFullPeptideName'].transform(lambda x: ';'.join(x))
+        uis_peptidoform_data['AlternativeFullPeptideName'] = uis_peptidoform_data['hypothesis'] + ":" + uis_peptidoform_data['pf_score'].map(str)
+        uis_peptidoform_data['AlternativeFullPeptideName'] = uis_peptidoform_data.sort_values(by=['id','pf_score','hypothesis'],ascending=False).groupby(['id'])['AlternativeFullPeptideName'].transform(lambda x: ';'.join(x))
 
         # report only (multiple) best results
-        td_data['max_pf_score'] = td_data.sort_values(by=['id','pf_score','hypothesis','AlternativeFullPeptideName'],ascending=False).groupby(['id'])['pf_score'].transform(max)
+        uis_peptidoform_data['max_pf_score'] = uis_peptidoform_data.sort_values(by=['id','pf_score','hypothesis','AlternativeFullPeptideName'],ascending=False).groupby(['id'])['pf_score'].transform(max)
 
         # collapse (multiple) best FullPeptideName
-        td_data_collapsed = td_data[td_data['pf_score'] == td_data['max_pf_score']].sort_values(by=['id','pf_score','hypothesis','AlternativeFullPeptideName'],ascending=False).groupby(['id']).agg({'PosteriorFullPeptideName': lambda x: ';'.join(x), 'prec_pg_score': lambda x: x.iloc[0], 'pf_score': lambda x: x.iloc[0], 'pfqm_score': lambda x: x.iloc[0], 'AlternativeFullPeptideName': lambda x: x.iloc[0]}).reset_index()
+        uis_peptidoform_data_collapsed = uis_peptidoform_data[uis_peptidoform_data['pf_score'] == uis_peptidoform_data['max_pf_score']].sort_values(by=['id','pf_score','hypothesis','AlternativeFullPeptideName'],ascending=False).groupby(['id']).agg({'PosteriorFullPeptideName': lambda x: ';'.join(x), 'prec_pg_score': lambda x: x.iloc[0], 'pf_score': lambda x: x.iloc[0], 'pfqm_score': lambda x: x.iloc[0], 'AlternativeFullPeptideName': lambda x: x.iloc[0]}).reset_index()
 
         for path in pathes:
                 table = pd.read_csv(path, CONFIG.get("delim.in"))
 
-                table = table.merge(td_data_collapsed, on=['id'], how='inner')
+                table = table.merge(uis_peptidoform_data_collapsed, on=['id'], how='inner')
                 table.ix[pd.notnull(table.PosteriorFullPeptideName),'transition_group_id'] = table.ix[pd.notnull(table.PosteriorFullPeptideName)]['PosteriorFullPeptideName'] + "_" + table[pd.notnull(table.PosteriorFullPeptideName)]['transition_group_id']
 
                 new_path = target_dir + os.path.basename(path).split(".")[0] + "_uis_collapsed." + os.path.basename(path).split(".")[1]
