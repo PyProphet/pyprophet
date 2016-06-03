@@ -8,7 +8,6 @@ pyprophet test_data_2.txt test_data_3.txt --random_seed=42 --target.overwrite --
      delim.out:
      export.mayu: False
      final_statistics.emp_p: False
-     final_statistics.fdr_all_pg: False
      final_statistics.lambda: 0.4
      ignore.invalid_score_columns: 0
      is_test: 0
@@ -85,7 +84,6 @@ used parameters:
     delim.out                                  : '\t'
     export.mayu                                : False
     final_statistics.emp_p                     : False
-    final_statistics.fdr_all_pg                : False
     final_statistics.lambda                    : 0.4
     ignore.invalid_score_columns               : 0
     is_test                                    : 0
