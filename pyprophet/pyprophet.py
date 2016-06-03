@@ -216,8 +216,6 @@ class LazyScoredTablesIter(object):
                 yield LazyScoredTable(p, self.scorer, self.options)
 
 
-
-
 class ScoredTable(object):
 
     def __init__(self, df):
@@ -238,7 +236,6 @@ class ScoredTable(object):
         top_targets = tops[tops["decoy"] == 0]["d_score"].values
 
         return decoys, targets, top_decoys, top_targets
-
 
 
 class LazyScoredTable(object):
@@ -369,7 +366,7 @@ class HolyGostQuery(object):
         experiment, score_columns = self._setup_experiment(tables)
 
         final_classifier, all_test_target_scores, all_test_decoy_scores = \
-                                            self._apply_weights_on_exp(experiment, loaded_weights)
+            self._apply_weights_on_exp(experiment, loaded_weights)
 
         return self._build_result(tables, final_classifier, score_columns, experiment,
                                   all_test_target_scores, all_test_decoy_scores)
@@ -391,14 +388,13 @@ class HolyGostQuery(object):
 
         return final_classifier, all_test_target_scores, all_test_decoy_scores
 
-
     def apply_weights_out_of_core(self, pathes, delim, check_cols, loaded_weights):
         self.check_table_headers(pathes, delim, check_cols)
         with timer():
 
             logging.info("apply weights out of core")
             result, scorer, trained_weights = self._apply_weights_out_of_core(pathes, delim,
-                    loaded_weights)
+                                                                              loaded_weights)
             logging.info("processing input data finished")
 
         return result, scorer, trained_weights
@@ -414,7 +410,7 @@ class HolyGostQuery(object):
         experiment.log_summary()
 
         final_classifier, all_test_target_scores, all_test_decoy_scores = \
-                                            self._apply_weights_on_exp(experiment, loaded_weights)
+            self._apply_weights_on_exp(experiment, loaded_weights)
 
         return self._build_lazy_result(pathes, final_classifier, score_columns, experiment,
                                        all_test_target_scores, all_test_decoy_scores)

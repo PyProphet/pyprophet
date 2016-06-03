@@ -3,9 +3,6 @@ from __future__ import print_function
 
 import logging
 
-# format_ = "%(levelname)s -- [pid=%(process)s] : %(asctime)s: %(message)s"
-# logging.basicConfig(level=logging.INFO, format=format_)
-
 
 def create(loggers=[]):
     if loggers:
@@ -20,4 +17,3 @@ def create(loggers=[]):
     return logger
 
 logging = create()
-

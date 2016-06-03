@@ -14,8 +14,6 @@ else:
     assert vtuple >= min_numpy_version, msg
 
 
-
-
 ######################################################################
 version = (0, 22, 0)  # NEVER FORGET TO UPDATE version.py AS WELL !!!
 ######################################################################
@@ -32,7 +30,7 @@ setup(name='pyprophet',
       url="http://github.com/uweschmitt/pyprophet",
       packages=find_packages(exclude=['ez_setup', 'examples', 'tests']),
       include_package_data=True,
-      include_dirs = [numpy.get_include()],
+      include_dirs=[numpy.get_include()],
       classifiers=[
           'Development Status :: 3 - Alpha',
           'Environment :: Console',

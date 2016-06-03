@@ -66,7 +66,6 @@ def to_one_dim_array(values, as_type=None):
 def posterior_pg_prob(dvals, target_scores, decoy_scores, error_stat, number_target_peaks,
                       number_target_pg,
                       given_scores, lambda_):
-
     """Compute posterior probabilities for each peakgroup
 
     - Estimate the true distribution by using all target peakgroups above the
@@ -113,8 +112,8 @@ def posterior_pg_prob(dvals, target_scores, decoy_scores, error_stat, number_tar
 
     # Bayesian inference
     # Posterior probabilities for each peakgroup
-    pp_pg_pvalues = p_target *  prior_peakgroup_true / \
-        (p_target * prior_peakgroup_true + p_decoy * (1.0 - prior_peakgroup_true))
+    pp_pg_pvalues = p_target * prior_peakgroup_true / (p_target * prior_peakgroup_true
+                                                       + p_decoy * (1.0 - prior_peakgroup_true))
 
     return pp_pg_pvalues
 
@@ -154,7 +153,7 @@ def posterior_chromatogram_hypotheses_fast(experiment, prior_chrom_null):
         if id_ != current_tg_id:
 
             # Actual computation for a single transition group (chromatogram)
-            prior_pg_true = (1.0-prior_chrom_null) / len(scores)
+            prior_pg_true = (1.0 - prior_chrom_null) / len(scores)
             rr = single_chromatogram_hypothesis_fast(
                 np.array(scores), prior_chrom_null, prior_pg_true)
             final_result.extend(rr[1:])
@@ -167,7 +166,7 @@ def posterior_chromatogram_hypotheses_fast(experiment, prior_chrom_null):
         scores.append(1.0 - pp_values[i])
 
     # Last cycle
-    prior_pg_true = (1.0-prior_chrom_null) / len(scores)
+    prior_pg_true = (1.0 - prior_chrom_null) / len(scores)
     rr = single_chromatogram_hypothesis_fast(np.array(scores), prior_chrom_null, prior_pg_true)
     final_result.extend(rr[1:])
     final_result_h0.extend([rr[0]] * len(scores))
@@ -431,7 +430,8 @@ def get_error_stat_from_null(target_scores, decoy_scores, lambda_, use_pemp, use
 def find_cutoff(target_scores, decoy_scores, lambda_, fdr, use_pemp, use_pfdr):
     """ finds cut off target score for specified false discovery rate fdr """
 
-    error_stat, __ = get_error_stat_from_null(target_scores, decoy_scores, lambda_, use_pemp, use_pfdr)
+    error_stat, __ = get_error_stat_from_null(
+        target_scores, decoy_scores, lambda_, use_pemp, use_pfdr)
     if not len(error_stat.df):
         raise Exception("to little data for calculating error statistcs")
     i0 = (error_stat.df.qvalue - fdr).abs().argmin()

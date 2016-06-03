@@ -16,12 +16,12 @@ def _standard_config(n_cpus=1):
     config = {}
     info = {}
 
-
     config["is_test"] = 0
     info["is_test"] = "[switches randomness off]"
 
     config["random_seed"] = None
-    info["random_seed"] = "[seed for pseude random generator. can be used to get reproducable results]"
+    info[
+        "random_seed"] = "[seed for pseude random generator. can be used to get reproducable results]"
 
     config["xeval.fraction"] = 0.5
     config["xeval.num_iter"] = 5
@@ -39,7 +39,8 @@ def _standard_config(n_cpus=1):
     config["semi_supervised_learner.use_best"] = 0
     config["semi_supervised_learner.stat_best"] = 0
 
-    info["semi_supervised_learner.use_best"] = """[use only weights from last iteration for final classifier]"""
+    info[
+        "semi_supervised_learner.use_best"] = """[use only weights from last iteration for final classifier]"""
     info["semi_supervised_learner.stat_best"] = """[use only stats from final for statistics]"""
 
     config["final_statistics.lambda"] = lambda_
@@ -82,13 +83,15 @@ def _standard_config(n_cpus=1):
     info["compute.probabilities"] = """[Compute approximate binned probability values]"""
 
     config["d_score.cutoff"] = -1000.0
-    info["d_score.cutoff"] = """[Filter output such that only results with a d_score higher than this value are reported]"""
+    info[
+        "d_score.cutoff"] = """[Filter output such that only results with a d_score higher than this value are reported]"""
 
     config["out_of_core"] = 0
     info["out_of_core"] = """[handle large data files by slower out of core computation]"""
 
     config["out_of_core.sampling_rate"] = 0.1
-    info["out_of_core.sampling_rate"] = """[handle large data files by random sampling. this value is between 0.0 and 1.0]"""
+    info[
+        "out_of_core.sampling_rate"] = """[handle large data files by random sampling. this value is between 0.0 and 1.0]"""
 
     return config, info
 
@@ -131,7 +134,6 @@ def _fix_config_types(dd):
         dd["random_seed"] = random.randint(0, sys.maxint)
 
 
-
 def set_pandas_print_options():
     # w, h = pd.util.terminal.get_terminal_size()
 
@@ -170,4 +172,3 @@ class _ConfigHolder(object):
 
 
 CONFIG = _ConfigHolder()
-

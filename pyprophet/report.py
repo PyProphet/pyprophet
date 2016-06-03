@@ -10,7 +10,6 @@ except ImportError:
 from scipy.stats import gaussian_kde
 from numpy import linspace, concatenate
 
-from config import CONFIG
 
 class Protein:
 
@@ -62,12 +61,13 @@ def save_report(report_path, prefix, decoys, targets, top_decoys, top_targets, c
 
     plt.subplot(514)
     tdensity = gaussian_kde(top_targets)
-    tdensity.covariance_factor = lambda : .25
+    tdensity.covariance_factor = lambda: .25
     tdensity._compute_covariance()
     ddensity = gaussian_kde(top_decoys)
-    ddensity.covariance_factor = lambda : .25
+    ddensity.covariance_factor = lambda: .25
     ddensity._compute_covariance()
-    xs = linspace(min(concatenate((top_targets,top_decoys))),max(concatenate((top_targets,top_decoys))),200)
+    xs = linspace(min(concatenate((top_targets, top_decoys))), max(
+        concatenate((top_targets, top_decoys))), 200)
     plt.title("Top Peak Groups' d_score Density")
     plt.xlabel("d_score")
     plt.ylabel("density")

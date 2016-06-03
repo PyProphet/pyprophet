@@ -85,18 +85,18 @@ def create_pathes(prefix, dirname):
         __getattr__ = dict.__getitem__
 
     return Pathes(prefix, dirname,
-                scored_table="_with_dscore.csv",
-                filtered_table="_with_dscore_filtered.csv",
-                report="_report.pdf",
-                cutoffs="_cutoffs.txt",
-                svalues="_svalues.txt",
-                qvalues="_qvalues.txt",
-                d_scores_top_target_peaks="_dscores_top_target_peaks.txt",
-                d_scores_top_decoy_peaks="_dscores_top_decoy_peaks.txt",
-                mayu_cutoff="_mayu.cutoff",
-                mayu_fasta="_mayu.fasta",
-                mayu_csv="_mayu.csv",
-                )
+                  scored_table="_with_dscore.csv",
+                  filtered_table="_with_dscore_filtered.csv",
+                  report="_report.pdf",
+                  cutoffs="_cutoffs.txt",
+                  svalues="_svalues.txt",
+                  qvalues="_qvalues.txt",
+                  d_scores_top_target_peaks="_dscores_top_target_peaks.txt",
+                  d_scores_top_decoy_peaks="_dscores_top_decoy_peaks.txt",
+                  mayu_cutoff="_mayu.cutoff",
+                  mayu_fasta="_mayu.fasta",
+                  mayu_csv="_mayu.csv",
+                  )
 
 
 def check_if_any_exists(to_check):
@@ -110,4 +110,3 @@ def check_if_any_exists(to_check):
         print "please use --target.overwrite option"
         print
     return found_exsiting_file
-
