@@ -53,50 +53,27 @@ def save_report(report_path, prefix, decoys, targets, top_decoys, top_targets, c
     plt.plot(cutoffs, qvalues, color='r', label="FPR (qvalue)")
 
     plt.subplot(513)
-    if (CONFIG.get("final_statistics.fdr_all_pg")):
-        plt.title("All Peak Groups' d_score Distributions")
-        plt.xlabel("d_score")
-        plt.ylabel("# of groups")
-        plt.hist(
-            [targets, decoys], 20, color=['w', 'r'], label=['target', 'decoy'], histtype='bar')
-        plt.legend(loc=2)
-    else:
-        plt.title("Top Peak Groups' d_score Distributions")
-        plt.xlabel("d_score")
-        plt.ylabel("# of groups")
-        plt.hist(
-            [top_targets, top_decoys], 20, color=['w', 'r'], label=['target', 'decoy'], histtype='bar')
-        plt.legend(loc=2)
+    plt.title("Top Peak Groups' d_score Distributions")
+    plt.xlabel("d_score")
+    plt.ylabel("# of groups")
+    plt.hist(
+        [top_targets, top_decoys], 20, color=['w', 'r'], label=['target', 'decoy'], histtype='bar')
+    plt.legend(loc=2)
 
     plt.subplot(514)
-    if (CONFIG.get("final_statistics.fdr_all_pg")):
-        atdensity = gaussian_kde(targets)
-        atdensity.covariance_factor = lambda : .25
-        atdensity._compute_covariance()
-        addensity = gaussian_kde(decoys)
-        addensity.covariance_factor = lambda : .25
-        addensity._compute_covariance()
-        axs = linspace(min(concatenate((targets,decoys))),max(concatenate((targets,decoys))),200)
-        plt.title("All Peak Groups' d_score Density")
-        plt.xlabel("d_score")
-        plt.ylabel("density")
-        plt.plot(axs, atdensity(axs), color='g', label='target')
-        plt.plot(axs, addensity(axs), color='r', label='decoy')
-        plt.legend(loc=2)
-    else:
-        tdensity = gaussian_kde(top_targets)
-        tdensity.covariance_factor = lambda : .25
-        tdensity._compute_covariance()
-        ddensity = gaussian_kde(top_decoys)
-        ddensity.covariance_factor = lambda : .25
-        ddensity._compute_covariance()
-        xs = linspace(min(concatenate((top_targets,top_decoys))),max(concatenate((top_targets,top_decoys))),200)
-        plt.title("Top Peak Groups' d_score Density")
-        plt.xlabel("d_score")
-        plt.ylabel("density")
-        plt.plot(xs, tdensity(xs), color='g', label='target')
-        plt.plot(xs, ddensity(xs), color='r', label='decoy')
-        plt.legend(loc=2)
+    tdensity = gaussian_kde(top_targets)
+    tdensity.covariance_factor = lambda : .25
+    tdensity._compute_covariance()
+    ddensity = gaussian_kde(top_decoys)
+    ddensity.covariance_factor = lambda : .25
+    ddensity._compute_covariance()
+    xs = linspace(min(concatenate((top_targets,top_decoys))),max(concatenate((top_targets,top_decoys))),200)
+    plt.title("Top Peak Groups' d_score Density")
+    plt.xlabel("d_score")
+    plt.ylabel("density")
+    plt.plot(xs, tdensity(xs), color='g', label='target')
+    plt.plot(xs, ddensity(xs), color='r', label='decoy')
+    plt.legend(loc=2)
 
     plt.subplot(515)
     if pvalues is not None:

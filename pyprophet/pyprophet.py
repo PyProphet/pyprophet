@@ -81,10 +81,7 @@ def calculate_params_for_d_score(classifier, experiment):
     score = classifier.score(experiment, True)
     experiment.set_and_rerank("classifier_score", score)
 
-    if (CONFIG.get("final_statistics.fdr_all_pg")):
-        td_scores = experiment.get_decoy_peaks()["classifier_score"]
-    else:
-        td_scores = experiment.get_top_decoy_peaks()["classifier_score"]
+    td_scores = experiment.get_top_decoy_peaks()["classifier_score"]
 
     mu, nu = mean_and_std_dev(td_scores)
     return mu, nu
@@ -102,10 +99,8 @@ class Scorer(object):
         final_score = classifier.score(experiment, True)
         experiment["d_score"] = (final_score - self.mu) / self.nu
         lambda_ = CONFIG.get("final_statistics.lambda")
-        if (CONFIG.get("final_statistics.fdr_all_pg")):
-            all_tt_scores = experiment.get_target_peaks()["d_score"]
-        else:
-            all_tt_scores = experiment.get_top_target_peaks()["d_score"]
+
+        all_tt_scores = experiment.get_top_target_peaks()["d_score"]
 
         use_pemp = CONFIG.get("final_statistics.emp_p")
         self.error_stat, self.target_pvalues = calculate_final_statistics(all_tt_scores,
