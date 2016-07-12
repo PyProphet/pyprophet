@@ -181,6 +181,56 @@ def find_top_ranked(np.int64_t[:] tg_ids, DATA_TYPE[:] scores):
     view[current_imax] = 1
     return flags
 
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def find_second_ranked(np.int64_t[:] tg_ids, DATA_TYPE[:] scores):
+    cdef size_t n = scores.shape[0]
+    flags = np.zeros((n,), dtype=np.int64)
+    cdef np.int64_t[:] view = flags
+    cdef DATA_TYPE current_max = scores[0]
+    cdef DATA_TYPE current_2ndmax = scores[0]
+    cdef size_t current_imax = 0
+    cdef size_t current_i2ndmax = 0
+    cdef size_t current_tg_id = tg_ids[0]
+    cdef size_t current_write_i = 0
+    cdef size_t i
+    cdef size_t id_
+    cdef DATA_TYPE sc
+    for i in range(tg_ids.shape[0]):
+        id_ = tg_ids[i]
+        sc = scores[i]
+        if id_ != current_tg_id:
+
+            ## In case that best and second best are equal, do not select any
+            ## pg (e.g. if only one pg is present)
+            if current_i2ndmax != current_imax:
+                view[current_i2ndmax] = 1
+
+            # Start next group
+            current_tg_id = id_
+            current_write_i += 1
+            current_max = sc
+            current_2ndmax = sc
+            current_imax = i
+            current_i2ndmax = i
+            continue
+        if current_i2ndmax == current_imax:
+            # start of group: let's initialize with the next best
+            current_2ndmax = sc
+            current_i2ndmax = i
+        if sc > current_max:
+            # Found new best group, previous best is new 2nd best
+            current_2ndmax = current_max
+            current_i2ndmax = current_imax
+            current_max = sc
+            current_imax = i
+        elif sc > current_2ndmax:
+            # Found new 2nd best group
+            current_2ndmax = sc
+            current_i2ndmax = i
+    if current_i2ndmax != current_imax:
+        view[current_i2ndmax] = 1
+    return flags
 
 cdef partial_rank(DATA_TYPE[:] scores, size_t imin, size_t imax, np.uint32_t[:] ranks, np.uint32_t * ix):
     """ imax is exclusive, imax-imin is the size of a target group, so 32 bit int should
