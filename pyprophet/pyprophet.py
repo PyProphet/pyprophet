@@ -77,11 +77,11 @@ def unwrap_self_for_multiprocessing((inst, method_name, args),):
 
 
 @profile
-def calculate_params_for_d_score(classifier, experiment):
+def calculate_params_for_d_score(classifier, experiment, decoy_method):
     score = classifier.score(experiment, True)
     experiment.set_and_rerank("classifier_score", score)
 
-    td_scores = experiment.get_top_decoy_peaks()["classifier_score"]
+    td_scores = experiment.get_top_decoy_peaks(decoy_method)["classifier_score"]
 
     mu, nu = mean_and_std_dev(td_scores)
     return mu, nu
@@ -94,7 +94,8 @@ class Scorer(object):
 
         self.classifier = classifier
         self.score_columns = score_columns
-        self.mu, self.nu = calculate_params_for_d_score(classifier, experiment)
+        self.decoy_method = CONFIG.get("decoy_method")
+        self.mu, self.nu = calculate_params_for_d_score(classifier, experiment, self.decoy_method)
         self.merge_results = merge_results
         final_score = classifier.score(experiment, True)
         experiment["d_score"] = (final_score - self.mu) / self.nu
@@ -114,7 +115,7 @@ class Scorer(object):
         self.number_target_peaks = len(experiment.get_top_target_peaks().df)
         self.dvals = experiment.df.loc[(experiment.df.is_decoy.eq(True)), "d_score"]
         self.target_scores = experiment.get_top_target_peaks().df["d_score"]
-        self.decoy_scores = experiment.get_top_decoy_peaks().df["d_score"]
+        self.decoy_scores = experiment.get_top_decoy_peaks(self.decoy_method).df["d_score"]
 
     def score(self, table):
 
@@ -235,6 +236,11 @@ class ScoredTable(object):
         top_decoys = tops[tops["decoy"] == 1]["d_score"].values
         top_targets = tops[tops["decoy"] == 0]["d_score"].values
 
+        if CONFIG.get("decoy_method") == "second_best":
+            # for second-best
+            decoys = self.df[self.df["peak_group_rank"] == 2]
+            top_decoys = decoys["d_score"].values
+
         return decoys, targets, top_decoys, top_targets
 
 
@@ -259,6 +265,11 @@ class LazyScoredTable(object):
         tops = df[df["peak_group_rank"] == 1]
         self.top_decoys = tops[tops["decoy"] == 1]["d_score"].values
         self.top_targets = tops[tops["decoy"] == 0]["d_score"].values
+
+        if CONFIG.get("decoy_method") == "second_best":
+            # for second-best
+            self.decoys = self.df[self.df["peak_group_rank"] == 2]
+            self.top_decoys = self.decoys["d_score"].values
 
     def scores(self):
         assert self.decoys is not None, ("you have to save the lazy table before you can access "
@@ -313,6 +324,11 @@ class MergedLazyScoredTables(object):
         top_decoys = tops[tops["decoy"] == 1]["d_score"].values
         top_targets = tops[tops["decoy"] == 0]["d_score"].values
 
+        if CONFIG.get("decoy_method") == "second_best":
+            # for second-best
+            decoys = scored_table[scored_table["peak_group_rank"] == 2]
+            top_decoys = decoys["d_score"].values
+
         self.decoys.extend(decoys)
         self.targets.extend(targets)
         self.top_decoys.extend(top_decoys)
@@ -329,6 +345,7 @@ class HolyGostQuery(object):
         assert isinstance(semi_supervised_learner,
                           AbstractSemiSupervisedLearner)
         self.semi_supervised_learner = semi_supervised_learner
+        self.decoy_method = CONFIG.get("decoy_method")
 
     def read_tables_iter(self, pathes, delim):
         logging.info("process %s" % ", ".join(pathes))
@@ -380,7 +397,7 @@ class HolyGostQuery(object):
         experiment.set_and_rerank("classifier_score", clf_scores)
 
         all_test_target_scores = experiment.get_top_target_peaks()["classifier_score"]
-        all_test_decoy_scores = experiment.get_top_decoy_peaks()["classifier_score"]
+        all_test_decoy_scores = experiment.get_top_decoy_peaks(self.decoy_method)["classifier_score"]
         logging.info("finished pretrained scoring")
 
         ws = [loaded_weights.flatten()]

@@ -43,6 +43,7 @@ class AbstractSemiSupervisedLearner(object):
 
         fraction = CONFIG.get("xeval.fraction")
         is_test = CONFIG.get("is_test")
+        decoy_method = CONFIG.get("decoy_method")
         experiment.split_for_xval(fraction, is_test)
         train = experiment.get_train_peaks()
 
@@ -62,7 +63,7 @@ class AbstractSemiSupervisedLearner(object):
         mu, nu = mean_and_std_dev(clf_scores)
         experiment.set_and_rerank("classifier_score", clf_scores)
 
-        td_scores = experiment.get_top_decoy_peaks()["classifier_score"]
+        td_scores = experiment.get_top_decoy_peaks(decoy_method)["classifier_score"]
 
         mu, nu = mean_and_std_dev(td_scores)
         experiment["classifier_score"] = (experiment["classifier_score"] - mu) / nu
@@ -71,7 +72,7 @@ class AbstractSemiSupervisedLearner(object):
         top_test_peaks = experiment.get_top_test_peaks()
 
         top_test_target_scores = top_test_peaks.get_target_peaks()["classifier_score"]
-        top_test_decoy_scores = top_test_peaks.get_decoy_peaks()["classifier_score"]
+        top_test_decoy_scores = experiment.get_top_decoy_peaks(decoy_method)["classifier_score"]
 
         logging.info("end learn_randomized")
 
@@ -88,10 +89,11 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
         assert isinstance(train, Experiment)
         assert isinstance(sel_column, basestring)
         assert isinstance(fdr, float)
+        decoy_method = CONFIG.get("decoy_method")
 
         tt_peaks = train.get_top_target_peaks()
         tt_scores = tt_peaks[sel_column]
-        td_peaks = train.get_top_decoy_peaks()
+        td_peaks = train.get_top_decoy_peaks(decoy_method)
         td_scores = td_peaks[sel_column]
 
         # find cutoff fdr from scores and only use best target peaks:
@@ -126,3 +128,4 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
     def score(self, df, params):
         self.inner_learner.set_parameters(params)
         return self.inner_learner.score(df, True)
+

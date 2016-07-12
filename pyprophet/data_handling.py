@@ -8,7 +8,7 @@ import random
 
 import pandas as pd
 import numpy as np
-from optimized import find_top_ranked, rank
+from optimized import find_top_ranked, find_second_ranked, rank
 from config import CONFIG
 
 try:
@@ -70,7 +70,7 @@ def cleanup_and_check(df):
 
     msg = "data set contains %d decoy and %d target transition groups" % (n_decoy, n_target)
     logging.info(msg)
-    if n_decoy < 10 or n_target < 10:
+    if CONFIG.get("decoy_method") == "decoy" and (n_decoy < 10 or n_target < 10):
         logging.error("need at least 10 decoy groups ans 10 non decoy groups")
         raise Exception("need at least 10 decoy groups ans 10 non decoy groups. %s" % msg)
 
@@ -139,12 +139,13 @@ def prepare_data_table(table, tg_id_name="transition_group_id",
                 tg_num_id=tg_num_ids,
                 is_decoy=table[decoy_name].values.astype(bool),
                 is_top_peak=empty_col,
+                is_second_peak=empty_col,
                 is_train=empty_none_col,
                 main_score=table[main_score_name].values,
                 )
 
     ignore_invalid_scores = CONFIG["ignore.invalid_score_columns"]
-    column_names = ["tg_id", "tg_num_id", "is_decoy", "is_top_peak", "is_train", "main_score"]
+    column_names = ["tg_id", "tg_num_id", "is_decoy", "is_top_peak", "is_second_peak", "is_train", "main_score"]
     for i, v in enumerate(var_column_names):
         col_name = "var_%d" % i
         col_data = table[v]
@@ -278,27 +279,49 @@ class Experiment(object):
     def rank_by(self, score_col_name):
         flags = find_top_ranked(self.df.tg_num_id.values, self.df[score_col_name].values)
         self.df.is_top_peak = flags
+        self.df.is_second_peak = find_second_ranked(self.df.tg_num_id.values, self.df[score_col_name].values)
 
     def get_top_test_peaks(self):
         df = self.df
         return Experiment(df[(df.is_train == False) & (df.is_top_peak == True)])
 
-    def get_decoy_peaks(self):
-        return Experiment(self.df[self.df.is_decoy == True])
-
     def get_target_peaks(self):
         return Experiment(self.df[self.df.is_decoy == False])
 
-    def get_top_decoy_peaks(self):
-        ix_top = self.df.is_top_peak == True
-        return Experiment(self.df[(self.df.is_decoy == True) & ix_top])
+    def get_decoy_peaks(self, method):
+        return self._get_second_target_peaks()
+        if method == "decoy":
+            return self._get_decoy_peaks()
+        elif method == "second_best":
+            # These are all the "decoys" we have
+            # Alternatively, we could return *all but* the best ...
+            return self._get_second_target_peaks()
+
+    def _get_decoy_peaks(self):
+        assert False
+        return Experiment(self.df[self.df.is_decoy == True])
 
     def get_top_target_peaks(self):
         ix_top = self.df.is_top_peak == True
         return Experiment(self.df[(self.df.is_decoy == False) & ix_top])
 
+    def get_top_decoy_peaks(self, method):
+        if method == "decoy":
+            return self._get_top_decoy_peaks()
+        elif method == "second_best":
+            return self._get_second_target_peaks()
+
+    def _get_top_decoy_peaks(self):
+        ix_top = self.df.is_top_peak == True
+        assert False
+        return Experiment(self.df[(self.df.is_decoy == True) & ix_top])
+
+    def _get_second_target_peaks(self):
+        ix_top = self.df.is_second_peak == True
+        return Experiment(self.df[(self.df.is_decoy == False) & ix_top])
+
     def get_feature_matrix(self, use_main_score):
-        min_col = 5 if use_main_score else 6
+        min_col = 6 if use_main_score else 7
         return self.df.iloc[:, min_col:-1].values
 
     def filter_(self, idx):
@@ -334,3 +357,4 @@ class Experiment(object):
     def get_train_peaks(self):
         df = self.df[self.df.is_train == True]
         return Experiment(df)
+
