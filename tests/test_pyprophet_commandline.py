@@ -103,7 +103,7 @@ def _run_cmdline(cmdline):
 
 def _run_pyprophet_to_learn_model(regtest, temp_folder, dump_result_files=False,
                                   with_probatilities=False, compress=False, sampling_rate=None, use_best=False,
-                                  stat_best=False):
+                                  stat_best=False, decoy_method="decoy"):
     os.chdir(temp_folder)
     data_path = os.path.join(DATA_FOLDER, "test_data.txt")
     shutil.copy(data_path, temp_folder)
@@ -118,6 +118,7 @@ def _run_pyprophet_to_learn_model(regtest, temp_folder, dump_result_files=False,
         cmdline += " --semi_supervised_learner.stat_best"
     if sampling_rate is not None:
         cmdline += " --out_of_core --out_of_core.sampling_rate=%f" % sampling_rate
+    cmdline += " --decoy_method=%s" % decoy_method
     stdout = _run_cmdline(cmdline)
 
     for f in _expected_output_files():
@@ -348,6 +349,9 @@ def test_out_of_core_multi_input_files(tmpdir, regtest):
     compare_folders(f1, f2)
     compare_folders(f1merge, f2merge)
 
+def test_second_best_decoy(tmpdir, regtest):
+    stdout = _run_pyprophet_to_learn_model(regtest, tmpdir.strpath, True, True, True, "second_best")
+    _record(stdout, regtest)
 
 def compare_folders(f1, f2):
 
