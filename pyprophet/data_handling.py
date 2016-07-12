@@ -298,7 +298,6 @@ class Experiment(object):
             return self._get_second_target_peaks()
 
     def _get_decoy_peaks(self):
-        assert False
         return Experiment(self.df[self.df.is_decoy == True])
 
     def get_top_target_peaks(self):
@@ -313,7 +312,6 @@ class Experiment(object):
 
     def _get_top_decoy_peaks(self):
         ix_top = self.df.is_top_peak == True
-        assert False
         return Experiment(self.df[(self.df.is_decoy == True) & ix_top])
 
     def _get_second_target_peaks(self):
