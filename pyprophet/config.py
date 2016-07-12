@@ -28,6 +28,9 @@ def _standard_config(n_cpus=1):
 
     lambda_ = 0.4
 
+    config["decoy_method"] = "decoy"
+    info["decoy_method"] = r"""[Decoy method to be used (either 'decoy' or 'second_best')]"""
+
     config["semi_supervised_learner.initial_fdr"] = 0.15
     config["semi_supervised_learner.initial_lambda"] = lambda_
 
