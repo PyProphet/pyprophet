@@ -103,12 +103,14 @@ class Scorer(object):
         all_tt_scores = experiment.get_top_target_peaks()["d_score"]
 
         use_pemp = CONFIG.get("final_statistics.emp_p")
+        use_pfdr = CONFIG.get("final_statistics.pfdr")
+
         self.error_stat, self.target_pvalues = calculate_final_statistics(all_tt_scores,
                                                                           all_test_target_scores,
                                                                           all_test_decoy_scores,
                                                                           lambda_,
                                                                           use_pemp,
-                                                                          False)
+                                                                          use_pfdr)
 
         self.number_target_pg = len(experiment.df[experiment.df.is_decoy.eq(False)])
         self.number_target_peaks = len(experiment.get_top_target_peaks().df)

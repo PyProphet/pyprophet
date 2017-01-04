@@ -48,6 +48,9 @@ def _standard_config(n_cpus=1):
     config["final_statistics.emp_p"] = False
     info["final_statistics.emp_p"] = """[use empirical p-values for scoring]"""
 
+    config["final_statistics.pfdr"] = False
+    info["final_statistics.pfdr"] = """[compute positive FDR (pFDR) instead of FDR]"""
+
     config["num_processes"] = n_cpus
     info["num_processes"] = "[-1 means 'all available cpus']"
 
