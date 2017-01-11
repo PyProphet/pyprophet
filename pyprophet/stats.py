@@ -383,7 +383,10 @@ def get_error_table_from_pvalues_new(p_values, lambda_=0.4, use_pfdr=False):
     # see http://www.genomine.org/papers/directfdr.pdf:
 
     if use_pfdr:
-        sys.exit("Not implemented yet.")
+        fac = 1.0 - p_values ** num_total
+        fnr /= fac
+        # if we take the limit p->1 we achieve the following factor:
+        fnr[p_values == 0] = 1.0 / num_total
 
     # cut off values to range 0..1
     fnr[fnr < 0.0] = 0.0
