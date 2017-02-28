@@ -247,6 +247,11 @@ def get_error_table_using_percentile_positives_new(err_df, target_scores, num_nu
     fdr[fdr > 1.0] = 1.0
     fdr[num_positives == 0] = 0.0
 
+    fnr = err_df.FNR.iloc[imax].values
+    fnr[fnr < 0.0] = 0.0
+    fnr[fnr > 1.0] = 1.0
+    fnr[num_positives == 0] = 0.0
+
     fp = np.round(fdr * num_positives)
     tp = num_positives - fp
     tn = num_null - fp
@@ -267,9 +272,10 @@ def get_error_table_using_percentile_positives_new(err_df, target_scores, num_nu
              TN=tn,
              FN=fn,
              FDR=fdr,
+             FNR=fnr,
              sens=sens,
              cutoff=target_scores),
-        columns="qvalue svalue pvalue TP FP TN FN FDR sens cutoff".split(),
+        columns="qvalue svalue pvalue TP FP TN FN FDR FNR sens cutoff".split(),
     )
     return df_error
 
@@ -370,6 +376,22 @@ def get_error_table_from_pvalues_new(p_values, lambda_=0.4, use_pfdr=False):
     fdr[fdr < 0.0] = 0.0
     fdr[fdr > 1.0] = 1.0
 
+    # estimate false non-discovery rate
+    fnr = fn / num_negatives
+
+    # storey published pFDR as an improvement over FDR,
+    # see http://www.genomine.org/papers/directfdr.pdf:
+
+    if use_pfdr:
+        fac = 1.0 - p_values ** num_total
+        fnr /= fac
+        # if we take the limit p->1 we achieve the following factor:
+        fnr[p_values == 0] = 1.0 / num_total
+
+    # cut off values to range 0..1
+    fnr[fnr < 0.0] = 0.0
+    fnr[fnr > 1.0] = 1.0
+
     sens = tp / (num_total - num_null)
     # cut off values to range 0..1
     sens[sens < 0.0] = 0.0
@@ -391,11 +413,12 @@ def get_error_table_from_pvalues_new(p_values, lambda_=0.4, use_pfdr=False):
              TN=tn.flatten().astype(np.float32),
              FN=fn.flatten().astype(np.float32),
              FDR=fdr.flatten().astype(np.float32),
+             FNR=fnr.flatten().astype(np.float32),
              sens=sens.flatten().astype(np.float32),
              FPR=fpr.flatten().astype(np.float32),
              ),
         columns="""pvalue percentile_positive positive negative TP FP
-                        TN FN FDR sens FPR""".split(),
+                        TN FN FDR FNR sens FPR""".split(),
     )
 
     # cummin/cummax not available in numpy, so we create them from dataframe
