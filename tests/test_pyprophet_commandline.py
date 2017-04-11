@@ -10,7 +10,7 @@ import pytest
 
 d = pd.options.display
 d.width = 220
-d.precision = 6
+d.precision = 4
 
 DATA_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 
@@ -71,7 +71,12 @@ def _dump(full_path, regtest):
 
     # lines = open(full_path, "r").readlines()
     # f = os.path.basename(full_path)
-    print >> regtest, df
+    if len(df) > 20:
+        print >> regtest, df[:10]
+        print >> regtest, "..."
+        print >> regtest, df[-10:]
+    else:
+        print >> regtest, df
 
 
 def _dump_digest(full_path):

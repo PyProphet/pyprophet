@@ -9,6 +9,7 @@ pyprophet test_data_2.txt test_data_3.txt --out_of_core --out_of_core.sampling_r
      export.mayu: False
      final_statistics.emp_p: False
      final_statistics.lambda: 0.4
+     final_statistics.pfdr: False
      ignore.invalid_score_columns: 0
      is_test: 0
      multiple_files.merge_results: 0
@@ -53,10 +54,10 @@ pyprophet test_data_2.txt test_data_3.txt --out_of_core --out_of_core.sampling_r
  calculated scoring and statistics
  processing input data finished
  data set contains 387 decoy and 387 target transition groups
- mean m_score = 6.130689e-02, std_dev m_score = 1.658476e-02
+ mean m_score = 6.130687e-02, std_dev m_score = 1.658475e-02
  mean s_value = 9.800913e-01, std_dev s_value = 1.125709e-01
  data set contains 387 decoy and 387 target transition groups
- mean m_score = 6.130689e-02, std_dev m_score = 1.658476e-02
+ mean m_score = 6.130687e-02, std_dev m_score = 1.658475e-02
  mean s_value = 9.800913e-01, std_dev s_value = 1.125709e-01
 
 used parameters:
@@ -70,6 +71,7 @@ used parameters:
     export.mayu                                : False
     final_statistics.emp_p                     : False
     final_statistics.lambda                    : 0.4
+    final_statistics.pfdr                      : False
     ignore.invalid_score_columns               : 0
     is_test                                    : 0
     multiple_files.merge_results               : 0
@@ -94,16 +96,27 @@ used parameters:
 
 ==================================================================================================
 
-   qvalue   svalue        pvalue   TP  FP        TN         FN           FDR      sens    cutoff
-0    0.00  0.00223  7.172041e-14    2   0  54.80829  717.19171  2.450447e-12  0.002781  7.229382
-1    0.01  1.00000  1.178843e-01  720   6  48.80829   -0.80829  8.901026e-03  1.000000  1.680954
-2    0.02  1.00000  2.421844e-01  721  13  41.80829   -1.80829  1.808663e-02  1.000000  1.045573
-3    0.05  1.00000  6.864015e-01  718  38  16.80829    1.19171  4.973925e-02  0.998343 -0.363324
-4    0.10  1.00000  9.622875e-01  721  53   1.80829   -1.80829  6.814126e-02  1.000000 -1.586763
-5    0.20      NaN           NaN  NaN NaN       NaN        NaN           NaN       NaN       NaN
-6    0.30      NaN           NaN  NaN NaN       NaN        NaN           NaN       NaN       NaN
-7    0.40      NaN           NaN  NaN NaN       NaN        NaN           NaN       NaN       NaN
-8    0.50      NaN           NaN  NaN NaN       NaN        NaN           NaN       NaN       NaN
+   qvalue   svalue        pvalue     TP    FP        TN         FN           FDR       FNR  \
+0    0.00  0.00223  7.172041e-14    2.0   0.0  54.80829  717.19171  2.450447e-12  0.929041
+1    0.01  1.00000  1.178847e-01  720.0   6.0  48.80829   -0.80829  8.901058e-03  0.000000
+2    0.02  1.00000  2.421850e-01  721.0  13.0  41.80829   -1.80829  1.808667e-02  0.000000
+3    0.05  1.00000  6.864012e-01  718.0  38.0  16.80829    1.19171  4.973922e-02  0.025943
+4    0.10  1.00000  9.622872e-01  721.0  53.0   1.80829   -1.80829  6.814124e-02  0.000000
+5    0.20      NaN           NaN    NaN   NaN       NaN        NaN           NaN       NaN
+6    0.30      NaN           NaN    NaN   NaN       NaN        NaN           NaN       NaN
+7    0.40      NaN           NaN    NaN   NaN       NaN        NaN           NaN       NaN
+8    0.50      NaN           NaN    NaN   NaN       NaN        NaN           NaN       NaN
+
+       sens    cutoff
+0  0.002781  7.229383
+1  1.000000  1.680954
+2  1.000000  1.045573
+3  0.998343 -0.363325
+4  1.000000 -1.586764
+5       NaN       NaN
+6       NaN       NaN
+7       NaN       NaN
+8       NaN       NaN
 
 ==================================================================================================
 
@@ -140,6 +153,7 @@ pyprophet test_data_2.txt test_data_3.txt --out_of_core --out_of_core.sampling_r
      export.mayu: False
      final_statistics.emp_p: False
      final_statistics.lambda: 0.4
+     final_statistics.pfdr: False
      ignore.invalid_score_columns: 0
      is_test: 0
      multiple_files.merge_results: True
@@ -184,10 +198,10 @@ pyprophet test_data_2.txt test_data_3.txt --out_of_core --out_of_core.sampling_r
  calculated scoring and statistics
  processing input data finished
  data set contains 387 decoy and 387 target transition groups
- mean m_score = 6.130689e-02, std_dev m_score = 1.658476e-02
+ mean m_score = 6.130687e-02, std_dev m_score = 1.658475e-02
  mean s_value = 9.800913e-01, std_dev s_value = 1.125709e-01
  data set contains 387 decoy and 387 target transition groups
- mean m_score = 6.130689e-02, std_dev m_score = 1.658476e-02
+ mean m_score = 6.130687e-02, std_dev m_score = 1.658475e-02
  mean s_value = 9.800913e-01, std_dev s_value = 1.125709e-01
 
 used parameters:
@@ -201,6 +215,7 @@ used parameters:
     export.mayu                                : False
     final_statistics.emp_p                     : False
     final_statistics.lambda                    : 0.4
+    final_statistics.pfdr                      : False
     ignore.invalid_score_columns               : 0
     is_test                                    : 0
     multiple_files.merge_results               : True
@@ -225,16 +240,27 @@ used parameters:
 
 ==================================================================================================
 
-   qvalue   svalue        pvalue   TP  FP        TN         FN           FDR      sens    cutoff
-0    0.00  0.00223  7.172041e-14    2   0  54.80829  717.19171  2.450447e-12  0.002781  7.229382
-1    0.01  1.00000  1.178843e-01  720   6  48.80829   -0.80829  8.901026e-03  1.000000  1.680954
-2    0.02  1.00000  2.421844e-01  721  13  41.80829   -1.80829  1.808663e-02  1.000000  1.045573
-3    0.05  1.00000  6.864015e-01  718  38  16.80829    1.19171  4.973925e-02  0.998343 -0.363324
-4    0.10  1.00000  9.622875e-01  721  53   1.80829   -1.80829  6.814126e-02  1.000000 -1.586763
-5    0.20      NaN           NaN  NaN NaN       NaN        NaN           NaN       NaN       NaN
-6    0.30      NaN           NaN  NaN NaN       NaN        NaN           NaN       NaN       NaN
-7    0.40      NaN           NaN  NaN NaN       NaN        NaN           NaN       NaN       NaN
-8    0.50      NaN           NaN  NaN NaN       NaN        NaN           NaN       NaN       NaN
+   qvalue   svalue        pvalue     TP    FP        TN         FN           FDR       FNR  \
+0    0.00  0.00223  7.172041e-14    2.0   0.0  54.80829  717.19171  2.450447e-12  0.929041
+1    0.01  1.00000  1.178847e-01  720.0   6.0  48.80829   -0.80829  8.901058e-03  0.000000
+2    0.02  1.00000  2.421850e-01  721.0  13.0  41.80829   -1.80829  1.808667e-02  0.000000
+3    0.05  1.00000  6.864012e-01  718.0  38.0  16.80829    1.19171  4.973922e-02  0.025943
+4    0.10  1.00000  9.622872e-01  721.0  53.0   1.80829   -1.80829  6.814124e-02  0.000000
+5    0.20      NaN           NaN    NaN   NaN       NaN        NaN           NaN       NaN
+6    0.30      NaN           NaN    NaN   NaN       NaN        NaN           NaN       NaN
+7    0.40      NaN           NaN    NaN   NaN       NaN        NaN           NaN       NaN
+8    0.50      NaN           NaN    NaN   NaN       NaN        NaN           NaN       NaN
+
+       sens    cutoff
+0  0.002781  7.229383
+1  1.000000  1.680954
+2  1.000000  1.045573
+3  0.998343 -0.363325
+4  1.000000 -1.586764
+5       NaN       NaN
+6       NaN       NaN
+7       NaN       NaN
+8       NaN       NaN
 
 ==================================================================================================
 
@@ -263,6 +289,7 @@ pyprophet test_data_2.txt test_data_3.txt --random_seed=42
      export.mayu: False
      final_statistics.emp_p: False
      final_statistics.lambda: 0.4
+     final_statistics.pfdr: False
      ignore.invalid_score_columns: 0
      is_test: 0
      multiple_files.merge_results: 0
@@ -306,10 +333,10 @@ pyprophet test_data_2.txt test_data_3.txt --random_seed=42
  finished cross evals
 
  data set contains 387 decoy and 387 target transition groups
- mean m_score = 6.130689e-02, std_dev m_score = 1.658476e-02
+ mean m_score = 6.130687e-02, std_dev m_score = 1.658475e-02
  mean s_value = 9.800913e-01, std_dev s_value = 1.125709e-01
  data set contains 387 decoy and 387 target transition groups
- mean m_score = 6.130689e-02, std_dev m_score = 1.658476e-02
+ mean m_score = 6.130687e-02, std_dev m_score = 1.658475e-02
  mean s_value = 9.800913e-01, std_dev s_value = 1.125709e-01
  calculated scoring and statistics
  processing input data finished
@@ -325,6 +352,7 @@ used parameters:
     export.mayu                                : False
     final_statistics.emp_p                     : False
     final_statistics.lambda                    : 0.4
+    final_statistics.pfdr                      : False
     ignore.invalid_score_columns               : 0
     is_test                                    : 0
     multiple_files.merge_results               : 0
@@ -349,16 +377,27 @@ used parameters:
 
 ==================================================================================================
 
-   qvalue   svalue        pvalue   TP  FP        TN         FN           FDR      sens    cutoff
-0    0.00  0.00223  7.172041e-14    2   0  54.80829  717.19171  2.450447e-12  0.002781  7.229382
-1    0.01  1.00000  1.178843e-01  720   6  48.80829   -0.80829  8.901026e-03  1.000000  1.680954
-2    0.02  1.00000  2.421844e-01  721  13  41.80829   -1.80829  1.808663e-02  1.000000  1.045573
-3    0.05  1.00000  6.864015e-01  718  38  16.80829    1.19171  4.973925e-02  0.998343 -0.363324
-4    0.10  1.00000  9.622875e-01  721  53   1.80829   -1.80829  6.814126e-02  1.000000 -1.586763
-5    0.20      NaN           NaN  NaN NaN       NaN        NaN           NaN       NaN       NaN
-6    0.30      NaN           NaN  NaN NaN       NaN        NaN           NaN       NaN       NaN
-7    0.40      NaN           NaN  NaN NaN       NaN        NaN           NaN       NaN       NaN
-8    0.50      NaN           NaN  NaN NaN       NaN        NaN           NaN       NaN       NaN
+   qvalue   svalue        pvalue     TP    FP        TN         FN           FDR       FNR  \
+0    0.00  0.00223  7.172041e-14    2.0   0.0  54.80829  717.19171  2.450447e-12  0.929041
+1    0.01  1.00000  1.178847e-01  720.0   6.0  48.80829   -0.80829  8.901058e-03  0.000000
+2    0.02  1.00000  2.421850e-01  721.0  13.0  41.80829   -1.80829  1.808667e-02  0.000000
+3    0.05  1.00000  6.864012e-01  718.0  38.0  16.80829    1.19171  4.973922e-02  0.025943
+4    0.10  1.00000  9.622872e-01  721.0  53.0   1.80829   -1.80829  6.814124e-02  0.000000
+5    0.20      NaN           NaN    NaN   NaN       NaN        NaN           NaN       NaN
+6    0.30      NaN           NaN    NaN   NaN       NaN        NaN           NaN       NaN
+7    0.40      NaN           NaN    NaN   NaN       NaN        NaN           NaN       NaN
+8    0.50      NaN           NaN    NaN   NaN       NaN        NaN           NaN       NaN
+
+       sens    cutoff
+0  0.002781  7.229383
+1  1.000000  1.680954
+2  1.000000  1.045573
+3  0.998343 -0.363325
+4  1.000000 -1.586764
+5       NaN       NaN
+6       NaN       NaN
+7       NaN       NaN
+8       NaN       NaN
 
 ==================================================================================================
 
@@ -395,6 +434,7 @@ pyprophet test_data_2.txt test_data_3.txt --random_seed=42 --multiple_files.merg
      export.mayu: False
      final_statistics.emp_p: False
      final_statistics.lambda: 0.4
+     final_statistics.pfdr: False
      ignore.invalid_score_columns: 0
      is_test: 0
      multiple_files.merge_results: True
@@ -438,10 +478,10 @@ pyprophet test_data_2.txt test_data_3.txt --random_seed=42 --multiple_files.merg
  finished cross evals
 
  data set contains 387 decoy and 387 target transition groups
- mean m_score = 6.130689e-02, std_dev m_score = 1.658476e-02
+ mean m_score = 6.130687e-02, std_dev m_score = 1.658475e-02
  mean s_value = 9.800913e-01, std_dev s_value = 1.125709e-01
  data set contains 387 decoy and 387 target transition groups
- mean m_score = 6.130689e-02, std_dev m_score = 1.658476e-02
+ mean m_score = 6.130687e-02, std_dev m_score = 1.658475e-02
  mean s_value = 9.800913e-01, std_dev s_value = 1.125709e-01
  calculated scoring and statistics
  processing input data finished
@@ -457,6 +497,7 @@ used parameters:
     export.mayu                                : False
     final_statistics.emp_p                     : False
     final_statistics.lambda                    : 0.4
+    final_statistics.pfdr                      : False
     ignore.invalid_score_columns               : 0
     is_test                                    : 0
     multiple_files.merge_results               : True
@@ -481,16 +522,27 @@ used parameters:
 
 ==================================================================================================
 
-   qvalue   svalue        pvalue   TP  FP        TN         FN           FDR      sens    cutoff
-0    0.00  0.00223  7.172041e-14    2   0  54.80829  717.19171  2.450447e-12  0.002781  7.229382
-1    0.01  1.00000  1.178843e-01  720   6  48.80829   -0.80829  8.901026e-03  1.000000  1.680954
-2    0.02  1.00000  2.421844e-01  721  13  41.80829   -1.80829  1.808663e-02  1.000000  1.045573
-3    0.05  1.00000  6.864015e-01  718  38  16.80829    1.19171  4.973925e-02  0.998343 -0.363324
-4    0.10  1.00000  9.622875e-01  721  53   1.80829   -1.80829  6.814126e-02  1.000000 -1.586763
-5    0.20      NaN           NaN  NaN NaN       NaN        NaN           NaN       NaN       NaN
-6    0.30      NaN           NaN  NaN NaN       NaN        NaN           NaN       NaN       NaN
-7    0.40      NaN           NaN  NaN NaN       NaN        NaN           NaN       NaN       NaN
-8    0.50      NaN           NaN  NaN NaN       NaN        NaN           NaN       NaN       NaN
+   qvalue   svalue        pvalue     TP    FP        TN         FN           FDR       FNR  \
+0    0.00  0.00223  7.172041e-14    2.0   0.0  54.80829  717.19171  2.450447e-12  0.929041
+1    0.01  1.00000  1.178847e-01  720.0   6.0  48.80829   -0.80829  8.901058e-03  0.000000
+2    0.02  1.00000  2.421850e-01  721.0  13.0  41.80829   -1.80829  1.808667e-02  0.000000
+3    0.05  1.00000  6.864012e-01  718.0  38.0  16.80829    1.19171  4.973922e-02  0.025943
+4    0.10  1.00000  9.622872e-01  721.0  53.0   1.80829   -1.80829  6.814124e-02  0.000000
+5    0.20      NaN           NaN    NaN   NaN       NaN        NaN           NaN       NaN
+6    0.30      NaN           NaN    NaN   NaN       NaN        NaN           NaN       NaN
+7    0.40      NaN           NaN    NaN   NaN       NaN        NaN           NaN       NaN
+8    0.50      NaN           NaN    NaN   NaN       NaN        NaN           NaN       NaN
+
+       sens    cutoff
+0  0.002781  7.229383
+1  1.000000  1.680954
+2  1.000000  1.045573
+3  0.998343 -0.363325
+4  1.000000 -1.586764
+5       NaN       NaN
+6       NaN       NaN
+7       NaN       NaN
+8       NaN       NaN
 
 ==================================================================================================
 
@@ -519,6 +571,7 @@ pyprophet test_data_2.txt test_data_3.txt --out_of_core --out_of_core.sampling_r
      export.mayu: False
      final_statistics.emp_p: False
      final_statistics.lambda: 0.4
+     final_statistics.pfdr: False
      ignore.invalid_score_columns: 0
      is_test: 0
      multiple_files.merge_results: 0
@@ -580,6 +633,7 @@ used parameters:
     export.mayu                                : False
     final_statistics.emp_p                     : False
     final_statistics.lambda                    : 0.4
+    final_statistics.pfdr                      : False
     ignore.invalid_score_columns               : 0
     is_test                                    : 0
     multiple_files.merge_results               : 0
@@ -604,27 +658,27 @@ used parameters:
 
 ==================================================================================================
 
-   qvalue    svalue        pvalue   TP  FP         TN          FN           FDR      sens  \
-0    0.00  0.002256  1.909584e-14    2   0  58.972222  711.027778  7.001806e-13  0.002805
-1    0.01  1.000000  1.290022e-01  718   8  50.972222   -4.972222  1.047637e-02  1.000000
-2    0.02  1.000000  2.510037e-01  719  15  43.972222   -5.972222  2.016094e-02  1.000000
-3    0.05  1.000000  6.472562e-01  716  38  20.972222   -2.972222  5.060283e-02  1.000000
-4    0.10  1.000000  9.950285e-01  713  59  -0.027778    0.027778  7.600912e-02  0.999961
-5    0.20       NaN           NaN  NaN NaN        NaN         NaN           NaN       NaN
-6    0.30       NaN           NaN  NaN NaN        NaN         NaN           NaN       NaN
-7    0.40       NaN           NaN  NaN NaN        NaN         NaN           NaN       NaN
-8    0.50       NaN           NaN  NaN NaN        NaN         NaN           NaN       NaN
+   qvalue    svalue        pvalue     TP    FP         TN          FN           FDR       FNR  \
+0    0.00  0.002256  1.909584e-14    2.0   0.0  58.972222  711.027778  7.001806e-13  0.923452
+1    0.01  1.000000  1.290025e-01  718.0   8.0  50.972222   -4.972222  1.047639e-02  0.000000
+2    0.02  1.000000  2.510043e-01  719.0  15.0  43.972222   -5.972222  2.016099e-02  0.000000
+3    0.05  1.000000  6.472561e-01  716.0  38.0  20.972222   -2.972222  5.060283e-02  0.000000
+4    0.10  1.000000  9.950284e-01  713.0  59.0  -0.027778    0.027778  7.600912e-02  0.000000
+5    0.20       NaN           NaN    NaN   NaN        NaN         NaN           NaN       NaN
+6    0.30       NaN           NaN    NaN   NaN        NaN         NaN           NaN       NaN
+7    0.40       NaN           NaN    NaN   NaN        NaN         NaN           NaN       NaN
+8    0.50       NaN           NaN    NaN   NaN        NaN         NaN           NaN       NaN
 
-     cutoff
-0  7.253125
-1  1.425551
-2  0.918524
-3 -0.216627
-4 -2.112345
-5       NaN
-6       NaN
-7       NaN
-8       NaN
+       sens    cutoff
+0  0.002805  7.253127
+1  1.000000  1.425550
+2  1.000000  0.918522
+3  1.000000 -0.216626
+4  0.999961 -2.112342
+5       NaN       NaN
+6       NaN       NaN
+7       NaN       NaN
+8       NaN       NaN
 
 ==================================================================================================
 
@@ -652,49 +706,49 @@ WRITTEN:  test_data__weights.txt
 
 
 the next three should be identical:
-                  0                1                  2      3     4              5               6                  7                 8                9
-0            qvalue           svalue             pvalue     TP    FP             TN              FN                FDR              sens           cutoff
-1               0.0  0.0022304833401  7.17204073908e-14    2.0   0.0  54.8082901554   717.191709845  2.45044718024e-12  0.00278089968589    7.22938203812
-2  0.00999999977648              1.0     0.117884323001  720.0   6.0  48.8082901554  -0.80829015544   0.00890102609992               1.0    1.68095445633
-3    0.019999999553              1.0     0.242184370756  721.0  13.0  41.8082901554  -1.80829015544    0.0180866289884               1.0    1.04557335377
-4   0.0500000007451              1.0     0.686401546001  718.0  38.0  16.8082901554   1.19170984456    0.0497392453253    0.998342987234  -0.363324433565
-5     0.10000000149              1.0     0.962287545204  721.0  53.0  1.80829015544  -1.80829015544     0.068141259253               1.0   -1.58676338196
-6     0.20000000298              NaN                NaN    NaN   NaN            NaN             NaN                NaN               NaN              NaN
-7    0.300000011921              NaN                NaN    NaN   NaN            NaN             NaN                NaN               NaN              NaN
-8     0.40000000596              NaN                NaN    NaN   NaN            NaN             NaN                NaN               NaN              NaN
-9               0.5              NaN                NaN    NaN   NaN            NaN             NaN                NaN               NaN              NaN
-                  0                1                  2      3     4              5               6                  7                 8                9
-0            qvalue           svalue             pvalue     TP    FP             TN              FN                FDR              sens           cutoff
-1               0.0  0.0022304833401  7.17204073908e-14    2.0   0.0  54.8082901554   717.191709845  2.45044718024e-12  0.00278089968589    7.22938203812
-2  0.00999999977648              1.0     0.117884323001  720.0   6.0  48.8082901554  -0.80829015544   0.00890102609992               1.0    1.68095445633
-3    0.019999999553              1.0     0.242184370756  721.0  13.0  41.8082901554  -1.80829015544    0.0180866289884               1.0    1.04557335377
-4   0.0500000007451              1.0     0.686401546001  718.0  38.0  16.8082901554   1.19170984456    0.0497392453253    0.998342987234  -0.363324433565
-5     0.10000000149              1.0     0.962287545204  721.0  53.0  1.80829015544  -1.80829015544     0.068141259253               1.0   -1.58676338196
-6     0.20000000298              NaN                NaN    NaN   NaN            NaN             NaN                NaN               NaN              NaN
-7    0.300000011921              NaN                NaN    NaN   NaN            NaN             NaN                NaN               NaN              NaN
-8     0.40000000596              NaN                NaN    NaN   NaN            NaN             NaN                NaN               NaN              NaN
-9               0.5              NaN                NaN    NaN   NaN            NaN             NaN                NaN               NaN              NaN
-                  0                1                  2      3     4              5               6                  7                 8                9
-0            qvalue           svalue             pvalue     TP    FP             TN              FN                FDR              sens           cutoff
-1               0.0  0.0022304833401  7.17204073908e-14    2.0   0.0  54.8082901554   717.191709845  2.45044718024e-12  0.00278089968589    7.22938203812
-2  0.00999999977648              1.0     0.117884323001  720.0   6.0  48.8082901554  -0.80829015544   0.00890102609992               1.0    1.68095445633
-3    0.019999999553              1.0     0.242184370756  721.0  13.0  41.8082901554  -1.80829015544    0.0180866289884               1.0    1.04557335377
-4   0.0500000007451              1.0     0.686401546001  718.0  38.0  16.8082901554   1.19170984456    0.0497392453253    0.998342987234  -0.363324433565
-5     0.10000000149              1.0     0.962287545204  721.0  53.0  1.80829015544  -1.80829015544     0.068141259253               1.0   -1.58676338196
-6     0.20000000298              NaN                NaN    NaN   NaN            NaN             NaN                NaN               NaN              NaN
-7    0.300000011921              NaN                NaN    NaN   NaN            NaN             NaN                NaN               NaN              NaN
-8     0.40000000596              NaN                NaN    NaN   NaN            NaN             NaN                NaN               NaN              NaN
-9               0.5              NaN                NaN    NaN   NaN            NaN             NaN                NaN               NaN              NaN
+                 0                1                  2      3     4              5               6                  7                8                 9                10
+0            qvalue           svalue             pvalue     TP    FP             TN              FN                FDR              FNR              sens           cutoff
+1               0.0  0.0022304833401  7.17204073908e-14    2.0   0.0  54.8082901554   717.191709845  2.45044718024e-12   0.929041206837  0.00278089968589    7.22938346863
+2  0.00999999977648              1.0     0.117884732783  720.0   6.0  48.8082901554  -0.80829015544   0.00890105776489              0.0               1.0     1.6809540987
+3    0.019999999553              1.0     0.242184951901  721.0  13.0  41.8082901554  -1.80829015544    0.0180866718292              0.0               1.0    1.04557299614
+4   0.0500000007451              1.0     0.686401188374  718.0  38.0  16.8082901554   1.19170984456    0.0497392192483  0.0259431619197    0.998342987234  -0.363324940205
+5     0.10000000149              1.0     0.962287247181  721.0  53.0  1.80829015544  -1.80829015544    0.0681412369013              0.0               1.0     -1.586763978
+6     0.20000000298              NaN                NaN    NaN   NaN            NaN             NaN                NaN              NaN               NaN              NaN
+7    0.300000011921              NaN                NaN    NaN   NaN            NaN             NaN                NaN              NaN               NaN              NaN
+8     0.40000000596              NaN                NaN    NaN   NaN            NaN             NaN                NaN              NaN               NaN              NaN
+9               0.5              NaN                NaN    NaN   NaN            NaN             NaN                NaN              NaN               NaN              NaN
+                 0                1                  2      3     4              5               6                  7                8                 9                10
+0            qvalue           svalue             pvalue     TP    FP             TN              FN                FDR              FNR              sens           cutoff
+1               0.0  0.0022304833401  7.17204073908e-14    2.0   0.0  54.8082901554   717.191709845  2.45044718024e-12   0.929041206837  0.00278089968589    7.22938346863
+2  0.00999999977648              1.0     0.117884732783  720.0   6.0  48.8082901554  -0.80829015544   0.00890105776489              0.0               1.0     1.6809540987
+3    0.019999999553              1.0     0.242184951901  721.0  13.0  41.8082901554  -1.80829015544    0.0180866718292              0.0               1.0    1.04557299614
+4   0.0500000007451              1.0     0.686401188374  718.0  38.0  16.8082901554   1.19170984456    0.0497392192483  0.0259431619197    0.998342987234  -0.363324940205
+5     0.10000000149              1.0     0.962287247181  721.0  53.0  1.80829015544  -1.80829015544    0.0681412369013              0.0               1.0     -1.586763978
+6     0.20000000298              NaN                NaN    NaN   NaN            NaN             NaN                NaN              NaN               NaN              NaN
+7    0.300000011921              NaN                NaN    NaN   NaN            NaN             NaN                NaN              NaN               NaN              NaN
+8     0.40000000596              NaN                NaN    NaN   NaN            NaN             NaN                NaN              NaN               NaN              NaN
+9               0.5              NaN                NaN    NaN   NaN            NaN             NaN                NaN              NaN               NaN              NaN
+                 0                1                  2      3     4              5               6                  7                8                 9                10
+0            qvalue           svalue             pvalue     TP    FP             TN              FN                FDR              FNR              sens           cutoff
+1               0.0  0.0022304833401  7.17204073908e-14    2.0   0.0  54.8082901554   717.191709845  2.45044718024e-12   0.929041206837  0.00278089968589    7.22938346863
+2  0.00999999977648              1.0     0.117884732783  720.0   6.0  48.8082901554  -0.80829015544   0.00890105776489              0.0               1.0     1.6809540987
+3    0.019999999553              1.0     0.242184951901  721.0  13.0  41.8082901554  -1.80829015544    0.0180866718292              0.0               1.0    1.04557299614
+4   0.0500000007451              1.0     0.686401188374  718.0  38.0  16.8082901554   1.19170984456    0.0497392192483  0.0259431619197    0.998342987234  -0.363324940205
+5     0.10000000149              1.0     0.962287247181  721.0  53.0  1.80829015544  -1.80829015544    0.0681412369013              0.0               1.0     -1.586763978
+6     0.20000000298              NaN                NaN    NaN   NaN            NaN             NaN                NaN              NaN               NaN              NaN
+7    0.300000011921              NaN                NaN    NaN   NaN            NaN             NaN                NaN              NaN               NaN              NaN
+8     0.40000000596              NaN                NaN    NaN   NaN            NaN             NaN                NaN              NaN               NaN              NaN
+9               0.5              NaN                NaN    NaN   NaN            NaN             NaN                NaN              NaN               NaN              NaN
 
 this might be different:
-                  0                 1                  2      3     4                 5                6                  7                 8                9
-0            qvalue            svalue             pvalue     TP    FP                TN               FN                FDR              sens           cutoff
-1               0.0  0.00225563906133  1.90958360236e-14    2.0   0.0     58.9722222222    711.027777778  7.00180636127e-13  0.00280493981067     7.2531247139
-2  0.00999999977648               1.0      0.12900224328  718.0   8.0     50.9722222222   -4.97222222222     0.010476373136               1.0    1.42555093765
-3    0.019999999553               1.0     0.251003652811  719.0  15.0     43.9722222222   -5.97222222222    0.0201609358191               1.0   0.918523967266
-4   0.0500000007451               1.0     0.647256195545  716.0  38.0     20.9722222222   -2.97222222222    0.0506028272212               1.0  -0.216626867652
-5     0.10000000149               1.0     0.995028495789  713.0  59.0  -0.0277777777778  0.0277777777778    0.0760091170669    0.999961042503    -2.1123445034
-6     0.20000000298               NaN                NaN    NaN   NaN               NaN              NaN                NaN               NaN              NaN
-7    0.300000011921               NaN                NaN    NaN   NaN               NaN              NaN                NaN               NaN              NaN
-8     0.40000000596               NaN                NaN    NaN   NaN               NaN              NaN                NaN               NaN              NaN
-9               0.5               NaN                NaN    NaN   NaN               NaN              NaN                NaN               NaN              NaN
+                 0                 1                  2      3     4                 5                6                  7               8                 9                10
+0            qvalue            svalue             pvalue     TP    FP                TN               FN                FDR             FNR              sens           cutoff
+1               0.0  0.00225563906133  1.90958360236e-14    2.0   0.0     58.9722222222    711.027777778  7.00180636127e-13  0.923451662064  0.00280493981067    7.25312662125
+2  0.00999999977648               1.0     0.129002451897  718.0   8.0     50.9722222222   -4.97222222222    0.0104763898998             0.0               1.0    1.42555046082
+3    0.019999999553               1.0      0.25100427866  719.0  15.0     43.9722222222   -5.97222222222    0.0201609861106             0.0               1.0   0.918521821499
+4   0.0500000007451               1.0     0.647256135941  716.0  38.0     20.9722222222   -2.97222222222    0.0506028272212             0.0               1.0  -0.216626390815
+5     0.10000000149               1.0     0.995028436184  713.0  59.0  -0.0277777777778  0.0277777777778    0.0760091170669             0.0    0.999961042503   -2.11234211922
+6     0.20000000298               NaN                NaN    NaN   NaN               NaN              NaN                NaN             NaN               NaN              NaN
+7    0.300000011921               NaN                NaN    NaN   NaN               NaN              NaN                NaN             NaN               NaN              NaN
+8     0.40000000596               NaN                NaN    NaN   NaN               NaN              NaN                NaN             NaN               NaN              NaN
+9               0.5               NaN                NaN    NaN   NaN               NaN              NaN                NaN             NaN               NaN              NaN
