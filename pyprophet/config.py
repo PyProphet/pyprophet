@@ -150,6 +150,7 @@ class _ConfigHolder(object):
 
     def __init__(self):
         self.config, self.info = _standard_config()
+        _fix_config_types(self.config)
 
     def update(self, dd):
         self.config.update(dd)
