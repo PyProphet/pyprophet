@@ -14,7 +14,6 @@ import abc
 import cPickle
 from std_logger import logging
 import sys
-import random
 import time
 import warnings
 import zlib
@@ -334,7 +333,7 @@ def _main(args):
                         "processes. Using more than one process is rarely faster.")
 
     if random_seed is not None:
-        random.seed(random_seed)
+        np.random.seed(random_seed)
 
     if apply_scorer and apply_weights:
         raise Exception("can not apply scorer and weights at the same time")

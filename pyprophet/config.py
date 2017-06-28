@@ -5,7 +5,6 @@ import os
 os.putenv("OPENBLAS_NUM_THREADS", "1")
 
 import multiprocessing
-import random
 import sys
 
 import pandas as pd
@@ -134,7 +133,7 @@ def _fix_config_types(dd):
     if dd["random_seed"] is not None:
         dd["random_seed"] = int(dd["random_seed"])
     else:
-        dd["random_seed"] = random.randint(0, sys.maxint)
+        dd["random_seed"] = None
 
 
 def set_pandas_print_options():
