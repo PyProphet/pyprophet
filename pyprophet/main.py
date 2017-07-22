@@ -25,8 +25,7 @@ from pyprophet import PyProphet
 from config import CONFIG, set_pandas_print_options
 from report import save_report, export_mayu, mayu_cols
 
-from .main_helpers import (parse_cmdline, create_pathes, check_if_any_exists)
-
+from .main_helpers import (parse_cmdline, create_pathes, check_if_any_exists, filterChromByTSV)
 
 class PyProphetRunner(object):
 
@@ -172,12 +171,39 @@ class PyProphetRunner(object):
             result.final_statistics.to_csv(full_stat_path, sep=self.delim_out, index=False)
             print "WRITTEN: ", full_stat_path
 
-        for scored_table, out_path in zip(result.scored_tables, out_pathes):
+        for input_path, scored_table, out_path in zip(self.pathes, result.scored_tables, out_pathes):
 
             cutoff = CONFIG.get("d_score.cutoff")
             scored_table.to_csv(out_path.scored_table, out_path.filtered_table, cutoff, sep=self.delim_out, index=False)
             print "WRITTEN: ", out_path.scored_table
             print "WRITTEN: ", out_path.filtered_table
+
+            if CONFIG.get("rewrite_sqmass"):
+
+                # get basepath
+                basepath = input_path.split(".tsv")[0]
+                basepath = basepath.split(".txt")[0]
+                basepath = basepath.split(".csv")[0]
+
+                # try to find a matching sqMass file
+                sqmass_file = None
+                if os.path.exists(basepath + ".chrom.sqMass"):
+                    sqmass_file = basepath + ".chrom.sqMass"
+                elif os.path.exists(basepath + ".sqMass"):
+                    sqmass_file = basepath + ".sqMass"
+
+                # get selected chromatograms on the filtered table
+                df = scored_table.df[scored_table.df.d_score > cutoff]
+                fragment_anno = df.aggr_Fragment_Annotation.unique()
+                prec_anno = df.aggr_prec_Fragment_Annotation.unique()
+
+                labels = []
+                for l in fragment_anno:
+                    labels.extend( l.split(";") )
+                for l in prec_anno:
+                    labels.extend( l.split(";") )
+
+                filterChromByLabels(sqmass_file, out_path.filtered_chroms, labels)
 
             if result.final_statistics is not None:
 
