@@ -16,7 +16,7 @@ cd pyprophet
 git apply /data/manylinux.patch
 
 # Compile wheels
-for PYBIN in /opt/python/*/bin; do
+for PYBIN in /opt/python/cp27*/bin /opt/python/cp3[4-9]*/bin; do
   "${PYBIN}/pip" install Cython
   "${PYBIN}/pip" install numpy
   "${PYBIN}/pip" install pandas
