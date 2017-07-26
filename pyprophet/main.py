@@ -25,7 +25,7 @@ from pyprophet import PyProphet
 from config import CONFIG, set_pandas_print_options
 from report import save_report, export_mayu, mayu_cols
 
-from .main_helpers import (parse_cmdline, create_pathes, check_if_any_exists, filterChromByTSV)
+from .main_helpers import (parse_cmdline, create_pathes, check_if_any_exists, filterChromByLabels)
 
 class PyProphetRunner(object):
 
