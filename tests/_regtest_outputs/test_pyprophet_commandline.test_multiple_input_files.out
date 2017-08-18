@@ -9,6 +9,10 @@ pyprophet test_data_2.txt test_data_3.txt --random_seed=42 --target.overwrite
      export.mayu: False
      final_statistics.emp_p: False
      final_statistics.lambda: 0.4
+     final_statistics.lfdr_eps: 1e-08
+     final_statistics.lfdr_monotone: True
+     final_statistics.lfdr_transf: probit
+     final_statistics.lfdr_trunc: True
      final_statistics.pfdr: False
      ignore.invalid_score_columns: 0
      is_test: 0
@@ -72,6 +76,10 @@ used parameters:
     export.mayu                                : False
     final_statistics.emp_p                     : False
     final_statistics.lambda                    : 0.4
+    final_statistics.lfdr_eps                  : 1e-08
+    final_statistics.lfdr_monotone             : True
+    final_statistics.lfdr_transf               : 'probit'
+    final_statistics.lfdr_trunc                : True
     final_statistics.pfdr                      : False
     ignore.invalid_score_columns               : 0
     is_test                                    : 0
@@ -97,27 +105,27 @@ used parameters:
 
 ==================================================================================================
 
-   qvalue   svalue        pvalue     TP    FP        TN         FN           FDR       FNR  \
-0    0.00  0.00223  7.172041e-14    2.0   0.0  54.80829  717.19171  2.450447e-12  0.929041
-1    0.01  1.00000  1.178847e-01  720.0   6.0  48.80829   -0.80829  8.901058e-03  0.000000
-2    0.02  1.00000  2.421850e-01  721.0  13.0  41.80829   -1.80829  1.808667e-02  0.000000
-3    0.05  1.00000  6.864012e-01  718.0  38.0  16.80829    1.19171  4.973922e-02  0.025943
-4    0.10  1.00000  9.622872e-01  721.0  53.0   1.80829   -1.80829  6.814124e-02  0.000000
-5    0.20      NaN           NaN    NaN   NaN       NaN        NaN           NaN       NaN
-6    0.30      NaN           NaN    NaN   NaN       NaN        NaN           NaN       NaN
-7    0.40      NaN           NaN    NaN   NaN       NaN        NaN           NaN       NaN
-8    0.50      NaN           NaN    NaN   NaN       NaN        NaN           NaN       NaN
+   qvalue   svalue        pvalue           pep     TP    FP        TN         FN           FDR  \
+0    0.00  0.00223  7.172041e-14  7.205829e-09    2.0   0.0  54.80829  717.19171  2.450447e-12
+1    0.01  1.00000  1.178847e-01  5.291491e-01  720.0   6.0  48.80829   -0.80829  8.901058e-03
+2    0.02  1.00000  2.421850e-01  1.000000e+00  721.0  13.0  41.80829   -1.80829  1.808667e-02
+3    0.05  1.00000  6.864012e-01  1.000000e+00  718.0  38.0  16.80829    1.19171  4.973922e-02
+4    0.10  1.00000  9.622872e-01  1.000000e+00  721.0  53.0   1.80829   -1.80829  6.814124e-02
+5    0.20      NaN           NaN           NaN    NaN   NaN       NaN        NaN           NaN
+6    0.30      NaN           NaN           NaN    NaN   NaN       NaN        NaN           NaN
+7    0.40      NaN           NaN           NaN    NaN   NaN       NaN        NaN           NaN
+8    0.50      NaN           NaN           NaN    NaN   NaN       NaN        NaN           NaN
 
-       sens    cutoff
-0  0.002781  7.229383
-1  1.000000  1.680954
-2  1.000000  1.045573
-3  0.998343 -0.363325
-4  1.000000 -1.586764
-5       NaN       NaN
-6       NaN       NaN
-7       NaN       NaN
-8       NaN       NaN
+        FNR      sens    cutoff
+0  0.929041  0.002781  7.229383
+1  0.000000  1.000000  1.680954
+2  0.000000  1.000000  1.045573
+3  0.025943  0.998343 -0.363325
+4  0.000000  1.000000 -1.586764
+5       NaN       NaN       NaN
+6       NaN       NaN       NaN
+7       NaN       NaN       NaN
+8       NaN       NaN       NaN
 
 ==================================================================================================
 

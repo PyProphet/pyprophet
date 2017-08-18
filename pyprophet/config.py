@@ -8,6 +8,7 @@ import multiprocessing
 import random
 import sys
 
+import numpy as np
 import pandas as pd
 
 
@@ -50,6 +51,18 @@ def _standard_config(n_cpus=1):
 
     config["final_statistics.pfdr"] = False
     info["final_statistics.pfdr"] = """[compute positive FDR (pFDR) instead of FDR]"""
+
+    config["final_statistics.lfdr_trunc"] = True
+    info["final_statistics.lfdr_trunc"] = """[if True, local FDR values >1 are set to 1]"""
+
+    config["final_statistics.lfdr_monotone"] = True
+    info["final_statistics.lfdr_monotone"] = """[if True, local FDR values are non-decreasing with increasing p-values]"""
+
+    config["final_statistics.lfdr_transf"] = "probit"
+    info["final_statistics.lfdr_transf"] = """[either a "probit" or "logit" transformation is applied to the p-values so that a local FDR estimate can be formed that does not involve edge effects of the [0,1] interval in which the p-values lie]"""
+
+    config["final_statistics.lfdr_eps"] = np.power(10.0,-8)
+    info["final_statistics.lfdr_eps"] = """[numeric value that is threshold for the tails of the empirical p-value distribution]"""
 
     config["num_processes"] = n_cpus
     info["num_processes"] = "[-1 means 'all available cpus']"
