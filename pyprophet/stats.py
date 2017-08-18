@@ -9,6 +9,7 @@ os.putenv("OPENBLAS_NUM_THREADS", "1")
 from collections import namedtuple
 
 import numpy as np
+import scipy as sp
 import pandas as pd
 
 try:
@@ -21,6 +22,8 @@ from optimized import (find_nearest_matches as _find_nearest_matches,
 import scipy.special
 import math
 import scipy.stats
+from scipy.interpolate import interp1d
+import sys
 
 from config import CONFIG
 
@@ -28,6 +31,8 @@ import multiprocessing
 
 from std_logger import logging
 
+
+pi0s = namedtuple("pi0", "pi0 pi0_lambda lambda_ pi0_smooth")
 
 ErrorStatistics = namedtuple("ErrorStatistics", "df num_null num_total")
 
@@ -339,7 +344,60 @@ def summary_err_table(df, qvalues=[0, 0.01, 0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5]
 
 
 @profile
-def get_error_table_from_pvalues_new(p_values, lambda_=0.4, use_pfdr=False):
+def pi0est(p, lambda_ = np.arange(0.05,1.0,0.05), pi0_method = "smoother", smooth_df = 3, smooth_log_pi0 = False):
+    rm_na = np.isfinite(p)
+    p = p[rm_na]
+    m = len(p)
+    ll = 1
+    if isinstance(lambda_, np.ndarray ):
+        ll = len(lambda_)
+        lambda_ = np.sort(lambda_)
+
+    if (min(p) < 0 or max(p) > 1):
+        sys.exit("Error: p-values not in valid range [0,1].")
+    elif (ll > 1 and ll < 4):
+        sys.exit("Error: If lambda_ is not predefined (one value), at least four data points are required.")
+    elif (np.min(lambda_) < 0 or np.max(lambda_) >= 1):
+        sys.exit("Error: Lambda must be within [0,1)")
+
+    if (ll == 1):
+        pi0 = np.mean(p >= lambda_)/(1 - lambda_)
+        pi0_lambda = pi0
+        pi0 = np.minimum(pi0, 1)
+        pi0Smooth = False
+    else:
+        pi0 = []
+        for l in lambda_:
+            pi0.append(np.mean(p >= l)/(1 - l))
+        pi0_lambda = pi0
+
+        if (pi0_method == "smoother"):
+            if smooth_log_pi0:
+                pi0 = np.log(pi0)
+                tck = sp.interpolate.splrep(lambda_, pi0, k=smooth_df)
+                pi0Smooth = np.exp(sp.interpolate.splev(lambda_, tck))
+            else:
+                tck = sp.interpolate.splrep(lambda_, pi0, k=smooth_df)
+                pi0Smooth = sp.interpolate.splev(lambda_, tck)
+            pi0 = np.minimum(pi0Smooth[ll-1],1)
+        elif (pi0_method == "bootstrap"):
+            minpi0 = np.percentile(pi0,0.1)
+            W = []
+            for l in lambda_:
+                W.append(np.sum(p >= l))
+            mse = (np.array(W) / (np.power(m,2) * np.power((1 - lambda_),2))) * (1 - np.array(W) / m) + np.power((pi0 - minpi0),2)
+            pi0 = np.minimum(pi0[np.argmin(mse)],1)
+            pi0Smooth = False
+        else:
+            sys.exit("Error: pi0.method must be one of 'smoother' or 'bootstrap'.")
+    if (pi0<=0):
+        sys.exit("Error: The estimated pi0 <= 0. Check that you have valid p-values or use a different range of lambda.")
+
+    return pi0s(pi0, pi0_lambda, lambda_, pi0Smooth)
+
+
+@profile
+def qvalue(p_values, pi0, use_pfdr=False):
     """ estimate error table from p_values with method of storey for estimating fdrs and q-values
     """
 
@@ -347,8 +405,8 @@ def get_error_table_from_pvalues_new(p_values, lambda_=0.4, use_pfdr=False):
     p_values = np.sort(to_one_dim_array(p_values))[::-1]
 
     # estimate FDR with storeys method:
-    num_null = 1.0 / (1.0 - lambda_) * (p_values >= lambda_).sum()
     num_total = len(p_values)
+    num_null = pi0 * num_total
 
     # optimized with numpys broadcasting: comparing column vector with row
     # vector yields a matrix with pairwise comparison results.  sum(axis=0)
@@ -427,6 +485,13 @@ def get_error_table_from_pvalues_new(p_values, lambda_=0.4, use_pfdr=False):
     df["svalue"] = df.sens[::-1].cummax()[::-1]
 
     return ErrorStatistics(df, num_null, num_total)
+
+
+@profile
+def get_error_table_from_pvalues_new(p_values, lambda_=0.4, use_pfdr=False):
+    pi0 = pi0est(p_values, lambda_).pi0
+
+    return qvalue(p_values,pi0,use_pfdr)
 
 
 @profile
