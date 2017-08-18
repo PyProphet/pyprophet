@@ -110,7 +110,7 @@
 9163  DECOY_592_run0  0  1   -4.25948238373  0.0681385472417  15  1.13548817053e-07  7.75215311201e-08  0.832455912569
 9164  DECOY_592_run0  0  1   -4.12553596497  0.0681385472417  14  1.54874069216e-07  1.05734923442e-07  0.832455912569
 9165  DECOY_592_run0  0  1   -3.57327675819  0.0681385472417  12  5.69465197972e-07  3.88782863225e-07  0.832455912569
-hex digtest pickled classifier: 02bf11a00e6dc67d0c5fd3070884ef9393615b10
+hex digtest pickled classifier: b416ddb1a08ae19f6d89ec20cbacb4c24a3759bc
 pyprophet test_data.txt --random_seed=42 --compute.probabilities --target.compress_results
  config settings:
      apply_scorer: None
@@ -363,7 +363,7 @@ WRITTEN:  test_data_weights.txt
 9163  DECOY_592_run0  0  1   -4.25948238373  0.0681385472417  15  1.13548817053e-07  7.75215311201e-08  0.832455912569
 9164  DECOY_592_run0  0  1   -4.12553596497  0.0681385472417  14  1.54874069216e-07  1.05734923442e-07  0.832455912569
 9165  DECOY_592_run0  0  1   -3.57327675819  0.0681385472417  12  5.69465197972e-07  3.88782863225e-07  0.832455912569
-hex digtest pickled classifier: 02bf11a00e6dc67d0c5fd3070884ef9393615b10
+hex digtest pickled classifier: b416ddb1a08ae19f6d89ec20cbacb4c24a3759bc
 pyprophet test_data.txt --random_seed=42 --compute.probabilities --target.compress_results --out_of_core --out_of_core.sampling_rate=1.000000
 
 used parameters:

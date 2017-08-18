@@ -190,7 +190,7 @@
 9165            1.0             1.0             0.0             0.0  0.0   -3.57327675819  0.0681385472417  12
 
 [10 rows x 23 columns]
-hex digtest pickled classifier: 02bf11a00e6dc67d0c5fd3070884ef9393615b10
+hex digtest pickled classifier: b416ddb1a08ae19f6d89ec20cbacb4c24a3759bc
 pyprophet test_data.txt --random_seed=42
  config settings:
      apply_scorer: None

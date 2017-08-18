@@ -10,7 +10,7 @@ import pytest
 
 d = pd.options.display
 d.width = 220
-d.precision = 4
+d.precision = 6
 
 DATA_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 
