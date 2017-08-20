@@ -27,7 +27,7 @@ def _standard_config(n_cpus=1):
     config["xeval.fraction"] = 0.5
     config["xeval.num_iter"] = 5
 
-    lambda_ = 0.4
+    lambda_ = "0.4"
 
     config["semi_supervised_learner.initial_fdr"] = 0.15
     config["semi_supervised_learner.initial_lambda"] = lambda_
@@ -45,6 +45,17 @@ def _standard_config(n_cpus=1):
     info["semi_supervised_learner.stat_best"] = """[use only stats from final for statistics]"""
 
     config["final_statistics.lambda"] = lambda_
+    info["final_statistics.lambda"] = """[to estimate pi0 using Storey's method, set lambda to start,end,step (e.g. 0.05,1,0.05); alternatively set to fixed value (e.g. 0.4)]"""
+
+
+    config["final_statistics.pi0_method"] = "smoother"
+    info["final_statistics.pi0_method"] = """[either "smoother" or "bootstrap"; the method for automatically choosing tuning parameter in the estimation of pi_0, the proportion of true null hypotheses]"""
+
+    config["final_statistics.pi0_smooth_df"] = 3
+    info["final_statistics.pi0_smooth_df"] = """[number of degrees-of-freedom to use when estimating pi_0 with a smoother]"""
+
+    config["final_statistics.pi0_smooth_log_pi0"] = False
+    info["final_statistics.pi0_smooth_df"] = """[if True and pi0_method = "smoother", pi0 will be estimated by applying a smoother to a scatterplot of log(pi0) estimates against the tuning parameter lambda]"""
 
     config["final_statistics.emp_p"] = False
     info["final_statistics.emp_p"] = """[use empirical p-values for scoring]"""
@@ -123,20 +134,27 @@ def _fix_config_types(dd):
               "out_of_core",
               "num_processes",
               "target.compress_results",
+              "final_statistics.pi0_smooth_df",
               ]:
         dd[k] = int(dd[k])
 
     for k in ["xeval.fraction",
               "d_score.cutoff",
               "semi_supervised_learner.initial_fdr",
-              "semi_supervised_learner.initial_lambda",
-              "semi_supervised_learner.iteration_lambda",
               "semi_supervised_learner.initial_fdr",
               "semi_supervised_learner.iteration_fdr",
               "out_of_core.sampling_rate",
-              "final_statistics.lambda",
               ]:
         dd[k] = float(dd[k])
+
+    for k in ["semi_supervised_learner.initial_lambda",
+              "semi_supervised_learner.iteration_lambda",
+              "final_statistics.lambda",
+              ]:
+        if len(str(dd[k]).split(',')) == 3:
+            dd[k] = np.arange(float(dd[k].split(',')[0]),float(dd[k].split(',')[1]),float(dd[k].split(',')[2]))
+        else:
+            dd[k] = float(dd[k])
 
     if dd["delim.in"] == "tab":
         dd["delim.in"] = "\t"

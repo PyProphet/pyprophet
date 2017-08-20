@@ -95,7 +95,7 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
         td_scores = td_peaks[sel_column]
 
         # find cutoff fdr from scores and only use best target peaks:
-        cutoff = find_cutoff(tt_scores, td_scores, lambda_, fdr, False, False)
+        cutoff = find_cutoff(tt_scores, td_scores, fdr, lambda_)
         best_target_peaks = tt_peaks.filter_(tt_scores >= cutoff)
         return td_peaks, best_target_peaks
 

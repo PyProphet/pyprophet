@@ -109,11 +109,17 @@ class Scorer(object):
         lfdr_transf  = CONFIG.get("final_statistics.lfdr_transf")
         lfdr_eps  = CONFIG.get("final_statistics.lfdr_eps")
 
+        pi0_method  = CONFIG.get("final_statistics.pi0_method")
+        pi0_smooth_df  = CONFIG.get("final_statistics.pi0_smooth_df")
+        pi0_smooth_log_pi0  = CONFIG.get("final_statistics.pi0_smooth_log_pi0")
 
-        self.error_stat, self.target_pvalues = calculate_final_statistics(all_tt_scores,
+        self.error_stat, self.target_pvalues, self.pi0 = calculate_final_statistics(all_tt_scores,
                                                                           all_test_target_scores,
                                                                           all_test_decoy_scores,
                                                                           lambda_,
+                                                                          pi0_method, 
+                                                                          pi0_smooth_df, 
+                                                                          pi0_smooth_log_pi0, 
                                                                           use_pemp,
                                                                           use_pfdr,
                                                                           lfdr_trunc,

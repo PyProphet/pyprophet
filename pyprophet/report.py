@@ -25,15 +25,15 @@ class Protein:
 
 
 def save_report(report_path, prefix, decoys, targets, top_decoys, top_targets, cutoffs, svalues,
-                qvalues, pvalues, lambda_):
+                qvalues, pvalues, pi0):
 
     if plt is None:
         raise ImportError("you need matplotlib package to create a report")
 
-    plt.figure(figsize=(10, 20))
+    plt.figure(figsize=(10, 15))
     plt.subplots_adjust(hspace=.5)
 
-    plt.subplot(511)
+    plt.subplot(321)
     plt.title(prefix + "\n\nROC")
     plt.xlabel('False Positive Rate (qvalue)')
     plt.ylabel('True Positive Rate (svalue)')
@@ -41,7 +41,7 @@ def save_report(report_path, prefix, decoys, targets, top_decoys, top_targets, c
     plt.scatter(qvalues, svalues, s=3)
     plt.plot(qvalues, svalues)
 
-    plt.subplot(512)
+    plt.subplot(322)
     plt.title('d_score Performance')
     plt.xlabel('dscore cutoff')
     plt.ylabel('rates')
@@ -51,15 +51,15 @@ def save_report(report_path, prefix, decoys, targets, top_decoys, top_targets, c
     plt.scatter(cutoffs, qvalues, color='r', s=3)
     plt.plot(cutoffs, qvalues, color='r', label="FPR (qvalue)")
 
-    plt.subplot(513)
+    plt.subplot(323)
     plt.title("Top Peak Groups' d_score Distributions")
     plt.xlabel("d_score")
     plt.ylabel("# of groups")
     plt.hist(
-        [top_targets, top_decoys], 20, color=['w', 'r'], label=['target', 'decoy'], histtype='bar')
+        [top_targets, top_decoys], 20, color=['g', 'r'], label=['target', 'decoy'], histtype='bar')
     plt.legend(loc=2)
 
-    plt.subplot(514)
+    plt.subplot(324)
     tdensity = gaussian_kde(top_targets)
     tdensity.covariance_factor = lambda: .25
     tdensity._compute_covariance()
@@ -75,12 +75,19 @@ def save_report(report_path, prefix, decoys, targets, top_decoys, top_targets, c
     plt.plot(xs, ddensity(xs), color='r', label='decoy')
     plt.legend(loc=2)
 
-    plt.subplot(515)
+    plt.subplot(325)
     if pvalues is not None:
-        counts, __, __ = plt.hist(pvalues, bins=40)
-        y_max = max(counts)
-        plt.plot([lambda_, lambda_], [0, y_max], "r")
-        plt.title("histogram pvalues")
+        counts, __, __ = plt.hist(pvalues, bins=40, normed=True)
+        plt.plot([0, 1], [pi0.pi0, pi0.pi0], "r")
+        plt.title("p-value density histogram")
+
+    if pi0.pi0_smooth is not False:
+        plt.subplot(326)
+        plt.plot(pi0.lambda_, pi0.pi0_lambda, ".")
+        plt.plot(pi0.lambda_, pi0.pi0_smooth, "r")
+        plt.xlim([0,1])
+        plt.ylim([0,1])
+        plt.title("pi0 smoothing fit plot")
 
     plt.savefig(report_path)
 

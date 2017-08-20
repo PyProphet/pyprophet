@@ -134,7 +134,8 @@ class PyProphetRunner(object):
         set_pandas_print_options()
         self.print_summary(result)
         pvalues = None if scorer is None else scorer.target_pvalues
-        self.save_results(result, extra_writes, out_pathes, pvalues)
+        pi0 = None if scorer is None else scorer.pi0
+        self.save_results(result, extra_writes, out_pathes, pvalues, pi0)
 
         self.save_scorer(scorer, extra_writes)
         self.save_weights(weights, extra_writes)
@@ -160,7 +161,7 @@ class PyProphetRunner(object):
             print "=" * 98
         print
 
-    def save_results(self, result, extra_writes, out_pathes, pvalues):
+    def save_results(self, result, extra_writes, out_pathes, pvalues, pi0):
         summ_stat_path = extra_writes.get("summ_stat_path")
         if summ_stat_path is not None:
             result.summary_statistics.to_csv(summ_stat_path, self.delim_out, index=False)
@@ -212,10 +213,9 @@ class PyProphetRunner(object):
                 qvalues = result.final_statistics["qvalue"].values
                 # pvalues = result.final_statistics["pvalue"].values
                 decoys, targets, top_decoys, top_targets = scored_table.scores()
-                lambda_ = CONFIG.get("final_statistics.lambda")
                 plot_data = save_report(
                     out_path.report, self.prefix, decoys, targets, top_decoys, top_targets,
-                    cutoffs, svalues, qvalues, pvalues, lambda_)
+                    cutoffs, svalues, qvalues, pvalues, pi0)
                 print "WRITTEN: ", out_path.report
 
                 cutoffs, svalues, qvalues, top_targets, top_decoys = plot_data
