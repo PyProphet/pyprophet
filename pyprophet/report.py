@@ -8,7 +8,7 @@ except ImportError:
     plt = None
 
 from scipy.stats import gaussian_kde
-from numpy import linspace, concatenate
+from numpy import linspace, concatenate, around
 
 
 class Protein:
@@ -79,7 +79,7 @@ def save_report(report_path, prefix, decoys, targets, top_decoys, top_targets, c
     if pvalues is not None:
         counts, __, __ = plt.hist(pvalues, bins=40, normed=True)
         plt.plot([0, 1], [pi0['pi0'], pi0['pi0']], "r")
-        plt.title("p-value density histogram")
+        plt.title("p-value density histogram: pi0 = " + str(around(pi0['pi0'], decimals=3)))
         plt.xlabel("p-value")
         plt.ylabel("density histogram")
 
