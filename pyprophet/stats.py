@@ -67,7 +67,7 @@ def to_one_dim_array(values, as_type=None):
 
 def qvality_posterior_pg_prob(experiment):
     # All target values and all decoy values
-    df = experiment.get_top_peaks().df.sort(['d_score'],ascending=[0])
+    df = experiment.get_top_peaks().df.sort_values(['d_score'],ascending=[0])
     df = df.reset_index()
 
     tf_targets = tempfile.NamedTemporaryFile()
