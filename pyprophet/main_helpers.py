@@ -3,24 +3,10 @@
 import os
 import sys
 
+import click
+from .version import version
+
 from config import CONFIG
-
-
-def print_help():
-    print
-    script = os.path.basename(sys.argv[0])
-    print "usage:"
-    print "       %s [options] input_file [input_file ...]" % script
-    print "   or "
-    print "       %s --help" % script
-    print "   or "
-    print "       %s --version" % script
-    dump_config_info(CONFIG.config, CONFIG.info)
-
-
-def print_version():
-    import version
-    print "%d.%d.%d" % version.version
 
 
 def dump_config_info(config, info):

@@ -11,6 +11,7 @@ except NameError:
         return fun
 
 import abc
+import click
 import cPickle
 from std_logger import logging
 import sys
@@ -340,6 +341,10 @@ class PyProphetOutOfCoreScorerApplier(PyProphetRunner):
         yield
 
 
+# @click.command()
+# @click.version_option()
+# @click.option('--test/--no-test', default=False, help='Run in test mode with fixed seed.')
+# @click.option('--random_seed', default=None, type=int, help='Set fixed seed to integer value.')
 def _main(args):
 
     pathes = parse_cmdline(args)
@@ -389,5 +394,28 @@ def _main(args):
             pathes, prefix, merge_results, apply_scorer, delim_in, delim_out).run()
 
 
-def main():
+@click.command()
+@click.version_option()
+@click.argument('input')
+@click.option('--apply_weights', type=click.Path(), help='Apply PyProphet score weights file instead of semi-supervised learning.')
+@click.option('--parametric/--no-parametric', default=True, help='Do parametric estimation of p-values.')
+@click.option('--pfdr/--no-pfdr', default=False, help='Compute positive false discovery rate (pFDR) instead of FDR.')
+@click.option('--lambda', default=0.4, type=(float, float, float), help='Use non-parametric estimation of p-values. Either use <START END STEP>, e.g. 0.1, 1.0, 0.1 or set to fixed value, e.g. 0.4.')
+@click.option('--xeval_fraction', default=0.5, type=float, help='Data fraction used for cross-validation of semi-supervised learning step.')
+@click.option('--xeval_iterations', default=10, type=int, help='Number of iterations for cross-validation of semi-supervised learning step.')
+@click.option('--initial_fdr', default=0.15, type=float, help='Initial FDR cutoff for best scoring targets.')
+@click.option('--iteration_fdr', default=0.02, type=float, help='Iteration FDR cutoff for best scoring targets.')
+@click.option('--pi0_method', default='smoother', type=click.Choice(['smoother', 'bootstrap']), help='Either "smoother" or "bootstrap"; the method for automatically choosing tuning parameter in the estimation of pi_0, the proportion of true null hypotheses.')
+@click.option('--pi0_smooth_df', default=3, type=int, help='Number of degrees-of-freedom to use when estimating pi_0 with a smoother.')
+@click.option('--pi0_smooth_log_pi0/--no-pi0_smooth_log_pi0', default=False, help='If True and pi0_method = "smoother", pi0 will be estimated by applying a smoother to a scatterplot of log(pi0) estimates against the tuning parameter lambda.')
+@click.option('--lfdr_truncate/--no-lfdr_truncate', default=True, help='If True, local FDR values >1 are set to 1.')
+@click.option('--lfdr_monotone/--no-lfdr_monotone', default=True, help='If True, local FDR values are non-decreasing with increasing p-values.')
+@click.option('--lfdr_transformation', default='probit', type=click.Choice(['probit', 'logit']), help='Either a "probit" or "logit" transformation is applied to the p-values so that a local FDR estimate can be formed that does not involve edge effects of the [0,1] interval in which the p-values lie.')
+@click.option('--lfdr_eps', default=np.power(10.0,-8), type=float, help='Numeric value that is threshold for the tails of the empirical p-value distribution.')
+@click.option('--threads', default=1, type=int, help='Number of threads used for semi-supervised learning. -1 means all available CPUs.')
+@click.option('--subsample/--no-subsample', default=False, help='Subsample input data to speed up semi-supervised learning.')
+@click.option('--subsample_rate', default=0.1, type=float, help='Subsampling rate of input data.')
+@click.option('--group_id', default="transition_group_id", type=str, help='Group identifier for calculation of statistics.')
+
+def main(input):
     _main(sys.argv[1:])
