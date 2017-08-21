@@ -158,7 +158,7 @@
 9163  DECOY_592_run0  0  1   -5.66616296768  0.879240691662  0.978714423882  0.0683347657323  16  6.32778706284e-09  3.28853264012e-09  0.700715197088
 9164  DECOY_592_run0  0  1   -5.14049863815  0.879240691662  0.978714423882  0.0683347657323  15   2.2726014084e-08  1.18106439779e-08  0.700715197088
 9165  DECOY_592_run0  0  1   -4.07130098343  0.879240691662  0.978714423882  0.0683347657323  12  3.10397068278e-07  1.61312507699e-07  0.700715197088
-hex digtest pickled classifier: 61be9456df89714124bcd9967e89f6679bba7c6f
+hex digtest pickled classifier: df27d8a2cb24a993740d707ba798a67824b18b7f
 pyprophet test_data.txt --random_seed=42 --compute.probabilities --target.compress_results --semi_supervised_learner.use_best --semi_supervised_learner.stat_best
  config settings:
      apply_scorer: None
@@ -175,6 +175,9 @@ pyprophet test_data.txt --random_seed=42 --compute.probabilities --target.compre
      final_statistics.lfdr_transf: probit
      final_statistics.lfdr_trunc: True
      final_statistics.pfdr: False
+     final_statistics.pi0_method: smoother
+     final_statistics.pi0_smooth_df: 3
+     final_statistics.pi0_smooth_log_pi0: False
      ignore.invalid_score_columns: 0
      is_test: 0
      multiple_files.merge_results: 0
@@ -245,6 +248,9 @@ used parameters:
     final_statistics.lfdr_transf               : 'probit'
     final_statistics.lfdr_trunc                : True
     final_statistics.pfdr                      : False
+    final_statistics.pi0_method                : 'smoother'
+    final_statistics.pi0_smooth_df             : 3
+    final_statistics.pi0_smooth_log_pi0        : False
     ignore.invalid_score_columns               : 0
     is_test                                    : 0
     multiple_files.merge_results               : 0

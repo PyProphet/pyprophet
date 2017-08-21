@@ -31,9 +31,6 @@ import multiprocessing
 
 from std_logger import logging
 
-
-pi0s = namedtuple("pi0", "pi0 pi0_lambda lambda_ pi0_smooth")
-
 ErrorStatistics = namedtuple("ErrorStatistics", "df num_null num_total")
 
 
@@ -405,7 +402,7 @@ def pi0est(p_values, lambda_ = np.arange(0.05,1.0,0.05), pi0_method = "smoother"
     if (pi0<=0):
         sys.exit("Error: The estimated pi0 <= 0. Check that you have valid p-values or use a different range of lambda.")
 
-    return pi0s(pi0, pi0_lambda, lambda_, pi0Smooth)
+    return {'pi0': pi0, 'pi0_lambda': pi0_lambda, 'lambda_': lambda_, 'pi0_smooth': pi0Smooth}
 
 
 @profile
@@ -576,8 +573,8 @@ def get_error_stat_from_null(target_scores, decoy_scores, lambda_, pi0_method = 
         target_pvalues = 1.0 - pnorm(target_scores, mu, nu)
 
     pi0 = pi0est(target_pvalues, lambda_, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0)
-    error_stat = qvalue(target_pvalues, pi0.pi0, use_pfdr)
-    error_stat.df["pep"] = lfdr(target_pvalues, pi0.pi0, lfdr_trunc, lfdr_monotone, lfdr_transf, lfdr_eps)
+    error_stat = qvalue(target_pvalues, pi0['pi0'], use_pfdr)
+    error_stat.df["pep"] = lfdr(target_pvalues, pi0['pi0'], lfdr_trunc, lfdr_monotone, lfdr_transf, lfdr_eps)
     error_stat.df["cutoff"] = target_scores
     return error_stat, target_pvalues, pi0
 

@@ -14,6 +14,9 @@ pyprophet test_data_2.txt test_data_3.txt --out_of_core --out_of_core.sampling_r
      final_statistics.lfdr_transf: probit
      final_statistics.lfdr_trunc: True
      final_statistics.pfdr: False
+     final_statistics.pi0_method: smoother
+     final_statistics.pi0_smooth_df: 3
+     final_statistics.pi0_smooth_log_pi0: False
      ignore.invalid_score_columns: 0
      is_test: 0
      multiple_files.merge_results: True
@@ -80,6 +83,9 @@ used parameters:
     final_statistics.lfdr_transf               : 'probit'
     final_statistics.lfdr_trunc                : True
     final_statistics.pfdr                      : False
+    final_statistics.pi0_method                : 'smoother'
+    final_statistics.pi0_smooth_df             : 3
+    final_statistics.pi0_smooth_log_pi0        : False
     ignore.invalid_score_columns               : 0
     is_test                                    : 0
     multiple_files.merge_results               : True
@@ -158,6 +164,9 @@ pyprophet test_data_2.txt test_data_3.txt --out_of_core --apply_weights=test_dat
      final_statistics.lfdr_transf: probit
      final_statistics.lfdr_trunc: True
      final_statistics.pfdr: False
+     final_statistics.pi0_method: smoother
+     final_statistics.pi0_smooth_df: 3
+     final_statistics.pi0_smooth_log_pi0: False
      ignore.invalid_score_columns: 0
      is_test: 0
      multiple_files.merge_results: True
@@ -212,6 +221,9 @@ used parameters:
     final_statistics.lfdr_transf               : 'probit'
     final_statistics.lfdr_trunc                : True
     final_statistics.pfdr                      : False
+    final_statistics.pi0_method                : 'smoother'
+    final_statistics.pi0_smooth_df             : 3
+    final_statistics.pi0_smooth_log_pi0        : False
     ignore.invalid_score_columns               : 0
     is_test                                    : 0
     multiple_files.merge_results               : True

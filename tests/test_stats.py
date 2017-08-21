@@ -18,7 +18,7 @@ DATA_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 def test_0(regtest):
     p_values = np.linspace(0.0, 1., 50)
     p_values = np.append(p_values, np.linspace(1.0 - 0.0001, 1.0, 50))
-    pi0 = pi0est(p_values).pi0
+    pi0 = pi0est(p_values)['pi0']
     df = qvalue(p_values,pi0,use_pfdr=False).df
     print("without correction", file=regtest)
     print(df.head(), file=regtest)
@@ -83,15 +83,15 @@ def test_3(tmpdir):
     stat = pd.read_csv('test_lfdr_ref_data.csv', delimiter=',').sort_values("p")
 
     # For comparison with R/bioconductor reference implementation
-    # np.testing.assert_almost_equal(pi0est(stat['p'], lambda_ = 0.4).pi0, 0.6971609)
-    # np.testing.assert_almost_equal(pi0est(stat['p']).pi0, 0.669926)
-    # np.testing.assert_almost_equal(pi0est(stat['p'], lambda_ = np.arange(0.4,1.0,0.05), smooth_log_pi0 = True).pi0, 0.6718003)
-    # np.testing.assert_almost_equal(pi0est(stat['p'], pi0_method = "bootstrap").pi0, 0.6763407)
+    # np.testing.assert_almost_equal(pi0est(stat['p'], lambda_ = 0.4)['pi0'], 0.6971609)
+    # np.testing.assert_almost_equal(pi0est(stat['p'])['pi0'], 0.669926)
+    # np.testing.assert_almost_equal(pi0est(stat['p'], lambda_ = np.arange(0.4,1.0,0.05), smooth_log_pi0 = True)['pi0'], 0.6718003)
+    # np.testing.assert_almost_equal(pi0est(stat['p'], pi0_method = "bootstrap")['pi0'], 0.6763407)
 
-    np.testing.assert_almost_equal(pi0est(stat['p'], lambda_ = 0.4).pi0, 0.6971609)
-    np.testing.assert_almost_equal(pi0est(stat['p']).pi0, 0.6876971608832817)
-    np.testing.assert_almost_equal(pi0est(stat['p'], lambda_ = np.arange(0.4,1.0,0.05), smooth_log_pi0 = True).pi0, 0.68769716088327859)
-    np.testing.assert_almost_equal(pi0est(stat['p'], pi0_method = "bootstrap").pi0, 0.6763407)
+    np.testing.assert_almost_equal(pi0est(stat['p'], lambda_ = 0.4)['pi0'], 0.6971609)
+    np.testing.assert_almost_equal(pi0est(stat['p'])['pi0'], 0.6876971608832817)
+    np.testing.assert_almost_equal(pi0est(stat['p'], lambda_ = np.arange(0.4,1.0,0.05), smooth_log_pi0 = True)['pi0'], 0.68769716088327859)
+    np.testing.assert_almost_equal(pi0est(stat['p'], pi0_method = "bootstrap")['pi0'], 0.6763407)
 
 
 def test_random(regtest):

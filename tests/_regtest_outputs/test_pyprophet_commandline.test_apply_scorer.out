@@ -214,7 +214,7 @@
 9165             0.0             0.0  0.0   -3.57327675819  0.962249279022  1.0  0.0681385472417  12
 
 [10 rows x 25 columns]
-hex digtest pickled classifier: 82d5d7020f263d356eb92f15284265be91206d75
+hex digtest pickled classifier: 52ff41f593d5061aa1be0ddb652ff70eeb01a383
 pyprophet test_data.txt --apply_scorer=test_data_scorer.bin --target.overwrite --random_seed=42
  config settings:
      apply_scorer: test_data_scorer.bin
@@ -231,6 +231,9 @@ pyprophet test_data.txt --apply_scorer=test_data_scorer.bin --target.overwrite -
      final_statistics.lfdr_transf: probit
      final_statistics.lfdr_trunc: True
      final_statistics.pfdr: False
+     final_statistics.pi0_method: smoother
+     final_statistics.pi0_smooth_df: 3
+     final_statistics.pi0_smooth_log_pi0: False
      ignore.invalid_score_columns: 0
      is_test: 0
      multiple_files.merge_results: 0
@@ -273,6 +276,9 @@ used parameters:
     final_statistics.lfdr_transf               : 'probit'
     final_statistics.lfdr_trunc                : True
     final_statistics.pfdr                      : False
+    final_statistics.pi0_method                : 'smoother'
+    final_statistics.pi0_smooth_df             : 3
+    final_statistics.pi0_smooth_log_pi0        : False
     ignore.invalid_score_columns               : 0
     is_test                                    : 0
     multiple_files.merge_results               : 0
@@ -442,6 +448,9 @@ pyprophet test_data.txt --out_of_core --apply_scorer=test_data_scorer.bin --targ
      final_statistics.lfdr_transf: probit
      final_statistics.lfdr_trunc: True
      final_statistics.pfdr: False
+     final_statistics.pi0_method: smoother
+     final_statistics.pi0_smooth_df: 3
+     final_statistics.pi0_smooth_log_pi0: False
      ignore.invalid_score_columns: 0
      is_test: 0
      multiple_files.merge_results: 0
@@ -484,6 +493,9 @@ used parameters:
     final_statistics.lfdr_transf               : 'probit'
     final_statistics.lfdr_trunc                : True
     final_statistics.pfdr                      : False
+    final_statistics.pi0_method                : 'smoother'
+    final_statistics.pi0_smooth_df             : 3
+    final_statistics.pi0_smooth_log_pi0        : False
     ignore.invalid_score_columns               : 0
     is_test                                    : 0
     multiple_files.merge_results               : 0
