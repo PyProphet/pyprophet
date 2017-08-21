@@ -54,9 +54,9 @@ def save_report(report_path, prefix, decoys, targets, top_decoys, top_targets, c
     plt.plot(cutoffs, qvalues, color='r', label="FPR (q-value)")
 
     plt.subplot(323)
-    plt.title("top " + CONFIG.get("group_id") + " d-score distributions")
+    plt.title(CONFIG.get("group_id") + " d-score distributions")
     plt.xlabel("d-score")
-    plt.ylabel("# of groups")
+    plt.ylabel("# of " + CONFIG.get("group_id"))
     plt.hist(
         [top_targets, top_decoys], 20, color=['g', 'r'], label=['target', 'decoy'], histtype='bar')
     plt.legend(loc=2)
@@ -70,7 +70,7 @@ def save_report(report_path, prefix, decoys, targets, top_decoys, top_targets, c
     ddensity._compute_covariance()
     xs = linspace(min(concatenate((top_targets, top_decoys))), max(
         concatenate((top_targets, top_decoys))), 200)
-    plt.title("top " + CONFIG.get("group_id") + " d-score densities")
+    plt.title(CONFIG.get("group_id") + " d-score densities")
     plt.xlabel("d-score")
     plt.ylabel("density")
     plt.plot(xs, tdensity(xs), color='g', label='target')
@@ -81,7 +81,7 @@ def save_report(report_path, prefix, decoys, targets, top_decoys, top_targets, c
     if pvalues is not None:
         counts, __, __ = plt.hist(pvalues, bins=40, normed=True)
         plt.plot([0, 1], [pi0['pi0'], pi0['pi0']], "r")
-        plt.title("p-value density histogram: pi0 = " + str(around(pi0['pi0'], decimals=3)))
+        plt.title("p-value density histogram: $\pi_0$ = " + str(around(pi0['pi0'], decimals=3)))
         plt.xlabel("p-value")
         plt.ylabel("density histogram")
 
@@ -91,9 +91,9 @@ def save_report(report_path, prefix, decoys, targets, top_decoys, top_targets, c
         plt.plot(pi0['lambda_'], pi0['pi0_smooth'], "r")
         plt.xlim([0,1])
         plt.ylim([0,1])
-        plt.title("pi0 smoothing fit plot")
+        plt.title("$\pi_0$ smoothing fit plot")
         plt.xlabel("lambda")
-        plt.ylabel("pi0est(lambda)")
+        plt.ylabel("$\pi_0$($\lambda$)")
 
     plt.savefig(report_path)
 
