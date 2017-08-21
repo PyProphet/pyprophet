@@ -120,6 +120,9 @@ def _standard_config(n_cpus=1):
     info[
         "out_of_core.sampling_rate"] = """[handle large data files by random sampling. this value is between 0.0 and 1.0]"""
 
+    config["group_id"] = "transition_group_id"
+    info["group_id"] = r"""[Specify aggregation group id to compute statistics.]"""
+
     return config, info
 
 

@@ -22,7 +22,6 @@ from optimized import (find_nearest_matches as _find_nearest_matches,
 import scipy.special
 import math
 import scipy.stats
-from scipy.interpolate import interp1d
 import sys
 
 from config import CONFIG
@@ -379,13 +378,13 @@ def pi0est(p_values, lambda_ = np.arange(0.05,1.0,0.05), pi0_method = "smoother"
         if (pi0_method == "smoother"):
             if smooth_log_pi0:
                 pi0 = np.log(pi0)
-                tck = sp.interpolate.splrep(lambda_, pi0, k=smooth_df)
-                pi0Smooth = np.exp(sp.interpolate.splev(lambda_, tck))
+                spi0 = sp.interpolate.UnivariateSpline(lambda_, pi0, k=smooth_df)
+                pi0Smooth = np.exp(spi0(lambda_))
                 # spi0 = smoothspline(lambda_, pi0, df = smooth_df) # R reference function
                 # pi0Smooth = np.exp(predict(spi0, x = lambda_).rx2('y')) # R reference function
             else:
-                tck = sp.interpolate.splrep(lambda_, pi0, k=smooth_df)
-                pi0Smooth = sp.interpolate.splev(lambda_, tck)
+                spi0 = sp.interpolate.UnivariateSpline(lambda_, pi0, k=smooth_df)
+                pi0Smooth = spi0(lambda_)
                 # spi0 = smoothspline(lambda_, pi0, df = smooth_df) # R reference function
                 # pi0Smooth = predict(spi0, x = lambda_).rx2('y')  # R reference function
             pi0 = np.minimum(pi0Smooth[ll-1],1)

@@ -411,4 +411,4 @@ def test_not_unique_tg_id_blocks(tmpdir):
         subprocess.check_output(cmdline, shell=True, stderr=subprocess.STDOUT)
 
     e = exc_info.value
-    assert "transition group ids do not form unique blocks in data file" in e.output
+    assert "transition_group_id do not form unique blocks in data file" in e.output

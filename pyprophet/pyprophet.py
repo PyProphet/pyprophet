@@ -135,7 +135,7 @@ class Scorer(object):
 
     def score(self, table):
 
-        prepared_table, __ = prepare_data_table(table, score_columns=self.score_columns)
+        prepared_table, __ = prepare_data_table(table, tg_id_name=CONFIG.get("group_id"), score_columns=self.score_columns)
         texp = Experiment(prepared_table)
         score = self.classifier.score(texp, True)
         texp["d_score"] = (score - self.mu) / self.nu
@@ -365,7 +365,7 @@ class HolyGostQuery(object):
             raise Exception("the input files have different headers.")
 
     def _setup_experiment(self, tables):
-        prepared_tables, score_columns = prepare_data_tables(tables)
+        prepared_tables, score_columns = prepare_data_tables(tables, tg_id_name=CONFIG.get("group_id"))
         prepared_table = pd.concat(prepared_tables)
         experiment = Experiment(prepared_table)
         experiment.log_summary()

@@ -113,7 +113,7 @@ class PyProphetRunner(object):
             if error:
                 return False
 
-        self.check_cols = ["transition_group_id", "run_id", "decoy"]
+        self.check_cols = [CONFIG.get("group_id"), "run_id", "decoy"]
         if CONFIG.get("export.mayu"):
             self.check_cols += mayu_cols()
             if 'm_score' in self.check_cols:

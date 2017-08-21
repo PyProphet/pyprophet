@@ -234,6 +234,7 @@ pyprophet test_data.txt --random_seed=42 --compute.probabilities
      final_statistics.pi0_method: smoother
      final_statistics.pi0_smooth_df: 3
      final_statistics.pi0_smooth_log_pi0: False
+     group_id: transition_group_id
      ignore.invalid_score_columns: 0
      is_test: 0
      multiple_files.merge_results: 0
@@ -307,6 +308,7 @@ used parameters:
     final_statistics.pi0_method                : 'smoother'
     final_statistics.pi0_smooth_df             : 3
     final_statistics.pi0_smooth_log_pi0        : False
+    group_id                                   : 'transition_group_id'
     ignore.invalid_score_columns               : 0
     is_test                                    : 0
     multiple_files.merge_results               : 0

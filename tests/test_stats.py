@@ -88,10 +88,10 @@ def test_3(tmpdir):
     # np.testing.assert_almost_equal(pi0est(stat['p'], lambda_ = np.arange(0.4,1.0,0.05), smooth_log_pi0 = True)['pi0'], 0.6718003)
     # np.testing.assert_almost_equal(pi0est(stat['p'], pi0_method = "bootstrap")['pi0'], 0.6763407)
 
-    np.testing.assert_almost_equal(pi0est(stat['p'], lambda_ = 0.4)['pi0'], 0.6971609)
-    np.testing.assert_almost_equal(pi0est(stat['p'])['pi0'], 0.6876971608832817)
-    np.testing.assert_almost_equal(pi0est(stat['p'], lambda_ = np.arange(0.4,1.0,0.05), smooth_log_pi0 = True)['pi0'], 0.68769716088327859)
-    np.testing.assert_almost_equal(pi0est(stat['p'], pi0_method = "bootstrap")['pi0'], 0.6763407)
+    np.testing.assert_almost_equal(pi0est(stat['p'], lambda_ = 0.4)['pi0'], 0.697161)
+    np.testing.assert_almost_equal(pi0est(stat['p'])['pi0'], 0.6685638)
+    np.testing.assert_almost_equal(pi0est(stat['p'], lambda_ = np.arange(0.4,1.0,0.05), smooth_log_pi0 = True)['pi0'], 0.6658949)
+    np.testing.assert_almost_equal(pi0est(stat['p'], pi0_method = "bootstrap")['pi0'], 0.6763406)
 
 
 def test_random(regtest):

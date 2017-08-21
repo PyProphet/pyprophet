@@ -10,6 +10,8 @@ except ImportError:
 from scipy.stats import gaussian_kde
 from numpy import linspace, concatenate, around
 
+from config import CONFIG, set_pandas_print_options
+
 
 class Protein:
 
@@ -52,7 +54,7 @@ def save_report(report_path, prefix, decoys, targets, top_decoys, top_targets, c
     plt.plot(cutoffs, qvalues, color='r', label="FPR (q-value)")
 
     plt.subplot(323)
-    plt.title("top peak group d-score distributions")
+    plt.title("top " + CONFIG.get("group_id") + " d-score distributions")
     plt.xlabel("d-score")
     plt.ylabel("# of groups")
     plt.hist(
@@ -68,7 +70,7 @@ def save_report(report_path, prefix, decoys, targets, top_decoys, top_targets, c
     ddensity._compute_covariance()
     xs = linspace(min(concatenate((top_targets, top_decoys))), max(
         concatenate((top_targets, top_decoys))), 200)
-    plt.title("top peak group d-score densities")
+    plt.title("top " + CONFIG.get("group_id") + " d-score densities")
     plt.xlabel("d-score")
     plt.ylabel("density")
     plt.plot(xs, tdensity(xs), color='g', label='target')
@@ -99,7 +101,7 @@ def save_report(report_path, prefix, decoys, targets, top_decoys, top_targets, c
 
 
 def mayu_cols():
-    interesting_cols = ['run_id', 'transition_group_id', 'Sequence', 'ProteinName', 'm_score',
+    interesting_cols = ['run_id', CONFIG.get("group_id"), 'Sequence', 'ProteinName', 'm_score',
                         'Charge']
     return interesting_cols
 

@@ -234,6 +234,7 @@ pyprophet test_data.txt --random_seed=42
      final_statistics.pi0_method: smoother
      final_statistics.pi0_smooth_df: 3
      final_statistics.pi0_smooth_log_pi0: False
+     group_id: transition_group_id
      ignore.invalid_score_columns: 0
      is_test: 0
      multiple_files.merge_results: 0
@@ -300,6 +301,7 @@ used parameters:
     final_statistics.pi0_method                : 'smoother'
     final_statistics.pi0_smooth_df             : 3
     final_statistics.pi0_smooth_log_pi0        : False
+    group_id                                   : 'transition_group_id'
     ignore.invalid_score_columns               : 0
     is_test                                    : 0
     multiple_files.merge_results               : 0
@@ -381,6 +383,7 @@ pyprophet test_data.txt --apply_weights=test_data_weights.txt --target.overwrite
      final_statistics.pi0_method: smoother
      final_statistics.pi0_smooth_df: 3
      final_statistics.pi0_smooth_log_pi0: False
+     group_id: transition_group_id
      ignore.invalid_score_columns: 0
      is_test: 0
      multiple_files.merge_results: 0
@@ -435,6 +438,7 @@ used parameters:
     final_statistics.pi0_method                : 'smoother'
     final_statistics.pi0_smooth_df             : 3
     final_statistics.pi0_smooth_log_pi0        : False
+    group_id                                   : 'transition_group_id'
     ignore.invalid_score_columns               : 0
     is_test                                    : 0
     multiple_files.merge_results               : 0
@@ -731,6 +735,7 @@ pyprophet test_data.txt --out_of_core --apply_weights=test_data_weights.txt --ta
      final_statistics.pi0_method: smoother
      final_statistics.pi0_smooth_df: 3
      final_statistics.pi0_smooth_log_pi0: False
+     group_id: transition_group_id
      ignore.invalid_score_columns: 0
      is_test: 0
      multiple_files.merge_results: 0
@@ -784,6 +789,7 @@ used parameters:
     final_statistics.pi0_method                : 'smoother'
     final_statistics.pi0_smooth_df             : 3
     final_statistics.pi0_smooth_log_pi0        : False
+    group_id                                   : 'transition_group_id'
     ignore.invalid_score_columns               : 0
     is_test                                    : 0
     multiple_files.merge_results               : 0
