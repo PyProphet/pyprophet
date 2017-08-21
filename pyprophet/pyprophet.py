@@ -524,7 +524,7 @@ class HolyGostQuery(object):
     def _learn(self, experiment):
         is_test = CONFIG.get("is_test")
         if is_test:  # for reliable results
-            experiment.df.sort("tg_id", ascending=True, inplace=True)
+            experiment.df.sort_values("tg_id", ascending=True, inplace=True)
 
         learner = self.semi_supervised_learner
         ws = []
