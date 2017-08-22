@@ -24,7 +24,7 @@ import numpy as np
 
 from pyprophet import PyProphet
 from config import CONFIG, set_pandas_print_options
-from report import save_report, export_mayu, mayu_cols
+from report import save_report
 
 from .main_helpers import (parse_cmdline, create_pathes, check_if_any_exists, filterChromByLabels)
 
@@ -68,21 +68,6 @@ class PyProphetRunner(object):
             logging.info("created folder %s" % dirname)
         return dirname
 
-    def check_pathes(self):
-
-        if len(self.pathes) > 1 and not self.merge_results and self.prefix:
-            logging.warn("ignore --target.prefix=%r" % self.prefix)
-
-        if self.prefix is None:
-            prefixes = [os.path.splitext(os.path.basename(path))[0] for path in self.pathes]
-            common_prefix = os.path.commonprefix(prefixes)
-            # is always ok for not learning_mode, which includes that pathes has only one entry
-            if not common_prefix:
-                raise Exception("could not derive common prefix of input file names, please use "
-                                "--target.prefix option")
-            prefix = common_prefix
-        return prefix
-
     def create_out_pathes(self, dirname):
         if self.merge_results:
             assert self.prefix is not None
@@ -100,7 +85,6 @@ class PyProphetRunner(object):
 
     def run(self):
 
-        self.prefix = self.check_pathes()
         dirname = self.determine_output_dir_name()
         out_pathes = self.create_out_pathes(dirname)
 
@@ -115,11 +99,6 @@ class PyProphetRunner(object):
                 return False
 
         self.check_cols = [CONFIG.get("group_id"), "run_id", "decoy"]
-        if CONFIG.get("export.mayu"):
-            self.check_cols += mayu_cols()
-            if 'm_score' in self.check_cols:
-                self.check_cols.remove('m_score')  # The m_score is calculated by the learner
-                #  and should not be in the OpenSwathWorkflow output
 
         logging.info("config settings:")
         for k, v in sorted(CONFIG.config.items()):
@@ -220,23 +199,13 @@ class PyProphetRunner(object):
                 print "WRITTEN: ", out_path.report
 
                 cutoffs, svalues, qvalues, top_targets, top_decoys = plot_data
-                for (name, values) in [("cutoffs", cutoffs), ("svalues", svalues), ("qvalues", qvalues),
-                                       ("d_scores_top_target_peaks", top_targets),
-                                       ("d_scores_top_decoy_peaks", top_decoys)]:
-                    path = out_path[name]
-                    with open(path, "w") as fp:
-                        fp.write(" ".join("%e" % v for v in values))
-                    print "WRITTEN: ", path
-
-            if CONFIG.get("export.mayu"):
-                if result.final_statistics is not None:
-                    export_mayu(out_pathes[0]['mayu_cutoff'], out_pathes[0]['mayu_fasta'],
-                                out_pathes[0]['mayu_csv'], scored_table, result.final_statistics)
-                    print "WRITTEN: ", out_pathes[0]['mayu_cutoff']
-                    print "WRITTEN: ", out_pathes[0]['mayu_fasta']
-                    print "WRITTEN: ", out_pathes[0]['mayu_csv']
-                else:
-                    logging.warn("can not write mayu table in this case")
+                # for (name, values) in [("cutoffs", cutoffs), ("svalues", svalues), ("qvalues", qvalues),
+                #                        ("d_scores_top_target_peaks", top_targets),
+                #                        ("d_scores_top_decoy_peaks", top_decoys)]:
+                #     path = out_path[name]
+                #     with open(path, "w") as fp:
+                #         fp.write(" ".join("%e" % v for v in values))
+                #     print "WRITTEN: ", path
 
     def save_scorer(self, scorer, extra_writes):
         pickled_scorer_path = extra_writes.get("pickled_scorer_path")
@@ -341,13 +310,36 @@ class PyProphetOutOfCoreScorerApplier(PyProphetRunner):
         yield
 
 
-# @click.command()
-# @click.version_option()
-# @click.option('--test/--no-test', default=False, help='Run in test mode with fixed seed.')
-# @click.option('--random_seed', default=None, type=int, help='Set fixed seed to integer value.')
-def _main(args):
+@click.command()
+@click.version_option()
+@click.argument('infiles', nargs=-1)
+@click.option('--outfile', type=click.Path(exists=False), help='PyProphet output file.')
+@click.option('--apply_weights', type=click.Path(exists=True), help='Apply PyProphet score weights file instead of semi-supervised learning.')
+@click.option('--xeval_fraction', default=0.5, type=float, help='Data fraction used for cross-validation of semi-supervised learning step.')
+@click.option('--xeval_iterations', default=10, type=int, help='Number of iterations for cross-validation of semi-supervised learning step.')
+@click.option('--initial_fdr', default=0.15, type=float, help='Initial FDR cutoff for best scoring targets.')
+@click.option('--iteration_fdr', default=0.02, type=float, help='Iteration FDR cutoff for best scoring targets.')
+@click.option('--subsample/--no-subsample', default=False, help='Subsample input data to speed up semi-supervised learning.')
+@click.option('--subsample_rate', default=0.1, type=float, help='Subsampling rate of input data.')
 
-    pathes = parse_cmdline(args)
+@click.option('--group_id', default="transition_group_id", type=str, help='Group identifier for calculation of statistics.')
+@click.option('--parametric/--no-parametric', default=True, help='Do parametric estimation of p-values.')
+@click.option('--pfdr/--no-pfdr', default=False, help='Compute positive false discovery rate (pFDR) instead of FDR.')
+@click.option('--pi0_lambda', default=[0.4,None,None], type=(float, float, float), help='Use non-parametric estimation of p-values. Either use <START END STEPS>, e.g. 0.1, 1.0, 0.1 or set to fixed value, e.g. 0.4.')
+@click.option('--pi0_method', default='smoother', type=click.Choice(['smoother', 'bootstrap']), help='Either "smoother" or "bootstrap"; the method for automatically choosing tuning parameter in the estimation of pi_0, the proportion of true null hypotheses.')
+@click.option('--pi0_smooth_df', default=3, type=int, help='Number of degrees-of-freedom to use when estimating pi_0 with a smoother.')
+@click.option('--pi0_smooth_log_pi0/--no-pi0_smooth_log_pi0', default=False, help='If True and pi0_method = "smoother", pi0 will be estimated by applying a smoother to a scatterplot of log(pi0) estimates against the tuning parameter lambda.')
+@click.option('--lfdr_truncate/--no-lfdr_truncate', default=True, help='If True, local FDR values >1 are set to 1.')
+@click.option('--lfdr_monotone/--no-lfdr_monotone', default=True, help='If True, local FDR values are non-decreasing with increasing p-values.')
+@click.option('--lfdr_transformation', default='probit', type=click.Choice(['probit', 'logit']), help='Either a "probit" or "logit" transformation is applied to the p-values so that a local FDR estimate can be formed that does not involve edge effects of the [0,1] interval in which the p-values lie.')
+@click.option('--lfdr_eps', default=np.power(10.0,-8), type=float, help='Numeric value that is threshold for the tails of the empirical p-value distribution.')
+
+@click.option('--threads', default=1, type=int, help='Number of threads used for semi-supervised learning. -1 means all available CPUs.')
+@click.option('--test/--no-test', default=False, help='Run in test mode with fixed seed.')
+@click.option('--random_seed', default=None, type=int, help='Set fixed seed to integer value.')
+def main(infiles, outfile, apply_weights, xeval_fraction, xeval_iterations, initial_fdr, iteration_fdr, subsample, subsample_rate, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_eps, threads, test, random_seed):
+
+    pathes = parse_cmdline(infiles, outfile, apply_weights, xeval_fraction, xeval_iterations, initial_fdr, iteration_fdr, subsample, subsample_rate, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_eps, threads, test, random_seed)
 
     apply_scorer = CONFIG.get("apply_scorer")
     apply_weights = CONFIG.get("apply_weights")
@@ -393,29 +385,3 @@ def _main(args):
         PyProphetOutOfCoreScorerApplier(
             pathes, prefix, merge_results, apply_scorer, delim_in, delim_out).run()
 
-
-@click.command()
-@click.version_option()
-@click.argument('input')
-@click.option('--apply_weights', type=click.Path(), help='Apply PyProphet score weights file instead of semi-supervised learning.')
-@click.option('--parametric/--no-parametric', default=True, help='Do parametric estimation of p-values.')
-@click.option('--pfdr/--no-pfdr', default=False, help='Compute positive false discovery rate (pFDR) instead of FDR.')
-@click.option('--lambda', default=0.4, type=(float, float, float), help='Use non-parametric estimation of p-values. Either use <START END STEP>, e.g. 0.1, 1.0, 0.1 or set to fixed value, e.g. 0.4.')
-@click.option('--xeval_fraction', default=0.5, type=float, help='Data fraction used for cross-validation of semi-supervised learning step.')
-@click.option('--xeval_iterations', default=10, type=int, help='Number of iterations for cross-validation of semi-supervised learning step.')
-@click.option('--initial_fdr', default=0.15, type=float, help='Initial FDR cutoff for best scoring targets.')
-@click.option('--iteration_fdr', default=0.02, type=float, help='Iteration FDR cutoff for best scoring targets.')
-@click.option('--pi0_method', default='smoother', type=click.Choice(['smoother', 'bootstrap']), help='Either "smoother" or "bootstrap"; the method for automatically choosing tuning parameter in the estimation of pi_0, the proportion of true null hypotheses.')
-@click.option('--pi0_smooth_df', default=3, type=int, help='Number of degrees-of-freedom to use when estimating pi_0 with a smoother.')
-@click.option('--pi0_smooth_log_pi0/--no-pi0_smooth_log_pi0', default=False, help='If True and pi0_method = "smoother", pi0 will be estimated by applying a smoother to a scatterplot of log(pi0) estimates against the tuning parameter lambda.')
-@click.option('--lfdr_truncate/--no-lfdr_truncate', default=True, help='If True, local FDR values >1 are set to 1.')
-@click.option('--lfdr_monotone/--no-lfdr_monotone', default=True, help='If True, local FDR values are non-decreasing with increasing p-values.')
-@click.option('--lfdr_transformation', default='probit', type=click.Choice(['probit', 'logit']), help='Either a "probit" or "logit" transformation is applied to the p-values so that a local FDR estimate can be formed that does not involve edge effects of the [0,1] interval in which the p-values lie.')
-@click.option('--lfdr_eps', default=np.power(10.0,-8), type=float, help='Numeric value that is threshold for the tails of the empirical p-value distribution.')
-@click.option('--threads', default=1, type=int, help='Number of threads used for semi-supervised learning. -1 means all available CPUs.')
-@click.option('--subsample/--no-subsample', default=False, help='Subsample input data to speed up semi-supervised learning.')
-@click.option('--subsample_rate', default=0.1, type=float, help='Subsampling rate of input data.')
-@click.option('--group_id', default="transition_group_id", type=str, help='Group identifier for calculation of statistics.')
-
-def main(input):
-    _main(sys.argv[1:])

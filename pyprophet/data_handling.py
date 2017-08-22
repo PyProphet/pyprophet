@@ -128,7 +128,7 @@ def prepare_data_table(table, tg_id_name="transition_group_id",
     tg_ids = table[tg_id_name]
 
     if not check_for_unique_blocks(tg_ids):
-        raise Exception(CONFIG.get("group_id") + " do not form unique blocks in data file")
+        raise Exception(tg_id_name + " do not form unique blocks in data file")
 
     tg_map = dict()
     for i, tg_id in enumerate(tg_ids.unique()):

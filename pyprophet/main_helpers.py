@@ -2,22 +2,14 @@
 
 import os
 import sys
+import numpy as np
 
 import click
 from .version import version
 
 from config import CONFIG
 
-
-def dump_config_info(config, info):
-    print
-    print "parameters:"
-    print
-    for k, v in sorted(config.items()):
-        comment = info.get(k, "")
-        print "    --%-40s   default: %-5r %s" % (k, v, comment)
-    print
-
+import ntpath
 
 def dump_config(config):
     print
@@ -28,37 +20,60 @@ def dump_config(config):
     print
 
 
-def parse_cmdline(args):
+def parse_cmdline(infiles, outfile, apply_weights, xeval_fraction, xeval_iterations, initial_fdr, iteration_fdr, subsample, subsample_rate, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_eps, threads, test, random_seed):
 
     options = dict()
-    pathes = []
 
-    if "--help" in args:
-        print_help()
-        sys.exit(0)
+    if outfile != None:
+        options['target.prefix'] = outfile
+    elif outfile == None and len(infiles) == 1:
+        options['target.prefix'] = os.path.splitext(ntpath.basename(infiles[0]))[0]
+    else:
+        raise Exception("Specify output filename when analysing multiple input files together.")
 
-    if "--version" in args:
-        print_version()
-        sys.exit(0)
+    if pi0_lambda[1] == None and pi0_lambda[2] == None:
+        pi0_lambda = pi0_lambda[0]
+    elif 0 <= pi0_lambda[0] < 1 and pi0_lambda[0] <= pi0_lambda[1] <= 1 and 0 < pi0_lambda[2] < 1:
+        pi0_lambda = np.arange(pi0_lambda[0], pi0_lambda[1], pi0_lambda[2])
+    else:
+        raise Exception("Wrong input values for pi0_lambda. pi0_lambda must be within [0,1)")
+    
+    options['apply_weights'] = apply_weights
+    options['xeval.fraction'] = xeval_fraction
+    options['xeval.num_iter'] = xeval_iterations
+    options['semi_supervised_learner.initial_fdr'] = initial_fdr
+    options['semi_supervised_learner.initial_lambda'] = pi0_lambda
+    options['semi_supervised_learner.iteration_fdr'] = iteration_fdr
+    options['semi_supervised_learner.iteration_lambda'] = pi0_lambda
+    options['semi_supervised_learner.num_iter'] = xeval_iterations
+    options['out_of_core'] = subsample
+    options['out_of_core.sampling_rate'] = subsample_rate
 
-    for arg in args:
-        if arg.startswith("--"):
-            if "=" in arg:
-                pre, __, post = arg.partition("=")
-                options[pre[2:]] = post
-            else:
-                options[arg[2:]] = True
-        else:
-            pathes.append(arg)
+    options['group_id'] = group_id
+    options['final_statistics.emp_p'] = parametric
+    options['final_statistics.pfdr'] = pfdr
+    options['final_statistics.lambda'] = pi0_lambda
+    options['final_statistics.pi0_method'] = pi0_method
+    options['final_statistics.pi0_smooth_df'] = pi0_smooth_df
+    options['final_statistics.pi0_smooth_log_pi0'] = pi0_smooth_log_pi0
+    options['final_statistics.lfdr_trunc'] = lfdr_truncate
+    options['final_statistics.lfdr_monotone'] = lfdr_monotone
+    options['final_statistics.lfdr_transf'] = lfdr_transformation
+    options['final_statistics.lfdr_eps'] = lfdr_eps
 
-    if not pathes:
-        print_help()
-        raise Exception("no input file given")
+    options['num_processes'] = threads
+    options['is_test'] = test
+
+    options['random_seed'] = random_seed
+    if options["random_seed"] is not None:
+        options["random_seed"] = int(options["random_seed"])
+    else:
+        options["random_seed"] = np.random.randint(0, sys.maxint)
 
     CONFIG.update(options)
     dump_config(CONFIG.config)
 
-    return pathes
+    return infiles
 
 
 def create_pathes(prefix, dirname):
@@ -71,18 +86,15 @@ def create_pathes(prefix, dirname):
         __getattr__ = dict.__getitem__
 
     return Pathes(prefix, dirname,
-                  scored_table="_with_dscore.csv",
+                  scored_table="_scored.txt",
                   filtered_table="_with_dscore_filtered.csv",
-                  filtered_chroms="_with_dscore_filtered.sqMass",
+                  filtered_chroms="_scored.sqMass",
                   report="_report.pdf",
                   cutoffs="_cutoffs.txt",
                   svalues="_svalues.txt",
                   qvalues="_qvalues.txt",
                   d_scores_top_target_peaks="_dscores_top_target_peaks.txt",
                   d_scores_top_decoy_peaks="_dscores_top_decoy_peaks.txt",
-                  mayu_cutoff="_mayu.cutoff",
-                  mayu_fasta="_mayu.fasta",
-                  mayu_csv="_mayu.csv",
                   )
 
 
