@@ -47,6 +47,7 @@ setup(name='pyprophet',
           "scipy >= 0.9.0",
           "numexpr >= 2.1",
           "scikit-learn >= 0.17",
+          "statsmodels >= 0.8.0",
           "matplotlib",
           "seaborn"
       ],
