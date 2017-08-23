@@ -15,7 +15,7 @@ else:
 
 
 ######################################################################
-version = (0, 24, 1)  # NEVER FORGET TO UPDATE version.py AS WELL !!!
+version = (0, 24, 2)  # NEVER FORGET TO UPDATE version.py AS WELL !!!
 ######################################################################
 
 
