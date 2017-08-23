@@ -30,10 +30,8 @@ def _standard_config(n_cpus=1):
     lambda_ = "0.4"
 
     config["semi_supervised_learner.initial_fdr"] = 0.15
-    config["semi_supervised_learner.initial_lambda"] = lambda_
 
     config["semi_supervised_learner.iteration_fdr"] = 0.02
-    config["semi_supervised_learner.iteration_lambda"] = lambda_
 
     config["semi_supervised_learner.num_iter"] = 5
 
@@ -150,9 +148,7 @@ def _fix_config_types(dd):
               ]:
         dd[k] = float(dd[k])
 
-    for k in ["semi_supervised_learner.initial_lambda",
-              "semi_supervised_learner.iteration_lambda",
-              "final_statistics.lambda",
+    for k in ["final_statistics.lambda",
               ]:
         if len(str(dd[k]).split(',')) == 3:
             dd[k] = np.arange(float(dd[k].split(',')[0]),float(dd[k].split(',')[1]),float(dd[k].split(',')[2]))

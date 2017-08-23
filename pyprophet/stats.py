@@ -100,7 +100,14 @@ def posterior_pg_prob(dvals, target_scores, decoy_scores, error_stat, number_tar
     # Estimate a suitable cutoff in discriminant score (d_score)
     # target_scores = experiment.get_top_target_peaks().df["d_score"]
     # decoy_scores = experiment.get_top_decoy_peaks().df["d_score"]
-    estimated_cutoff = find_cutoff(target_scores, decoy_scores, 0.15, lambda_)
+
+    pi0_method = CONFIG.get("final_statistics.pi0_method")
+    pi0_smooth_df = CONFIG.get("final_statistics.pi0_smooth_df")
+    pi0_smooth_log_pi0 = CONFIG.get("final_statistics.pi0_smooth_log_pi0")
+    use_pemp = CONFIG.get("final_statistics.use_pemp")
+    use_pfdr = CONFIG.get("final_statistics.use_pfdr")
+
+    estimated_cutoff = find_cutoff(target_scores, decoy_scores, 0.15, lambda_, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, use_pemp, use_pfdr)
 
     target_scores_above = target_scores[target_scores > estimated_cutoff]
 
@@ -556,7 +563,7 @@ def lfdr(p_values, pi0, trunc = True, monotone = True, transf = "probit", eps = 
 
 
 @profile
-def get_error_stat_from_null(target_scores, decoy_scores, lambda_, pi0_method = "smoother", pi0_smooth_df = 3, pi0_smooth_log_pi0 = False, use_pemp = False, use_pfdr = False, lfdr_trunc = True, lfdr_monotone = True, lfdr_transf = "probit", lfdr_eps = np.power(10.0,-8)):
+def get_error_stat_from_null(target_scores, decoy_scores, lambda_, pi0_method = "smoother", pi0_smooth_df = 3, pi0_smooth_log_pi0 = False, use_pemp = False, use_pfdr = False, use_lfdr = False, lfdr_trunc = True, lfdr_monotone = True, lfdr_transf = "probit", lfdr_eps = np.power(10.0,-8)):
     """ takes list of decoy and target scores and creates error statistics for target values based
     on mean and std dev of decoy scores"""
 
@@ -573,15 +580,19 @@ def get_error_stat_from_null(target_scores, decoy_scores, lambda_, pi0_method = 
 
     pi0 = pi0est(target_pvalues, lambda_, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0)
     error_stat = qvalue(target_pvalues, pi0['pi0'], use_pfdr)
-    error_stat.df["pep"] = lfdr(target_pvalues, pi0['pi0'], lfdr_trunc, lfdr_monotone, lfdr_transf, lfdr_eps)
+
+    if use_lfdr:
+        logging.info("Estimate local false discovery rates (lFDR) / posterior error probabilities (PEP)")
+        error_stat.df["pep"] = lfdr(target_pvalues, pi0['pi0'], lfdr_trunc, lfdr_monotone, lfdr_transf, lfdr_eps)
+
     error_stat.df["cutoff"] = target_scores
     return error_stat, target_pvalues, pi0
 
 
-def find_cutoff(target_scores, decoy_scores, fdr, lambda_ = np.arange(0.05,1.0,0.05), pi0_method = "smoother", pi0_smooth_df = 3, pi0_smooth_log_pi0 = False, use_pemp = False, use_pfdr = False, lfdr_trunc = True, lfdr_monotone = True, lfdr_transf = "probit", lfdr_eps = np.power(10.0,-8)):
+def find_cutoff(target_scores, decoy_scores, fdr, lambda_, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, use_pemp, use_pfdr):
     """ finds cut off target score for specified false discovery rate fdr """
 
-    error_stat, __, __ = get_error_stat_from_null(target_scores, decoy_scores, lambda_, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, use_pemp, use_pfdr, lfdr_trunc, lfdr_monotone, lfdr_transf, lfdr_eps)
+    error_stat, __, __ = get_error_stat_from_null(target_scores, decoy_scores, lambda_, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, use_pemp, use_pfdr, False)
     if not len(error_stat.df):
         raise Exception("to little data for calculating error statistcs")
     i0 = (error_stat.df.qvalue - fdr).abs().argmin()
@@ -606,7 +617,7 @@ def calculate_final_statistics(all_top_target_scores,
     'exp' """
 
     # estimate error statistics from given samples
-    error_stat, target_pvalues, pi0 = get_error_stat_from_null(test_target_scores, test_decoy_scores, lambda_, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, use_pemp, use_pfdr, lfdr_trunc, lfdr_monotone, lfdr_transf, lfdr_eps)
+    error_stat, target_pvalues, pi0 = get_error_stat_from_null(test_target_scores, test_decoy_scores, lambda_, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, use_pemp, use_pfdr, True, lfdr_trunc, lfdr_monotone, lfdr_transf, lfdr_eps)
 
     # fraction of null hypothesises in sample values
     summed_test_fraction_null = error_stat.num_null / error_stat.num_total

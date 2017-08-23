@@ -84,7 +84,7 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
         assert isinstance(inner_learner, AbstractLearner)
         self.inner_learner = inner_learner
 
-    def select_train_peaks(self, train, sel_column, fdr, lambda_):
+    def select_train_peaks(self, train, sel_column, fdr, lambda_, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, use_pemp, use_pfdr):
         assert isinstance(train, Experiment)
         assert isinstance(sel_column, basestring)
         assert isinstance(fdr, float)
@@ -95,14 +95,20 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
         td_scores = td_peaks[sel_column]
 
         # find cutoff fdr from scores and only use best target peaks:
-        cutoff = find_cutoff(tt_scores, td_scores, fdr, lambda_)
+        cutoff = find_cutoff(tt_scores, td_scores, fdr, lambda_, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, use_pemp, use_pfdr)
         best_target_peaks = tt_peaks.filter_(tt_scores >= cutoff)
         return td_peaks, best_target_peaks
 
     def start_semi_supervised_learning(self, train):
         fdr = CONFIG.get("semi_supervised_learner.initial_fdr")
-        lambda_ = CONFIG.get("semi_supervised_learner.initial_lambda")
-        td_peaks, bt_peaks = self.select_train_peaks(train, "main_score", fdr, lambda_)
+        lambda_ = CONFIG.get("final_statistics.lambda")
+        pi0_method = CONFIG.get("final_statistics.pi0_method")
+        pi0_smooth_df = CONFIG.get("final_statistics.pi0_smooth_df")
+        pi0_smooth_log_pi0 = CONFIG.get("final_statistics.pi0_smooth_log_pi0")
+        use_pemp = CONFIG.get("final_statistics.use_pemp")
+        use_pfdr = CONFIG.get("final_statistics.use_pfdr")
+
+        td_peaks, bt_peaks = self.select_train_peaks(train, "main_score", fdr, lambda_, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, use_pemp, use_pfdr)
         model = self.inner_learner.learn(td_peaks, bt_peaks, False)
         w = model.get_parameters()
         clf_scores = model.score(train, False)
@@ -112,8 +118,14 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
     @profile
     def iter_semi_supervised_learning(self, train):
         fdr = CONFIG.get("semi_supervised_learner.iteration_fdr")
-        lambda_ = CONFIG.get("semi_supervised_learner.iteration_lambda")
-        td_peaks, bt_peaks = self.select_train_peaks(train, "classifier_score", fdr, lambda_)
+        lambda_ = CONFIG.get("final_statistics.lambda")
+        pi0_method = CONFIG.get("final_statistics.pi0_method")
+        pi0_smooth_df = CONFIG.get("final_statistics.pi0_smooth_df")
+        pi0_smooth_log_pi0 = CONFIG.get("final_statistics.pi0_smooth_log_pi0")
+        use_pemp = CONFIG.get("final_statistics.use_pemp")
+        use_pfdr = CONFIG.get("final_statistics.use_pfdr")
+
+        td_peaks, bt_peaks = self.select_train_peaks(train, "classifier_score", fdr, lambda_, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, use_pemp, use_pfdr)
 
         model = self.inner_learner.learn(td_peaks, bt_peaks, True)
         w = model.get_parameters()

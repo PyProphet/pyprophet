@@ -243,9 +243,7 @@ pyprophet test_data.txt --apply_scorer=test_data_scorer.bin --target.overwrite -
      out_of_core.sampling_rate: 0.1
      random_seed: 42
      semi_supervised_learner.initial_fdr: 0.15
-     semi_supervised_learner.initial_lambda: 0.4
      semi_supervised_learner.iteration_fdr: 0.02
-     semi_supervised_learner.iteration_lambda: 0.4
      semi_supervised_learner.num_iter: 5
      semi_supervised_learner.stat_best: 0
      semi_supervised_learner.use_best: 0
@@ -289,9 +287,7 @@ used parameters:
     out_of_core.sampling_rate                  : 0.1
     random_seed                                : 42
     semi_supervised_learner.initial_fdr        : 0.15
-    semi_supervised_learner.initial_lambda     : 0.4
     semi_supervised_learner.iteration_fdr      : 0.02
-    semi_supervised_learner.iteration_lambda   : 0.4
     semi_supervised_learner.num_iter           : 5
     semi_supervised_learner.stat_best          : 0
     semi_supervised_learner.use_best           : 0
@@ -462,9 +458,7 @@ pyprophet test_data.txt --out_of_core --apply_scorer=test_data_scorer.bin --targ
      out_of_core.sampling_rate: 0.1
      random_seed: 42
      semi_supervised_learner.initial_fdr: 0.15
-     semi_supervised_learner.initial_lambda: 0.4
      semi_supervised_learner.iteration_fdr: 0.02
-     semi_supervised_learner.iteration_lambda: 0.4
      semi_supervised_learner.num_iter: 5
      semi_supervised_learner.stat_best: 0
      semi_supervised_learner.use_best: 0
@@ -508,9 +502,7 @@ used parameters:
     out_of_core.sampling_rate                  : 0.1
     random_seed                                : 42
     semi_supervised_learner.initial_fdr        : 0.15
-    semi_supervised_learner.initial_lambda     : 0.4
     semi_supervised_learner.iteration_fdr      : 0.02
-    semi_supervised_learner.iteration_lambda   : 0.4
     semi_supervised_learner.num_iter           : 5
     semi_supervised_learner.stat_best          : 0
     semi_supervised_learner.use_best           : 0

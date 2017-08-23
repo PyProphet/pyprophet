@@ -26,9 +26,7 @@ pyprophet test_data_2.txt test_data_3.txt --out_of_core --out_of_core.sampling_r
      out_of_core.sampling_rate: 1.0
      random_seed: 42
      semi_supervised_learner.initial_fdr: 0.15
-     semi_supervised_learner.initial_lambda: 0.4
      semi_supervised_learner.iteration_fdr: 0.02
-     semi_supervised_learner.iteration_lambda: 0.4
      semi_supervised_learner.num_iter: 5
      semi_supervised_learner.stat_best: 0
      semi_supervised_learner.use_best: 0
@@ -59,6 +57,7 @@ pyprophet test_data_2.txt test_data_3.txt --out_of_core --out_of_core.sampling_r
  end learn_randomized
  finished cross evals
 
+ Estimate local false discovery rates (lFDR) / posterior error probabilities (PEP)
  calculated scoring and statistics
  processing input data finished
  data set contains 387 decoy and 387 target transition groups
@@ -96,9 +95,7 @@ used parameters:
     out_of_core.sampling_rate                  : 1.0
     random_seed                                : 42
     semi_supervised_learner.initial_fdr        : 0.15
-    semi_supervised_learner.initial_lambda     : 0.4
     semi_supervised_learner.iteration_fdr      : 0.02
-    semi_supervised_learner.iteration_lambda   : 0.4
     semi_supervised_learner.num_iter           : 5
     semi_supervised_learner.stat_best          : 0
     semi_supervised_learner.use_best           : 0
@@ -178,9 +175,7 @@ pyprophet test_data_2.txt test_data_3.txt --out_of_core --apply_weights=test_dat
      out_of_core.sampling_rate: 1.0
      random_seed: 42
      semi_supervised_learner.initial_fdr: 0.15
-     semi_supervised_learner.initial_lambda: 0.4
      semi_supervised_learner.iteration_fdr: 0.02
-     semi_supervised_learner.iteration_lambda: 0.4
      semi_supervised_learner.num_iter: 5
      semi_supervised_learner.stat_best: 0
      semi_supervised_learner.use_best: 0
@@ -199,6 +194,7 @@ pyprophet test_data_2.txt test_data_3.txt --out_of_core --apply_weights=test_dat
     17 scores including main score
  start application of pretrained weights
  finished pretrained scoring
+ Estimate local false discovery rates (lFDR) / posterior error probabilities (PEP)
  calculated scoring and statistics
  processing input data finished
  data set contains 387 decoy and 387 target transition groups
@@ -236,9 +232,7 @@ used parameters:
     out_of_core.sampling_rate                  : 1.0
     random_seed                                : 42
     semi_supervised_learner.initial_fdr        : 0.15
-    semi_supervised_learner.initial_lambda     : 0.4
     semi_supervised_learner.iteration_fdr      : 0.02
-    semi_supervised_learner.iteration_lambda   : 0.4
     semi_supervised_learner.num_iter           : 5
     semi_supervised_learner.stat_best          : 0
     semi_supervised_learner.use_best           : 0
