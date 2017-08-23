@@ -312,7 +312,7 @@ class PyProphetOutOfCoreScorerApplier(PyProphetRunner):
 
 @click.command()
 @click.version_option()
-@click.argument('infiles', nargs=-1)
+@click.argument('infiles', nargs=-1, type=click.Path(exists=True))
 @click.option('--outfile', type=click.Path(exists=False), help='PyProphet output file.')
 @click.option('--apply_weights', type=click.Path(exists=True), help='Apply PyProphet score weights file instead of semi-supervised learning.')
 @click.option('--xeval_fraction', default=0.5, type=float, help='Data fraction used for cross-validation of semi-supervised learning step.')
@@ -353,14 +353,14 @@ def main(infiles, outfile, apply_weights, xeval_fraction, xeval_iterations, init
     num_processes = CONFIG.get("num_processes")
 
     if random_seed is not None and num_processes != 1:
-        raise Exception("Setting random seed does not work if you run pyprophet with multiple "
+        sys.exit("Setting random seed does not work if you run pyprophet with multiple "
                         "processes. Using more than one process is rarely faster.")
 
     if random_seed is not None:
         random.seed(random_seed)
 
     if apply_scorer and apply_weights:
-        raise Exception("can not apply scorer and weights at the same time")
+        sys.exit("can not apply scorer and weights at the same time")
 
     learning_mode = not apply_scorer and not apply_weights
 

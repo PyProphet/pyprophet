@@ -24,19 +24,22 @@ def parse_cmdline(infiles, outfile, apply_weights, xeval_fraction, xeval_iterati
 
     options = dict()
 
+    if len(infiles) < 1:
+        sys.exit('Use option --help for further information.')
+
     if outfile != None:
         options['target.prefix'] = outfile
     elif outfile == None and len(infiles) == 1:
         options['target.prefix'] = os.path.splitext(ntpath.basename(infiles[0]))[0]
     else:
-        raise Exception("Specify output filename when analysing multiple input files together.")
+        sys.exit('Error: Specify output filename when analysing multiple input files together.')
 
     if pi0_lambda[1] == None and pi0_lambda[2] == None:
         pi0_lambda = pi0_lambda[0]
     elif 0 <= pi0_lambda[0] < 1 and pi0_lambda[0] <= pi0_lambda[1] <= 1 and 0 < pi0_lambda[2] < 1:
         pi0_lambda = np.arange(pi0_lambda[0], pi0_lambda[1], pi0_lambda[2])
     else:
-        raise Exception("Wrong input values for pi0_lambda. pi0_lambda must be within [0,1)")
+        sys.exit('Error: Wrong input values for pi0_lambda. pi0_lambda must be within [0,1).')
     
     options['apply_weights'] = apply_weights
     options['xeval.fraction'] = xeval_fraction
