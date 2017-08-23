@@ -22,6 +22,8 @@ from optimized import (find_nearest_matches as _find_nearest_matches,
 import scipy.special
 import math
 import scipy.stats
+from statsmodels.nonparametric.kde import KDEUnivariate
+
 import sys
 
 from config import CONFIG
@@ -501,20 +503,35 @@ def qvalue(p_values, pi0, use_pfdr=False):
     return ErrorStatistics(df, num_null, num_total)
 
 
+def bw_nrd0(x):
+    if len(x) < 2:
+        sys.exit("Error: bandwidth estimation requires at least two data points.")
+
+    hi = np.std(x, ddof=1)
+    q75, q25 = np.percentile(x, [75 ,25])
+    iqr = q75 - q25
+    lo = min(hi, iqr/1.34)
+
+    if not ((lo == hi) or (lo == abs(x[0])) or (lo == 1)):
+        lo = 1
+
+    return 0.9 * lo *len(x)**-0.2
+
+
 @profile
-def lfdr(p_values, pi0, trunc = True, monotone = True, transf = "probit", eps = np.power(10.0,-8)):
+def lfdr(p_values, pi0, trunc = True, monotone = True, transf = "probit", adj = 1.5, eps = np.power(10.0,-8)):
     """ estimate local FDR / posterior error probability from p-values with method of storey"""
     p = np.array(p_values)
 
     # Compare to bioconductor/qvalue reference implementation
-    # import rpy2
-    # import rpy2.robjects as robjects
-    # from rpy2.robjects import pandas2ri
-    # pandas2ri.activate()
+    import rpy2
+    import rpy2.robjects as robjects
+    from rpy2.robjects import pandas2ri
+    pandas2ri.activate()
 
-    # density=robjects.r('density')
-    # smoothspline=robjects.r('smooth.spline')
-    # predict=robjects.r('predict')
+    density=robjects.r('density')
+    smoothspline=robjects.r('smooth.spline')
+    predict=robjects.r('predict')
 
     # Check inputs
     lfdr_out = p
@@ -531,19 +548,29 @@ def lfdr(p_values, pi0, trunc = True, monotone = True, transf = "probit", eps = 
         p = np.maximum(p, eps)
         p = np.minimum(p, 1-eps)
         x = scipy.stats.norm.ppf(p, loc=0, scale=1)
-        myk = scipy.stats.gaussian_kde(x) # different than R implementation!
-        y = myk.evaluate(x)
+
+        # R-like implementation
+        bw = bw_nrd0(x)
+        myd = KDEUnivariate(x)
+        myd.fit(bw=adj*bw, gridsize = 512)
+        y = sp.interpolate.spline(myd.support, myd.density, x)
         # myd = density(x, adjust = 1.5) # R reference function
         # mys = smoothspline(x = myd.rx2('x'), y = myd.rx2('y')) # R reference function
         # y = predict(mys, x).rx2('y') # R reference function
+
         lfdr = pi0 * scipy.stats.norm.pdf(x) / y
     elif (transf == "logit"):
         x = np.log((p + eps) / (1 - p + eps))
-        myk = scipy.stats.gaussian_kde(x) # different than R implementation!
-        y = myk.evaluate(x)
+
+        # R-like implementation
+        bw = bw_nrd0(x)
+        myd = KDEUnivariate(x)
+        myd.fit(bw=adj*bw, gridsize = 512)
+        y = sp.interpolate.spline(myd.support, myd.density, x)
         # myd = density(x, adjust = 1.5) # R reference function
         # mys = smoothspline(x = myd.rx2('x'), y = myd.rx2('y')) # R reference function
         # y = predict(mys, x).rx2('y') # R reference function
+
         dx = np.exp(x) / np.power((1 + np.exp(x)),2)
         lfdr = (pi0 * dx) / y
     else:
@@ -563,7 +590,7 @@ def lfdr(p_values, pi0, trunc = True, monotone = True, transf = "probit", eps = 
 
 
 @profile
-def get_error_stat_from_null(target_scores, decoy_scores, lambda_, pi0_method = "smoother", pi0_smooth_df = 3, pi0_smooth_log_pi0 = False, use_pemp = False, use_pfdr = False, use_lfdr = False, lfdr_trunc = True, lfdr_monotone = True, lfdr_transf = "probit", lfdr_eps = np.power(10.0,-8)):
+def get_error_stat_from_null(target_scores, decoy_scores, lambda_, pi0_method = "smoother", pi0_smooth_df = 3, pi0_smooth_log_pi0 = False, use_pemp = False, use_pfdr = False, use_lfdr = False, lfdr_trunc = True, lfdr_monotone = True, lfdr_transf = "probit", lfdr_adj = 1.5, lfdr_eps = np.power(10.0,-8)):
     """ takes list of decoy and target scores and creates error statistics for target values based
     on mean and std dev of decoy scores"""
 
@@ -583,7 +610,7 @@ def get_error_stat_from_null(target_scores, decoy_scores, lambda_, pi0_method = 
 
     if use_lfdr:
         logging.info("Estimate local false discovery rates (lFDR) / posterior error probabilities (PEP)")
-        error_stat.df["pep"] = lfdr(target_pvalues, pi0['pi0'], lfdr_trunc, lfdr_monotone, lfdr_transf, lfdr_eps)
+        error_stat.df["pep"] = lfdr(target_pvalues, pi0['pi0'], lfdr_trunc, lfdr_monotone, lfdr_transf, lfdr_adj, lfdr_eps)
 
     error_stat.df["cutoff"] = target_scores
     return error_stat, target_pvalues, pi0
@@ -611,13 +638,14 @@ def calculate_final_statistics(all_top_target_scores,
                                lfdr_trunc=True,
                                lfdr_monotone=True,
                                lfdr_transf="probit",
+                               lfdr_adj=1.5,
                                lfdr_eps=np.power(10.0,-8)):
     """ estimates error statistics for given samples target_scores and
     decoy scores and extends them to the full table of peak scores in table
     'exp' """
 
     # estimate error statistics from given samples
-    error_stat, target_pvalues, pi0 = get_error_stat_from_null(test_target_scores, test_decoy_scores, lambda_, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, use_pemp, use_pfdr, True, lfdr_trunc, lfdr_monotone, lfdr_transf, lfdr_eps)
+    error_stat, target_pvalues, pi0 = get_error_stat_from_null(test_target_scores, test_decoy_scores, lambda_, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, use_pemp, use_pfdr, True, lfdr_trunc, lfdr_monotone, lfdr_transf, lfdr_adj, lfdr_eps)
 
     # fraction of null hypothesises in sample values
     summed_test_fraction_null = error_stat.num_null / error_stat.num_total

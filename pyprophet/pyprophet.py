@@ -107,6 +107,7 @@ class Scorer(object):
         lfdr_trunc  = CONFIG.get("final_statistics.lfdr_trunc")
         lfdr_monotone  = CONFIG.get("final_statistics.lfdr_monotone")
         lfdr_transf  = CONFIG.get("final_statistics.lfdr_transf")
+        lfdr_adj  = CONFIG.get("final_statistics.lfdr_adj")
         lfdr_eps  = CONFIG.get("final_statistics.lfdr_eps")
 
         pi0_method  = CONFIG.get("final_statistics.pi0_method")
@@ -125,6 +126,7 @@ class Scorer(object):
                                                                           lfdr_trunc,
                                                                           lfdr_monotone,
                                                                           lfdr_transf,
+                                                                          lfdr_adj,
                                                                           lfdr_eps)
 
         self.number_target_pg = len(experiment.df[experiment.df.is_decoy.eq(False)])

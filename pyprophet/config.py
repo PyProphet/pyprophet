@@ -70,6 +70,9 @@ def _standard_config(n_cpus=1):
     config["final_statistics.lfdr_transf"] = "probit"
     info["final_statistics.lfdr_transf"] = """[either a "probit" or "logit" transformation is applied to the p-values so that a local FDR estimate can be formed that does not involve edge effects of the [0,1] interval in which the p-values lie]"""
 
+    config["final_statistics.lfdr_adj"] = 1.5
+    info["final_statistics.lfdr_adj"] = """[numeric value that is applied as a multiple of the smoothing bandwidth used in the density estimation]"""
+
     config["final_statistics.lfdr_eps"] = np.power(10.0,-8)
     info["final_statistics.lfdr_eps"] = """[numeric value that is threshold for the tails of the empirical p-value distribution]"""
 

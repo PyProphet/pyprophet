@@ -46,29 +46,10 @@ def test_2(tmpdir, regtest):
     stat = pd.read_csv('test_lfdr_ref_data.csv', delimiter=',').sort_values("p")
 
     # For comparison with R/bioconductor reference implementation
-    # import matplotlib
-    # matplotlib.use('Agg')
-    # import matplotlib.pyplot as plt
-
-    # f = plt.figure(1)
-    # plt.subplot(221)
-    # plt.plot(lfdr(stat['p'], 0.669926026474838), stat['lfdr_default'].values, '.')
-
-    # plt.subplot(222)
-    # plt.plot(lfdr(stat['p'], 0.669926026474838, monotone = False), stat['lfdr_monotone_false'].values, '.')
-
-    # plt.subplot(223)
-    # plt.plot(lfdr(stat['p'], 0.669926026474838, transf="logit"), stat['lfdr_transf_logit'].values, '.')
-
-    # plt.subplot(224)
-    # plt.plot(lfdr(stat['p'], 0.669926026474838, eps=np.power(10.0,-2)), stat['lfdr_eps'].values, '.')
-
-    # f.savefig("test_lfdr_ref_data.pdf")
-
-    # np.testing.assert_almost_equal(lfdr(stat['p'], 0.669926026474838), stat['lfdr_default'].values)
-    # np.testing.assert_almost_equal(lfdr(stat['p'], 0.669926026474838, monotone = False), stat['lfdr_monotone_false'].values)
-    # np.testing.assert_almost_equal(lfdr(stat['p'], 0.669926026474838, transf="logit"), stat['lfdr_transf_logit'].values)
-    # np.testing.assert_almost_equal(lfdr(stat['p'], 0.669926026474838, eps=np.power(10.0,-2)), stat['lfdr_eps'].values)
+    np.testing.assert_almost_equal(lfdr(stat['p'], 0.669926026474838), stat['lfdr_default'].values, decimal=3)
+    np.testing.assert_almost_equal(lfdr(stat['p'], 0.669926026474838, monotone = False), stat['lfdr_monotone_false'].values, decimal=3)
+    np.testing.assert_almost_equal(lfdr(stat['p'], 0.669926026474838, transf="logit"), stat['lfdr_transf_logit'].values, decimal=1)
+    np.testing.assert_almost_equal(lfdr(stat['p'], 0.669926026474838, eps=np.power(10.0,-2)), stat['lfdr_eps'].values, decimal=3)
 
     print(lfdr(stat['p'], 0.669926026474838), file=regtest)
     print(lfdr(stat['p'], 0.669926026474838, monotone = False), file=regtest)
