@@ -9,6 +9,7 @@ os.putenv("OPENBLAS_NUM_THREADS", "1")
 from collections import namedtuple
 
 import numpy as np
+import scipy as sp
 import pandas as pd
 
 try:
@@ -21,13 +22,15 @@ from optimized import (find_nearest_matches as _find_nearest_matches,
 import scipy.special
 import math
 import scipy.stats
+from statsmodels.nonparametric.kde import KDEUnivariate
+
+import sys
 
 from config import CONFIG
 
 import multiprocessing
 
 from std_logger import logging
-
 
 ErrorStatistics = namedtuple("ErrorStatistics", "df num_null num_total")
 
@@ -99,7 +102,14 @@ def posterior_pg_prob(dvals, target_scores, decoy_scores, error_stat, number_tar
     # Estimate a suitable cutoff in discriminant score (d_score)
     # target_scores = experiment.get_top_target_peaks().df["d_score"]
     # decoy_scores = experiment.get_top_decoy_peaks().df["d_score"]
-    estimated_cutoff = find_cutoff(target_scores, decoy_scores, lambda_, 0.15, False, False)
+
+    pi0_method = CONFIG.get("final_statistics.pi0_method")
+    pi0_smooth_df = CONFIG.get("final_statistics.pi0_smooth_df")
+    pi0_smooth_log_pi0 = CONFIG.get("final_statistics.pi0_smooth_log_pi0")
+    use_pemp = CONFIG.get("final_statistics.use_pemp")
+    use_pfdr = CONFIG.get("final_statistics.use_pfdr")
+
+    estimated_cutoff = find_cutoff(target_scores, decoy_scores, 0.15, lambda_, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, use_pemp, use_pfdr)
 
     target_scores_above = target_scores[target_scores > estimated_cutoff]
 
@@ -241,6 +251,7 @@ def get_error_table_using_percentile_positives_new(err_df, target_scores, num_nu
     qvalues = err_df.qvalue.iloc[imax].values
     svalues = err_df.svalue.iloc[imax].values
     pvalues = err_df.pvalue.iloc[imax].values
+    peps = err_df.pep.iloc[imax].values
 
     fdr = err_df.FDR.iloc[imax].values
     fdr[fdr < 0.0] = 0.0
@@ -267,6 +278,7 @@ def get_error_table_using_percentile_positives_new(err_df, target_scores, num_nu
         dict(qvalue=qvalues,
              svalue=svalues,
              pvalue=pvalues,
+             pep=peps,
              TP=tp,
              FP=fp,
              TN=tn,
@@ -275,23 +287,16 @@ def get_error_table_using_percentile_positives_new(err_df, target_scores, num_nu
              FNR=fnr,
              sens=sens,
              cutoff=target_scores),
-        columns="qvalue svalue pvalue TP FP TN FN FDR FNR sens cutoff".split(),
+        columns="qvalue svalue pvalue pep TP FP TN FN FDR FNR sens cutoff".split(),
     )
     return df_error
 
 
 @profile
-def lookup_s_and_q_values_from_error_table(scores, err_df):
+def lookup_values_from_error_table(scores, err_df):
     """ find best matching q-value for each score in 'scores' """
     ix = find_nearest_matches(err_df.cutoff.values, scores)
-    return err_df.svalue.iloc[ix].values, err_df.qvalue.iloc[ix].values
-
-
-@profile
-def lookup_p_values_from_error_table(scores, err_df):
-    """ find best matching q-value for each score in 'scores' """
-    ix = find_nearest_matches(err_df.cutoff.values, scores)
-    return err_df.pvalue.iloc[ix].values
+    return err_df.pvalue.iloc[ix].values, err_df.svalue.iloc[ix].values, err_df.pep.iloc[ix].values, err_df.qvalue.iloc[ix].values
 
 
 @profile
@@ -339,16 +344,85 @@ def summary_err_table(df, qvalues=[0, 0.01, 0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5]
 
 
 @profile
-def get_error_table_from_pvalues_new(p_values, lambda_=0.4, use_pfdr=False):
-    """ estimate error table from p_values with method of storey for estimating fdrs and q-values
-    """
+def pi0est(p_values, lambda_ = np.arange(0.05,1.0,0.05), pi0_method = "smoother", smooth_df = 3, smooth_log_pi0 = False):
+    """ estimate pi0 with method of storey"""
+
+    # Compare to bioconductor/qvalue reference implementation
+    # import rpy2
+    # import rpy2.robjects as robjects
+    # from rpy2.robjects import pandas2ri
+    # pandas2ri.activate()
+
+    # smoothspline=robjects.r('smooth.spline')
+    # predict=robjects.r('predict')
+
+    p = np.array(p_values)
+
+    rm_na = np.isfinite(p)
+    p = p[rm_na]
+    m = len(p)
+    ll = 1
+    if isinstance(lambda_, np.ndarray ):
+        ll = len(lambda_)
+        lambda_ = np.sort(lambda_)
+
+    if (min(p) < 0 or max(p) > 1):
+        sys.exit("Error: p-values not in valid range [0,1].")
+    elif (ll > 1 and ll < 4):
+        sys.exit("Error: If lambda_ is not predefined (one value), at least four data points are required.")
+    elif (np.min(lambda_) < 0 or np.max(lambda_) >= 1):
+        sys.exit("Error: Lambda must be within [0,1)")
+
+    if (ll == 1):
+        pi0 = np.mean(p >= lambda_)/(1 - lambda_)
+        pi0_lambda = pi0
+        pi0 = np.minimum(pi0, 1)
+        pi0Smooth = False
+    else:
+        pi0 = []
+        for l in lambda_:
+            pi0.append(np.mean(p >= l)/(1 - l))
+        pi0_lambda = pi0
+
+        if (pi0_method == "smoother"):
+            if smooth_log_pi0:
+                pi0 = np.log(pi0)
+                spi0 = sp.interpolate.UnivariateSpline(lambda_, pi0, k=smooth_df)
+                pi0Smooth = np.exp(spi0(lambda_))
+                # spi0 = smoothspline(lambda_, pi0, df = smooth_df) # R reference function
+                # pi0Smooth = np.exp(predict(spi0, x = lambda_).rx2('y')) # R reference function
+            else:
+                spi0 = sp.interpolate.UnivariateSpline(lambda_, pi0, k=smooth_df)
+                pi0Smooth = spi0(lambda_)
+                # spi0 = smoothspline(lambda_, pi0, df = smooth_df) # R reference function
+                # pi0Smooth = predict(spi0, x = lambda_).rx2('y')  # R reference function
+            pi0 = np.minimum(pi0Smooth[ll-1],1)
+        elif (pi0_method == "bootstrap"):
+            minpi0 = np.percentile(pi0,0.1)
+            W = []
+            for l in lambda_:
+                W.append(np.sum(p >= l))
+            mse = (np.array(W) / (np.power(m,2) * np.power((1 - lambda_),2))) * (1 - np.array(W) / m) + np.power((pi0 - minpi0),2)
+            pi0 = np.minimum(pi0[np.argmin(mse)],1)
+            pi0Smooth = False
+        else:
+            sys.exit("Error: pi0_method must be one of 'smoother' or 'bootstrap'.")
+    if (pi0<=0):
+        sys.exit("Error: The estimated pi0 <= 0. Check that you have valid p-values or use a different range of lambda.")
+
+    return {'pi0': pi0, 'pi0_lambda': pi0_lambda, 'lambda_': lambda_, 'pi0_smooth': pi0Smooth}
+
+
+@profile
+def qvalue(p_values, pi0, use_pfdr=False):
+    """ estimate error table from p-values with method of storey for estimating fdrs and q-values"""
 
     # sort descending:
     p_values = np.sort(to_one_dim_array(p_values))[::-1]
 
     # estimate FDR with storeys method:
-    num_null = 1.0 / (1.0 - lambda_) * (p_values >= lambda_).sum()
     num_total = len(p_values)
+    num_null = pi0 * num_total
 
     # optimized with numpys broadcasting: comparing column vector with row
     # vector yields a matrix with pairwise comparison results.  sum(axis=0)
@@ -429,9 +503,95 @@ def get_error_table_from_pvalues_new(p_values, lambda_=0.4, use_pfdr=False):
     return ErrorStatistics(df, num_null, num_total)
 
 
+def bw_nrd0(x):
+    if len(x) < 2:
+        sys.exit("Error: bandwidth estimation requires at least two data points.")
+
+    hi = np.std(x, ddof=1)
+    q75, q25 = np.percentile(x, [75 ,25])
+    iqr = q75 - q25
+    lo = min(hi, iqr/1.34)
+
+    if not ((lo == hi) or (lo == abs(x[0])) or (lo == 1)):
+        lo = 1
+
+    return 0.9 * lo *len(x)**-0.2
+
+
 @profile
-def get_error_stat_from_null(target_scores, decoy_scores, lambda_, use_pemp, use_pfdr):
-    """ takes list of decoy and master scores and creates error statistics for target values based
+def lfdr(p_values, pi0, trunc = True, monotone = True, transf = "probit", adj = 1.5, eps = np.power(10.0,-8)):
+    """ estimate local FDR / posterior error probability from p-values with method of storey"""
+    p = np.array(p_values)
+
+    # Compare to bioconductor/qvalue reference implementation
+    import rpy2
+    import rpy2.robjects as robjects
+    from rpy2.robjects import pandas2ri
+    pandas2ri.activate()
+
+    density=robjects.r('density')
+    smoothspline=robjects.r('smooth.spline')
+    predict=robjects.r('predict')
+
+    # Check inputs
+    lfdr_out = p
+    rm_na = np.isfinite(p)
+    p = p[rm_na]
+
+    if (min(p) < 0 or max(p) > 1):
+        sys.exit("Error: p-values not in valid range [0,1].")
+    elif (pi0 < 0 or pi0 > 1):
+        sys.exit("Error: pi0 not in valid range [0,1].")
+
+    # Local FDR method for both probit and logit transformations
+    if (transf == "probit"):
+        p = np.maximum(p, eps)
+        p = np.minimum(p, 1-eps)
+        x = scipy.stats.norm.ppf(p, loc=0, scale=1)
+
+        # R-like implementation
+        bw = bw_nrd0(x)
+        myd = KDEUnivariate(x)
+        myd.fit(bw=adj*bw, gridsize = 512)
+        y = sp.interpolate.spline(myd.support, myd.density, x)
+        # myd = density(x, adjust = 1.5) # R reference function
+        # mys = smoothspline(x = myd.rx2('x'), y = myd.rx2('y')) # R reference function
+        # y = predict(mys, x).rx2('y') # R reference function
+
+        lfdr = pi0 * scipy.stats.norm.pdf(x) / y
+    elif (transf == "logit"):
+        x = np.log((p + eps) / (1 - p + eps))
+
+        # R-like implementation
+        bw = bw_nrd0(x)
+        myd = KDEUnivariate(x)
+        myd.fit(bw=adj*bw, gridsize = 512)
+        y = sp.interpolate.spline(myd.support, myd.density, x)
+        # myd = density(x, adjust = 1.5) # R reference function
+        # mys = smoothspline(x = myd.rx2('x'), y = myd.rx2('y')) # R reference function
+        # y = predict(mys, x).rx2('y') # R reference function
+
+        dx = np.exp(x) / np.power((1 + np.exp(x)),2)
+        lfdr = (pi0 * dx) / y
+    else:
+        sys.exit("Error: Invalid local FDR method.")
+
+    if (trunc):
+        lfdr[lfdr > 1] = 1
+    if (monotone):
+        lfdr = lfdr[p.ravel().argsort()]
+        for i in range(1,len(x)):
+            if (lfdr[i] < lfdr[i - 1]):
+                lfdr[i] = lfdr[i - 1]
+        lfdr = lfdr[scipy.stats.rankdata(p,"min")-1]
+
+    lfdr_out[rm_na] = lfdr
+    return lfdr_out
+
+
+@profile
+def get_error_stat_from_null(target_scores, decoy_scores, lambda_, pi0_method = "smoother", pi0_smooth_df = 3, pi0_smooth_log_pi0 = False, use_pemp = False, use_pfdr = False, use_lfdr = False, lfdr_trunc = True, lfdr_monotone = True, lfdr_transf = "probit", lfdr_adj = 1.5, lfdr_eps = np.power(10.0,-8)):
+    """ takes list of decoy and target scores and creates error statistics for target values based
     on mean and std dev of decoy scores"""
 
     decoy_scores = to_one_dim_array(decoy_scores)
@@ -445,16 +605,21 @@ def get_error_stat_from_null(target_scores, decoy_scores, lambda_, use_pemp, use
     else:
         target_pvalues = 1.0 - pnorm(target_scores, mu, nu)
 
-    error_stat = get_error_table_from_pvalues_new(target_pvalues, lambda_, use_pfdr)
+    pi0 = pi0est(target_pvalues, lambda_, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0)
+    error_stat = qvalue(target_pvalues, pi0['pi0'], use_pfdr)
+
+    if use_lfdr:
+        logging.info("Estimate local false discovery rates (lFDR) / posterior error probabilities (PEP)")
+        error_stat.df["pep"] = lfdr(target_pvalues, pi0['pi0'], lfdr_trunc, lfdr_monotone, lfdr_transf, lfdr_adj, lfdr_eps)
+
     error_stat.df["cutoff"] = target_scores
-    return error_stat, target_pvalues
+    return error_stat, target_pvalues, pi0
 
 
-def find_cutoff(target_scores, decoy_scores, lambda_, fdr, use_pemp, use_pfdr):
+def find_cutoff(target_scores, decoy_scores, fdr, lambda_, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, use_pemp, use_pfdr):
     """ finds cut off target score for specified false discovery rate fdr """
 
-    error_stat, __ = get_error_stat_from_null(
-        target_scores, decoy_scores, lambda_, use_pemp, use_pfdr)
+    error_stat, __, __ = get_error_stat_from_null(target_scores, decoy_scores, lambda_, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, use_pemp, use_pfdr, False)
     if not len(error_stat.df):
         raise Exception("to little data for calculating error statistcs")
     i0 = (error_stat.df.qvalue - fdr).abs().argmin()
@@ -467,15 +632,20 @@ def calculate_final_statistics(all_top_target_scores,
                                test_target_scores,
                                test_decoy_scores,
                                lambda_,
-                               use_pemp,
-                               use_pfdr=False):
+                               pi0_method, pi0_smooth_df, 
+                               pi0_smooth_log_pi0, use_pemp,
+                               use_pfdr=False,
+                               lfdr_trunc=True,
+                               lfdr_monotone=True,
+                               lfdr_transf="probit",
+                               lfdr_adj=1.5,
+                               lfdr_eps=np.power(10.0,-8)):
     """ estimates error statistics for given samples target_scores and
     decoy scores and extends them to the full table of peak scores in table
     'exp' """
 
     # estimate error statistics from given samples
-    error_stat, target_pvalues = get_error_stat_from_null(test_target_scores, test_decoy_scores,
-                                                          lambda_, use_pemp, use_pfdr)
+    error_stat, target_pvalues, pi0 = get_error_stat_from_null(test_target_scores, test_decoy_scores, lambda_, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, use_pemp, use_pfdr, True, lfdr_trunc, lfdr_monotone, lfdr_transf, lfdr_adj, lfdr_eps)
 
     # fraction of null hypothesises in sample values
     summed_test_fraction_null = error_stat.num_null / error_stat.num_total
@@ -483,7 +653,7 @@ def calculate_final_statistics(all_top_target_scores,
     # transfer statistics from sample set to full set:
     num_top_target = len(all_top_target_scores)
 
-    # most important: transfer estimted number of null hyptothesis:
+    # most important: transfer estimated number of null hyptothesis:
     num_null_top_target = num_top_target * summed_test_fraction_null
 
     # now complete error stats based on num_null_top_target:
@@ -491,4 +661,4 @@ def calculate_final_statistics(all_top_target_scores,
                                                                     all_top_target_scores,
                                                                     num_null_top_target)
     return ErrorStatistics(raw_error_stat, error_stat.num_null,
-                           error_stat.num_total), target_pvalues
+                           error_stat.num_total), target_pvalues, pi0

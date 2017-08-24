@@ -21,7 +21,7 @@ pd.set_option('display.width', 180)
 # reduce precision to avoid to sensitive tests because of roundings:
 pd.set_option('display.precision', 6)
 
-from stats import (lookup_s_and_q_values_from_error_table, calculate_final_statistics,
+from stats import (lookup_values_from_error_table, calculate_final_statistics,
                    mean_and_std_dev, final_err_table, summary_err_table,
                    posterior_pg_prob, posterior_chromatogram_hypotheses_fast,
                    ErrorStatistics)
@@ -104,13 +104,30 @@ class Scorer(object):
 
         use_pemp = CONFIG.get("final_statistics.emp_p")
         use_pfdr = CONFIG.get("final_statistics.pfdr")
+        lfdr_trunc  = CONFIG.get("final_statistics.lfdr_trunc")
+        lfdr_monotone  = CONFIG.get("final_statistics.lfdr_monotone")
+        lfdr_transf  = CONFIG.get("final_statistics.lfdr_transf")
+        lfdr_adj  = CONFIG.get("final_statistics.lfdr_adj")
+        lfdr_eps  = CONFIG.get("final_statistics.lfdr_eps")
 
-        self.error_stat, self.target_pvalues = calculate_final_statistics(all_tt_scores,
+        pi0_method  = CONFIG.get("final_statistics.pi0_method")
+        pi0_smooth_df  = CONFIG.get("final_statistics.pi0_smooth_df")
+        pi0_smooth_log_pi0  = CONFIG.get("final_statistics.pi0_smooth_log_pi0")
+
+        self.error_stat, self.target_pvalues, self.pi0 = calculate_final_statistics(all_tt_scores,
                                                                           all_test_target_scores,
                                                                           all_test_decoy_scores,
                                                                           lambda_,
+                                                                          pi0_method, 
+                                                                          pi0_smooth_df, 
+                                                                          pi0_smooth_log_pi0, 
                                                                           use_pemp,
-                                                                          use_pfdr)
+                                                                          use_pfdr,
+                                                                          lfdr_trunc,
+                                                                          lfdr_monotone,
+                                                                          lfdr_transf,
+                                                                          lfdr_adj,
+                                                                          lfdr_eps)
 
         self.number_target_pg = len(experiment.df[experiment.df.is_decoy.eq(False)])
         self.number_target_peaks = len(experiment.get_top_target_peaks().df)
@@ -120,22 +137,25 @@ class Scorer(object):
 
     def score(self, table):
 
-        prepared_table, __ = prepare_data_table(table, score_columns=self.score_columns)
+        prepared_table, __ = prepare_data_table(table, tg_id_name=CONFIG.get("group_id"), score_columns=self.score_columns)
         texp = Experiment(prepared_table)
         score = self.classifier.score(texp, True)
         texp["d_score"] = (score - self.mu) / self.nu
 
-        s_values, q_values = lookup_s_and_q_values_from_error_table(texp["d_score"].values,
+        p_values, s_values, peps, q_values = lookup_values_from_error_table(texp["d_score"].values,
                                                                     self.error_stat.df)
+
+        texp["pep"] = peps
         texp["m_score"] = q_values
         texp["s_value"] = s_values
+        texp["p_value"] = p_values
         logging.info("mean m_score = %e, std_dev m_score = %e" % (np.mean(q_values),
                                                                   np.std(q_values, ddof=1)))
         logging.info("mean s_value = %e, std_dev s_value = %e" % (np.mean(s_values),
                                                                   np.std(s_values, ddof=1)))
         texp.add_peak_group_rank()
 
-        df = table.join(texp[["d_score", "m_score", "peak_group_rank"]])
+        df = table.join(texp[["d_score", "p_value", "pep", "m_score", "peak_group_rank"]])
 
         if CONFIG.get("compute.probabilities"):
             df = self.add_probabilities(df, texp)
@@ -186,7 +206,7 @@ class Scorer(object):
         return final_err_table(self.error_stat.df), summary_err_table(self.error_stat.df)
 
     def minimal_error_stat(self):
-        minimal_err_stat = ErrorStatistics(self.error_stat.df.loc[:, ["svalue", "qvalue", "cutoff"]],
+        minimal_err_stat = ErrorStatistics(self.error_stat.df.loc[:, ["svalue", "qvalue", "pvalue", "pep", "cutoff"]],
                                            self.error_stat.num_null, self.error_stat.num_total)
         return minimal_err_stat
 
@@ -347,7 +367,7 @@ class HolyGostQuery(object):
             raise Exception("the input files have different headers.")
 
     def _setup_experiment(self, tables):
-        prepared_tables, score_columns = prepare_data_tables(tables)
+        prepared_tables, score_columns = prepare_data_tables(tables, tg_id_name=CONFIG.get("group_id"))
         prepared_table = pd.concat(prepared_tables)
         experiment = Experiment(prepared_table)
         experiment.log_summary()
@@ -506,7 +526,7 @@ class HolyGostQuery(object):
     def _learn(self, experiment):
         is_test = CONFIG.get("is_test")
         if is_test:  # for reliable results
-            experiment.df.sort("tg_id", ascending=True, inplace=True)
+            experiment.df.sort_values("tg_id", ascending=True, inplace=True)
 
         learner = self.semi_supervised_learner
         ws = []

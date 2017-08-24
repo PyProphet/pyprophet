@@ -8,6 +8,7 @@ import multiprocessing
 import random
 import sys
 
+import numpy as np
 import pandas as pd
 
 
@@ -26,13 +27,11 @@ def _standard_config(n_cpus=1):
     config["xeval.fraction"] = 0.5
     config["xeval.num_iter"] = 5
 
-    lambda_ = 0.4
+    lambda_ = "0.4"
 
     config["semi_supervised_learner.initial_fdr"] = 0.15
-    config["semi_supervised_learner.initial_lambda"] = lambda_
 
     config["semi_supervised_learner.iteration_fdr"] = 0.02
-    config["semi_supervised_learner.iteration_lambda"] = lambda_
 
     config["semi_supervised_learner.num_iter"] = 5
 
@@ -44,12 +43,38 @@ def _standard_config(n_cpus=1):
     info["semi_supervised_learner.stat_best"] = """[use only stats from final for statistics]"""
 
     config["final_statistics.lambda"] = lambda_
+    info["final_statistics.lambda"] = """[to estimate pi0 using Storey's method, set lambda to start,end,step (e.g. 0.05,1,0.05); alternatively set to fixed value (e.g. 0.4)]"""
+
+
+    config["final_statistics.pi0_method"] = "smoother"
+    info["final_statistics.pi0_method"] = """[either "smoother" or "bootstrap"; the method for automatically choosing tuning parameter in the estimation of pi_0, the proportion of true null hypotheses]"""
+
+    config["final_statistics.pi0_smooth_df"] = 3
+    info["final_statistics.pi0_smooth_df"] = """[number of degrees-of-freedom to use when estimating pi_0 with a smoother]"""
+
+    config["final_statistics.pi0_smooth_log_pi0"] = False
+    info["final_statistics.pi0_smooth_df"] = """[if True and pi0_method = "smoother", pi0 will be estimated by applying a smoother to a scatterplot of log(pi0) estimates against the tuning parameter lambda]"""
 
     config["final_statistics.emp_p"] = False
     info["final_statistics.emp_p"] = """[use empirical p-values for scoring]"""
 
     config["final_statistics.pfdr"] = False
     info["final_statistics.pfdr"] = """[compute positive FDR (pFDR) instead of FDR]"""
+
+    config["final_statistics.lfdr_trunc"] = True
+    info["final_statistics.lfdr_trunc"] = """[if True, local FDR values >1 are set to 1]"""
+
+    config["final_statistics.lfdr_monotone"] = True
+    info["final_statistics.lfdr_monotone"] = """[if True, local FDR values are non-decreasing with increasing p-values]"""
+
+    config["final_statistics.lfdr_transf"] = "probit"
+    info["final_statistics.lfdr_transf"] = """[either a "probit" or "logit" transformation is applied to the p-values so that a local FDR estimate can be formed that does not involve edge effects of the [0,1] interval in which the p-values lie]"""
+
+    config["final_statistics.lfdr_adj"] = 1.5
+    info["final_statistics.lfdr_adj"] = """[numeric value that is applied as a multiple of the smoothing bandwidth used in the density estimation]"""
+
+    config["final_statistics.lfdr_eps"] = np.power(10.0,-8)
+    info["final_statistics.lfdr_eps"] = """[numeric value that is threshold for the tails of the empirical p-value distribution]"""
 
     config["num_processes"] = n_cpus
     info["num_processes"] = "[-1 means 'all available cpus']"
@@ -96,6 +121,9 @@ def _standard_config(n_cpus=1):
     info[
         "out_of_core.sampling_rate"] = """[handle large data files by random sampling. this value is between 0.0 and 1.0]"""
 
+    config["group_id"] = "transition_group_id"
+    info["group_id"] = r"""[Specify aggregation group id to compute statistics.]"""
+
     return config, info
 
 
@@ -110,20 +138,25 @@ def _fix_config_types(dd):
               "out_of_core",
               "num_processes",
               "target.compress_results",
+              "final_statistics.pi0_smooth_df",
               ]:
         dd[k] = int(dd[k])
 
     for k in ["xeval.fraction",
               "d_score.cutoff",
               "semi_supervised_learner.initial_fdr",
-              "semi_supervised_learner.initial_lambda",
-              "semi_supervised_learner.iteration_lambda",
               "semi_supervised_learner.initial_fdr",
               "semi_supervised_learner.iteration_fdr",
               "out_of_core.sampling_rate",
-              "final_statistics.lambda",
               ]:
         dd[k] = float(dd[k])
+
+    for k in ["final_statistics.lambda",
+              ]:
+        if len(str(dd[k]).split(',')) == 3:
+            dd[k] = np.arange(float(dd[k].split(',')[0]),float(dd[k].split(',')[1]),float(dd[k].split(',')[2]))
+        else:
+            dd[k] = float(dd[k])
 
     if dd["delim.in"] == "tab":
         dd["delim.in"] = "\t"
