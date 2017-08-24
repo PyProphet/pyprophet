@@ -11,6 +11,27 @@ from config import CONFIG
 
 import ntpath
 
+
+# Parameter transformation functions
+def transform_pi0_lambda(ctx, param, value):
+  if value[1] == 0 and value[2] == 0:
+      pi0_lambda = value[0]
+  elif 0 <= value[0] < 1 and value[0] <= value[1] <= 1 and 0 < value[2] < 1:
+      pi0_lambda = np.arange(value[0], value[1], value[2])
+  else:
+      sys.exit('Error: Wrong input values for pi0_lambda. pi0_lambda must be within [0,1).')
+  return(pi0_lambda)
+
+def transform_threads(ctx, param, value):
+    if value == -1:
+        value = multiprocessing.cpu_count()
+    return(value)
+
+def transform_random_seed(ctx, param, value):
+    if value is None:
+        value = np.random.randint(0, sys.maxint)
+    return(value)
+
 def dump_config(config):
     print
     print "used parameters:"
@@ -20,7 +41,7 @@ def dump_config(config):
     print
 
 
-def parse_cmdline(infiles, outfile, apply_weights, xeval_fraction, xeval_iterations, initial_fdr, iteration_fdr, subsample, subsample_rate, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_eps, threads, test, random_seed):
+def set_parameters(infiles, outfile, apply_weights, xeval_fraction, xeval_iterations, initial_fdr, iteration_fdr, subsample, subsample_rate, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, threads, test, random_seed):
 
     options = dict()
 
@@ -33,13 +54,6 @@ def parse_cmdline(infiles, outfile, apply_weights, xeval_fraction, xeval_iterati
         options['target.prefix'] = os.path.splitext(ntpath.basename(infiles[0]))[0]
     else:
         sys.exit('Error: Specify output filename when analysing multiple input files together.')
-
-    if pi0_lambda[1] == None and pi0_lambda[2] == None:
-        pi0_lambda = pi0_lambda[0]
-    elif 0 <= pi0_lambda[0] < 1 and pi0_lambda[0] <= pi0_lambda[1] <= 1 and 0 < pi0_lambda[2] < 1:
-        pi0_lambda = np.arange(pi0_lambda[0], pi0_lambda[1], pi0_lambda[2])
-    else:
-        sys.exit('Error: Wrong input values for pi0_lambda. pi0_lambda must be within [0,1).')
     
     options['apply_weights'] = apply_weights
     options['xeval.fraction'] = xeval_fraction
@@ -62,16 +76,14 @@ def parse_cmdline(infiles, outfile, apply_weights, xeval_fraction, xeval_iterati
     options['final_statistics.lfdr_trunc'] = lfdr_truncate
     options['final_statistics.lfdr_monotone'] = lfdr_monotone
     options['final_statistics.lfdr_transf'] = lfdr_transformation
+    options['final_statistics.lfdr_adj'] = lfdr_adj
     options['final_statistics.lfdr_eps'] = lfdr_eps
 
     options['num_processes'] = threads
     options['is_test'] = test
 
     options['random_seed'] = random_seed
-    if options["random_seed"] is not None:
-        options["random_seed"] = int(options["random_seed"])
-    else:
-        options["random_seed"] = np.random.randint(0, sys.maxint)
+
 
     CONFIG.update(options)
     dump_config(CONFIG.config)
