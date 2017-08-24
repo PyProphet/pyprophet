@@ -524,14 +524,14 @@ def lfdr(p_values, pi0, trunc = True, monotone = True, transf = "probit", adj = 
     p = np.array(p_values)
 
     # Compare to bioconductor/qvalue reference implementation
-    import rpy2
-    import rpy2.robjects as robjects
-    from rpy2.robjects import pandas2ri
-    pandas2ri.activate()
+    # import rpy2
+    # import rpy2.robjects as robjects
+    # from rpy2.robjects import pandas2ri
+    # pandas2ri.activate()
 
-    density=robjects.r('density')
-    smoothspline=robjects.r('smooth.spline')
-    predict=robjects.r('predict')
+    # density=robjects.r('density')
+    # smoothspline=robjects.r('smooth.spline')
+    # predict=robjects.r('predict')
 
     # Check inputs
     lfdr_out = p
