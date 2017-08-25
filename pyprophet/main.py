@@ -12,7 +12,6 @@ except NameError:
 
 import abc
 import click
-import cPickle
 from std_logger import logging
 import sys
 import random
@@ -28,6 +27,10 @@ from report import save_report
 
 from .main_helpers import (transform_pi0_lambda, transform_threads, transform_random_seed, set_parameters, create_pathes, check_if_any_exists, filterChromByLabels)
 
+from functools import update_wrapper
+
+import pandas as pd
+
 class PyProphetRunner(object):
 
     __metaclass__ = abc.ABCMeta
@@ -35,12 +38,9 @@ class PyProphetRunner(object):
     """Base class for workflow of command line tool
     """
 
-    def __init__(self, pathes, prefix, merge_results, delim_in, delim_out):
-        self.pathes = pathes
+    def __init__(self, table, prefix):
+        self.table = table
         self.prefix = prefix
-        self.merge_results = merge_results
-        self.delim_in = delim_in
-        self.delim_out = delim_out
 
     @abc.abstractmethod
     def run_algo(self):
@@ -50,53 +50,9 @@ class PyProphetRunner(object):
     def extra_writes(self):
         pass
 
-    def determine_output_dir_name(self):
-
-        # from now on: paramterchecks above only for learning mode
-
-        dirname = CONFIG.get("target.dir")
-        if dirname is None:
-            dirnames = set(os.path.dirname(path) for path in self.pathes)
-            # is always ok for not learning_mode, which includes that pathes has only one entry
-            if len(dirnames) > 1:
-                raise Exception("could not derive common directory name of input files, please use "
-                                "--target.dir option")
-            dirname = dirnames.pop()
-
-        if dirname and not os.path.exists(dirname):
-            os.makedirs(dirname)
-            logging.info("created folder %s" % dirname)
-        return dirname
-
-    def create_out_pathes(self, dirname):
-        if self.merge_results:
-            assert self.prefix is not None
-            out_pathes = [create_pathes(self.prefix, dirname)]
-
-        elif len(self.pathes) == 1:
-            assert self.prefix is not None
-            out_pathes = [create_pathes(self.prefix, dirname)]
-        else:
-            out_pathes = []
-            for path in self.pathes:
-                specific_prefix = os.path.splitext(os.path.basename(path))[0]
-                out_pathes.append(create_pathes(specific_prefix, dirname))
-        return out_pathes
-
     def run(self):
 
-        dirname = self.determine_output_dir_name()
-        out_pathes = self.create_out_pathes(dirname)
-
-        extra_writes = dict(self.extra_writes(dirname))
-
-        to_check = list(v for p in out_pathes for v in p.values())
-        to_check.extend(extra_writes.values())
-
-        if not CONFIG.get("target.overwrite"):
-            error = check_if_any_exists(to_check)
-            if error:
-                return False
+        extra_writes = dict(self.extra_writes("./"))
 
         self.check_cols = [CONFIG.get("group_id"), "run_id", "decoy"]
 
@@ -113,11 +69,9 @@ class PyProphetRunner(object):
 
         set_pandas_print_options()
         self.print_summary(result)
-        pvalues = None if scorer is None else scorer.target_pvalues
         pi0 = None if scorer is None else scorer.pi0
-        self.save_results(result, extra_writes, out_pathes, pvalues, pi0)
+        self.save_results(result, extra_writes, pi0)
 
-        self.save_scorer(scorer, extra_writes)
         self.save_weights(weights, extra_writes)
 
         seconds = int(needed)
@@ -141,80 +95,33 @@ class PyProphetRunner(object):
             print "=" * 98
         print
 
-    def save_results(self, result, extra_writes, out_pathes, pvalues, pi0):
+    def save_results(self, result, extra_writes, pi0):
         summ_stat_path = extra_writes.get("summ_stat_path")
         if summ_stat_path is not None:
-            result.summary_statistics.to_csv(summ_stat_path, self.delim_out, index=False)
+            result.summary_statistics.to_csv(summ_stat_path, sep="\t", index=False)
             print "WRITTEN: ", summ_stat_path
 
         full_stat_path = extra_writes.get("full_stat_path")
         if full_stat_path is not None:
-            result.final_statistics.to_csv(full_stat_path, sep=self.delim_out, index=False)
+            result.final_statistics.to_csv(full_stat_path, sep="\t", index=False)
             print "WRITTEN: ", full_stat_path
 
-        for input_path, scored_table, out_path in zip(self.pathes, result.scored_tables, out_pathes):
+        output_path = extra_writes.get("output_path")
+        if output_path is not None:
+            result.scored_tables.to_csv(output_path, sep="\t", index=False)
+            print "WRITTEN: ", output_path
 
-            cutoff = CONFIG.get("d_score.cutoff")
-            scored_table.to_csv(out_path.scored_table, out_path.filtered_table, cutoff, sep=self.delim_out, index=False)
-            print "WRITTEN: ", out_path.scored_table
-            print "WRITTEN: ", out_path.filtered_table
+        if result.final_statistics is not None:
+            cutoffs = result.final_statistics["cutoff"].values
+            svalues = result.final_statistics["svalue"].values
+            qvalues = result.final_statistics["qvalue"].values
+            pvalues = result.scored_tables.loc[(result.scored_tables.peak_group_rank == 1) & (result.scored_tables.decoy == 0)]["p_value"].values
 
-            if CONFIG.get("rewrite_sqmass"):
+            top_targets = result.scored_tables.loc[(result.scored_tables.peak_group_rank == 1) & (result.scored_tables.decoy == 0)]["d_score"].values
+            top_decoys = result.scored_tables.loc[(result.scored_tables.peak_group_rank == 1) & (result.scored_tables.decoy == 1)]["d_score"].values
 
-                # get basepath
-                basepath = input_path.split(".tsv")[0]
-                basepath = basepath.split(".txt")[0]
-                basepath = basepath.split(".csv")[0]
-
-                # try to find a matching sqMass file
-                sqmass_file = None
-                if os.path.exists(basepath + ".chrom.sqMass"):
-                    sqmass_file = basepath + ".chrom.sqMass"
-                elif os.path.exists(basepath + ".sqMass"):
-                    sqmass_file = basepath + ".sqMass"
-
-                # get selected chromatograms on the filtered table
-                df = scored_table.df[scored_table.df.d_score > cutoff]
-                fragment_anno = df.aggr_Fragment_Annotation.unique()
-                prec_anno = df.aggr_prec_Fragment_Annotation.unique()
-
-                labels = []
-                for l in fragment_anno:
-                    labels.extend( l.split(";") )
-                for l in prec_anno:
-                    labels.extend( l.split(";") )
-
-                filterChromByLabels(sqmass_file, out_path.filtered_chroms, labels)
-
-            if result.final_statistics is not None:
-
-                cutoffs = result.final_statistics["cutoff"].values
-                svalues = result.final_statistics["svalue"].values
-                qvalues = result.final_statistics["qvalue"].values
-                # pvalues = result.final_statistics["pvalue"].values
-                decoys, targets, top_decoys, top_targets = scored_table.scores()
-                plot_data = save_report(
-                    out_path.report, self.prefix, decoys, targets, top_decoys, top_targets,
-                    cutoffs, svalues, qvalues, pvalues, pi0)
-                print "WRITTEN: ", out_path.report
-
-                cutoffs, svalues, qvalues, top_targets, top_decoys = plot_data
-                # for (name, values) in [("cutoffs", cutoffs), ("svalues", svalues), ("qvalues", qvalues),
-                #                        ("d_scores_top_target_peaks", top_targets),
-                #                        ("d_scores_top_decoy_peaks", top_decoys)]:
-                #     path = out_path[name]
-                #     with open(path, "w") as fp:
-                #         fp.write(" ".join("%e" % v for v in values))
-                #     print "WRITTEN: ", path
-
-    def save_scorer(self, scorer, extra_writes):
-        pickled_scorer_path = extra_writes.get("pickled_scorer_path")
-        if pickled_scorer_path is not None:
-            assert scorer is not None, "invalid setting, should never happend"
-            bin_data = zlib.compress(cPickle.dumps(scorer, protocol=2))
-            with open(pickled_scorer_path, "wb") as fp:
-                fp.write(bin_data)
-            print "WRITTEN: ", pickled_scorer_path
+            save_report(extra_writes.get("report_path"), output_path, top_decoys, top_targets, cutoffs, svalues, qvalues, pvalues, pi0)
+            print "WRITTEN: ", extra_writes.get("report_path")
 
     def save_weights(self, weights, extra_writes):
         trained_weights_path = extra_writes.get("trained_weights_path")
@@ -226,30 +133,20 @@ class PyProphetRunner(object):
 class PyProphetLearner(PyProphetRunner):
 
     def run_algo(self):
-        (result, scorer, weights) = PyProphet().learn_and_apply(self.pathes, self.delim_in,
-                                                                self.check_cols)
+        (result, scorer, weights) = PyProphet().learn_and_apply(self.table)
         return (result, scorer, weights)
 
     def extra_writes(self, dirname):
+        yield "output_path", os.path.join(dirname, self.prefix + "_scored.txt")
         yield "summ_stat_path", os.path.join(dirname, self.prefix + "_summary_stat.csv")
         yield "full_stat_path", os.path.join(dirname, self.prefix + "_full_stat.csv")
-        yield "pickled_scorer_path", os.path.join(dirname, self.prefix + "_scorer.bin")
         yield "trained_weights_path", os.path.join(dirname, self.prefix + "_weights.txt")
-
-
-class PyProphetOutOfCoreLearner(PyProphetLearner):
-
-    def run_algo(self):
-        (result, scorer, weights) = PyProphet().learn_and_apply_out_of_core(self.pathes,
-                                                                            self.delim_in,
-                                                                            self.check_cols)
-        return (result, scorer, weights)
-
+        yield "report_path", os.path.join(dirname, self.prefix + "_report.pdf")
 
 class PyProphetWeightApplier(PyProphetRunner):
 
-    def __init__(self, pathes, prefix, merge_results, apply_weights, delim_in, delim_out):
-        super(PyProphetWeightApplier, self).__init__(pathes, prefix, merge_results, delim_in,
+    def __init__(self, table, prefix, merge_results, apply_weights, delim_in, delim_out):
+        super(PyProphetWeightApplier, self).__init__(table, prefix, merge_results, delim_in,
                                                      delim_out)
         if not os.path.exists(apply_weights):
             raise Exception("weights file %s does not exist" % apply_weights)
@@ -261,62 +158,83 @@ class PyProphetWeightApplier(PyProphetRunner):
             raise
 
     def run_algo(self):
-        (result, scorer, weights) = PyProphet().apply_weights(self.pathes, self.delim_in,
+        (result, scorer, weights) = PyProphet().apply_weights(self.table, self.delim_in,
                                                               self.check_cols,
                                                               self.persisted_weights)
         return (result, scorer, weights)
 
     def extra_writes(self, dirname):
+        yield "output_path", os.path.join(dirname, self.prefix + "_scored.txt")
         yield "summ_stat_path", os.path.join(dirname, self.prefix + "_summary_stat.csv")
         yield "full_stat_path", os.path.join(dirname, self.prefix + "_full_stat.csv")
-        yield "pickled_scorer_path", os.path.join(dirname, self.prefix + "_scorer.bin")
+        yield "report_path", os.path.join(dirname, self.prefix + "_report.pdf")
 
-
-class PyProphetOutOfCoreWeightApplier(PyProphetWeightApplier):
-
-    def run_algo(self):
-        (result, scorer, weights) = PyProphet().apply_weights_out_of_core(self.pathes, self.delim_in,
-                                                                          self.check_cols,
-                                                                          self.persisted_weights)
-        return (result, scorer, weights)
-
-
-class PyProphetOutOfCoreScorerApplier(PyProphetRunner):
-
-    def __init__(self, pathes, prefix, merge_results, apply_scorer, delim_in, delim_out):
-        super(PyProphetOutOfCoreScorerApplier, self).__init__(pathes, prefix, merge_results, delim_in,
-                                                              delim_out)
-        if not os.path.exists(apply_scorer):
-            raise Exception("persisted scorer file %s does not exist" % apply_scorer)
-        try:
-            self.persisted_scorer = cPickle.loads(zlib.decompress(open(apply_scorer, "rb").read()))
-            self.persisted_scorer.merge_results = merge_results
-        except Exception:
-            import traceback
-            traceback.print_exc()
-            raise
-
-    def run_algo(self):
-        (result, scorer, weights) = PyProphet().apply_scorer_out_of_core(self.pathes, self.delim_in,
-                                                                         self.check_cols,
-                                                                         self.persisted_scorer)
-        return (result, scorer, weights)
-
-    def extra_writes(self, dirname):
-        """empty generator, see
-        http://stackoverflow.com/questions/13243766/python-empty-generator-function
-        """
-        return
-        yield
-
-
-@click.command()
-
+@click.group(chain=True)
 @click.version_option()
+def cli():
+    """
+    PyProphet helptext
+    """
 
+
+@cli.resultcallback()
+def process_commands(processors):
+    """This result callback is invoked with an iterable of all the chained
+    subcommands.  As in this example each subcommand returns a function
+    we can chain them together to feed one into the other, similar to how
+    a pipe on unix works.
+    """
+    # Start with an empty iterable.
+    stream = ()
+
+    # Pipe it through all stream processors.
+    for processor in processors:
+        stream = processor(stream)
+
+    # Evaluate the stream and throw away the items.
+    for _ in stream:
+        pass
+
+
+def processor(f):
+    """Helper decorator to rewrite a function so that it returns another
+    function from it.
+    """
+    def new_func(*args, **kwargs):
+        def processor(stream):
+            return f(stream, *args, **kwargs)
+        return processor
+    return update_wrapper(new_func, f)
+
+
+def generator(f):
+    """Similar to the :func:`processor` but passes through old values
+    unchanged and does not pass through the values as parameter.
+    """
+    @processor
+    def new_func(stream, *args, **kwargs):
+        for item in stream:
+            yield item
+        for item in f(*args, **kwargs):
+            yield item
+    return update_wrapper(new_func, f)
+
+
+def copy_filename(new, old):
+    new.filename = old.filename
+    return new
+
+
+@cli.command("tsv")
+@click.argument('infile', nargs=1, type=click.Path(exists=True))
+@processor
+def tsv(ctx, infile):
+    table = pd.read_csv(infile, "\t")
+    return(table)
+
+@cli.command("run")
 # # File handling
-@click.argument('infiles', nargs=-1, type=click.Path(exists=True))
-@click.option('--outfile', type=click.Path(exists=False), help='PyProphet output file.')
+@click.option('--outfile', default="test123.txt", type=click.Path(exists=False), help='PyProphet output file.')
 
 # Semi-supervised learning
 @click.option('--apply_weights', type=click.Path(exists=True), help='Apply PyProphet score weights file instead of semi-supervised learning.')
@@ -346,9 +264,10 @@ class PyProphetOutOfCoreScorerApplier(PyProphetRunner):
 @click.option('--test/--no-test', default=False, show_default=True, help='Run in test mode with fixed seed.')
 @click.option('--random_seed', default=None, show_default=True, type=int, help='Set fixed seed to integer value.', callback=transform_random_seed)
 
-def main(infiles, outfile, apply_weights, xeval_fraction, xeval_iterations, initial_fdr, iteration_fdr, subsample, subsample_rate, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, threads, test, random_seed):
+@processor
+def run(table, outfile, apply_weights, xeval_fraction, xeval_iterations, initial_fdr, iteration_fdr, subsample, subsample_rate, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, threads, test, random_seed):
 
-    pathes = set_parameters(infiles, outfile, apply_weights, xeval_fraction, xeval_iterations, initial_fdr, iteration_fdr, subsample, subsample_rate, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, threads, test, random_seed)
+    set_parameters(outfile, apply_weights, xeval_fraction, xeval_iterations, initial_fdr, iteration_fdr, subsample, subsample_rate, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, threads, test, random_seed)
 
     apply_scorer = CONFIG.get("apply_scorer")
     apply_weights = CONFIG.get("apply_weights")
@@ -371,26 +290,13 @@ def main(infiles, outfile, apply_weights, xeval_fraction, xeval_iterations, init
     if apply_scorer and apply_weights:
         sys.exit("can not apply scorer and weights at the same time")
 
-    learning_mode = not apply_scorer and not apply_weights
+    learning_mode = not apply_weights
 
     if learning_mode:
-        if out_of_core:
-            PyProphetOutOfCoreLearner(pathes, prefix, merge_results, delim_in, delim_out).run()
-        else:
-            PyProphetLearner(pathes, prefix, merge_results, delim_in, delim_out).run()
+        PyProphetLearner(table, prefix).run()
 
     elif apply_weights:
-        if out_of_core:
-            PyProphetOutOfCoreWeightApplier(
-                pathes, prefix, merge_results, apply_weights, delim_in, delim_out).run()
-        else:
-            PyProphetWeightApplier(
-                pathes, prefix, merge_results, apply_weights, delim_in, delim_out).run()
+        PyProphetWeightApplier(
+            [table], prefix, merge_results, apply_weights, delim_in, delim_out).run()
 
-    else:
-        if out_of_core:
-            logging.info("out_of_core setting ignored: this parameter has no influence for "
-                         "applying a persisted scorer")
-        PyProphetOutOfCoreScorerApplier(
-            pathes, prefix, merge_results, apply_scorer, delim_in, delim_out).run()
-
+    yield True

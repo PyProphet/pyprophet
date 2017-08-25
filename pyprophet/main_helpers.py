@@ -41,19 +41,12 @@ def dump_config(config):
     print
 
 
-def set_parameters(infiles, outfile, apply_weights, xeval_fraction, xeval_iterations, initial_fdr, iteration_fdr, subsample, subsample_rate, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, threads, test, random_seed):
+def set_parameters(outfile, apply_weights, xeval_fraction, xeval_iterations, initial_fdr, iteration_fdr, subsample, subsample_rate, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, threads, test, random_seed):
 
     options = dict()
 
-    if len(infiles) < 1:
-        sys.exit('Use option --help for further information.')
 
-    if outfile != None:
-        options['target.prefix'] = outfile
-    elif outfile == None and len(infiles) == 1:
-        options['target.prefix'] = os.path.splitext(ntpath.basename(infiles[0]))[0]
-    else:
-        sys.exit('Error: Specify output filename when analysing multiple input files together.')
+    options['target.prefix'] = outfile
     
     options['apply_weights'] = apply_weights
     options['xeval.fraction'] = xeval_fraction
@@ -87,8 +80,6 @@ def set_parameters(infiles, outfile, apply_weights, xeval_fraction, xeval_iterat
 
     CONFIG.update(options)
     dump_config(CONFIG.config)
-
-    return infiles
 
 
 def create_pathes(prefix, dirname):

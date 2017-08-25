@@ -54,7 +54,7 @@ setup(name='pyprophet',
       ],
       entry_points={
           'console_scripts': [
-              "pyprophet=pyprophet.main:main",
+              "pyprophet=pyprophet.main:cli",
               ]
       },
       ext_modules=ext_modules,

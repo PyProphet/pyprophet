@@ -228,70 +228,6 @@ def mean_and_std_dev(values):
     return np.mean(values), np.std(values, ddof=1)
 
 
-def get_error_table_using_percentile_positives_new(err_df, target_scores, num_null):
-    """ transfer error statistics in err_df for many target scores and given
-    number of estimated null hypothesises 'num_null' """
-
-    num_total = len(target_scores)
-    num_alternative = num_total - num_null
-    target_scores = np.sort(to_one_dim_array(target_scores))  # ascending
-
-    # optimized
-    num_positives = count_num_positives(target_scores.astype(np.float64))
-
-    num_negatives = num_total - num_positives
-
-    # the last coertion is needed because depending on the scale of num_total
-    # numpy switched to 64 bit floats
-    pp = (num_positives.astype(np.float32) / num_total).astype(np.float32)
-
-    # find best matching row in err_df for each percentile_positive in pp:
-    imax = find_nearest_matches(err_df.percentile_positive.values, pp)
-
-    qvalues = err_df.qvalue.iloc[imax].values
-    svalues = err_df.svalue.iloc[imax].values
-    pvalues = err_df.pvalue.iloc[imax].values
-    peps = err_df.pep.iloc[imax].values
-
-    fdr = err_df.FDR.iloc[imax].values
-    fdr[fdr < 0.0] = 0.0
-    fdr[fdr > 1.0] = 1.0
-    fdr[num_positives == 0] = 0.0
-
-    fnr = err_df.FNR.iloc[imax].values
-    fnr[fnr < 0.0] = 0.0
-    fnr[fnr > 1.0] = 1.0
-    fnr[num_positives == 0] = 0.0
-
-    fp = np.round(fdr * num_positives)
-    tp = num_positives - fp
-    tn = num_null - fp
-    fn = num_negatives - tn
-
-    sens = tp / num_alternative
-    if num_alternative == 0:
-        sens = np.zeros_like(tp)
-    sens[sens < 0.0] = 0.0
-    sens[sens > 1.0] = 1.0
-
-    df_error = pd.DataFrame(
-        dict(qvalue=qvalues,
-             svalue=svalues,
-             pvalue=pvalues,
-             pep=peps,
-             TP=tp,
-             FP=fp,
-             TN=tn,
-             FN=fn,
-             FDR=fdr,
-             FNR=fnr,
-             sens=sens,
-             cutoff=target_scores),
-        columns="qvalue svalue pvalue pep TP FP TN FN FDR FNR sens cutoff".split(),
-    )
-    return df_error
-
-
 @profile
 def lookup_values_from_error_table(scores, err_df):
     """ find best matching q-value for each score in 'scores' """
@@ -329,7 +265,7 @@ def summary_err_table(df, qvalues=[0, 0.01, 0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5]
 
     qvalues = to_one_dim_array(qvalues)
     # find best matching fows in df for given qvalues:
-    ix = find_nearest_matches(df.qvalue.values, qvalues)
+    ix = find_nearest_matches(np.float32(df.qvalue.values), qvalues)
     # extract sub table
     df_sub = df.iloc[ix]
     # remove duplicate hits, mark them with None / NAN:
@@ -414,93 +350,31 @@ def pi0est(p_values, lambda_ = np.arange(0.05,1.0,0.05), pi0_method = "smoother"
 
 
 @profile
-def qvalue(p_values, pi0, use_pfdr=False):
-    """ estimate error table from p-values with method of storey for estimating fdrs and q-values"""
+def qvalue(p, pi0, pfdr = False):
+    qvals_out = p
+    rm_na = np.isfinite(p)
+    p = p[rm_na]
 
-    # sort descending:
-    p_values = np.sort(to_one_dim_array(p_values))[::-1]
+    if (min(p) < 0 or max(p) > 1):
+        sys.exit("Error: p-values not in valid range [0,1].")
+    elif (pi0 < 0 or pi0 > 1):
+        sys.exit("Error: pi0 not in valid range [0,1].")
 
-    # estimate FDR with storeys method:
-    num_total = len(p_values)
-    num_null = pi0 * num_total
+    m = len(p)
+    u = np.argsort(p)
+    v = scipy.stats.rankdata(p,"max")
 
-    # optimized with numpys broadcasting: comparing column vector with row
-    # vector yields a matrix with pairwise comparison results.  sum(axis=0)
-    # sums up each column:
-    num_positives = count_num_positives(p_values)
-    num_negatives = num_total - num_positives
-    pp = 1.0 * num_positives / num_total
-    tp = num_positives - num_null * p_values
-    fp = num_null * p_values
-    tn = num_null * (1.0 - p_values)
-    fn = num_negatives - num_null * (1.0 - p_values)
-
-    fdr = fp / num_positives
-
-    # storey published pFDR as an improvement over FDR,
-    # see http://www.genomine.org/papers/directfdr.pdf:
-
-    if use_pfdr:
-        fac = 1.0 - (1.0 - p_values) ** num_total
-        fdr /= fac
-        # if we take the limit p->1 we achieve the following factor:
-        fdr[p_values == 0] = 1.0 / num_total
-
-    # cut off values to range 0..1
-    fdr[fdr < 0.0] = 0.0
-    fdr[fdr > 1.0] = 1.0
-
-    # estimate false non-discovery rate
-    fnr = fn / num_negatives
-
-    # storey published pFDR as an improvement over FDR,
-    # see http://www.genomine.org/papers/directfdr.pdf:
-
-    if use_pfdr:
-        fac = 1.0 - p_values ** num_total
-        fnr /= fac
-        # if we take the limit p->1 we achieve the following factor:
-        fnr[p_values == 0] = 1.0 / num_total
-
-    # cut off values to range 0..1
-    fnr[fnr < 0.0] = 0.0
-    fnr[fnr > 1.0] = 1.0
-
-    sens = tp / (num_total - num_null)
-    # cut off values to range 0..1
-    sens[sens < 0.0] = 0.0
-    sens[sens > 1.0] = 1.0
-
-    if num_null:
-        fpr = fp / num_null
+    if pfdr:
+        qvals = (pi0 * m * p) / (v * (1 - np.power((1 - p), m)))
     else:
-        fpr = 0.0 * fp
+        qvals = (pi0 * m * p) / v
+    
+    qvals[u[m-1]] = np.minimum(qvals[u[m-1]], 1)
+    for i in range(m - 2,1,1):
+        qvals[u[i]] = np.minimum(qvals[u[i]], qvals[u[i + 1]])
 
-    # assemble statistics as data frame
-    df = pd.DataFrame(
-        dict(pvalue=p_values.flatten().astype(np.float32),
-             percentile_positive=pp.flatten().astype(np.float32),
-             positive=num_positives.flatten().astype(np.float32),
-             negative=num_negatives.flatten().astype(np.float32),
-             TP=tp.flatten().astype(np.float32),
-             FP=fp.flatten().astype(np.float32),
-             TN=tn.flatten().astype(np.float32),
-             FN=fn.flatten().astype(np.float32),
-             FDR=fdr.flatten().astype(np.float32),
-             FNR=fnr.flatten().astype(np.float32),
-             sens=sens.flatten().astype(np.float32),
-             FPR=fpr.flatten().astype(np.float32),
-             ),
-        columns="""pvalue percentile_positive positive negative TP FP
-                        TN FN FDR FNR sens FPR""".split(),
-    )
-
-    # cummin/cummax not available in numpy, so we create them from dataframe
-    # here:
-    df["qvalue"] = df.FDR.cummin()
-    df["svalue"] = df.sens[::-1].cummax()[::-1]
-
-    return ErrorStatistics(df, num_null, num_total)
+    qvals_out[rm_na] = qvals
+    return qvals_out
 
 
 def bw_nrd0(x):
@@ -590,7 +464,7 @@ def lfdr(p_values, pi0, trunc = True, monotone = True, transf = "probit", adj = 
 
 
 @profile
-def get_error_stat_from_null(target_scores, decoy_scores, lambda_, pi0_method = "smoother", pi0_smooth_df = 3, pi0_smooth_log_pi0 = False, use_pemp = False, use_pfdr = False, use_lfdr = False, lfdr_trunc = True, lfdr_monotone = True, lfdr_transf = "probit", lfdr_adj = 1.5, lfdr_eps = np.power(10.0,-8)):
+def error_statistics(target_scores, decoy_scores, lambda_, pi0_method = "smoother", pi0_smooth_df = 3, pi0_smooth_log_pi0 = False, use_pemp = False, use_pfdr = False, compute_lfdr = False, lfdr_trunc = True, lfdr_monotone = True, lfdr_transf = "probit", lfdr_adj = 1.5, lfdr_eps = np.power(10.0,-8)):
     """ takes list of decoy and target scores and creates error statistics for target values based
     on mean and std dev of decoy scores"""
 
@@ -605,60 +479,53 @@ def get_error_stat_from_null(target_scores, decoy_scores, lambda_, pi0_method = 
     else:
         target_pvalues = 1.0 - pnorm(target_scores, mu, nu)
 
+    # sort descending:
+    target_pvalues = np.sort(to_one_dim_array(target_pvalues))[::-1]
+
     pi0 = pi0est(target_pvalues, lambda_, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0)
-    error_stat = qvalue(target_pvalues, pi0['pi0'], use_pfdr)
+    target_qvalues = qvalue(target_pvalues, pi0['pi0'], use_pfdr)
 
-    if use_lfdr:
+    # summary statistics
+    num_total = len(target_pvalues)
+    num_positives = count_num_positives(target_pvalues)
+    num_negatives = num_total - num_positives
+    num_null = pi0['pi0'] * num_total
+    tp = num_positives - num_null * target_pvalues
+    fp = num_null * target_pvalues
+    tn = num_null * (1.0 - target_pvalues)
+    fn = num_negatives - num_null * (1.0 - target_pvalues)
+    fpr = fp / num_null
+
+    fdr = fp / num_positives
+    fnr = fn / num_negatives
+    if use_pfdr:
+        fdr /= (1.0 - (1.0 - target_pvalues) ** num_total)
+        fdr[target_pvalues == 0] = 1.0 / num_total
+
+        fnr /= 1.0 - p_values ** num_total
+        fnr[p_values == 0] = 1.0 / num_total
+
+    sens = tp / (num_total - num_null)
+    target_svalues = pd.Series(sens)[::-1].cummax()[::-1]
+
+    error_stat = pd.DataFrame({'cutoff': target_scores, 'pvalue': target_pvalues, 'qvalue': target_qvalues, 'svalue': target_svalues, 'tp': tp, 'fp': fp, 'tn': tn, 'fn': fn, 'fpr': fpr, 'fdr': fdr, 'fnr': fnr})
+
+    if compute_lfdr:
         logging.info("Estimate local false discovery rates (lFDR) / posterior error probabilities (PEP)")
-        error_stat.df["pep"] = lfdr(target_pvalues, pi0['pi0'], lfdr_trunc, lfdr_monotone, lfdr_transf, lfdr_adj, lfdr_eps)
+        error_stat['pep'] = lfdr(target_pvalues, pi0['pi0'], lfdr_trunc, lfdr_monotone, lfdr_transf, lfdr_adj, lfdr_eps)
 
-    error_stat.df["cutoff"] = target_scores
-    return error_stat, target_pvalues, pi0
+    print error_stat
+
+    return error_stat, pi0
 
 
 def find_cutoff(target_scores, decoy_scores, fdr, lambda_, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, use_pemp, use_pfdr):
     """ finds cut off target score for specified false discovery rate fdr """
 
-    error_stat, __, __ = get_error_stat_from_null(target_scores, decoy_scores, lambda_, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, use_pemp, use_pfdr, False)
-    if not len(error_stat.df):
+    error_stat, pi0 = error_statistics(target_scores, decoy_scores, lambda_, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, use_pemp, use_pfdr, False)
+    if not len(error_stat):
         raise Exception("to little data for calculating error statistcs")
-    i0 = (error_stat.df.qvalue - fdr).abs().argmin()
-    cutoff = error_stat.df.iloc[i0]["cutoff"]
+    i0 = (error_stat.qvalue - fdr).abs().argmin()
+    cutoff = error_stat.iloc[i0]["cutoff"]
     return cutoff
 
-
-@profile
-def calculate_final_statistics(all_top_target_scores,
-                               test_target_scores,
-                               test_decoy_scores,
-                               lambda_,
-                               pi0_method, pi0_smooth_df, 
-                               pi0_smooth_log_pi0, use_pemp,
-                               use_pfdr=False,
-                               lfdr_trunc=True,
-                               lfdr_monotone=True,
-                               lfdr_transf="probit",
-                               lfdr_adj=1.5,
-                               lfdr_eps=np.power(10.0,-8)):
-    """ estimates error statistics for given samples target_scores and
-    decoy scores and extends them to the full table of peak scores in table
-    'exp' """
-
-    # estimate error statistics from given samples
-    error_stat, target_pvalues, pi0 = get_error_stat_from_null(test_target_scores, test_decoy_scores, lambda_, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, use_pemp, use_pfdr, True, lfdr_trunc, lfdr_monotone, lfdr_transf, lfdr_adj, lfdr_eps)
-
-    # fraction of null hypothesises in sample values
-    summed_test_fraction_null = error_stat.num_null / error_stat.num_total
-
-    # transfer statistics from sample set to full set:
-    num_top_target = len(all_top_target_scores)
-
-    # most important: transfer estimated number of null hyptothesis:
-    num_null_top_target = num_top_target * summed_test_fraction_null
-
-    # now complete error stats based on num_null_top_target:
-    raw_error_stat = get_error_table_using_percentile_positives_new(error_stat.df,
-                                                                    all_top_target_scores,
-                                                                    num_null_top_target)
-    return ErrorStatistics(raw_error_stat, error_stat.num_null,
-                           error_stat.num_total), target_pvalues, pi0

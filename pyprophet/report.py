@@ -1,5 +1,3 @@
-# needed for headless environment:
-
 try:
     import matplotlib
     matplotlib.use('Agg')
@@ -10,24 +8,7 @@ except ImportError:
 from scipy.stats import gaussian_kde
 from numpy import linspace, concatenate, around
 
-from config import CONFIG, set_pandas_print_options
-
-
-class Protein:
-
-    def __init__(self, name):
-        self.peptides = set()
-        self.name = name
-
-    def add_peptide(self, peptide):
-        self.peptides.update([peptide])
-
-    def get_concat_peptides(self):
-        return "".join(self.peptides)
-
-
-def save_report(report_path, prefix, decoys, targets, top_decoys, top_targets, cutoffs, svalues,
-                qvalues, pvalues, pi0):
+def save_report(pdf_path, title, top_decoys, top_targets, cutoffs, svalues, qvalues, pvalues, pi0):
 
     if plt is None:
         raise ImportError("you need matplotlib package to create a report")
@@ -36,7 +17,7 @@ def save_report(report_path, prefix, decoys, targets, top_decoys, top_targets, c
     plt.subplots_adjust(hspace=.5)
 
     plt.subplot(321)
-    plt.title(prefix + "\n\nROC")
+    plt.title("ROC")
     plt.xlabel('false positive rate (q-value)')
     plt.ylabel('true positive rate (s-value)')
 
@@ -54,9 +35,9 @@ def save_report(report_path, prefix, decoys, targets, top_decoys, top_targets, c
     plt.plot(cutoffs, qvalues, color='r', label="FPR (q-value)")
 
     plt.subplot(323)
-    plt.title(CONFIG.get("group_id") + " d-score distributions")
+    plt.title("group d-score distributions")
     plt.xlabel("d-score")
-    plt.ylabel("# of " + CONFIG.get("group_id"))
+    plt.ylabel("# of groups")
     plt.hist(
         [top_targets, top_decoys], 20, color=['g', 'r'], label=['target', 'decoy'], histtype='bar')
     plt.legend(loc=2)
@@ -70,7 +51,7 @@ def save_report(report_path, prefix, decoys, targets, top_decoys, top_targets, c
     ddensity._compute_covariance()
     xs = linspace(min(concatenate((top_targets, top_decoys))), max(
         concatenate((top_targets, top_decoys))), 200)
-    plt.title(CONFIG.get("group_id") + " d-score densities")
+    plt.title("group d-score densities")
     plt.xlabel("d-score")
     plt.ylabel("density")
     plt.plot(xs, tdensity(xs), color='g', label='target')
@@ -79,7 +60,7 @@ def save_report(report_path, prefix, decoys, targets, top_decoys, top_targets, c
 
     plt.subplot(325)
     if pvalues is not None:
-        counts, __, __ = plt.hist(pvalues, bins=40, normed=True)
+        counts, __, __ = plt.hist(pvalues, bins=10, normed=True)
         plt.plot([0, 1], [pi0['pi0'], pi0['pi0']], "r")
         plt.title("p-value density histogram: $\pi_0$ = " + str(around(pi0['pi0'], decimals=3)))
         plt.xlabel("p-value")
@@ -92,9 +73,8 @@ def save_report(report_path, prefix, decoys, targets, top_decoys, top_targets, c
         plt.xlim([0,1])
         plt.ylim([0,1])
         plt.title("$\pi_0$ smoothing fit plot")
-        plt.xlabel("lambda")
+        plt.xlabel("$\lambda$")
         plt.ylabel("$\pi_0$($\lambda$)")
 
-    plt.savefig(report_path)
-
-    return cutoffs, svalues, qvalues, top_targets, top_decoys
+    plt.suptitle(title)
+    plt.savefig(pdf_path)
