@@ -15,21 +15,16 @@ import shutil
 
 DATA_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 
-def test_0(regtest):
-    p_values = np.linspace(0.0, 1., 50)
-    p_values = np.append(p_values, np.linspace(1.0 - 0.0001, 1.0, 50))
-    pi0 = pi0est(p_values)['pi0']
-    df = qvalue(p_values,pi0,use_pfdr=False).df
-    print("without correction", file=regtest)
-    print(df.head(), file=regtest)
-    print(df.tail(), file=regtest)
-    df = qvalue(p_values,pi0,use_pfdr=True).df
+def test_0(tmpdir, regtest):
+    os.chdir(tmpdir.strpath)
+    data_path = os.path.join(DATA_FOLDER, "test_qvalue_ref_data.csv")
+    shutil.copy(data_path, tmpdir.strpath)
 
-    # we should see non nan here for FDR:
-    print("with correction", file=regtest)
-    print(df.head(), file=regtest)
-    print(df.tail(), file=regtest)
+    stat = pd.read_csv('test_qvalue_ref_data.csv', delimiter=',').sort_values("p")
 
+    # For comparison with R/bioconductor reference implementation
+    np.testing.assert_almost_equal(qvalue(stat['p'], 0.669926026474838, pfdr=False), stat['q_default'].values, decimal=4)
+    np.testing.assert_almost_equal(qvalue(stat['p'], 0.669926026474838, pfdr=True), stat['q_pfdr'].values, decimal=4)
 
 def test_1():
     stat = np.array([0, 1, 3, 2, 0.1, 0.5, 0.6, 0.3, 0.5, 0.6, 0.2, 0.5])

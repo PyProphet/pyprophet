@@ -3,6 +3,13 @@ data(hedenfalk)
 p <- hedenfalk$p
 pi0<-pi0est(p)$pi0 # 0.669926
 
+# qvalue validation
+qv_q<-qvalue(p)
+qv_q_pfdr<-qvalue(p, pfdr=TRUE)
+
+qvalue_ref_data<-data.frame("p"=p, "q_default"=qv_q$qvalues, "q_pfdr"=qv_q_pfdr$qvalues)
+write.csv(qvalue_ref_data, file="test_qvalue_ref_data.csv", row.names=FALSE)
+
 # pi0est validation
 nullRatio <- pi0est(p)$pi0
 nullRatioS <- pi0est(p, lambda=seq(0.40, 0.95, 0.05), smooth.log.pi0="TRUE")$pi0

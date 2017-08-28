@@ -350,7 +350,9 @@ def pi0est(p_values, lambda_ = np.arange(0.05,1.0,0.05), pi0_method = "smoother"
 
 
 @profile
-def qvalue(p, pi0, pfdr = False):
+def qvalue(p_values, pi0, pfdr = False):
+    p = np.array(p_values)
+
     qvals_out = p
     rm_na = np.isfinite(p)
     p = p[rm_na]
@@ -370,7 +372,7 @@ def qvalue(p, pi0, pfdr = False):
         qvals = (pi0 * m * p) / v
     
     qvals[u[m-1]] = np.minimum(qvals[u[m-1]], 1)
-    for i in range(m - 2,1,1):
+    for i in list(reversed(range(0,m-2,1))):
         qvals[u[i]] = np.minimum(qvals[u[i]], qvals[u[i + 1]])
 
     qvals_out[rm_na] = qvals
@@ -465,8 +467,7 @@ def lfdr(p_values, pi0, trunc = True, monotone = True, transf = "probit", adj = 
 
 @profile
 def error_statistics(target_scores, decoy_scores, lambda_, pi0_method = "smoother", pi0_smooth_df = 3, pi0_smooth_log_pi0 = False, use_pemp = False, use_pfdr = False, compute_lfdr = False, lfdr_trunc = True, lfdr_monotone = True, lfdr_transf = "probit", lfdr_adj = 1.5, lfdr_eps = np.power(10.0,-8)):
-    """ takes list of decoy and target scores and creates error statistics for target values based
-    on mean and std dev of decoy scores"""
+    """ takes list of decoy and target scores and creates error statistics for target values"""
 
     decoy_scores = to_one_dim_array(decoy_scores)
     mu, nu = mean_and_std_dev(decoy_scores)
@@ -513,8 +514,6 @@ def error_statistics(target_scores, decoy_scores, lambda_, pi0_method = "smoothe
     if compute_lfdr:
         logging.info("Estimate local false discovery rates (lFDR) / posterior error probabilities (PEP)")
         error_stat['pep'] = lfdr(target_pvalues, pi0['pi0'], lfdr_trunc, lfdr_monotone, lfdr_transf, lfdr_adj, lfdr_eps)
-
-    print error_stat
 
     return error_stat, pi0
 
