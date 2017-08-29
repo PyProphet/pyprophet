@@ -32,9 +32,6 @@ import multiprocessing
 
 from std_logger import logging
 
-ErrorStatistics = namedtuple("ErrorStatistics", "df num_null num_total")
-
-
 def _ff(a):
     return _find_nearest_matches(*a)
 
@@ -231,7 +228,7 @@ def mean_and_std_dev(values):
 @profile
 def lookup_values_from_error_table(scores, err_df):
     """ find best matching q-value for each score in 'scores' """
-    ix = find_nearest_matches(err_df.cutoff.values, scores)
+    ix = find_nearest_matches(np.float32(err_df.cutoff.values), np.float32(scores))
     return err_df.pvalue.iloc[ix].values, err_df.svalue.iloc[ix].values, err_df.pep.iloc[ix].values, err_df.qvalue.iloc[ix].values
 
 
@@ -469,20 +466,25 @@ def lfdr(p_values, pi0, trunc = True, monotone = True, transf = "probit", adj = 
 def error_statistics(target_scores, decoy_scores, lambda_, pi0_method = "smoother", pi0_smooth_df = 3, pi0_smooth_log_pi0 = False, use_pemp = False, use_pfdr = False, compute_lfdr = False, lfdr_trunc = True, lfdr_monotone = True, lfdr_transf = "probit", lfdr_adj = 1.5, lfdr_eps = np.power(10.0,-8)):
     """ takes list of decoy and target scores and creates error statistics for target values"""
 
-    decoy_scores = to_one_dim_array(decoy_scores)
-    mu, nu = mean_and_std_dev(decoy_scores)
-
     target_scores = to_one_dim_array(target_scores)
     target_scores = np.sort(target_scores[~np.isnan(target_scores)])
 
+    decoy_scores = to_one_dim_array(decoy_scores)
+    decoy_scores = np.sort(decoy_scores[~np.isnan(decoy_scores)])
+
+    # compute p-values using decoy scores
     if use_pemp:
+        # non-parametric
         target_pvalues = pemp(target_scores, decoy_scores)
     else:
+        # parametric
+        mu, nu = mean_and_std_dev(decoy_scores)
         target_pvalues = 1.0 - pnorm(target_scores, mu, nu)
 
-    # sort descending:
+    # sort p-values
     target_pvalues = np.sort(to_one_dim_array(target_pvalues))[::-1]
 
+    # estimate pi0
     pi0 = pi0est(target_pvalues, lambda_, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0)
     target_qvalues = qvalue(target_pvalues, pi0['pi0'], use_pfdr)
 
@@ -507,12 +509,23 @@ def error_statistics(target_scores, decoy_scores, lambda_, pi0_method = "smoothe
         fnr[p_values == 0] = 1.0 / num_total
 
     sens = tp / (num_total - num_null)
+
+    sens[sens < 0.0] = 0.0
+    sens[sens > 1.0] = 1.0
+
+    fdr[fdr < 0.0] = 0.0
+    fdr[fdr > 1.0] = 1.0
+    fdr[num_positives == 0] = 0.0
+
+    fnr[fnr < 0.0] = 0.0
+    fnr[fnr > 1.0] = 1.0
+    fnr[num_positives == 0] = 0.0
+
     target_svalues = pd.Series(sens)[::-1].cummax()[::-1]
 
     error_stat = pd.DataFrame({'cutoff': target_scores, 'pvalue': target_pvalues, 'qvalue': target_qvalues, 'svalue': target_svalues, 'tp': tp, 'fp': fp, 'tn': tn, 'fn': fn, 'fpr': fpr, 'fdr': fdr, 'fnr': fnr})
 
     if compute_lfdr:
-        logging.info("Estimate local false discovery rates (lFDR) / posterior error probabilities (PEP)")
         error_stat['pep'] = lfdr(target_pvalues, pi0['pi0'], lfdr_trunc, lfdr_monotone, lfdr_transf, lfdr_adj, lfdr_eps)
 
     return error_stat, pi0

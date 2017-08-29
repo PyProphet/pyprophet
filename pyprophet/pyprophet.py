@@ -15,21 +15,13 @@ except NameError:
 import pandas as pd
 import numpy as np
 
-# set output options for regression tests on a wide terminal
-pd.set_option('display.width', 180)
-
-# reduce precision to avoid to sensitive tests because of roundings:
-pd.set_option('display.precision', 6)
+from config import CONFIG, set_pandas_print_options
 
 from stats import (lookup_values_from_error_table, error_statistics,
                    mean_and_std_dev, final_err_table, summary_err_table,
-                   posterior_pg_prob, posterior_chromatogram_hypotheses_fast,
-                   ErrorStatistics)
+                   posterior_pg_prob, posterior_chromatogram_hypotheses_fast)
 
-from config import CONFIG
-
-from data_handling import (prepare_data_table, Experiment, check_header,
-                           sample_data_tables, read_csv)
+from data_handling import (prepare_data_table, Experiment)
 from classifiers import (LDALearner)
 from semi_supervised import (AbstractSemiSupervisedLearner, StandardSemiSupervisedLearner)
 
@@ -41,7 +33,7 @@ import time
 
 from collections import namedtuple
 from contextlib import contextmanager
-
+import sys
 
 @contextmanager
 def timer(name=""):
@@ -90,12 +82,11 @@ def calculate_params_for_d_score(classifier, experiment):
 class Scorer(object):
 
     def __init__(self, classifier, score_columns, experiment, all_test_target_scores,
-                 all_test_decoy_scores, merge_results):
+                 all_test_decoy_scores):
 
         self.classifier = classifier
         self.score_columns = score_columns
         self.mu, self.nu = calculate_params_for_d_score(classifier, experiment)
-        self.merge_results = merge_results
         final_score = classifier.score(experiment, True)
         experiment["d_score"] = (final_score - self.mu) / self.nu
         lambda_ = CONFIG.get("final_statistics.lambda")
@@ -147,16 +138,16 @@ class Scorer(object):
                                                                     self.error_stat)
 
         texp["pep"] = peps
-        texp["m_score"] = q_values
+        texp["q_value"] = q_values
         texp["s_value"] = s_values
         texp["p_value"] = p_values
-        logging.info("mean m_score = %e, std_dev m_score = %e" % (np.mean(q_values),
+        logging.info("mean q_value = %e, std_dev q_value = %e" % (np.mean(q_values),
                                                                   np.std(q_values, ddof=1)))
         logging.info("mean s_value = %e, std_dev s_value = %e" % (np.mean(s_values),
                                                                   np.std(s_values, ddof=1)))
         texp.add_peak_group_rank()
 
-        df = table.join(texp[["d_score", "p_value", "pep", "m_score", "peak_group_rank"]])
+        df = table.join(texp[["d_score", "p_value", "q_value", "pep", "peak_group_rank"]])
 
         if CONFIG.get("compute.probabilities"):
             df = self.add_probabilities(df, texp)
@@ -221,19 +212,24 @@ class HolyGostQuery(object):
         experiment.log_summary()
         return experiment, score_columns
 
-    def apply_weights(self, tables, delim_in, check_cols, loaded_weights):
+    def apply_weights(self, table, loaded_weights):
         with timer():
             logging.info("apply weights")
-            result, scorer, trained_weights = self._apply_weights(tables, loaded_weights)
+            result, scorer, trained_weights = self._apply_weights(table, loaded_weights)
             logging.info("processing input data finished")
         return result, scorer, trained_weights
 
     def _apply_weights(self, table, loaded_weights):
 
-        experiment, score_columns = self._setup_experiment(tables)
+        experiment, score_columns = self._setup_experiment(table)
+
+        if np.all(score_columns == loaded_weights['score'].values):
+            weights = loaded_weights['weight'].values
+        else:
+            sys.exit("Error: Scores in weights file do not match data.")
 
         final_classifier, all_test_target_scores, all_test_decoy_scores = \
-            self._apply_weights_on_exp(experiment, loaded_weights)
+            self._apply_weights_on_exp(experiment, weights)
 
         return self._build_result(table, final_classifier, score_columns, experiment,
                                   all_test_target_scores, all_test_decoy_scores)
@@ -254,21 +250,6 @@ class HolyGostQuery(object):
         final_classifier = self.semi_supervised_learner.averaged_learner(ws)
 
         return final_classifier, all_test_target_scores, all_test_decoy_scores
-
-    @profile
-    def apply_scorer(self, tables, delim, check_cols, loaded_scorer):
-        with timer():
-            logging.info("apply scorer to input data")
-            result, __, trained_weights = self._apply_scorer(tables, loaded_scorer)
-            scorer = None
-            logging.info("processing input data finished")
-        return result, scorer, trained_weights
-
-    @profile
-    def _apply_scorer(self, table, loaded_scorer):
-        scored_tables = loaded_scorer.score(table)
-        trained_weights = loaded_scorer.classifier.get_parameters()
-        return Result(None, None, scored_tables), None, trained_weights
 
     @profile
     def learn_and_apply(self, table):
@@ -342,11 +323,11 @@ class HolyGostQuery(object):
     def _build_result(self, table, final_classifier, score_columns, experiment,
                       all_test_target_scores, all_test_decoy_scores):
 
-        merge_results = CONFIG.get("multiple_files.merge_results")
         weights = final_classifier.get_parameters()
+        classifier_table = pd.DataFrame({'score': score_columns, 'weight': weights})
 
         scorer = Scorer(final_classifier, score_columns, experiment, all_test_target_scores,
-                        all_test_decoy_scores, merge_results)
+                        all_test_decoy_scores)
 
         scored_table = scorer.score(table)
 
@@ -355,7 +336,7 @@ class HolyGostQuery(object):
         result = Result(summary_statistics, final_statistics, scored_table)
 
         logging.info("calculated scoring and statistics")
-        return result, scorer, weights
+        return result, scorer, classifier_table
 
 @profile
 def PyProphet():

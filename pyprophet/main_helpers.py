@@ -40,6 +40,11 @@ def dump_config(config):
         print "    %-40s   : %r" % (k, v)
     print
 
+def transform_threads(ctx, param, value):
+    if value < 0 or value > 1:
+      sys.exit('Error: Wrong input values for subsample_ratio. subsample_ratio must be within [0,1].')
+    return(value)
+
 
 def set_parameters(outfile, apply_weights, xeval_fraction, xeval_iterations, initial_fdr, iteration_fdr, subsample, subsample_rate, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, threads, test, random_seed):
 
@@ -80,41 +85,6 @@ def set_parameters(outfile, apply_weights, xeval_fraction, xeval_iterations, ini
 
     CONFIG.update(options)
     dump_config(CONFIG.config)
-
-
-def create_pathes(prefix, dirname):
-
-    class Pathes(dict):
-
-        def __init__(self, prefix, dirname, **kw):
-            for k, postfix in kw.items():
-                self[k] = os.path.join(dirname, prefix + postfix)
-        __getattr__ = dict.__getitem__
-
-    return Pathes(prefix, dirname,
-                  scored_table="_scored.txt",
-                  filtered_table="_with_dscore_filtered.csv",
-                  filtered_chroms="_scored.sqMass",
-                  report="_report.pdf",
-                  cutoffs="_cutoffs.txt",
-                  svalues="_svalues.txt",
-                  qvalues="_qvalues.txt",
-                  d_scores_top_target_peaks="_dscores_top_target_peaks.txt",
-                  d_scores_top_decoy_peaks="_dscores_top_decoy_peaks.txt",
-                  )
-
-
-def check_if_any_exists(to_check):
-    found_exsiting_file = False
-    for p in to_check:
-        if os.path.exists(p):
-            found_exsiting_file = True
-            print "ERROR: %s already exists" % p
-    if found_exsiting_file:
-        print
-        print "please use --target.overwrite option"
-        print
-    return found_exsiting_file
 
 
 # Filter a sqMass chromatogram file by given input labels

@@ -20,20 +20,6 @@ except NameError:
 from std_logger import logging
 
 
-def setup_csv_dtypes(columns):
-    dtype = {}
-    for col_name in columns:
-        if col_name.startswith("main_") or col_name.startswith("var_"):
-            dtype[col_name] = np.float32
-    return dtype
-
-
-def read_csv(path, delim):
-    header = pd.read_csv(path, delim, nrows=1).columns
-    dtype = setup_csv_dtypes(header)
-    return pd.read_csv(path, delim, na_values=["NA", "NaN", "infinite"], engine="c", dtype=dtype)
-
-
 def check_for_unique_blocks(tg_ids):
     seen = set()
     last_tg_id = None
@@ -143,11 +129,15 @@ def prepare_data_table(table, tg_id_name="transition_group_id",
                 )
 
     column_names = ["tg_id", "tg_num_id", "is_decoy", "is_top_peak", "is_train", "main_score"]
+    used_var_column_names = []
     for i, v in enumerate(var_column_names):
         col_name = "var_%d" % i
         col_data = table[v]
         if pd.isnull(col_data).all():
-            logging.warn("Error: Column %s contains only invalid/missing values." % v)
+            logging.warn("Warning: Column %s contains only invalid/missing values. Column will be dropped." % v)
+            continue
+        else:
+            used_var_column_names.append(v)
 
         data[col_name] = col_data
         column_names.append(col_name)
@@ -158,90 +148,9 @@ def prepare_data_table(table, tg_id_name="transition_group_id",
     # build data frame:
     df = pd.DataFrame(data, columns=column_names)
 
-    all_score_columns = (main_score_name,) + tuple(var_column_names)
+    all_score_columns = (main_score_name,) + tuple(used_var_column_names)
     df = cleanup_and_check(df)
     return df, all_score_columns
-
-
-def check_header(path, delim, check_cols):
-    header = pd.read_csv(path, delim, nrows=1).columns
-    if check_cols:
-        missing = set(check_cols) - set(header)
-        if missing:
-            missing = sorted(missing)
-            sys.exit("Error: Columns %s are not in input file(s)." % ", ".join(missing))
-
-    if not any(name.startswith("main_") for name in header):
-        sys.exit("Error: No column \"main_*\" is in input file(s).")
-
-    if not any(name.startswith("var_") for name in header):
-        sys.exit("Error: No column \"var_*\" is in input file(s).")
-
-    return header
-
-
-@profile
-def prepare_data_tables(tables, tg_id_name="transition_group_id",
-                        decoy_name="decoy",
-                        main_score_name=None,
-                        score_columns=None,
-                        ):
-
-    all_score_columns = set()
-    dfs = []
-    for table in tables:
-        df, score_columns = prepare_data_table(table, tg_id_name, decoy_name, main_score_name,
-                                               score_columns)
-        all_score_columns.add(tuple(score_columns))
-        dfs.append(df)
-
-    if len(all_score_columns) > 1:
-        sys.exit("Error: Score columns in input files are not consistent in order and/or naming.")
-
-    return dfs, all_score_columns.pop()
-
-
-def sample_data_tables(pathes, delim,  sampling_rate=0.1, tg_id_name="transition_group_id",
-                       decoy_name="decoy"):
-    tg_target_ids = set()
-    tg_decoy_ids = set()
-    for path in pathes:
-        for chunk in pd.read_csv(path, delim, iterator=True, chunksize=100000,
-                                 usecols=[tg_id_name, decoy_name]):
-            ids = chunk[chunk[decoy_name].eq(False)][tg_id_name].values
-            tg_target_ids.update(ids)
-            ids = chunk[chunk[decoy_name].eq(True)][tg_id_name].values
-            # remove "DECOY_" in the beginnings:
-            ids = [id_.partition("DECOY_")[2] for id_ in ids]
-            tg_decoy_ids.update(ids)
-
-    assert len(pathes) > 0, "Error: Provide input files."
-    header = pd.read_csv(pathes[0], delim, nrows=1).columns
-
-    tg_ids = tg_target_ids.intersection(tg_decoy_ids)
-    if not len(tg_ids):
-        raise Exception("Error: No intersection of target and decoy groups was found during subsampling.")
-
-    # subsample from targets
-    if sampling_rate < 1.0:
-        tg_ids = random.sample(tg_ids, int(sampling_rate * len(tg_ids)))
-    else:
-        tg_ids = list(tg_ids)
-    # add corresponding decoys
-    tg_ids += ["DECOY_" + id_ for id_ in tg_ids]
-    # convert to set for faster lookup below:
-    tg_ids = set(tg_ids)
-
-    dtype = setup_csv_dtypes(header)
-    chunks = []
-    for path in pathes:
-        for chunk in pd.read_csv(path, delim, iterator=True, na_values=["NA", "NaN", "infinite"],
-                                 chunksize=100000, dtype=dtype):
-            chunk = chunk[chunk[tg_id_name].isin(tg_ids)]
-            chunks.append(chunk)
-
-    return prepare_data_tables(chunks)
-
 
 class Experiment(object):
 
