@@ -6,6 +6,7 @@ import sqlite3
 from .stats import error_statistics, lookup_values_from_error_table
 from .report import save_report
 from shutil import copyfile
+from .std_logger import logging
 
 def statistics_report(data, outfile, context, analyte, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps):
 
@@ -129,7 +130,10 @@ def merge_osw(infiles, outfile, subsample_ratio):
             c.execute('DELETE FROM FEATURE_TRANSITION')
             conn.commit()
             c.fetchall()
-
+            conn.close()
+            
+        conn = sqlite3.connect(outfile)
+        c = conn.cursor()
         c.execute('ATTACH DATABASE "'+ infile + '" AS sdb')
         c.execute('INSERT INTO RUN SELECT * FROM sdb.RUN')
         c.execute('INSERT INTO FEATURE SELECT * FROM sdb.FEATURE WHERE PRECURSOR_ID IN (SELECT PRECURSOR_ID FROM sdb.FEATURE ORDER BY RANDOM() LIMIT (SELECT ROUND(' + str(subsample_ratio) + '*COUNT(DISTINCT PRECURSOR_ID)) FROM sdb.FEATURE))')
@@ -137,7 +141,12 @@ def merge_osw(infiles, outfile, subsample_ratio):
         c.execute('INSERT INTO FEATURE_MS2 SELECT * FROM sdb.FEATURE_MS2 WHERE sdb.FEATURE_MS2.FEATURE_ID IN (SELECT ID FROM FEATURE)')
         c.execute('INSERT INTO FEATURE_TRANSITION SELECT * FROM sdb.FEATURE_TRANSITION WHERE sdb.FEATURE_TRANSITION.FEATURE_ID IN (SELECT ID FROM FEATURE)')
         logging.info("Merging file " + infile + " to " + outfile + ".")
+        conn.commit()
+        c.fetchall()
+        conn.close()
 
+    conn = sqlite3.connect(outfile)
+    c = conn.cursor()
     c.execute('VACUUM')
     conn.commit()
     c.fetchall()

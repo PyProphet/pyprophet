@@ -192,6 +192,13 @@ def infer_peptidoforms(infile, outfile, ipf_ms1_scoring, ipf_ms2_scoring, ipf_h0
         copyfile(infile, outfile)
 
     con = sqlite3.connect(outfile)
+
+    c = con.cursor()
+    c.execute('SELECT count(name) FROM sqlite_master WHERE type="table" AND name="SCORE_IPF"')
+    if c.fetchone()[0] == 1:
+        c.execute('DELETE FROM SCORE_IPF')
+    c.fetchall()
+
     uis_peptidoform_data.to_sql("SCORE_IPF", con, index=False, if_exists='fail')
     con.close()
 
