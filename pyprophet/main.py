@@ -44,48 +44,8 @@ def cli():
     Visit http://openswath.org for further usage instructions and help.
     """
 
-@cli.resultcallback()
-def process_commands(processors):
-    """This result callback is invoked with an iterable of all the chained
-    subcommands.  As in this example each subcommand returns a function
-    we can chain them together to feed one into the other, similar to how
-    a pipe on unix works.
-    """
-    # Start with an empty iterable.
-    stream = ()
-
-    # Pipe it through all stream processors.
-    for processor in processors:
-        stream = processor(stream)
-
-    # Evaluate the stream and throw away the items.
-    for _ in stream:
-        pass
-
-def processor(f):
-    """Helper decorator to rewrite a function so that it returns another
-    function from it.
-    """
-    def new_func(*args, **kwargs):
-        def processor(stream):
-            return f(stream, *args, **kwargs)
-        return processor
-    return update_wrapper(new_func, f)
-
-def generator(f):
-    """Similar to the :func:`processor` but passes through old values
-    unchanged and does not pass through the values as parameter.
-    """
-    @processor
-    def new_func(stream, *args, **kwargs):
-        for item in stream:
-            yield item
-        for item in f(*args, **kwargs):
-            yield item
-    return update_wrapper(new_func, f)
-
 # PyProphet semi-supervised learning and scoring
-@cli.command("score")
+@cli.command()
 # # File handling
 @click.option('--in', 'infile', required=True, type=click.Path(exists=True), help='PyProphet input file.')
 @click.option('--out', 'outfile', type=click.Path(exists=False), help='PyProphet output file.')
@@ -120,8 +80,6 @@ def generator(f):
 @click.option('--threads', default=1, show_default=True, type=int, help='Number of threads used for semi-supervised learning. -1 means all available CPUs.', callback=transform_threads)
 @click.option('--test/--no-test', default=False, show_default=True, help='Run in test mode with fixed seed.')
 @click.option('--random_seed', default=None, show_default=True, type=int, help='Set fixed seed to integer value.', callback=transform_random_seed)
-# Function
-@generator
 def score(infile, outfile, apply_weights, xeval_fraction, xeval_iterations, initial_fdr, iteration_fdr, ss_iterations, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, level, ipf_max_pgrank, ipf_max_pgpep, tric_chromprob, threads, test, random_seed):
 
     if outfile is None:
@@ -136,10 +94,9 @@ def score(infile, outfile, apply_weights, xeval_fraction, xeval_iterations, init
     else:
         PyProphetWeightApplier(infile, outfile, level, ipf_max_pgrank, ipf_max_pgpep, apply_weights).run()
 
-    yield True
 
 # IPF
-@cli.command("ipf")
+@cli.command()
 # File handling
 @click.option('--in', 'infile', required=True, type=click.Path(exists=True), help='PyProphet input file.')
 @click.option('--out', 'outfile', type=click.Path(exists=False), help='PyProphet output file.')
@@ -151,9 +108,7 @@ def score(infile, outfile, apply_weights, xeval_fraction, xeval_iterations, init
 @click.option('--ipf_max_peakgroup_pep', default=0.7, show_default=True, type=float, help='Maximum PEP to consider scored precursors in IPF.')
 @click.option('--ipf_max_precursor_peakgroup_pep', default=0.4, show_default=True, type=float, help='Maximum BHM layer 1 integrated precursor peakgroup PEP to consider in IPF.')
 @click.option('--ipf_max_transition_pep', default=0.6, show_default=True, type=float, help='Maximum PEP to consider scored transitions in IPF.')
-# Function
-@processor
-def ipf(ctx, infile, outfile, ipf_ms1_scoring, ipf_ms2_scoring, ipf_h0, ipf_max_precursor_pep, ipf_max_peakgroup_pep, ipf_max_precursor_peakgroup_pep, ipf_max_transition_pep):
+def ipf(infile, outfile, ipf_ms1_scoring, ipf_ms2_scoring, ipf_h0, ipf_max_precursor_pep, ipf_max_peakgroup_pep, ipf_max_precursor_peakgroup_pep, ipf_max_transition_pep):
 
     if outfile is None:
         outfile = infile
@@ -162,10 +117,9 @@ def ipf(ctx, infile, outfile, ipf_ms1_scoring, ipf_ms2_scoring, ipf_h0, ipf_max_
 
     infer_peptidoforms(infile, outfile, ipf_ms1_scoring, ipf_ms2_scoring, ipf_h0, ipf_max_precursor_pep, ipf_max_peakgroup_pep, ipf_max_precursor_peakgroup_pep, ipf_max_transition_pep)
 
-    yield True
 
 # Peptide-level inference
-@cli.command("peptide")
+@cli.command()
 # File handling
 @click.option('--in', 'infile', required=True, type=click.Path(exists=True), help='PyProphet input file.')
 @click.option('--out', 'outfile', type=click.Path(exists=False), help='PyProphet output file.')
@@ -183,9 +137,7 @@ def ipf(ctx, infile, outfile, ipf_ms1_scoring, ipf_ms2_scoring, ipf_h0, ipf_max_
 @click.option('--lfdr_transformation', default='probit', show_default=True, type=click.Choice(['probit', 'logit']), help='Either a "probit" or "logit" transformation is applied to the p-values so that a local FDR estimate can be formed that does not involve edge effects of the [0,1] interval in which the p-values lie.')
 @click.option('--lfdr_adj', default=1.5, show_default=True, type=float, help='Numeric value that is applied as a multiple of the smoothing bandwidth used in the density estimation.')
 @click.option('--lfdr_eps', default=np.power(10.0,-8), show_default=True, type=float, help='Numeric value that is threshold for the tails of the empirical p-value distribution.')
-# Function
-@processor
-def peptide(ctx, infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps):
+def peptide(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps):
 
     if outfile is None:
         outfile = infile
@@ -194,10 +146,9 @@ def peptide(ctx, infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_met
 
     infer_peptides(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps)
 
-    yield True
 
 # Protein-level inference
-@cli.command("protein")
+@cli.command()
 # # File handling
 @click.option('--in', 'infile', required=True, type=click.Path(exists=True), help='PyProphet input file.')
 @click.option('--out', 'outfile', type=click.Path(exists=False), help='PyProphet output file.')
@@ -215,9 +166,7 @@ def peptide(ctx, infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_met
 @click.option('--lfdr_transformation', default='probit', show_default=True, type=click.Choice(['probit', 'logit']), help='Either a "probit" or "logit" transformation is applied to the p-values so that a local FDR estimate can be formed that does not involve edge effects of the [0,1] interval in which the p-values lie.')
 @click.option('--lfdr_adj', default=1.5, show_default=True, type=float, help='Numeric value that is applied as a multiple of the smoothing bandwidth used in the density estimation.')
 @click.option('--lfdr_eps', default=np.power(10.0,-8), show_default=True, type=float, help='Numeric value that is threshold for the tails of the empirical p-value distribution.')
-# Function
-@processor
-def protein(ctx, infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps):
+def protein(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps):
 
     if outfile is None:
         outfile = infile
@@ -226,16 +175,12 @@ def protein(ctx, infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_met
 
     infer_proteins(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps)
 
-    yield True
 
 # Merging & subsampling of multiple runs
-@cli.command("merge")
+@cli.command()
 @click.argument('infiles', nargs=-1, type=click.Path(exists=True))
 @click.option('--out','outfile', type=click.Path(exists=False), help='Merged OSW output file.')
 @click.option('--subsample_ratio', default=1, show_default=True, type=float, help='Subsample ratio used per input file', callback=transform_subsample_ratio)
-# Function
-@processor
-def merge(ctx, infiles, outfile, subsample_ratio):
+def merge(infiles, outfile, subsample_ratio):
     merge_osw(infiles, outfile, subsample_ratio)
 
-    yield True
