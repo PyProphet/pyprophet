@@ -1,13 +1,13 @@
 from setuptools import setup, find_packages
 from distutils.extension import Extension
-
+import sys
 
 min_numpy_version = (1, 9, 0)
 
 try:
     import numpy
 except ImportError:
-    print "need at least numpy %d.%d.%d" % min_numpy_version
+    sys.exit("need at least numpy %d.%d.%d" % min_numpy_version)
 else:
     vtuple = tuple(map(int, numpy.__version__.split(".")))
     msg = "need at least numpy %s, found %s" % (min_numpy_version, vtuple)

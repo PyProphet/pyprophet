@@ -17,7 +17,7 @@ except NameError:
     def profile(fun):
         return fun
 
-from std_logger import logging
+from .std_logger import logging
 
 pd.set_option('chained_assignment',None)
 

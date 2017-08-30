@@ -9,15 +9,15 @@ try:
 except NameError:
     profile = lambda x: x
 
-from data_handling import Experiment
-from classifiers import AbstractLearner
-from config import CONFIG
+from .data_handling import Experiment
+from .classifiers import AbstractLearner
+from .config import CONFIG
 
 import numpy as np
-from stats import mean_and_std_dev, find_cutoff
+from .stats import mean_and_std_dev, find_cutoff
 
 
-from std_logger import logging
+from .std_logger import logging
 
 
 class AbstractSemiSupervisedLearner(object):
@@ -86,7 +86,7 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
 
     def select_train_peaks(self, train, sel_column, fdr, lambda_, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, use_pemp, use_pfdr):
         assert isinstance(train, Experiment)
-        assert isinstance(sel_column, basestring)
+        assert isinstance(sel_column, str)
         assert isinstance(fdr, float)
 
         tt_peaks = train.get_top_target_peaks()

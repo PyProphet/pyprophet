@@ -17,7 +17,7 @@ try:
 except NameError:
     profile = lambda x: x
 
-from optimized import (find_nearest_matches as _find_nearest_matches,
+from .optimized import (find_nearest_matches as _find_nearest_matches,
                        count_num_positives, single_chromatogram_hypothesis_fast)
 import scipy.special
 import math
@@ -26,11 +26,11 @@ from statsmodels.nonparametric.kde import KDEUnivariate
 
 import sys
 
-from config import CONFIG
+from .config import CONFIG
 
 import multiprocessing
 
-from std_logger import logging
+from .std_logger import logging
 
 def _ff(a):
     return _find_nearest_matches(*a)
@@ -63,68 +63,6 @@ def to_one_dim_array(values, as_type=None):
     return values
 
 
-def posterior_pg_prob(dvals, target_scores, decoy_scores, error_stat, number_target_peaks,
-                      number_target_pg,
-                      given_scores, lambda_):
-    """Compute posterior probabilities for each peakgroup
-
-    - Estimate the true distribution by using all target peakgroups above the
-      given the cutoff (estimated FDR as given as input). Assume gaussian distribution.
-
-    - Estimate the false/decoy distribution by using all decoy peakgroups.
-      Assume gaussian distribution.
-
-    """
-
-    # Note that num_null and num_total are the sum of the
-    # cross-validated statistics computed before, therefore the total
-    # number of data points selected will be
-    #   len(data) /  xeval.fraction * xeval.num_iter
-    #
-    logging.info("Posterior Probability estimation:")
-    logging.info("Estimated number of null %.2f out of a total of %s."
-                 % (error_stat.num_null, error_stat.num_total))
-
-    prior_chrom_null = error_stat.num_null / error_stat.num_total
-    number_true_chromatograms = (1.0 - prior_chrom_null) * number_target_peaks
-    prior_peakgroup_true = number_true_chromatograms / number_target_pg
-
-    logging.info("Prior for a peakgroup: %s" % (number_true_chromatograms / number_target_pg))
-    logging.info("Prior for a chromatogram: %s" % (1.0 - prior_chrom_null))
-    logging.info("Estimated number of true chromatograms: %s out of %s" %
-                 (number_true_chromatograms, number_target_peaks))
-    logging.info("Number of target data: %s" % number_target_pg)
-    logging.info("")
-
-    # Estimate a suitable cutoff in discriminant score (d_score)
-    # target_scores = experiment.get_top_target_peaks().df["d_score"]
-    # decoy_scores = experiment.get_top_decoy_peaks().df["d_score"]
-
-    pi0_method = CONFIG.get("final_statistics.pi0_method")
-    pi0_smooth_df = CONFIG.get("final_statistics.pi0_smooth_df")
-    pi0_smooth_log_pi0 = CONFIG.get("final_statistics.pi0_smooth_log_pi0")
-    use_pemp = CONFIG.get("final_statistics.use_pemp")
-    use_pfdr = CONFIG.get("final_statistics.use_pfdr")
-
-    estimated_cutoff = find_cutoff(target_scores, decoy_scores, 0.15, lambda_, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, use_pemp, use_pfdr)
-
-    target_scores_above = target_scores[target_scores > estimated_cutoff]
-
-    # Use all decoys and top-peaks of top target chromatograms to
-    # parametrically estimate the two distributions
-
-    p_decoy = scipy.stats.norm.pdf(given_scores, np.mean(dvals), np.std(dvals, ddof=1))
-    p_target = scipy.stats.norm.pdf(
-        given_scores, np.mean(target_scores_above), np.std(target_scores_above, ddof=1))
-
-    # Bayesian inference
-    # Posterior probabilities for each peakgroup
-    pp_pg_pvalues = p_target * prior_peakgroup_true / (p_target * prior_peakgroup_true
-                                                       + p_decoy * (1.0 - prior_peakgroup_true))
-
-    return pp_pg_pvalues
-
-
 def posterior_chromatogram_hypotheses_fast(experiment, prior_chrom_null):
     """ Compute posterior probabilities for each chromatogram
 
@@ -148,7 +86,7 @@ def posterior_chromatogram_hypotheses_fast(experiment, prior_chrom_null):
     """
 
     tg_ids = experiment.df.tg_num_id.values
-    pp_values = experiment.df["pg_score"].values
+    pp_values = 1-experiment.df["pep"].values
 
     current_tg_id = tg_ids[0]
     scores = []
@@ -273,7 +211,7 @@ def summary_err_table(df, qvalues=[0, 0.01, 0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5]
     df_sub.qvalue = qvalues
     # remove old index from original df:
     df_sub.reset_index(inplace=True, drop=True)
-    return df_sub
+    return df_sub[['qvalue','pvalue','svalue','pep','fdr','fnr','fpr','tp','tn','fp','fn','cutoff']]
 
 
 @profile
@@ -397,14 +335,14 @@ def lfdr(p_values, pi0, trunc = True, monotone = True, transf = "probit", adj = 
     p = np.array(p_values)
 
     # Compare to bioconductor/qvalue reference implementation
-    import rpy2
-    import rpy2.robjects as robjects
-    from rpy2.robjects import pandas2ri
-    pandas2ri.activate()
+    # import rpy2
+    # import rpy2.robjects as robjects
+    # from rpy2.robjects import pandas2ri
+    # pandas2ri.activate()
 
-    density=robjects.r('density')
-    smoothspline=robjects.r('smooth.spline')
-    predict=robjects.r('predict')
+    # density=robjects.r('density')
+    # smoothspline=robjects.r('smooth.spline')
+    # predict=robjects.r('predict')
 
     # Check inputs
     lfdr_out = p

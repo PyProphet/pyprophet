@@ -15,19 +15,19 @@ except NameError:
 import pandas as pd
 import numpy as np
 
-from config import CONFIG, set_pandas_print_options
+from .config import CONFIG, set_pandas_print_options
 
-from stats import (lookup_values_from_error_table, error_statistics,
+from .stats import (lookup_values_from_error_table, error_statistics,
                    mean_and_std_dev, final_err_table, summary_err_table,
-                   posterior_pg_prob, posterior_chromatogram_hypotheses_fast)
+                   posterior_chromatogram_hypotheses_fast)
 
-from data_handling import (prepare_data_table, Experiment)
-from classifiers import (LDALearner)
-from semi_supervised import (AbstractSemiSupervisedLearner, StandardSemiSupervisedLearner)
+from .data_handling import (prepare_data_table, Experiment)
+from .classifiers import (LDALearner)
+from .semi_supervised import (AbstractSemiSupervisedLearner, StandardSemiSupervisedLearner)
 
 import multiprocessing
 
-from std_logger import logging
+from .std_logger import logging
 
 import time
 
@@ -57,7 +57,7 @@ def timer(name=""):
 Result = namedtuple("Result", "summary_statistics final_statistics scored_tables")
 
 
-def unwrap_self_for_multiprocessing((inst, method_name, args),):
+def unwrap_self_for_multiprocessing(arg):
     """ You can not call methods with multiprocessing, but free functions,
         If you want to call  inst.method(arg0, arg1),
 
@@ -65,6 +65,7 @@ def unwrap_self_for_multiprocessing((inst, method_name, args),):
 
         does the trick.
     """
+    (inst, method_name, args) = arg
     return getattr(inst, method_name)(*args)
 
 
@@ -81,8 +82,7 @@ def calculate_params_for_d_score(classifier, experiment):
 
 class Scorer(object):
 
-    def __init__(self, classifier, score_columns, experiment, all_test_target_scores,
-                 all_test_decoy_scores):
+    def __init__(self, classifier, score_columns, experiment):
 
         self.classifier = classifier
         self.score_columns = score_columns
@@ -149,26 +149,12 @@ class Scorer(object):
 
         df = table.join(texp[["d_score", "p_value", "q_value", "pep", "peak_group_rank"]])
 
-        if CONFIG.get("compute.probabilities"):
-            df = self.add_probabilities(df, texp)
-
-        if CONFIG.get("target.compress_results"):
-            to_drop = [n for n in df.columns if n.startswith("var_") or n.startswith("main_")]
-            df.drop(to_drop, axis=1, inplace=True)
+        if CONFIG.get("tric_chromprob"):
+            df = self.add_chromatogram_probabilities(df, texp)
 
         return df
 
-    def add_probabilities(self, scored_table, texp):
-
-        lambda_ = CONFIG.get("final_statistics.lambda")
-        pp_pg_pvalues = posterior_pg_prob(self.dvals, self.target_scores, self.decoy_scores,
-                                          self.error_stat, self.number_target_peaks,
-                                          self.number_target_pg,
-                                          texp.df["d_score"],
-                                          lambda_)
-        texp.df["pg_score"] = pp_pg_pvalues
-        scored_table = scored_table.join(texp[["pg_score"]])
-
+    def add_chromatogram_probabilities(self, scored_table, texp):
         prior_chrom_null = self.error_stat.num_null / self.error_stat.num_total
         allhypothesis, h0 = posterior_chromatogram_hypotheses_fast(texp, prior_chrom_null)
         texp.df["h_score"] = allhypothesis
@@ -228,11 +214,9 @@ class HolyGostQuery(object):
         else:
             sys.exit("Error: Scores in weights file do not match data.")
 
-        final_classifier, all_test_target_scores, all_test_decoy_scores = \
-            self._apply_weights_on_exp(experiment, weights)
+        final_classifier = self._apply_weights_on_exp(experiment, weights)
 
-        return self._build_result(table, final_classifier, score_columns, experiment,
-                                  all_test_target_scores, all_test_decoy_scores)
+        return self._build_result(table, final_classifier, score_columns, experiment)
 
     def _apply_weights_on_exp(self, experiment, loaded_weights):
 
@@ -242,14 +226,12 @@ class HolyGostQuery(object):
         clf_scores = learner.score(experiment, loaded_weights)
         experiment.set_and_rerank("classifier_score", clf_scores)
 
-        all_test_target_scores = experiment.get_top_target_peaks()["classifier_score"]
-        all_test_decoy_scores = experiment.get_top_decoy_peaks()["classifier_score"]
         logging.info("finished pretrained scoring")
 
         ws = [loaded_weights.flatten()]
         final_classifier = self.semi_supervised_learner.averaged_learner(ws)
 
-        return final_classifier, all_test_target_scores, all_test_decoy_scores
+        return final_classifier
 
     @profile
     def learn_and_apply(self, table):
@@ -264,10 +246,9 @@ class HolyGostQuery(object):
     def _learn_and_apply(self, table):
 
         experiment, score_columns = self._setup_experiment(table)
-        final_classifier, all_test_target_scores, all_test_decoy_scores = self._learn(experiment)
+        final_classifier = self._learn(experiment)
 
-        return self._build_result(table, final_classifier, score_columns, experiment,
-                                  all_test_target_scores, all_test_decoy_scores)
+        return self._build_result(table, final_classifier, score_columns, experiment)
 
     def _learn(self, experiment):
         is_test = CONFIG.get("is_test")
@@ -279,8 +260,6 @@ class HolyGostQuery(object):
 
         neval = CONFIG.get("xeval.num_iter")
         num_processes = CONFIG.get("num_processes")
-        all_test_target_scores = []
-        all_test_decoy_scores = []
 
         logging.info("learn and apply scorer")
         logging.info("start %d cross evals using %d processes" % (neval, num_processes))
@@ -288,8 +267,6 @@ class HolyGostQuery(object):
         if num_processes == 1:
             for k in range(neval):
                 (ttt_scores, ttd_scores, w) = learner.learn_randomized(experiment)
-                all_test_target_scores.extend(ttt_scores)
-                all_test_decoy_scores.extend(ttd_scores)
                 ws.append(w.flatten())
         else:
             pool = multiprocessing.Pool(processes=num_processes)
@@ -302,32 +279,22 @@ class HolyGostQuery(object):
                 ttt_scores = [ti for r in res for ti in r[0]]
                 ttd_scores = [ti for r in res for ti in r[1]]
                 ws.extend([r[2] for r in res])
-                all_test_target_scores.extend(ttt_scores)
-                all_test_decoy_scores.extend(ttd_scores)
         logging.info("finished cross evals")
         logging.info("")
 
-        # only use socres from last iteration to build statistical model:
-        if CONFIG.get("semi_supervised_learner.stat_best"):
-            all_test_target_scores = ttt_scores
-            all_test_decoy_scores = ttd_scores
-
-        # we only use weights from last iteration if indicated:
-        if CONFIG.get("semi_supervised_learner.use_best"):
-            ws = [ws[-1]]
+        # we only use weights from last iteration
+        ws = [ws[-1]]
 
         final_classifier = self.semi_supervised_learner.averaged_learner(ws)
 
-        return final_classifier, all_test_target_scores, all_test_decoy_scores
+        return final_classifier
 
-    def _build_result(self, table, final_classifier, score_columns, experiment,
-                      all_test_target_scores, all_test_decoy_scores):
+    def _build_result(self, table, final_classifier, score_columns, experiment):
 
         weights = final_classifier.get_parameters()
         classifier_table = pd.DataFrame({'score': score_columns, 'weight': weights})
 
-        scorer = Scorer(final_classifier, score_columns, experiment, all_test_target_scores,
-                        all_test_decoy_scores)
+        scorer = Scorer(final_classifier, score_columns, experiment)
 
         scored_table = scorer.score(table)
 

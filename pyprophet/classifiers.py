@@ -13,7 +13,7 @@ from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 import numpy as np
 import inspect
 
-from data_handling import Experiment
+from .data_handling import Experiment
 
 
 class AbstractLearner(object):
