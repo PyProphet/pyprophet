@@ -52,6 +52,9 @@ def infer_proteins(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_m
         data = statistics_report(data, outfile, context, "protein", parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps)
 
     # store data in table
+    if infile != outfile:
+        copyfile(infile, outfile)
+
     con = sqlite3.connect(outfile)
 
     c = con.cursor()
@@ -94,6 +97,9 @@ def infer_peptides(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_m
         data = statistics_report(data, outfile, context, "peptide", parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps)
 
     # store data in table
+    if infile != outfile:
+        copyfile(infile, outfile)
+    
     con = sqlite3.connect(outfile)
 
     c = con.cursor()
