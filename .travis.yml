@@ -21,7 +21,7 @@ install:
   - pip install -U statsmodels
   - pip install -U matplotlib
   - pip install -U seaborn
-
+  - pip install -U git+https://github.com/hollenstein/maspy.git
   - travis_retry python setup.py develop
 script: 
   - if [[ $TRAVIS_PYTHON_VERSION == 2* ]]; then py.test tests/; fi
