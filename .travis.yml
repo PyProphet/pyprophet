@@ -1,0 +1,21 @@
+sudo: required
+dist: trusty
+language: python
+python:
+  - "2.7"
+  - "3.4"
+  - "3.5"
+  - "3.6"
+before_install:
+ - sudo apt-get update
+install:
+  - pip install -U setuptools
+  - pip install -U pytest
+  - pip install -U pytest-regtest
+  - travis_retry python setup.py develop
+script: 
+  - if [[ $TRAVIS_PYTHON_VERSION == 2* ]]; then py.test tests/; fi
+  - if [[ $TRAVIS_PYTHON_VERSION == 3.4* ]]; then py.test tests/; fi
+  - if [[ $TRAVIS_PYTHON_VERSION == 3.5* ]]; then py.test tests/; fi
+  - if [[ $TRAVIS_PYTHON_VERSION == 3.6* ]]; then py.test tests/; fi
+cache: pip
