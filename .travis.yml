@@ -12,6 +12,16 @@ install:
   - pip install -U setuptools
   - pip install -U pytest
   - pip install -U pytest-regtest
+  - pip install -U Click
+  - pip install -U numpy
+  - pip install -U scipy
+  - pip install -U pandas
+  - pip install -U scikit-learn
+  - pip install -U numexpr
+  - pip install -U statsmodels
+  - pip install -U matplotlib
+  - pip install -U seaborn
+
   - travis_retry python setup.py develop
 script: 
   - if [[ $TRAVIS_PYTHON_VERSION == 2* ]]; then py.test tests/; fi
