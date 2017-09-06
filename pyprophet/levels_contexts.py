@@ -8,6 +8,10 @@ from .report import save_report
 from shutil import copyfile
 from .std_logger import logging
 
+# Protein Grouping
+from collections import defaultdict as ddict
+import maspy.inference
+
 def statistics_report(data, outfile, context, analyte, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps):
 
     error_stat, pi0 = error_statistics(data[data.decoy==0]['score'], data[data.decoy==1]['score'], pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, parametric, pfdr, True, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps)
@@ -25,6 +29,7 @@ def statistics_report(data, outfile, context, analyte, parametric, pfdr, pi0_lam
     save_report(outfile + "_" + context + "_" + analyte + ".pdf", outfile + ": " + context + " " + analyte + "-level error-rate control", data[data.decoy==1]["score"], data[data.decoy==0]["score"], data["score"], data["s_value"], data["q_value"], data[data.decoy==0]["p_value"], pi0)
 
     return(data)
+
 
 def infer_proteins(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps):
 
@@ -68,6 +73,54 @@ def infer_proteins(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_m
     df.columns = ['CONTEXT','RUN_ID','PROTEIN_ID','SCORE','PVALUE','QVALUE','PEP']
     table = "SCORE_PROTEIN"
     df.to_sql(table, con, index=False, dtype={"RUN_ID": "TEXT"}, if_exists='append')
+
+    con.close()
+
+
+def infer_protein_groups(infile, outfile, peptide_qvalue, context, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps):
+
+    con = sqlite3.connect(infile)
+
+    if context == 'global':
+        data = pd.read_sql_query('SELECT SCORE_PEPTIDE.PEPTIDE_ID, PROTEIN_ID, PROTEIN.DECOY FROM SCORE_PEPTIDE INNER JOIN PEPTIDE_PROTEIN_MAPPING ON SCORE_PEPTIDE.PEPTIDE_ID = PEPTIDE_PROTEIN_MAPPING.PEPTIDE_ID INNER JOIN PROTEIN ON PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID = PROTEIN.ID WHERE qvalue < ' + str(peptide_qvalue), con)
+
+    else:
+        sys.exit("Error: Unspecified context selected.")
+    data.columns = [col.lower() for col in data.columns]
+    con.close()
+
+    # Protein Grouping
+    proteins_peptides = ddict(set)
+    for index, row in data.iterrows():
+        proteins_peptides[row['protein_id']].add(row['peptide_id'])
+    protein_groups = maspy.inference.mappingBasedGrouping(proteins_peptides)
+
+    group_dict = {'context': [], 'id': [], 'protein_id': []}
+    for group_id in protein_groups.groups:
+        leadingProteins = protein_groups.groups[group_id].leading
+        for protein_id in leadingProteins:
+            group_dict['context'].append(context)
+            group_dict['id'].append(group_id)
+            group_dict['protein_id'].append(protein_id)
+
+    df = pd.DataFrame(group_dict)
+
+    # store data in table
+    if infile != outfile:
+        copyfile(infile, outfile)
+    
+    con = sqlite3.connect(outfile)
+
+    c = con.cursor()
+    c.execute('SELECT count(name) FROM sqlite_master WHERE type="table" AND name="PROTEIN_GROUPS"')
+    if c.fetchone()[0] == 1:
+        c.execute('DELETE FROM PROTEIN_GROUPS WHERE CONTEXT =="' + context + '"')
+    c.fetchall()
+
+    df = df[['context','id','protein_id']]
+    df.columns = ['CONTEXT','ID','PROTEIN_ID']
+    table = "PROTEIN_GROUPS"
+    df.to_sql(table, con, index=False, if_exists='append')
 
     con.close()
 

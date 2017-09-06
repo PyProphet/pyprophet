@@ -16,7 +16,7 @@ import sys
 
 from .runner import PyProphetLearner, PyProphetWeightApplier
 from .ipf import infer_peptidoforms
-from .levels_contexts import infer_peptides, infer_proteins, merge_osw
+from .levels_contexts import infer_peptides, infer_proteins, infer_protein_groups, merge_osw
 
 from .config import (transform_pi0_lambda, transform_threads, transform_random_seed, transform_subsample_ratio, set_parameters)
 
@@ -149,7 +149,7 @@ def peptide(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_method, 
 
 # Protein-level inference
 @cli.command()
-# # File handling
+# File handling
 @click.option('--in', 'infile', required=True, type=click.Path(exists=True), help='PyProphet input file.')
 @click.option('--out', 'outfile', type=click.Path(exists=False), help='PyProphet output file.')
 # Context
@@ -175,6 +175,35 @@ def protein(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_method, 
 
     infer_proteins(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps)
 
+# Protein Group-level inference
+@cli.command()
+# File handling
+@click.option('--in', 'infile', required=True, type=click.Path(exists=True), help='PyProphet input file.')
+@click.option('--out', 'outfile', type=click.Path(exists=False), help='PyProphet output file.')
+# Grouping
+@click.option('--peptide_qvalue', default=0.01, show_default=True, type=float, help='Global peptide q-value cutoff to select peptides for protein grouping.')
+# Context
+@click.option('--context', default='global', show_default=True, type=click.Choice(['run-specific', 'experiment-wide', 'global']), help='Context to estimate protein-level FDR control.')
+# Statistics
+@click.option('--parametric/--no-parametric', default=False, show_default=True, help='Do parametric estimation of p-values.')
+@click.option('--pfdr/--no-pfdr', default=False, show_default=True, help='Compute positive false discovery rate (pFDR) instead of FDR.')
+@click.option('--pi0_lambda', default=[0.1,1.0,0.05], show_default=True, type=(float, float, float), help='Use non-parametric estimation of p-values. Either use <START END STEPS>, e.g. 0.1, 1.0, 0.1 or set to fixed value, e.g. 0.4, 0, 0.', callback=transform_pi0_lambda)
+@click.option('--pi0_method', default='smoother', show_default=True, type=click.Choice(['smoother', 'bootstrap']), help='Either "smoother" or "bootstrap"; the method for automatically choosing tuning parameter in the estimation of pi_0, the proportion of true null hypotheses.')
+@click.option('--pi0_smooth_df', default=3, show_default=True, type=int, help='Number of degrees-of-freedom to use when estimating pi_0 with a smoother.')
+@click.option('--pi0_smooth_log_pi0/--no-pi0_smooth_log_pi0', default=False, show_default=True, help='If True and pi0_method = "smoother", pi0 will be estimated by applying a smoother to a scatterplot of log(pi0) estimates against the tuning parameter lambda.')
+@click.option('--lfdr_truncate/--no-lfdr_truncate', show_default=True, default=True, help='If True, local FDR values >1 are set to 1.')
+@click.option('--lfdr_monotone/--no-lfdr_monotone', show_default=True, default=True, help='If True, local FDR values are non-decreasing with increasing p-values.')
+@click.option('--lfdr_transformation', default='probit', show_default=True, type=click.Choice(['probit', 'logit']), help='Either a "probit" or "logit" transformation is applied to the p-values so that a local FDR estimate can be formed that does not involve edge effects of the [0,1] interval in which the p-values lie.')
+@click.option('--lfdr_adj', default=1.5, show_default=True, type=float, help='Numeric value that is applied as a multiple of the smoothing bandwidth used in the density estimation.')
+@click.option('--lfdr_eps', default=np.power(10.0,-8), show_default=True, type=float, help='Numeric value that is threshold for the tails of the empirical p-value distribution.')
+def protein_group(infile, outfile, peptide_qvalue, context, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps):
+
+    if outfile is None:
+        outfile = infile
+    else:
+        outfile = outfile
+
+    infer_protein_groups(infile, outfile, peptide_qvalue, context, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps)
 
 # Merging & subsampling of multiple runs
 @cli.command()

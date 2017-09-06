@@ -10,6 +10,7 @@ import pandas as pd
 import numpy as np
 from .optimized import find_top_ranked, rank
 from .config import CONFIG
+import sys
 
 try:
     profile
