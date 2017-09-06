@@ -12,10 +12,15 @@ except NameError:
     def profile(fun):
         return fun
 
+
+
 import pandas as pd
+pd.options.display.width = 220
+pd.options.display.precision = 6
+
 import numpy as np
 
-from .config import CONFIG, set_pandas_print_options
+from .config import CONFIG
 
 from .stats import (lookup_values_from_error_table, error_statistics,
                    mean_and_std_dev, final_err_table, summary_err_table,

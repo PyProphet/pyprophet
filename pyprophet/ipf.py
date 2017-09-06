@@ -6,7 +6,11 @@ os.putenv("OPENBLAS_NUM_THREADS", "1")
 
 import random
 
+
 import pandas as pd
+pd.options.display.width = 220
+pd.options.display.precision = 6
+
 import numpy as np
 import scipy as sp
 import sqlite3

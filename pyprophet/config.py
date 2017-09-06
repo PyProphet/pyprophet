@@ -9,7 +9,10 @@ import random
 import sys
 
 import numpy as np
+
 import pandas as pd
+pd.options.display.width = 220
+pd.options.display.precision = 6
 
 # Parameter transformation functions
 def transform_pi0_lambda(ctx, param, value):
@@ -66,14 +69,6 @@ def set_parameters(xeval_fraction, xeval_iterations, initial_fdr, iteration_fdr,
     options['is_test'] = test
 
     CONFIG.update(options)
-
-def set_pandas_print_options():
-    # w, h = pd.util.terminal.get_terminal_size()
-
-    # set output options for regression tests on a wide terminal
-    pd.set_option('display.width', 100)
-    # reduce precision to avoid to sensitive tests because of roundings:
-    pd.set_option('display.precision', 6)
 
 
 class _ConfigHolder(object):

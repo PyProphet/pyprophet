@@ -10,7 +10,10 @@ from collections import namedtuple
 
 import numpy as np
 import scipy as sp
+
 import pandas as pd
+pd.options.display.width = 220
+pd.options.display.precision = 6
 
 try:
     profile

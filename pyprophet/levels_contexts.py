@@ -1,6 +1,9 @@
 # encoding: latin-1
 
 import pandas as pd
+pd.options.display.width = 220
+pd.options.display.precision = 6
+
 import numpy as np
 import sqlite3
 from .stats import error_statistics, lookup_values_from_error_table

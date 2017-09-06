@@ -4,10 +4,8 @@ from __future__ import print_function
 from pyprophet.stats import pi0est, qvalue, pemp, lfdr
 
 import pandas as pd
-
-d = pd.options.display
-d.width = 220
-d.precision = 6
+pd.options.display.width = 220
+pd.options.display.precision = 6
 
 import numpy as np
 import os

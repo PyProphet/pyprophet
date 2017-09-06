@@ -23,6 +23,9 @@ from .config import (transform_pi0_lambda, transform_threads, transform_subsampl
 from functools import update_wrapper
 
 import pandas as pd
+pd.options.display.width = 220
+pd.options.display.precision = 6
+
 import numpy as np
 
 @click.group(chain=True)

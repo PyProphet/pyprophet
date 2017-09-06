@@ -18,10 +18,14 @@ import time
 import warnings
 
 from .pyprophet import PyProphet
-from .config import CONFIG, set_pandas_print_options
+from .config import CONFIG
 from .report import save_report
 
+
 import pandas as pd
+pd.options.display.width = 220
+pd.options.display.precision = 6
+
 import numpy as np
 import sqlite3
 from shutil import copyfile
@@ -96,7 +100,6 @@ class PyProphetRunner(object):
 
         needed = time.time() - start_at
 
-        set_pandas_print_options()
         self.print_summary(result)
 
         if self.mode == 'tsv':
