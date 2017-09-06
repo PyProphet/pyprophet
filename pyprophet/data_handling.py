@@ -131,7 +131,7 @@ def prepare_data_table(table, tg_id_name="transition_group_id",
     tg_ids = table[tg_id_name]
 
     if not check_for_unique_blocks(tg_ids):
-        sys.exit("Error:" + tg_id_name + " values do not form unique blocks in input file(s).")
+        sys.exit("Error: " + tg_id_name + " values do not form unique blocks in input file(s).")
 
     tg_map = dict()
     for i, tg_id in enumerate(tg_ids.unique()):

@@ -120,12 +120,12 @@ class PyProphetRunner(object):
     def save_tsv_results(self, result, extra_writes, pi0):
         summ_stat_path = extra_writes.get("summ_stat_path")
         if summ_stat_path is not None:
-            result.summary_statistics.to_csv(summ_stat_path, sep="\t", index=False)
+            result.summary_statistics.to_csv(summ_stat_path, sep=",", index=False)
             click.echo("WRITTEN: " + summ_stat_path)
 
         full_stat_path = extra_writes.get("full_stat_path")
         if full_stat_path is not None:
-            result.final_statistics.to_csv(full_stat_path, sep="\t", index=False)
+            result.final_statistics.to_csv(full_stat_path, sep=",", index=False)
             click.echo("WRITTEN: " + full_stat_path)
 
         output_path = extra_writes.get("output_path")
@@ -149,7 +149,7 @@ class PyProphetRunner(object):
         weights['level'] = self.level
         trained_weights_path = extra_writes.get("trained_weights_path")
         if trained_weights_path is not None:
-            weights.to_csv(trained_weights_path, sep="\t", index=False)
+            weights.to_csv(trained_weights_path, sep=",", index=False)
             click.echo("WRITTEN: " + trained_weights_path)
 
     def save_osw_results(self, result, extra_writes, pi0):
@@ -223,10 +223,10 @@ class PyProphetLearner(PyProphetRunner):
         return (result, scorer, weights)
 
     def extra_writes(self):
-        yield "output_path", os.path.join(self.prefix + "_" + self.level + "_scored.txt")
+        yield "output_path", os.path.join(self.prefix + "_" + self.level + "_scored.tsv")
         yield "summ_stat_path", os.path.join(self.prefix + "_" + self.level + "_summary_stat.csv")
         yield "full_stat_path", os.path.join(self.prefix + "_" + self.level + "_full_stat.csv")
-        yield "trained_weights_path", os.path.join(self.prefix + "_" + self.level + "_weights.txt")
+        yield "trained_weights_path", os.path.join(self.prefix + "_" + self.level + "_weights.csv")
         yield "report_path", os.path.join(self.prefix + "_" + self.level + "_report.pdf")
 
 class PyProphetWeightApplier(PyProphetRunner):
@@ -237,7 +237,7 @@ class PyProphetWeightApplier(PyProphetRunner):
             sys.exit("Error: Weights file %s does not exist." % apply_weights)
         if self.mode == "tsv":
             try:
-                self.persisted_weights = pd.read_csv(apply_weights, sep="\t")
+                self.persisted_weights = pd.read_csv(apply_weights, sep=",")
                 if self.level != self.persisted_weights['level'].unique()[0]:
                     sys.exit("Error: Weights file has wrong level.")
             except Exception:
@@ -264,7 +264,7 @@ class PyProphetWeightApplier(PyProphetRunner):
         return (result, scorer, weights)
 
     def extra_writes(self):
-        yield "output_path", os.path.join(self.prefix + "_" + self.level + "_scored.txt")
+        yield "output_path", os.path.join(self.prefix + "_" + self.level + "_scored.tsv")
         yield "summ_stat_path", os.path.join(self.prefix + "_" + self.level + "_summary_stat.csv")
         yield "full_stat_path", os.path.join(self.prefix + "_" + self.level + "_full_stat.csv")
         yield "report_path", os.path.join(self.prefix + "_" + self.level + "_report.pdf")

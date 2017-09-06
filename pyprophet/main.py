@@ -18,7 +18,7 @@ from .runner import PyProphetLearner, PyProphetWeightApplier
 from .ipf import infer_peptidoforms
 from .levels_contexts import infer_peptides, infer_proteins, infer_protein_groups, merge_osw
 
-from .config import (transform_pi0_lambda, transform_threads, transform_random_seed, transform_subsample_ratio, set_parameters)
+from .config import (transform_pi0_lambda, transform_threads, transform_subsample_ratio, set_parameters)
 
 from functools import update_wrapper
 
@@ -31,17 +31,7 @@ def cli():
     """
     PyProphet: Semi-supervised learning and scoring of OpenSWATH results.
 
-    0. "merge": Merge (and subsample) multiple OSW files to a single file.
-
-    1. "score": Score OpenSWATH results on MS1, MS2 & transition levels.
-
-    2. "ipf": Conduct inference of peptidoforms.
-
-    3. "peptide": Conduct peptide-level inference in different contexts.
-
-    4. "protein": Conduct protein-level inference in different contexts.
-
-    Visit http://openswath.org for further usage instructions and help.
+    Visit http://openswath.org for usage instructions and help.
     """
 
 # PyProphet semi-supervised learning and scoring
@@ -79,15 +69,14 @@ def cli():
 # Processing
 @click.option('--threads', default=1, show_default=True, type=int, help='Number of threads used for semi-supervised learning. -1 means all available CPUs.', callback=transform_threads)
 @click.option('--test/--no-test', default=False, show_default=True, help='Run in test mode with fixed seed.')
-@click.option('--random_seed', default=None, show_default=True, type=int, help='Set fixed seed to integer value.', callback=transform_random_seed)
-def score(infile, outfile, apply_weights, xeval_fraction, xeval_iterations, initial_fdr, iteration_fdr, ss_iterations, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, level, ipf_max_pgrank, ipf_max_pgpep, tric_chromprob, threads, test, random_seed):
+def score(infile, outfile, apply_weights, xeval_fraction, xeval_iterations, initial_fdr, iteration_fdr, ss_iterations, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, level, ipf_max_pgrank, ipf_max_pgpep, tric_chromprob, threads, test):
 
     if outfile is None:
         outfile = infile
     else:
         outfile = outfile
 
-    set_parameters(xeval_fraction, xeval_iterations, initial_fdr, iteration_fdr, ss_iterations, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, tric_chromprob, threads, test, random_seed)
+    set_parameters(xeval_fraction, xeval_iterations, initial_fdr, iteration_fdr, ss_iterations, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, tric_chromprob, threads, test)
 
     if not apply_weights:
         PyProphetLearner(infile, outfile, level, ipf_max_pgrank, ipf_max_pgpep).run()

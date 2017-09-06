@@ -443,8 +443,8 @@ def error_statistics(target_scores, decoy_scores, lambda_, pi0_method = "smoothe
         fdr /= (1.0 - (1.0 - target_pvalues) ** num_total)
         fdr[target_pvalues == 0] = 1.0 / num_total
 
-        fnr /= 1.0 - p_values ** num_total
-        fnr[p_values == 0] = 1.0 / num_total
+        fnr /= 1.0 - target_pvalues ** num_total
+        fnr[target_pvalues == 0] = 1.0 / num_total
 
     sens = tp / (num_total - num_null)
 

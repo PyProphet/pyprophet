@@ -26,17 +26,12 @@ def transform_threads(ctx, param, value):
         value = multiprocessing.cpu_count()
     return(value)
 
-def transform_random_seed(ctx, param, value):
-    if value is None:
-        value = np.random.randint(0, sys.maxsize)
-    return(value)
-
 def transform_subsample_ratio(ctx, param, value):
     if value < 0 or value > 1:
       sys.exit('Error: Wrong input values for subsample_ratio. subsample_ratio must be within [0,1].')
     return(value)
 
-def set_parameters(xeval_fraction, xeval_iterations, initial_fdr, iteration_fdr, ss_iterations, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, tric_chromprob, threads, test, random_seed):
+def set_parameters(xeval_fraction, xeval_iterations, initial_fdr, iteration_fdr, ss_iterations, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, tric_chromprob, threads, test):
 
     options = dict()
 
@@ -69,7 +64,6 @@ def set_parameters(xeval_fraction, xeval_iterations, initial_fdr, iteration_fdr,
     # Processing
     options['num_processes'] = threads
     options['is_test'] = test
-    options['random_seed'] = random_seed
 
     CONFIG.update(options)
 
