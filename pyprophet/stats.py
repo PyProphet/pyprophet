@@ -404,6 +404,46 @@ def lfdr(p_values, pi0, trunc = True, monotone = True, transf = "probit", adj = 
 
 
 @profile
+def stat_metrics(p_values, pi0, use_pfdr):
+    num_total = len(p_values)
+    num_positives = count_num_positives(p_values)
+    num_negatives = num_total - num_positives
+    num_null = pi0 * num_total
+    tp = num_positives - num_null * p_values
+    fp = num_null * p_values
+    tn = num_null * (1.0 - p_values)
+    fn = num_negatives - num_null * (1.0 - p_values)
+    fpr = fp / num_null
+
+    fdr = fp / num_positives
+    fnr = fn / num_negatives
+    
+    if use_pfdr:
+        fdr /= (1.0 - (1.0 - p_values) ** num_total)
+        fdr[p_values == 0] = 1.0 / num_total
+
+        fnr /= 1.0 - p_values ** num_total
+        fnr[p_values == 0] = 1.0 / num_total
+
+    sens = tp / (num_total - num_null)
+
+    sens[sens < 0.0] = 0.0
+    sens[sens > 1.0] = 1.0
+
+    fdr[fdr < 0.0] = 0.0
+    fdr[fdr > 1.0] = 1.0
+    fdr[num_positives == 0] = 0.0
+
+    fnr[fnr < 0.0] = 0.0
+    fnr[fnr > 1.0] = 1.0
+    fnr[num_positives == 0] = 0.0
+
+    svalues = pd.Series(sens)[::-1].cummax()[::-1]
+
+    return pd.DataFrame({'tp': tp, 'fp': fp, 'tn': tn, 'fn': fn, 'fpr': fpr, 'fdr': fdr, 'fnr': fnr, 'svalue': svalues})
+
+
+@profile
 def error_statistics(target_scores, decoy_scores, lambda_, pi0_method = "smoother", pi0_smooth_df = 3, pi0_smooth_log_pi0 = False, use_pemp = False, use_pfdr = False, compute_lfdr = False, lfdr_trunc = True, lfdr_monotone = True, lfdr_transf = "probit", lfdr_adj = 1.5, lfdr_eps = np.power(10.0,-8)):
     """ takes list of decoy and target scores and creates error statistics for target values"""
 
@@ -427,45 +467,17 @@ def error_statistics(target_scores, decoy_scores, lambda_, pi0_method = "smoothe
 
     # estimate pi0
     pi0 = pi0est(target_pvalues, lambda_, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0)
+
+    # compute q-value
     target_qvalues = qvalue(target_pvalues, pi0['pi0'], use_pfdr)
 
-    # summary statistics
-    num_total = len(target_pvalues)
-    num_positives = count_num_positives(target_pvalues)
-    num_negatives = num_total - num_positives
-    num_null = pi0['pi0'] * num_total
-    tp = num_positives - num_null * target_pvalues
-    fp = num_null * target_pvalues
-    tn = num_null * (1.0 - target_pvalues)
-    fn = num_negatives - num_null * (1.0 - target_pvalues)
-    fpr = fp / num_null
+    # compute other metrics
+    metrics = stat_metrics(target_pvalues, pi0['pi0'], use_pfdr)
 
-    fdr = fp / num_positives
-    fnr = fn / num_negatives
-    if use_pfdr:
-        fdr /= (1.0 - (1.0 - target_pvalues) ** num_total)
-        fdr[target_pvalues == 0] = 1.0 / num_total
+    # generate main statistics table
+    error_stat = pd.DataFrame({'cutoff': target_scores, 'pvalue': target_pvalues, 'qvalue': target_qvalues, 'svalue': metrics['svalue'], 'tp': metrics['tp'], 'fp': metrics['fp'], 'tn': metrics['tn'], 'fn': metrics['fn'], 'fpr': metrics['fpr'], 'fdr': metrics['fdr'], 'fnr': metrics['fnr']})
 
-        fnr /= 1.0 - target_pvalues ** num_total
-        fnr[target_pvalues == 0] = 1.0 / num_total
-
-    sens = tp / (num_total - num_null)
-
-    sens[sens < 0.0] = 0.0
-    sens[sens > 1.0] = 1.0
-
-    fdr[fdr < 0.0] = 0.0
-    fdr[fdr > 1.0] = 1.0
-    fdr[num_positives == 0] = 0.0
-
-    fnr[fnr < 0.0] = 0.0
-    fnr[fnr > 1.0] = 1.0
-    fnr[num_positives == 0] = 0.0
-
-    target_svalues = pd.Series(sens)[::-1].cummax()[::-1]
-
-    error_stat = pd.DataFrame({'cutoff': target_scores, 'pvalue': target_pvalues, 'qvalue': target_qvalues, 'svalue': target_svalues, 'tp': tp, 'fp': fp, 'tn': tn, 'fn': fn, 'fpr': fpr, 'fdr': fdr, 'fnr': fnr})
-
+    # compute lfdr / PEP
     if compute_lfdr:
         error_stat['pep'] = lfdr(target_pvalues, pi0['pi0'], lfdr_trunc, lfdr_monotone, lfdr_transf, lfdr_adj, lfdr_eps)
 
@@ -477,7 +489,7 @@ def find_cutoff(target_scores, decoy_scores, fdr, lambda_, pi0_method, pi0_smoot
 
     error_stat, pi0 = error_statistics(target_scores, decoy_scores, lambda_, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, use_pemp, use_pfdr, False)
     if not len(error_stat):
-        raise Exception("to little data for calculating error statistcs")
+        sys.exit("Error: Too little data for calculating error statistcs.")
     i0 = (error_stat.qvalue - fdr).abs().argmin()
     cutoff = error_stat.iloc[i0]["cutoff"]
     return cutoff
