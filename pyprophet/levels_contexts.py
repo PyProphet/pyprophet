@@ -172,7 +172,7 @@ def infer_peptides(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_m
 
     con.close()
 
-def merge_osw(infiles, outfile, subsample_ratio):
+def merge_osw(infiles, outfile, subsample_ratio, test):
     for infile in infiles:
         if infile == infiles[0]:
             # Copy the first file to have a template
@@ -192,7 +192,13 @@ def merge_osw(infiles, outfile, subsample_ratio):
         c = conn.cursor()
         c.execute('ATTACH DATABASE "'+ infile + '" AS sdb')
         c.execute('INSERT INTO RUN SELECT * FROM sdb.RUN')
-        c.execute('INSERT INTO FEATURE SELECT * FROM sdb.FEATURE WHERE PRECURSOR_ID IN (SELECT PRECURSOR_ID FROM sdb.FEATURE ORDER BY RANDOM() LIMIT (SELECT ROUND(' + str(subsample_ratio) + '*COUNT(DISTINCT PRECURSOR_ID)) FROM sdb.FEATURE))')
+        if subsample_ratio >= 1.0:
+            c.execute('INSERT INTO FEATURE SELECT * FROM sdb.FEATURE')
+        else:
+            if not test:
+                c.execute('INSERT INTO FEATURE SELECT * FROM sdb.FEATURE WHERE PRECURSOR_ID IN (SELECT PRECURSOR_ID FROM sdb.FEATURE ORDER BY RANDOM() LIMIT (SELECT ROUND(' + str(subsample_ratio) + '*COUNT(DISTINCT PRECURSOR_ID)) FROM sdb.FEATURE))')
+            else:
+                c.execute('INSERT INTO FEATURE SELECT * FROM sdb.FEATURE WHERE PRECURSOR_ID IN (SELECT PRECURSOR_ID FROM sdb.FEATURE LIMIT (SELECT ROUND(' + str(subsample_ratio) + '*COUNT(DISTINCT PRECURSOR_ID)) FROM sdb.FEATURE))')
         c.execute('INSERT INTO FEATURE_MS1 SELECT * FROM sdb.FEATURE_MS1 WHERE sdb.FEATURE_MS1.FEATURE_ID IN (SELECT ID FROM FEATURE)')
         c.execute('INSERT INTO FEATURE_MS2 SELECT * FROM sdb.FEATURE_MS2 WHERE sdb.FEATURE_MS2.FEATURE_ID IN (SELECT ID FROM FEATURE)')
         c.execute('INSERT INTO FEATURE_TRANSITION SELECT * FROM sdb.FEATURE_TRANSITION WHERE sdb.FEATURE_TRANSITION.FEATURE_ID IN (SELECT ID FROM FEATURE)')
@@ -207,4 +213,4 @@ def merge_osw(infiles, outfile, subsample_ratio):
     conn.commit()
     c.fetchall()
     conn.close()
-    logging.info("All OSW files merged.")
+    logging.info("All OSW files were merged.")

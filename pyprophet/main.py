@@ -201,7 +201,12 @@ def protein_group(infile, outfile, peptide_qvalue, context, parametric, pfdr, pi
 @cli.command()
 @click.argument('infiles', nargs=-1, type=click.Path(exists=True))
 @click.option('--out','outfile', type=click.Path(exists=False), help='Merged OSW output file.')
-@click.option('--subsample_ratio', default=1, show_default=True, type=float, help='Subsample ratio used per input file', callback=transform_subsample_ratio)
-def merge(infiles, outfile, subsample_ratio):
-    merge_osw(infiles, outfile, subsample_ratio)
+@click.option('--subsample_ratio', default=1, show_default=True, type=float, help='Subsample ratio used per input file.', callback=transform_subsample_ratio)
+@click.option('--test/--no-test', default=False, show_default=True, help='Run in test mode with fixed seed.')
+def merge(infiles, outfile, subsample_ratio, test):
+    
+    if len(infiles) < 1:
+        sys.exit("Error: At least one PyProphet input file needs to be defined.")
+
+    merge_osw(infiles, outfile, subsample_ratio, test)
 

@@ -6,9 +6,11 @@ import shutil
 import sys
 
 import pandas as pd
+import sqlite3
 
 import pytest
 
+from pyprophet.ipf import read_pyp_peakgroup_precursor
 
 pd.options.display.width = 220
 pd.options.display.precision = 6
@@ -26,7 +28,7 @@ def _run_cmdline(cmdline):
     return stdout
 
 
-def _run_pyprophet_to_learn_model(regtest, temp_folder, dump_result_files=False, parametric=False, pfdr=False, pi0_lambda=False):
+def _run_pyprophet_tsv_to_learn_model(regtest, temp_folder, dump_result_files=False, parametric=False, pfdr=False, pi0_lambda=False):
     os.chdir(temp_folder)
     data_path = os.path.join(DATA_FOLDER, "test_data.txt")
     shutil.copy(data_path, temp_folder)
@@ -44,25 +46,72 @@ def _run_pyprophet_to_learn_model(regtest, temp_folder, dump_result_files=False,
     print(pd.read_csv("test_data_ms2_scored.tsv", sep="\t", nrows=100),file=regtest)
     print(pd.read_csv("test_data_ms2_weights.csv", sep=",", nrows=100),file=regtest)
 
+
+def _run_pyprophet_osw_to_learn_model(regtest, temp_folder, dump_result_files=False, parametric=False, pfdr=False, pi0_lambda=False):
+    os.chdir(temp_folder)
+    data_path = os.path.join(DATA_FOLDER, "test_data.osw")
+    shutil.copy(data_path, temp_folder)
+    # MS1-level
+    cmdline = "pyprophet score --in=test_data.osw --level=ms1 --test"
+    if parametric:
+        cmdline += " --parametric"
+    if pfdr:
+        cmdline += " --pfdr"
+    if pi0_lambda is not False:
+        cmdline += " --pi0_lambda=" + pi0_lambda
+
+    # MS2-level
+    cmdline += " score --in=test_data.osw --level=ms2 --test"
+    if parametric:
+        cmdline += " --parametric"
+    if pfdr:
+        cmdline += " --pfdr"
+    if pi0_lambda is not False:
+        cmdline += " --pi0_lambda=" + pi0_lambda
+
+    # MS2-level
+    cmdline += " score --in=test_data.osw --level=transition --test"
+    if parametric:
+        cmdline += " --parametric"
+    if pfdr:
+        cmdline += " --pfdr"
+    if pi0_lambda is not False:
+        cmdline += " --pi0_lambda=" + pi0_lambda
+
+    stdout = _run_cmdline(cmdline)
+
+    table = read_pyp_peakgroup_precursor("test_data.osw")
+
+    print(table.head(100),file=regtest)
+
+
 def test_tsv_0(tmpdir, regtest):
-    _run_pyprophet_to_learn_model(regtest, tmpdir.strpath, True)
+    _run_pyprophet_tsv_to_learn_model(regtest, tmpdir.strpath, True)
 
 def test_tsv_1(tmpdir, regtest):
-    _run_pyprophet_to_learn_model(regtest, tmpdir.strpath, True, True)
+    _run_pyprophet_tsv_to_learn_model(regtest, tmpdir.strpath, True, True)
 
 def test_tsv_2(tmpdir, regtest):
-    _run_pyprophet_to_learn_model(regtest, tmpdir.strpath, True, False, True)
+    _run_pyprophet_tsv_to_learn_model(regtest, tmpdir.strpath, True, False, True)
 
 def test_tsv_3(tmpdir, regtest):
-    _run_pyprophet_to_learn_model(regtest, tmpdir.strpath, True, False, False, "0.3 0.55 0.05")
+    _run_pyprophet_tsv_to_learn_model(regtest, tmpdir.strpath, True, False, False, "0.3 0.55 0.05")
 
 def test_tsv_apply_weights(tmpdir, regtest):
 
-    _run_pyprophet_to_learn_model(regtest, tmpdir.strpath, True)
+    _run_pyprophet_tsv_to_learn_model(regtest, tmpdir.strpath, True)
 
     _run_cmdline("pyprophet score --in=test_data.txt --apply_weights=test_data_ms2_weights.csv "
                           "--test")
 
+def test_osw_0(tmpdir, regtest):
+    _run_pyprophet_osw_to_learn_model(regtest, tmpdir.strpath, True, pi0_lambda="0 0 0")
+
+def test_osw_1(tmpdir, regtest):
+    _run_pyprophet_osw_to_learn_model(regtest, tmpdir.strpath, True, True, pi0_lambda="0 0 0")
+
+def test_osw_2(tmpdir, regtest):
+    _run_pyprophet_osw_to_learn_model(regtest, tmpdir.strpath, True, False, True, pi0_lambda="0 0 0")
 
 def test_not_unique_tg_id_blocks(tmpdir):
 
