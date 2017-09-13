@@ -146,7 +146,8 @@ def peptidoform_inference(data, ipf_max_transition_pep, ipf_h0):
     pp_data = pp_data.rename(columns=lambda x: x.replace('posterior', 'pf_score'))
 
     # compute model-based FDR
-    pp_data['pfqm_score'] = compute_model_fdr(pp_data['pf_score'].values)
+    pp_data['qvalue'] = compute_model_fdr(pp_data['pf_score'].values)
+    pp_data['pep'] = 1 - pp_data['pf_score']
     pp_data['PosteriorFullPeptideName'] = pp_data['hypothesis']
 
     # merge precursor-level data with UIS data
@@ -189,21 +190,15 @@ def infer_peptidoforms(infile, outfile, ipf_ms1_scoring, ipf_ms2_scoring, ipf_h0
     logging.info("end peptidoform-level inference")
     # end posterior peptidoform-level inference
 
-    uis_peptidoform_data = uis_peptidoform_data[uis_peptidoform_data['hypothesis']!='h0'][['feature_id','hypothesis','precursor_peakgroup_pp','pfqm_score','pf_score']]
-    uis_peptidoform_data.columns = ['FEATURE_ID','PEPTIDE_ID','PRECURSOR_PEAKGROUP_POSTERIOR','Q_VALUE','POSTERIOR']
+    uis_peptidoform_data = uis_peptidoform_data[uis_peptidoform_data['hypothesis']!='h0'][['feature_id','hypothesis','precursor_peakgroup_pp','qvalue','pep']]
+    uis_peptidoform_data.columns = ['FEATURE_ID','PEPTIDE_ID','PRECURSOR_PEAKGROUP_POSTERIOR','QVALUE','PEP']
 
     if infile != outfile:
         copyfile(infile, outfile)
 
     con = sqlite3.connect(outfile)
 
-    c = con.cursor()
-    c.execute('SELECT count(name) FROM sqlite_master WHERE type="table" AND name="SCORE_IPF"')
-    if c.fetchone()[0] == 1:
-        c.execute('DELETE FROM SCORE_IPF')
-    c.fetchall()
-
-    uis_peptidoform_data.to_sql("SCORE_IPF", con, index=False, if_exists='fail')
+    uis_peptidoform_data.to_sql("SCORE_IPF", con, index=False, if_exists='replace')
     con.close()
 
     logging.info("end IPF")

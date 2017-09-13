@@ -65,14 +65,16 @@ def cli():
 # OpenSWATH options
 @click.option('--level', default='ms2', show_default=True, type=click.Choice(['ms1', 'ms2', 'transition']), help='Either "ms1", "ms2" or "transition"; the data level selected for scoring.')
 # IPF options
-@click.option('--ipf_max_pgrank', default=1, show_default=True, type=int, help='Assess transitions only for candidate peak groups until maximum peak group rank.')
-@click.option('--ipf_max_pgpep', default=0.3, show_default=True, type=float, help='Assess transitions only for candidate peak groups until maximum posterior error probability.')
+@click.option('--ipf_max_peakgroup_rank', default=1, show_default=True, type=int, help='Assess transitions only for candidate peak groups until maximum peak group rank.')
+@click.option('--ipf_max_peakgroup_pep', default=0.3, show_default=True, type=float, help='Assess transitions only for candidate peak groups until maximum posterior error probability.')
+@click.option('--ipf_max_transition_isotope_overlap', default=0.5, show_default=True, type=float, help='Maximum isotope overlap to consider transitions in IPF.')
+@click.option('--ipf_min_transition_sn', default=0, show_default=True, type=float, help='Minimum log signal-to-noise level to consider transitions in IPF. Set -1 to disable this filter.')
 # TRIC
 @click.option('--tric_chromprob/--no-tric_chromprob', default=False, show_default=True, help='Whether chromatogram probabilities for TRIC should be computed.')
 # Processing
 @click.option('--threads', default=1, show_default=True, type=int, help='Number of threads used for semi-supervised learning. -1 means all available CPUs.', callback=transform_threads)
 @click.option('--test/--no-test', default=False, show_default=True, help='Run in test mode with fixed seed.')
-def score(infile, outfile, apply_weights, xeval_fraction, xeval_iterations, initial_fdr, iteration_fdr, ss_iterations, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, level, ipf_max_pgrank, ipf_max_pgpep, tric_chromprob, threads, test):
+def score(infile, outfile, apply_weights, xeval_fraction, xeval_iterations, initial_fdr, iteration_fdr, ss_iterations, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, level, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn, tric_chromprob, threads, test):
 
     if outfile is None:
         outfile = infile
@@ -82,9 +84,9 @@ def score(infile, outfile, apply_weights, xeval_fraction, xeval_iterations, init
     set_parameters(xeval_fraction, xeval_iterations, initial_fdr, iteration_fdr, ss_iterations, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, tric_chromprob, threads, test)
 
     if not apply_weights:
-        PyProphetLearner(infile, outfile, level, ipf_max_pgrank, ipf_max_pgpep).run()
+        PyProphetLearner(infile, outfile, level, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn).run()
     else:
-        PyProphetWeightApplier(infile, outfile, level, ipf_max_pgrank, ipf_max_pgpep, apply_weights).run()
+        PyProphetWeightApplier(infile, outfile, level, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn, apply_weights).run()
 
 
 # IPF
@@ -97,7 +99,7 @@ def score(infile, outfile, apply_weights, xeval_fraction, xeval_iterations, init
 @click.option('--ipf_ms2_scoring/--no-ipf_ms2_scoring', default=True, show_default=True, help='Use MS2 scores for IPF.')
 @click.option('--ipf_h0/--no-ipf_h0', default=True, show_default=True, help='Include possibility that peak groups are not covered by peptidoform space.')
 @click.option('--ipf_max_precursor_pep', default=0.7, show_default=True, type=float, help='Maximum PEP to consider scored precursors in IPF.')
-@click.option('--ipf_max_peakgroup_pep', default=0.7, show_default=True, type=float, help='Maximum PEP to consider scored precursors in IPF.')
+@click.option('--ipf_max_peakgroup_pep', default=0.7, show_default=True, type=float, help='Maximum PEP to consider scored peak groups in IPF.')
 @click.option('--ipf_max_precursor_peakgroup_pep', default=0.4, show_default=True, type=float, help='Maximum BHM layer 1 integrated precursor peakgroup PEP to consider in IPF.')
 @click.option('--ipf_max_transition_pep', default=0.6, show_default=True, type=float, help='Maximum PEP to consider scored transitions in IPF.')
 def ipf(infile, outfile, ipf_ms1_scoring, ipf_ms2_scoring, ipf_h0, ipf_max_precursor_pep, ipf_max_peakgroup_pep, ipf_max_precursor_peakgroup_pep, ipf_max_transition_pep):

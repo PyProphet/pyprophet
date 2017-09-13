@@ -39,12 +39,12 @@ class PyProphetRunner(object):
     """Base class for workflow of command line tool
     """
 
-    def __init__(self, infile, outfile, level, ipf_max_pgrank, ipf_max_pgpep):
+    def __init__(self, infile, outfile, level, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn):
         def read_tsv(infile):
             table = pd.read_csv(infile, "\t")
             return(table)
 
-        def read_osw(infile, level, ipf_max_pgrank, ipf_max_pgpep):
+        def read_osw(infile, level, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn):
             con = sqlite3.connect(infile)
 
             if level == "ms2":
@@ -52,8 +52,7 @@ class PyProphetRunner(object):
             elif level == "ms1":
                 table = pd.read_sql_query("SELECT *, RUN_ID || '_' || PRECURSOR_ID AS GROUP_ID, VAR_XCORR_SHAPE AS MAIN_VAR_XCORR_SHAPE FROM FEATURE_MS1 INNER JOIN (SELECT RUN_ID, ID, PRECURSOR_ID FROM FEATURE) AS FEATURE ON FEATURE_ID = FEATURE.ID INNER JOIN (SELECT ID, DECOY FROM PRECURSOR) AS PRECURSOR ON FEATURE.PRECURSOR_ID = PRECURSOR.ID;", con)
             elif level == "transition":
-                # TODO: Remove VAR_LOG_SN_SCORE by changing default values in OSW
-                table = pd.read_sql_query("SELECT TRANSITION.DECOY AS DECOY, FEATURE_TRANSITION.*, RUN_ID || '_' || FEATURE_TRANSITION.FEATURE_ID || '_' || PRECURSOR_ID || '_' || TRANSITION_ID AS GROUP_ID, VAR_XCORR_SHAPE AS MAIN_VAR_XCORR_SHAPE FROM FEATURE_TRANSITION INNER JOIN (SELECT RUN_ID, ID, PRECURSOR_ID FROM FEATURE) AS FEATURE ON FEATURE_TRANSITION.FEATURE_ID = FEATURE.ID INNER JOIN PRECURSOR ON FEATURE.PRECURSOR_ID = PRECURSOR.ID INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID INNER JOIN (SELECT ID, DECOY FROM TRANSITION) AS TRANSITION ON FEATURE_TRANSITION.TRANSITION_ID = TRANSITION.ID WHERE VAR_LOG_SN_SCORE > 0 AND RANK <= " + str(ipf_max_pgrank) + " AND PEP <= " + str(ipf_max_pgpep) + " AND PRECURSOR.DECOY == 0 ORDER BY FEATURE_ID, PRECURSOR_ID, TRANSITION_ID;", con)
+                table = pd.read_sql_query("SELECT TRANSITION.DECOY AS DECOY, FEATURE_TRANSITION.*, RUN_ID || '_' || FEATURE_TRANSITION.FEATURE_ID || '_' || PRECURSOR_ID || '_' || TRANSITION_ID AS GROUP_ID, VAR_XCORR_SHAPE AS MAIN_VAR_XCORR_SHAPE FROM FEATURE_TRANSITION INNER JOIN (SELECT RUN_ID, ID, PRECURSOR_ID FROM FEATURE) AS FEATURE ON FEATURE_TRANSITION.FEATURE_ID = FEATURE.ID INNER JOIN PRECURSOR ON FEATURE.PRECURSOR_ID = PRECURSOR.ID INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID INNER JOIN (SELECT ID, DECOY FROM TRANSITION) AS TRANSITION ON FEATURE_TRANSITION.TRANSITION_ID = TRANSITION.ID WHERE RANK <= " + str(ipf_max_peakgroup_rank) + " AND PEP <= " + str(ipf_max_peakgroup_pep) + " AND VAR_ISOTOPE_OVERLAP_SCORE <= " + str(ipf_max_transition_isotope_overlap) + " AND VAR_LOG_SN_SCORE > " + str(ipf_min_transition_sn) + " AND PRECURSOR.DECOY == 0 ORDER BY FEATURE_ID, PRECURSOR_ID, TRANSITION_ID;", con)
             else:
                 sys.exit("Error: Unspecified data level selected.")
 
@@ -65,7 +64,7 @@ class PyProphetRunner(object):
 
         if isSQLite3(infile):
             self.mode = 'osw'
-            self.table = read_osw(infile, level, ipf_max_pgrank, ipf_max_pgpep)
+            self.table = read_osw(infile, level, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn)
         else:
             self.mode = 'tsv'
             self.table = read_tsv(infile)
@@ -234,8 +233,8 @@ class PyProphetLearner(PyProphetRunner):
 
 class PyProphetWeightApplier(PyProphetRunner):
 
-    def __init__(self, infile, outfile, level, ipf_max_pgrank, ipf_max_pgpep, apply_weights):
-        super(PyProphetWeightApplier, self).__init__(infile, outfile, level, ipf_max_pgrank, ipf_max_pgpep)
+    def __init__(self, infile, outfile, level, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn, apply_weights):
+        super(PyProphetWeightApplier, self).__init__(infile, outfile, level, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn)
         if not os.path.exists(apply_weights):
             sys.exit("Error: Weights file %s does not exist." % apply_weights)
         if self.mode == "tsv":
