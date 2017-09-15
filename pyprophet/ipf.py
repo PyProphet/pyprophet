@@ -198,6 +198,7 @@ def infer_peptidoforms(infile, outfile, ipf_ms1_scoring, ipf_ms2_scoring, ipf_h0
 
     con = sqlite3.connect(outfile)
 
+    uis_peptidoform_data['PEPTIDE_ID'] = uis_peptidoform_data['PEPTIDE_ID'].astype(int)
     uis_peptidoform_data.to_sql("SCORE_IPF", con, index=False, if_exists='replace')
     con.close()
 
