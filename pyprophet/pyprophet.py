@@ -99,7 +99,7 @@ class Scorer(object):
         all_tt_scores = experiment.get_top_target_peaks()["d_score"]
         all_td_scores = experiment.get_top_decoy_peaks()["d_score"]
 
-        use_pemp = CONFIG.get("final_statistics.emp_p")
+        use_pemp = not CONFIG.get("final_statistics.parametric")
         use_pfdr = CONFIG.get("final_statistics.pfdr")
         lfdr_trunc  = CONFIG.get("final_statistics.lfdr_trunc")
         lfdr_monotone  = CONFIG.get("final_statistics.lfdr_monotone")

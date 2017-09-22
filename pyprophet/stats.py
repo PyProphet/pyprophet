@@ -66,6 +66,13 @@ def to_one_dim_array(values, as_type=None):
     return values
 
 
+@profile
+def lookup_values_from_error_table(scores, err_df):
+    """ find best matching q-value for each score in 'scores' """
+    ix = find_nearest_matches(np.float32(err_df.cutoff.values), np.float32(scores))
+    return err_df.pvalue.iloc[ix].values, err_df.svalue.iloc[ix].values, err_df.pep.iloc[ix].values, err_df.qvalue.iloc[ix].values
+
+
 def posterior_chromatogram_hypotheses_fast(experiment, prior_chrom_null):
     """ Compute posterior probabilities for each chromatogram
 
@@ -122,13 +129,19 @@ def posterior_chromatogram_hypotheses_fast(experiment, prior_chrom_null):
     return final_result, final_result_h0
 
 
-def pnorm(pvalues, mu, sigma):
-    """ [P(X>pi, mu, sigma) for pi in pvalues] for normal distributed P with
+def mean_and_std_dev(values):
+    return np.mean(values), np.std(values, ddof=1)
+
+
+def pnorm(stat, stat0):
+    """ [P(X>pi, mu, sigma) for pi in pvalues] for normal distributed stat with
     expectation value mu and std deviation sigma """
 
-    pvalues = to_one_dim_array(pvalues, np.float64)
-    args = (pvalues - mu) / sigma
-    return 0.5 * (1.0 + scipy.special.erf(args / np.sqrt(2.0)))
+    mu, sigma = mean_and_std_dev(stat0)
+
+    stat = to_one_dim_array(stat, np.float64)
+    args = (stat - mu) / sigma
+    return 1-(0.5 * (1.0 + scipy.special.erf(args / np.sqrt(2.0))))
 
 
 def pemp(stat, stat0):
@@ -160,61 +173,6 @@ def pemp(stat, stat0):
     p[p <= 1.0 / m0] = 1.0 / m0
 
     return p
-
-
-def mean_and_std_dev(values):
-    return np.mean(values), np.std(values, ddof=1)
-
-
-@profile
-def lookup_values_from_error_table(scores, err_df):
-    """ find best matching q-value for each score in 'scores' """
-    ix = find_nearest_matches(np.float32(err_df.cutoff.values), np.float32(scores))
-    return err_df.pvalue.iloc[ix].values, err_df.svalue.iloc[ix].values, err_df.pep.iloc[ix].values, err_df.qvalue.iloc[ix].values
-
-
-@profile
-def final_err_table(df, num_cut_offs=51):
-    """ create artificial cutoff sample points from given range of cutoff
-    values in df, number of sample points is 'num_cut_offs'"""
-
-    cutoffs = df.cutoff.values
-    min_ = min(cutoffs)
-    max_ = max(cutoffs)
-    # extend max_ and min_ by 5 % of full range
-    margin = (max_ - min_) * 0.05
-    sampled_cutoffs = np.linspace(min_ - margin, max_ + margin, num_cut_offs, dtype=np.float32)
-
-    # find best matching row index for each sampled cut off:
-    ix = find_nearest_matches(df.cutoff.values, sampled_cutoffs)
-
-    # create sub dataframe:
-    sampled_df = df.iloc[ix]
-    sampled_df.cutoff = sampled_cutoffs
-    # remove 'old' index from input df:
-    sampled_df.reset_index(inplace=True, drop=True)
-
-    return sampled_df
-
-
-@profile
-def summary_err_table(df, qvalues=[0, 0.01, 0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5]):
-    """ summary error table for some typical q-values """
-
-    qvalues = to_one_dim_array(qvalues)
-    # find best matching fows in df for given qvalues:
-    ix = find_nearest_matches(np.float32(df.qvalue.values), qvalues)
-    # extract sub table
-    df_sub = df.iloc[ix]
-    # remove duplicate hits, mark them with None / NAN:
-    for i_sub, (i0, i1) in enumerate(zip(ix, ix[1:])):
-        if i1 == i0:
-            df_sub.iloc[i_sub + 1, :] = None
-    # attach q values column
-    df_sub.qvalue = qvalues
-    # remove old index from original df:
-    df_sub.reset_index(inplace=True, drop=True)
-    return df_sub[['qvalue','pvalue','svalue','pep','fdr','fnr','fpr','tp','tn','fp','fn','cutoff']]
 
 
 @profile
@@ -325,9 +283,7 @@ def bw_nrd0(x):
     q75, q25 = np.percentile(x, [75 ,25])
     iqr = q75 - q25
     lo = min(hi, iqr/1.34)
-
-    if not ((lo == hi) or (lo == abs(x[0])) or (lo == 1)):
-        lo = 1
+    lo = lo or hi or abs(x[0]) or 1
 
     return 0.9 * lo *len(x)**-0.2
 
@@ -444,6 +400,50 @@ def stat_metrics(p_values, pi0, use_pfdr):
 
 
 @profile
+def final_err_table(df, num_cut_offs=51):
+    """ create artificial cutoff sample points from given range of cutoff
+    values in df, number of sample points is 'num_cut_offs'"""
+
+    cutoffs = df.cutoff.values
+    min_ = min(cutoffs)
+    max_ = max(cutoffs)
+    # extend max_ and min_ by 5 % of full range
+    margin = (max_ - min_) * 0.05
+    sampled_cutoffs = np.linspace(min_ - margin, max_ + margin, num_cut_offs, dtype=np.float32)
+
+    # find best matching row index for each sampled cut off:
+    ix = find_nearest_matches(df.cutoff.values, sampled_cutoffs)
+
+    # create sub dataframe:
+    sampled_df = df.iloc[ix]
+    sampled_df.cutoff = sampled_cutoffs
+    # remove 'old' index from input df:
+    sampled_df.reset_index(inplace=True, drop=True)
+
+    return sampled_df
+
+
+@profile
+def summary_err_table(df, qvalues=[0, 0.01, 0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5]):
+    """ summary error table for some typical q-values """
+
+    qvalues = to_one_dim_array(qvalues)
+    # find best matching fows in df for given qvalues:
+    ix = find_nearest_matches(np.float32(df.qvalue.values), qvalues)
+    # extract sub table
+    df_sub = df.iloc[ix]
+    # remove duplicate hits, mark them with None / NAN:
+    for i_sub, (i0, i1) in enumerate(zip(ix, ix[1:])):
+        if i1 == i0:
+            df_sub.iloc[i_sub + 1, :] = None
+    # attach q values column
+    df_sub.qvalue = qvalues
+    # remove old index from original df:
+    df_sub.reset_index(inplace=True, drop=True)
+    return df_sub[['qvalue','pvalue','svalue','pep','fdr','fnr','fpr','tp','tn','fp','fn','cutoff']]
+
+
+@profile
 def error_statistics(target_scores, decoy_scores, lambda_, pi0_method = "smoother", pi0_smooth_df = 3, pi0_smooth_log_pi0 = False, use_pemp = False, use_pfdr = False, compute_lfdr = False, lfdr_trunc = True, lfdr_monotone = True, lfdr_transf = "probit", lfdr_adj = 1.5, lfdr_eps = np.power(10.0,-8)):
     """ takes list of decoy and target scores and creates error statistics for target values"""
 
@@ -459,11 +459,7 @@ def error_statistics(target_scores, decoy_scores, lambda_, pi0_method = "smoothe
         target_pvalues = pemp(target_scores, decoy_scores)
     else:
         # parametric
-        mu, nu = mean_and_std_dev(decoy_scores)
-        target_pvalues = 1.0 - pnorm(target_scores, mu, nu)
-
-    # sort p-values
-    target_pvalues = np.sort(to_one_dim_array(target_pvalues))[::-1]
+        target_pvalues = pnorm(target_scores, decoy_scores)
 
     # estimate pi0
     pi0 = pi0est(target_pvalues, lambda_, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0)

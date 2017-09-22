@@ -13,9 +13,9 @@ SRM experiments.* **Nat Methods.** 2011 May;8(5):430-5. [doi:
 10.1038/nmeth.1584.](http://dx.doi.org/10.1038/nmeth.1584) Epub 2011 Mar 20.
 
 2. Teleman J, Röst HL, Rosenberger G, Schmitt U, Malmström L, Malmström J, Levander F.
-*DIANA--algorithmic improvements for analysis of data-independent acquisition MS data.* **Bioinformatics.** 2015 Feb 15;31(4):555-62. doi: [10.1093/bioinformatics/btu686.](http://dx.doi.org/10.1093/bioinformatics/btu686) Epub 2014 Oct 27.
+*DIANA--algorithmic improvements for analysis of data-independent acquisition MS data.* **Bioinformatics.** 2015 Feb 15;31(4):555-62. [doi: 10.1093/bioinformatics/btu686.](http://dx.doi.org/10.1093/bioinformatics/btu686) Epub 2014 Oct 27.
 
-3. Rosenberger G, Liu Y, Röst HL, Ludwig C, Buil A, Bensimon A, Soste M, Spector TD, Dermitzakis ET, Collins BC, Malmström L, Aebersold R. *Inference and quantification of peptidoforms in large sample cohorts by SWATH-MS.* **Nat Biotechnol** 2017 Aug;35(8):781-788. doi: [10.1038/nbt.3908.](http://dx.doi.org/10.1038/nbt.3908) Epub 2017 Jun 12.
+3. Rosenberger G, Liu Y, Röst HL, Ludwig C, Buil A, Bensimon A, Soste M, Spector TD, Dermitzakis ET, Collins BC, Malmström L, Aebersold R. *Inference and quantification of peptidoforms in large sample cohorts by SWATH-MS.* **Nat Biotechnol** 2017 Aug;35(8):781-788. [doi: 10.1038/nbt.3908.](http://dx.doi.org/10.1038/nbt.3908) Epub 2017 Jun 12.
 
 4. Rosenberger G, Bludau I, Schmitt U, Heusel M, Hunter CL, Liu Y, MacCoss MJ, MacLean BX, Nesvizhskii AI, Pedrioli PGA, Reiter L, Röst HL, Tate S, Ting YS, Collins BC, Aebersold R.
 *Statistical control of peptide and protein error rates in large-scale targeted data-independent acquisition analyses.* **Nat Methods.** 2017 Sep;14(9):921-927. [doi: 10.1038/nmeth.4398.](http://dx.doi.org/10.1038/nmeth.4398) Epub 2017 Aug 21. 

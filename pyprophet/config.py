@@ -49,7 +49,7 @@ def set_parameters(xeval_fraction, xeval_iterations, initial_fdr, iteration_fdr,
 
     # Statistics
     options['group_id'] = group_id
-    options['final_statistics.emp_p'] = parametric
+    options['final_statistics.parametric'] = parametric
     options['final_statistics.pfdr'] = pfdr
     options['final_statistics.lambda'] = pi0_lambda
     options['final_statistics.pi0_method'] = pi0_method
