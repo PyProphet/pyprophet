@@ -114,27 +114,33 @@ def precursor_inference(data, ipf_ms1_scoring, ipf_ms2_scoring, ipf_max_precurso
         uis_ms1_precursor_data = data[['feature_id']].drop_duplicates()
         uis_ms1_precursor_data['ms1_precursor_pp'] = np.nan
 
-    # get MS2-level peak group data
-    if ipf_ms2_scoring:
-        uis_ms2_pg_data = data[['feature_id','ms2_peakgroup_pp']].drop_duplicates()
-    else:
-        uis_ms2_pg_data = data['feature_id'].drop_duplicates()
-        uis_ms2_pg_data['ms2_peakgroup_pp'] = np.nan
-
     # get MS2-level precursor data
-    uis_ms2_precursor_data = data[data['ms2_precursor_pp'] >= 1-ipf_max_precursor_pep][['feature_id','ms2_precursor_pp']].drop_duplicates()
+    if ipf_ms2_scoring:
+        uis_ms2_precursor_data = data[data['ms2_precursor_pp'] >= 1-ipf_max_precursor_pep][['feature_id','ms2_precursor_pp']].drop_duplicates()
+    else:
+        uis_ms2_precursor_data = data[['feature_id']].drop_duplicates()
+        uis_ms2_precursor_data['ms2_precursor_pp'] = np.nan
 
-    # merge MS1- & MS2-level precursor and peak group data
-    uis_precursor_data = uis_ms2_precursor_data.merge(uis_ms1_precursor_data, on=['feature_id'], how='outer').merge(uis_ms2_pg_data, on=['feature_id'], how='outer')
+    # get MS2-level peak group data
+    uis_ms2_pg_data = data[['feature_id','ms2_peakgroup_pp']].drop_duplicates()
 
-    # prepare precursor-level Bayesian model
-    uis_precursor_data_bm = uis_precursor_data.groupby('feature_id').apply(prepare_precursor_bm).reset_index()
+    if ipf_ms1_scoring or ipf_ms2_scoring:
+        # merge MS1- & MS2-level precursor and peak group data
+        uis_precursor_data = uis_ms2_precursor_data.merge(uis_ms1_precursor_data, on=['feature_id'], how='outer').merge(uis_ms2_pg_data, on=['feature_id'], how='outer')
 
-    # compute posterior precursor probability
-    prec_pp_data = apply_bm(uis_precursor_data_bm)
-    prec_pp_data = prec_pp_data.rename(columns=lambda x: x.replace('posterior', 'precursor_peakgroup_pp'))
+        # prepare precursor-level Bayesian model
+        uis_precursor_data_bm = uis_precursor_data.groupby('feature_id').apply(prepare_precursor_bm).reset_index()
 
-    return prec_pp_data[prec_pp_data['hypothesis']][['feature_id','precursor_peakgroup_pp']]
+        # compute posterior precursor probability
+        prec_pp_data = apply_bm(uis_precursor_data_bm)
+        prec_pp_data = prec_pp_data.rename(columns=lambda x: x.replace('posterior', 'precursor_peakgroup_pp'))
+
+        inferred_precursors = prec_pp_data[prec_pp_data['hypothesis']][['feature_id','precursor_peakgroup_pp']]
+    else:
+        # no precursor-level data on MS1 and/or MS2 should be used; use peak group-level data
+        inferred_precursors = uis_ms2_pg_data.rename(columns=lambda x: x.replace('ms2_peakgroup_pp', 'precursor_peakgroup_pp'))
+
+    return inferred_precursors
 
 
 def peptidoform_inference(data, ipf_max_transition_pep, ipf_h0):

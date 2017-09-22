@@ -99,8 +99,8 @@ def score(infile, outfile, apply_weights, xeval_fraction, xeval_iterations, init
 @click.option('--in', 'infile', required=True, type=click.Path(exists=True), help='PyProphet input file.')
 @click.option('--out', 'outfile', type=click.Path(exists=False), help='PyProphet output file.')
 # IPF parameters
-@click.option('--ipf_ms1_scoring/--no-ipf_ms1_scoring', default=True, show_default=True, help='Use MS1 scores for IPF.')
-@click.option('--ipf_ms2_scoring/--no-ipf_ms2_scoring', default=True, show_default=True, help='Use MS2 scores for IPF.')
+@click.option('--ipf_ms1_scoring/--no-ipf_ms1_scoring', default=True, show_default=True, help='Use MS1 precursor data for IPF.')
+@click.option('--ipf_ms2_scoring/--no-ipf_ms2_scoring', default=True, show_default=True, help='Use MS2 precursor data for IPF.')
 @click.option('--ipf_h0/--no-ipf_h0', default=True, show_default=True, help='Include possibility that peak groups are not covered by peptidoform space.')
 @click.option('--ipf_max_precursor_pep', default=0.7, show_default=True, type=float, help='Maximum PEP to consider scored precursors in IPF.')
 @click.option('--ipf_max_peakgroup_pep', default=0.7, show_default=True, type=float, help='Maximum PEP to consider scored peak groups in IPF.')
