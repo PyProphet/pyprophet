@@ -288,7 +288,7 @@ class HolyGostQuery(object):
         logging.info("")
 
         # we only use weights from last iteration
-        ws = [ws[-1]]
+        # ws = [ws[-1]]
 
         final_classifier = self.semi_supervised_learner.averaged_learner(ws)
 
