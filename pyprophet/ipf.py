@@ -25,10 +25,10 @@ from .std_logger import logging
 
 pd.set_option('chained_assignment',None)
 
-def read_pyp_peakgroup_precursor(path):
+def read_pyp_peakgroup_precursor(path, ipf_max_peakgroup_pep):
     con = sqlite3.connect(path)
 
-    data = pd.read_sql_query("SELECT FEATURE.ID AS FEATURE_ID, 1 - SCORE_MS2.PEP AS MS2_PEAKGROUP_PP, 1 - SCORE_MS1.PEP AS MS1_PRECURSOR_PP, 1 - SCORE_TRANSITION.PEP AS MS2_PRECURSOR_PP FROM PRECURSOR INNER JOIN FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID INNER JOIN SCORE_MS1 ON FEATURE.ID = SCORE_MS1.FEATURE_ID INNER JOIN SCORE_MS2 ON SCORE_MS1.FEATURE_ID = SCORE_MS2.FEATURE_ID INNER JOIN (SELECT FEATURE_ID, PEP FROM SCORE_TRANSITION INNER JOIN TRANSITION ON SCORE_TRANSITION.TRANSITION_ID = TRANSITION.ID WHERE TRANSITION.TYPE='' AND TRANSITION.DECOY=0) AS SCORE_TRANSITION ON SCORE_MS1.FEATURE_ID = SCORE_TRANSITION.FEATURE_ID WHERE PRECURSOR.DECOY=0;", con)
+    data = pd.read_sql_query("SELECT FEATURE.ID AS FEATURE_ID, 1 - SCORE_MS2.PEP AS MS2_PEAKGROUP_PP, 1 - SCORE_MS1.PEP AS MS1_PRECURSOR_PP, 1 - SCORE_TRANSITION.PEP AS MS2_PRECURSOR_PP FROM PRECURSOR INNER JOIN FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID INNER JOIN SCORE_MS1 ON FEATURE.ID = SCORE_MS1.FEATURE_ID INNER JOIN SCORE_MS2 ON SCORE_MS1.FEATURE_ID = SCORE_MS2.FEATURE_ID INNER JOIN (SELECT FEATURE_ID, PEP FROM SCORE_TRANSITION INNER JOIN TRANSITION ON SCORE_TRANSITION.TRANSITION_ID = TRANSITION.ID WHERE TRANSITION.TYPE='' AND TRANSITION.DECOY=0) AS SCORE_TRANSITION ON SCORE_MS1.FEATURE_ID = SCORE_TRANSITION.FEATURE_ID WHERE PRECURSOR.DECOY=0 AND SCORE_MS2.PEP < " + str(ipf_max_peakgroup_pep) + ";", con)
 
     data.columns = [col.lower() for col in data.columns]
     con.close()
@@ -145,7 +145,7 @@ def precursor_inference(data, ipf_ms1_scoring, ipf_ms2_scoring, ipf_max_precurso
 
 def peptidoform_inference(data, ipf_max_transition_pep, ipf_h0):
     # compute transition posterior probabilities
-    uis_transition_data_bm = data[(data['posterior'] >= ipf_max_transition_pep)].groupby('feature_id').apply(prepare_transition_bm, ipf_h0).reset_index()
+    uis_transition_data_bm = data[(data['posterior'] >= 1-ipf_max_transition_pep)].groupby('feature_id').apply(prepare_transition_bm, ipf_h0).reset_index()
 
     # compute posterior peptidoform probability
     pp_data = apply_bm(uis_transition_data_bm)
@@ -171,7 +171,7 @@ def compute_model_fdr(data):
 def infer_peptidoforms(infile, outfile, ipf_ms1_scoring, ipf_ms2_scoring, ipf_h0, ipf_max_precursor_pep, ipf_max_peakgroup_pep, ipf_max_precursor_peakgroup_pep, ipf_max_transition_pep):
     logging.info("start IPF (Inference of PeptidoForms)")
 
-    uis_precursor_table = read_pyp_peakgroup_precursor(infile)
+    uis_precursor_table = read_pyp_peakgroup_precursor(infile, ipf_max_peakgroup_pep)
 
     # precursor-level inference
     logging.info("start precursor-level inference")
