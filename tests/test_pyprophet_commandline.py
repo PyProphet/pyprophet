@@ -32,7 +32,7 @@ def _run_pyprophet_tsv_to_learn_model(regtest, temp_folder, dump_result_files=Fa
     os.chdir(temp_folder)
     data_path = os.path.join(DATA_FOLDER, "test_data.txt")
     shutil.copy(data_path, temp_folder)
-    cmdline = "pyprophet score --in=test_data.txt --test"
+    cmdline = "pyprophet score --pi0_method=smoother --pi0_lambda 0.4 0 0 --in=test_data.txt --test"
     if parametric:
         cmdline += " --parametric"
     if pfdr:
@@ -80,7 +80,7 @@ def _run_pyprophet_osw_to_learn_model(regtest, temp_folder, dump_result_files=Fa
 
     stdout = _run_cmdline(cmdline)
 
-    table = read_pyp_peakgroup_precursor("test_data.osw")
+    table = read_pyp_peakgroup_precursor("test_data.osw", 1.0)
 
     print(table.head(100),file=regtest)
 
@@ -101,7 +101,7 @@ def test_tsv_apply_weights(tmpdir, regtest):
 
     _run_pyprophet_tsv_to_learn_model(regtest, tmpdir.strpath, True)
 
-    _run_cmdline("pyprophet score --in=test_data.txt --apply_weights=test_data_ms2_weights.csv "
+    _run_cmdline("pyprophet score --pi0_method=smoother --pi0_lambda 0.4 0 0 --in=test_data.txt --apply_weights=test_data_ms2_weights.csv "
                           "--test")
 
 def test_osw_0(tmpdir, regtest):
@@ -118,7 +118,7 @@ def test_not_unique_tg_id_blocks(tmpdir):
     os.chdir(tmpdir.strpath)
     data_path = os.path.join(DATA_FOLDER, "test_invalid_data.txt")
     shutil.copy(data_path, tmpdir.strpath)
-    cmdline = "pyprophet score --in=test_invalid_data.txt --test"
+    cmdline = "pyprophet score --pi0_method=smoother --pi0_lambda 0.4 0 0 --in=test_invalid_data.txt --test"
 
     with pytest.raises(subprocess.CalledProcessError) as exc_info:
         subprocess.check_output(cmdline, shell=True, stderr=subprocess.STDOUT)
