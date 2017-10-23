@@ -4,8 +4,6 @@
 import os
 os.putenv("OPENBLAS_NUM_THREADS", "1")
 
-import random
-
 import pandas as pd
 import numpy as np
 from optimized import find_top_ranked, rank
@@ -229,7 +227,7 @@ def sample_data_tables(pathes, delim,  sampling_rate=0.1, tg_id_name="transition
 
     # subsample from targets
     if sampling_rate < 1.0:
-        tg_ids = random.sample(tg_ids, int(sampling_rate * len(tg_ids)))
+        tg_ids = np.random.sample(tg_ids, int(sampling_rate * len(tg_ids)))
     else:
         tg_ids = list(tg_ids)
     # add corresponding decoys
@@ -318,8 +316,8 @@ class Experiment(object):
         target_ids = df[df.is_decoy == False].tg_id.unique()
 
         if not is_test:
-            random.shuffle(decoy_ids)
-            random.shuffle(target_ids)
+            np.random.shuffle(decoy_ids)
+            np.random.shuffle(target_ids)
         else:
             decoy_ids = sorted(decoy_ids)
             target_ids = sorted(target_ids)
