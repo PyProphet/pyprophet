@@ -80,7 +80,7 @@ def _run_pyprophet_osw_to_learn_model(regtest, temp_folder, dump_result_files=Fa
 
     stdout = _run_cmdline(cmdline)
 
-    table = read_pyp_peakgroup_precursor("test_data.osw", 1.0)
+    table = read_pyp_peakgroup_precursor("test_data.osw", 1.0, True, True)
 
     print(table.head(100),file=regtest)
 
