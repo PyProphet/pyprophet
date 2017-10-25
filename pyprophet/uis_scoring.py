@@ -185,6 +185,10 @@ def prepare_uis_tables(pathes):
         uis_target_columns = [c for c in table.columns.values if c.startswith("uis_target_transition_names")] + [c for c in table.columns.values if c.startswith("uis_target_main_var_")] + [c for c in table.columns.values if c.startswith("uis_target_var_")]
         uis_decoy_columns = [c for c in table.columns.values if c.startswith("uis_decoy_transition_names")] + [c for c in table.columns.values if c.startswith("uis_decoy_main_var_")] + [c for c in table.columns.values if c.startswith("uis_decoy_var_")]
 
+        # workaround for missing MS1-level data
+        if not "ms1_pg_score" in table.columns.values:
+            table["ms1_pg_score"] = np.nan
+
         # select target transition groups below or equal pg_score cutoff
         uis_targets = table[(table['pg_score'] >= CONFIG.get("uis_scoring.peakgroup_id_probability"))][table['decoy'] == 0][["run_id","transition_group_id","id","ms1_pg_score","pg_score"]+uis_target_columns]
 
