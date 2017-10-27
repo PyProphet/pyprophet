@@ -17,7 +17,7 @@ import sys
 from .runner import PyProphetLearner, PyProphetWeightApplier
 from .ipf import infer_peptidoforms
 from .levels_contexts import infer_peptides, infer_proteins, merge_osw # , infer_protein_groups
-from .export import export_tsv
+from .export import export_tsv, filter_sqmass
 
 from .config import (transform_pi0_lambda, transform_threads, transform_subsample_ratio, set_parameters)
 
@@ -245,3 +245,18 @@ def export(infile, outfile, format, outcsv, ipf, peptide, protein):
     """
 
     export_tsv(infile, outfile, format, outcsv, ipf, peptide, protein)
+
+# Filter sqMass files
+@cli.command()
+# File handling
+@click.argument('sqmassfiles', nargs=-1, type=click.Path(exists=True))
+@click.option('--in', 'infile', required=True, type=click.Path(exists=True), help='PyProphet input file.')
+@click.option('--max_precursor_pep', default=0.7, show_default=True, type=float, help='Maximum PEP to retain scored precursors in sqMass.')
+@click.option('--max_peakgroup_pep', default=0.7, show_default=True, type=float, help='Maximum PEP to retain scored peak groups in sqMass.')
+@click.option('--max_transition_pep', default=0.7, show_default=True, type=float, help='Maximum PEP to retain scored transitions in sqMass.')
+def filter(sqmassfiles, infile, max_precursor_pep, max_peakgroup_pep, max_transition_pep):
+    """
+    Filter sqMass files
+    """
+
+    filter_sqmass(sqmassfiles, infile, max_precursor_pep, max_peakgroup_pep, max_transition_pep)

@@ -6,6 +6,7 @@ pd.options.display.precision = 6
 
 import numpy as np
 import sqlite3
+from .data_handling import filterChromByLabels
 from .std_logger import logging
 
 def export_tsv(infile, outfile, format, outcsv, ipf, peptide, protein):
@@ -83,3 +84,17 @@ def export_tsv(infile, outfile, format, outcsv, ipf, peptide, protein):
 
     data.drop(['id_run','id_peptide','id_protein'], axis=1).to_csv(outfile, sep=sep, index=False)
     con.close()
+
+def filter_sqmass(sqmassfiles, infile, max_precursor_pep, max_peakgroup_pep, max_transition_pep):
+    con = sqlite3.connect(infile)
+
+    # process each sqmassfile independently
+    for sqm_in in sqmassfiles:
+        sqm_out = sqm_in.split(".sqMass")[0] + "_filtered.sqMass"
+        print sqm_in
+        print sqm_out
+
+        transitions = pd.read_sql_query("SELECT TRANSITION_ID AS transition_id FROM PRECURSOR INNER JOIN FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID INNER JOIN SCORE_MS1 ON FEATURE.ID = SCORE_MS1.FEATURE_ID INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID INNER JOIN SCORE_TRANSITION ON FEATURE.ID = SCORE_TRANSITION.FEATURE_ID INNER JOIN RUN ON FEATURE.RUN_ID = RUN.ID WHERE SCORE_MS1.PEP <=" + str(max_precursor_pep) + " AND SCORE_MS2.PEP <=" + str(max_peakgroup_pep) + " AND SCORE_TRANSITION.PEP <=" + str(max_transition_pep) + " AND FILENAME LIKE '%" + sqm_in.split(".sqMass")[0] + "%';", con)['transition_id'].values
+
+        filterChromByLabels(sqm_in, sqm_out, transitions)
+
