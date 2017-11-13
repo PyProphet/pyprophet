@@ -17,7 +17,7 @@ import sys
 from .runner import PyProphetLearner, PyProphetWeightApplier
 from .ipf import infer_peptidoforms
 from .levels_contexts import infer_peptides, infer_proteins, merge_osw # , infer_protein_groups
-from .export import export_tsv, filter_sqmass
+from .export import export_tsv, export_score_plots, filter_sqmass
 
 from .config import (transform_pi0_lambda, transform_threads, transform_subsample_ratio, set_parameters)
 
@@ -232,8 +232,8 @@ def merge(infiles, outfile, subsample_ratio, test):
 @cli.command()
 # File handling
 @click.option('--in', 'infile', required=True, type=click.Path(exists=True), help='PyProphet input file.')
-@click.option('--out', 'outfile', required=True, type=click.Path(exists=False), help='Output TSV/CSV file.')
-@click.option('--format', default='legacy', show_default=True, type=click.Choice(['matrix', 'legacy']), help='Export format, either matrix or legacy mProphet/PyProphet format.')
+@click.option('--out', 'outfile', type=click.Path(exists=False), help='Output TSV/CSV (matrix, legacy) file.')
+@click.option('--format', default='legacy', show_default=True, type=click.Choice(['matrix', 'legacy','score_plots']), help='Export format, either matrix, legacy (mProphet/PyProphet) or score_plots format.')
 @click.option('--csv/--no-csv', 'outcsv', default=False, show_default=True, help='Export CSV instead of TSV file.')
 # Context
 @click.option('--ipf/--no-ipf', default=True, show_default=True, help='Use IPF peptidoform-level data if available. Replaces FullPeptideName and m_score columns with IPF estimates. Note: Results do not contain decoys.')
@@ -243,8 +243,18 @@ def export(infile, outfile, format, outcsv, ipf, peptide, protein):
     """
     Export TSV/CSV tables
     """
+    if format == "score_plots":
+    	export_score_plots(infile)
+    else:
+	    if outfile is None:
+	    	if outcsv:
+	        	outfile = infile.split(".osw")[0] + ".csv"
+	        else:
+	        	outfile = infile.split(".osw")[0] + ".tsv"
+	    else:
+	        outfile = outfile
 
-    export_tsv(infile, outfile, format, outcsv, ipf, peptide, protein)
+	    export_tsv(infile, outfile, format, outcsv, ipf, peptide, protein)
 
 # Filter sqMass files
 @cli.command()

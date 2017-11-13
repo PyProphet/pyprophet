@@ -8,6 +8,22 @@ import numpy as np
 import sqlite3
 from .data_handling import filterChromByLabels
 from .std_logger import logging
+from .report import plot_scores
+
+def _check_sqlite_table(infile, table):
+    con = sqlite3.connect(infile)
+
+    table_present = False
+    c = con.cursor()
+    c.execute('SELECT count(name) FROM sqlite_master WHERE type="table" AND name="' + table + '"')
+    if c.fetchone()[0] == 1:
+        table_present = True
+    else:
+        table_present = False
+    c.fetchall()
+    con.close()
+
+    return(table_present)
 
 def export_tsv(infile, outfile, format, outcsv, ipf, peptide, protein):
 
@@ -15,13 +31,7 @@ def export_tsv(infile, outfile, format, outcsv, ipf, peptide, protein):
 
     ipf_present = False
     if ipf:
-        c = con.cursor()
-        c.execute('SELECT count(name) FROM sqlite_master WHERE type="table" AND name="SCORE_IPF"')
-        if c.fetchone()[0] == 1:
-            ipf_present = True
-        else:
-            ipf_present = False
-        c.fetchall()
+        ipf_present = _check_sqlite_table(infile, "SCORE_IPF")
 
     if ipf_present and ipf:
         if format == "legacy":
@@ -33,13 +43,7 @@ def export_tsv(infile, outfile, format, outcsv, ipf, peptide, protein):
 
     peptide_present = False
     if peptide:
-        c = con.cursor()
-        c.execute('SELECT count(name) FROM sqlite_master WHERE type="table" AND name="SCORE_PEPTIDE"')
-        if c.fetchone()[0] == 1:
-            peptide_present = True
-        else:
-            peptide_present = False
-        c.fetchall()
+        peptide_present = _check_sqlite_table(infile, "SCORE_PEPTIDE")
 
     if peptide_present and peptide:
         data_peptide_run = pd.read_sql_query("select run_id as id_run, peptide_id as id_peptide, qvalue as m_score_peptide_run_specific from score_peptide where context == 'run-specific';", con)
@@ -56,13 +60,7 @@ def export_tsv(infile, outfile, format, outcsv, ipf, peptide, protein):
 
     protein_present = False
     if protein:
-        c = con.cursor()
-        c.execute('SELECT count(name) FROM sqlite_master WHERE type="table" AND name="SCORE_PROTEIN"')
-        if c.fetchone()[0] == 1:
-            protein_present = True
-        else:
-            protein_present = False
-        c.fetchall()
+        peptide_present = _check_sqlite_table(infile, "SCORE_PROTEIN")
 
     if protein_present and protein:
         data_protein_run = pd.read_sql_query("select run_id as id_run, protein_id as id_protein, qvalue as m_score_protein_run_specific from score_protein where context == 'run-specific';", con)
@@ -83,6 +81,27 @@ def export_tsv(infile, outfile, format, outcsv, ipf, peptide, protein):
         sep = "\t"
 
     data.drop(['id_run','id_peptide','id_protein'], axis=1).to_csv(outfile, sep=sep, index=False)
+    con.close()
+
+def export_score_plots(infile):
+
+    con = sqlite3.connect(infile)
+
+    if _check_sqlite_table(infile, "SCORE_MS2"):
+        outfile = infile.split(".osw")[0] + "_ms2_score_plots.pdf"
+        table_ms2 = pd.read_sql_query("SELECT *, RUN_ID || '_' || PRECURSOR_ID AS GROUP_ID, VAR_XCORR_SHAPE AS MAIN_VAR_XCORR_SHAPE FROM FEATURE_MS2 INNER JOIN (SELECT RUN_ID, ID, PRECURSOR_ID, EXP_RT FROM FEATURE) AS FEATURE ON FEATURE_MS2.FEATURE_ID = FEATURE.ID INNER JOIN (SELECT ID, DECOY FROM PRECURSOR) AS PRECURSOR ON FEATURE.PRECURSOR_ID = PRECURSOR.ID INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID WHERE RANK == 1 ORDER BY RUN_ID, PRECURSOR.ID ASC, FEATURE.EXP_RT ASC;", con)
+        plot_scores(table_ms2, outfile)
+
+    if _check_sqlite_table(infile, "SCORE_MS1"):
+        outfile = infile.split(".osw")[0] + "_ms1_score_plots.pdf"
+        table_ms1 = pd.read_sql_query("SELECT *, RUN_ID || '_' || PRECURSOR_ID AS GROUP_ID, VAR_XCORR_SHAPE AS MAIN_VAR_XCORR_SHAPE FROM FEATURE_MS1 INNER JOIN (SELECT RUN_ID, ID, PRECURSOR_ID, EXP_RT FROM FEATURE) AS FEATURE ON FEATURE_MS1.FEATURE_ID = FEATURE.ID INNER JOIN (SELECT ID, DECOY FROM PRECURSOR) AS PRECURSOR ON FEATURE.PRECURSOR_ID = PRECURSOR.ID INNER JOIN SCORE_MS1 ON FEATURE.ID = SCORE_MS1.FEATURE_ID WHERE RANK == 1 ORDER BY RUN_ID, PRECURSOR.ID ASC, FEATURE.EXP_RT ASC;", con)
+        plot_scores(table_ms1, outfile)
+
+    if _check_sqlite_table(infile, "SCORE_TRANSITION"):
+        outfile = infile.split(".osw")[0] + "_transition_score_plots.pdf"
+        table_transition = pd.read_sql_query("SELECT TRANSITION.DECOY AS DECOY, FEATURE_TRANSITION.*, SCORE_TRANSITION.*, RUN_ID || '_' || FEATURE_TRANSITION.FEATURE_ID || '_' || PRECURSOR_ID || '_' || FEATURE_TRANSITION.TRANSITION_ID AS GROUP_ID, VAR_XCORR_SHAPE AS MAIN_VAR_XCORR_SHAPE FROM FEATURE_TRANSITION INNER JOIN (SELECT RUN_ID, ID, PRECURSOR_ID, EXP_RT FROM FEATURE) AS FEATURE ON FEATURE_TRANSITION.FEATURE_ID = FEATURE.ID INNER JOIN PRECURSOR ON FEATURE.PRECURSOR_ID = PRECURSOR.ID INNER JOIN SCORE_TRANSITION ON FEATURE_TRANSITION.FEATURE_ID = SCORE_TRANSITION.FEATURE_ID AND FEATURE_TRANSITION.TRANSITION_ID = SCORE_TRANSITION.TRANSITION_ID INNER JOIN (SELECT ID, DECOY FROM TRANSITION) AS TRANSITION ON FEATURE_TRANSITION.TRANSITION_ID = TRANSITION.ID ORDER BY RUN_ID, PRECURSOR.ID, FEATURE.EXP_RT, TRANSITION.ID;", con)
+        plot_scores(table_transition, outfile)
+
     con.close()
 
 def filter_sqmass(sqmassfiles, infile, max_precursor_pep, max_peakgroup_pep, max_transition_pep):
