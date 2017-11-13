@@ -180,9 +180,9 @@ class Experiment(object):
         self.df = df
 
     def log_summary(self):
-        logging.info("summary input file:")
-        logging.info("   %d lines" % len(self.df))
-        logging.info("   %d transition groups" % len(self.df.tg_id.unique()))
+        logging.info("Summary of input data:")
+        logging.info("   %d peak groups" % len(self.df))
+        logging.info("   %d group ids" % len(self.df.tg_id.unique()))
         logging.info("   %d scores including main score" % (len(self.df.columns.values) - 6))
 
     def __getitem__(self, *args):

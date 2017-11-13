@@ -39,7 +39,7 @@ class AbstractSemiSupervisedLearner(object):
         assert isinstance(experiment, Experiment)
 
         num_iter = CONFIG.get("semi_supervised_learner.num_iter")
-        logging.info("start learn_randomized")
+        logging.info("      start learning on cross-validation fold")
 
         fraction = CONFIG.get("xeval.fraction")
         is_test = CONFIG.get("is_test")
@@ -73,7 +73,7 @@ class AbstractSemiSupervisedLearner(object):
         top_test_target_scores = top_test_peaks.get_target_peaks()["classifier_score"]
         top_test_decoy_scores = top_test_peaks.get_decoy_peaks()["classifier_score"]
 
-        logging.info("end learn_randomized")
+        logging.info("      end learning on cross-validation fold")
 
         return top_test_target_scores, top_test_decoy_scores, params
 

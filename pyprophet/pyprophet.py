@@ -54,9 +54,9 @@ def timer(name=""):
     needed -= minutes * 60
 
     if name:
-        logging.info("time needed for %s: %02d:%02d:%.1f" % (name, hours, minutes, needed))
+        logging.info("Time needed for %s: %02d:%02d:%.1f" % (name, hours, minutes, needed))
     else:
-        logging.info("time needed: %02d:%02d:%.1f" % (hours, minutes, needed))
+        logging.info("Time needed: %02d:%02d:%.1f" % (hours, minutes, needed))
 
 
 Result = namedtuple("Result", "summary_statistics final_statistics scored_tables")
@@ -146,9 +146,9 @@ class Scorer(object):
         texp["q_value"] = q_values
         texp["s_value"] = s_values
         texp["p_value"] = p_values
-        logging.info("mean q_value = %e, std_dev q_value = %e" % (np.mean(q_values),
+        logging.info("Mean qvalue = %e, std_dev qvalue = %e" % (np.mean(q_values),
                                                                   np.std(q_values, ddof=1)))
-        logging.info("mean s_value = %e, std_dev s_value = %e" % (np.mean(s_values),
+        logging.info("Mean svalue = %e, std_dev svalue = %e" % (np.mean(s_values),
                                                                   np.std(s_values, ddof=1)))
         texp.add_peak_group_rank()
 
@@ -207,7 +207,7 @@ class HolyGostQuery(object):
         with timer():
             logging.info("apply weights")
             result, scorer, trained_weights = self._apply_weights(table, loaded_weights)
-            logging.info("processing input data finished")
+            logging.info("Finished processing of input data.")
         return result, scorer, trained_weights
 
     def _apply_weights(self, table, loaded_weights):
@@ -266,8 +266,8 @@ class HolyGostQuery(object):
         neval = CONFIG.get("xeval.num_iter")
         num_processes = CONFIG.get("num_processes")
 
-        logging.info("learn and apply scorer")
-        logging.info("start %d cross evals using %d processes" % (neval, num_processes))
+        logging.info("Semi-supervised learning of weights:")
+        logging.info("   start learning on  %d folds using %d processes" % (neval, num_processes))
 
         if num_processes == 1:
             for k in range(neval):
@@ -284,7 +284,7 @@ class HolyGostQuery(object):
                 ttt_scores = [ti for r in res for ti in r[0]]
                 ttd_scores = [ti for r in res for ti in r[1]]
                 ws.extend([r[2] for r in res])
-        logging.info("finished cross evals")
+        logging.info("   finished learning")
         logging.info("")
 
         # we only use weights from last iteration
@@ -307,7 +307,7 @@ class HolyGostQuery(object):
 
         result = Result(summary_statistics, final_statistics, scored_table)
 
-        logging.info("calculated scoring and statistics")
+        logging.info("Finished scoring and estimation statistics.")
         return result, scorer, classifier_table
 
 @profile

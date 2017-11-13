@@ -88,10 +88,6 @@ class PyProphetRunner(object):
 
         self.check_cols = [CONFIG.get("group_id"), "run_id", "decoy"]
 
-        logging.info("config settings:")
-        for k, v in sorted(CONFIG.config.items()):
-            logging.info("    %s: %s" % (k, v))
-
         start_at = time.time()
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
@@ -111,7 +107,7 @@ class PyProphetRunner(object):
         seconds = int(needed)
         msecs = int(1000 * (needed - seconds))
 
-        click.echo("TIME: %d seconds and %d msecs wall time" % (seconds, msecs))
+        click.echo("TOTAL TIME: %d seconds and %d msecs wall time" % (seconds, msecs))
 
     def print_summary(self, result):
         if result.summary_statistics is not None:
