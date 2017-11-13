@@ -244,17 +244,17 @@ def export(infile, outfile, format, outcsv, ipf, peptide, protein):
     Export TSV/CSV tables
     """
     if format == "score_plots":
-    	export_score_plots(infile)
+        export_score_plots(infile)
     else:
-	    if outfile is None:
-	    	if outcsv:
-	        	outfile = infile.split(".osw")[0] + ".csv"
-	        else:
-	        	outfile = infile.split(".osw")[0] + ".tsv"
-	    else:
-	        outfile = outfile
+        if outfile is None:
+            if outcsv:
+                outfile = infile.split(".osw")[0] + ".csv"
+            else:
+                outfile = infile.split(".osw")[0] + ".tsv"
+        else:
+            outfile = outfile
 
-	    export_tsv(infile, outfile, format, outcsv, ipf, peptide, protein)
+        export_tsv(infile, outfile, format, outcsv, ipf, peptide, protein)
 
 # Filter sqMass files
 @cli.command()
