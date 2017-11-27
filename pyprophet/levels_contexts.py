@@ -56,7 +56,6 @@ def infer_proteins(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_m
     if context == 'run-specific':
         data = data.groupby('run_id').apply(statistics_report, outfile, context, "protein", parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps).reset_index()
 
-        sys.exit()
     elif context in ['global', 'experiment-wide']:
         data = statistics_report(data, outfile, context, "protein", parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps)
 
