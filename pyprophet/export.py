@@ -57,7 +57,7 @@ def export_tsv(infile, outfile, format, outcsv, ipf, peptide, protein):
 
     protein_present = False
     if protein:
-        peptide_present = _check_sqlite_table(con, "SCORE_PROTEIN")
+        protein_present = _check_sqlite_table(con, "SCORE_PROTEIN")
 
     if protein_present and protein:
         data_protein_run = pd.read_sql_query("select run_id as id_run, protein_id as id_protein, qvalue as m_score_protein_run_specific from score_protein where context == 'run-specific';", con)
