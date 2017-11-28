@@ -237,9 +237,13 @@ def merge(infiles, outfile, subsample_ratio, test):
 @click.option('--csv/--no-csv', 'outcsv', default=False, show_default=True, help='Export CSV instead of TSV file.')
 # Context
 @click.option('--ipf/--no-ipf', default=True, show_default=True, help='Use IPF peptidoform-level data if available. Replaces FullPeptideName and m_score columns with IPF estimates. Note: Results do not contain decoys.')
+@click.option('--max_rs_peakgroup_qvalue', default=0.01, show_default=True, type=float, help='[format: matrix] Filter results to maximum run-specific peak group-level q-value.')
 @click.option('--peptide/--no-peptide', default=True, show_default=True, help='Append peptide-level error-rate estimates if available.')
+@click.option('--max_global_peptide_qvalue', default=0.01, show_default=True, type=float, help='[format: matrix/legacy] Filter results to maximum global peptide-level q-value.')
 @click.option('--protein/--no-protein', default=True, show_default=True, help='Append protein-level error-rate estimates if available.')
-def export(infile, outfile, format, outcsv, ipf, peptide, protein):
+@click.option('--max_global_protein_qvalue', default=0.01, show_default=True, type=float, help='[format: matrix/legacy] Filter results to maximum global protein-level q-value.')
+
+def export(infile, outfile, format, outcsv, ipf, max_rs_peakgroup_qvalue, peptide, max_global_peptide_qvalue, protein, max_global_protein_qvalue):
     """
     Export TSV/CSV tables
     """
@@ -254,7 +258,7 @@ def export(infile, outfile, format, outcsv, ipf, peptide, protein):
         else:
             outfile = outfile
 
-        export_tsv(infile, outfile, format, outcsv, ipf, peptide, protein)
+        export_tsv(infile, outfile, format, outcsv, ipf, max_rs_peakgroup_qvalue, peptide, max_global_peptide_qvalue, protein, max_global_protein_qvalue)
 
 # Filter sqMass files
 @cli.command()
