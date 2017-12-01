@@ -77,22 +77,24 @@ def read_pyp_transition(path, ipf_max_transition_pep, ipf_h0):
     return data
 
 def prepare_precursor_bm(data):
-    data_matrix = []
+    # MS1-level precursors
+    ms1_precursor_data = data[['feature_id','ms2_peakgroup_pep','ms1_precursor_pep']].dropna(axis=0, how='any')
+    ms1_bm_data = pd.concat([pd.DataFrame({'feature_id': ms1_precursor_data['feature_id'], 'prior': 1-ms1_precursor_data['ms2_peakgroup_pep'], 'evidence': 1-ms1_precursor_data['ms1_precursor_pep'], 'hypothesis': True}), pd.DataFrame({'feature_id': ms1_precursor_data['feature_id'], 'prior': ms1_precursor_data['ms2_peakgroup_pep'], 'evidence': ms1_precursor_data['ms1_precursor_pep'], 'hypothesis': False})])
 
-    for i,tr in data.iterrows():
-        if tr['ms1_precursor_pep'] <= 1.0 and tr['ms1_precursor_pep'] >= 0:
-            data_matrix.append({'prior': 1-tr['ms2_peakgroup_pep'], 'evidence': 1-tr['ms1_precursor_pep'], 'hypothesis': True})
-            data_matrix.append({'prior': tr['ms2_peakgroup_pep'], 'evidence': tr['ms1_precursor_pep'], 'hypothesis': False})
-        if tr['ms2_precursor_pep'] <= 1.0 and tr['ms2_precursor_pep'] >= 0:
-            data_matrix.append({'prior': 1-tr['ms2_peakgroup_pep'], 'evidence': 1-tr['ms2_precursor_pep'], 'hypothesis': True})
-            data_matrix.append({'prior': tr['ms2_peakgroup_pep'], 'evidence': tr['ms2_precursor_pep'], 'hypothesis': False})
+    # MS2-level precursors
+    ms2_precursor_pep = data[['feature_id','ms2_peakgroup_pep','ms2_precursor_pep']].dropna(axis=0, how='any')
+    ms2_bm_data = pd.concat([pd.DataFrame({'feature_id': ms2_precursor_pep['feature_id'], 'prior': 1-ms2_precursor_pep['ms2_peakgroup_pep'], 'evidence': 1-ms2_precursor_pep['ms2_precursor_pep'], 'hypothesis': True}), pd.DataFrame({'feature_id': ms2_precursor_pep['feature_id'], 'prior': ms2_precursor_pep['ms2_peakgroup_pep'], 'evidence': ms2_precursor_pep['ms2_precursor_pep'], 'hypothesis': False})])
 
-    # there is no evidence for a precursor so we set the evidence to 0
-    if len(data_matrix) == 0:
-            data_matrix.append({'prior': 1-tr['ms2_peakgroup_pep'], 'evidence': 0, 'hypothesis': True})
-            data_matrix.append({'prior': tr['ms2_peakgroup_pep'], 'evidence': 1, 'hypothesis': False})
+    # missing precursor data
+    missing_precursor_pep = data[['feature_id','ms2_peakgroup_pep']].dropna(axis=0, how='any').drop_duplicates()
+    missing_bm_data = pd.concat([pd.DataFrame({'feature_id': missing_precursor_pep['feature_id'], 'prior': 1-missing_precursor_pep['ms2_peakgroup_pep'], 'evidence': 0, 'hypothesis': True}), pd.DataFrame({'feature_id': missing_precursor_pep['feature_id'], 'prior': missing_precursor_pep['ms2_peakgroup_pep'], 'evidence': 1, 'hypothesis': False})])
 
-    return pd.DataFrame(data_matrix)
+    # combine precursor data
+    precursor_bm_data = pd.concat([ms1_bm_data, ms2_bm_data])
+    # append missing precursors if no MS1/MS2 evidence is available
+    precursor_bm_data = pd.concat([precursor_bm_data, missing_bm_data.ix[~missing_bm_data['feature_id'].isin(precursor_bm_data['feature_id'])]])
+
+    return(precursor_bm_data)
     
 def prepare_transition_bm(data):
     # peptide_id = -1 indicates h0, i.e. the peak group is wrong!
@@ -146,7 +148,7 @@ def precursor_inference(data, ipf_ms1_scoring, ipf_ms2_scoring, ipf_max_precurso
         precursor_data = ms2_precursor_data.merge(ms1_precursor_data, on=['feature_id'], how='outer').merge(ms2_pg_data, on=['feature_id'], how='outer')
 
         # prepare precursor-level Bayesian model
-        precursor_data_bm = precursor_data.groupby('feature_id').apply(prepare_precursor_bm).reset_index()
+        precursor_data_bm = prepare_precursor_bm(precursor_data)
 
         # compute posterior precursor probability
         prec_pp_data = apply_bm(precursor_data_bm)
