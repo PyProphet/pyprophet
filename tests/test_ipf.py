@@ -14,14 +14,12 @@ d.width = 220
 d.precision = 6
 
 def test_0():
-    test_in = {'ms1_precursor_pep': [0.4], 'ms2_peakgroup_pep': [0.2], 'ms2_precursor_pep': [0.5]}
-    tin = pd.DataFrame(data=test_in, index=None)
-    test_ref = {'evidence': [0.6, 0.4, 0.5, 0.5], 'hypothesis': [True, False, True, False], 'prior': [0.8, 0.2, 0.8, 0.2]}
-    tref = pd.DataFrame(data=test_ref, index=None)
+    test_in = pd.DataFrame({'feature_id': [0], 'ms1_precursor_pep': [0.4], 'ms2_peakgroup_pep': [0.2], 'ms2_precursor_pep': [0.5]})
+    test_ref = pd.DataFrame(data={'evidence': [0.6, 0.4, 0.5, 0.5], 'feature_id': [0, 0, 0, 0], 'hypothesis': [True, False, True, False], 'prior': [0.8, 0.2, 0.8, 0.2]}, index=None)
 
-    tout = prepare_precursor_bm(tin)
+    test_out = prepare_precursor_bm(test_in)
 
-    assert_frame_equal(tout,tref)
+    assert_frame_equal(test_out.reset_index(drop=True),test_ref.reset_index(drop=True))
 
 def test_1():
     tin = np.array([0.5, 0.6, 0.8, 0.9, 0.999, 0.1, 0.3])
@@ -32,9 +30,9 @@ def test_1():
     assert_almost_equal(tout,tref)
 
 def test_2():
-    test_in = {'feature_id': 'id0','evidence': [0.1, 0.1, 0.9, 0.9, 0.2, 0.8, 0.8, 0.2, 0.4, 0.4, 0.6, 0.4], 'hypothesis': ["PEPA", "PEPB", "PEPC", "h0", "PEPA", "PEPB", "PEPC", "h0", "PEPA", "PEPB", "PEPC", "h0"], 'peptidoforms': ["PEPA|PEPB", "PEPA|PEPB", "PEPA|PEPB", "PEPA|PEPB", "PEPB|PEPC", "PEPB|PEPC", "PEPB|PEPC", "PEPB|PEPC", "PEPC", "PEPC", "PEPC", "PEPC"], 'prior': [0.2, 0.2, 0.2, 0.4, 0.2, 0.2, 0.2, 0.4, 0.2, 0.2, 0.2, 0.4]}
+    test_in = {'feature_id': 'id0','evidence': [0.1, 0.1, 0.9, 0.9, 0.2, 0.8, 0.8, 0.2, 0.4, 0.4, 0.6, 0.4], 'hypothesis': [1, 2, 3, -1, 1, 2, 3, -1, 1, 2, 3, -1], 'prior': [0.2, 0.2, 0.2, 0.4, 0.2, 0.2, 0.2, 0.4, 0.2, 0.2, 0.2, 0.4]}
     tin = pd.DataFrame(data=test_in, index=None)
-    test_ref = {'feature_id': ['id0','id0','id0','id0'], 'hypothesis': ['PEPA','PEPB','PEPC','h0'],'likelihood_prior': [0.0016, 0.0064, 0.0864, 0.0288],'likelihood_sum': [0.1232, 0.1232, 0.1232, 0.1232],'posterior': [0.012987, 0.051948, 0.701299, 0.233766]}
+    test_ref = {'feature_id': ['id0','id0','id0','id0'], 'hypothesis': [-1, 1, 2, 3,],'likelihood_prior': [0.0288, 0.0016, 0.0064, 0.0864],'likelihood_sum': [0.1232, 0.1232, 0.1232, 0.1232],'posterior': [0.233766, 0.012987, 0.051948, 0.701299]}
     tref= pd.DataFrame(data=test_ref, index=None)
 
     tout = apply_bm(tin)

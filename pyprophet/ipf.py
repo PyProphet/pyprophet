@@ -82,12 +82,12 @@ def prepare_precursor_bm(data):
     ms1_bm_data = pd.concat([pd.DataFrame({'feature_id': ms1_precursor_data['feature_id'], 'prior': 1-ms1_precursor_data['ms2_peakgroup_pep'], 'evidence': 1-ms1_precursor_data['ms1_precursor_pep'], 'hypothesis': True}), pd.DataFrame({'feature_id': ms1_precursor_data['feature_id'], 'prior': ms1_precursor_data['ms2_peakgroup_pep'], 'evidence': ms1_precursor_data['ms1_precursor_pep'], 'hypothesis': False})])
 
     # MS2-level precursors
-    ms2_precursor_pep = data[['feature_id','ms2_peakgroup_pep','ms2_precursor_pep']].dropna(axis=0, how='any')
-    ms2_bm_data = pd.concat([pd.DataFrame({'feature_id': ms2_precursor_pep['feature_id'], 'prior': 1-ms2_precursor_pep['ms2_peakgroup_pep'], 'evidence': 1-ms2_precursor_pep['ms2_precursor_pep'], 'hypothesis': True}), pd.DataFrame({'feature_id': ms2_precursor_pep['feature_id'], 'prior': ms2_precursor_pep['ms2_peakgroup_pep'], 'evidence': ms2_precursor_pep['ms2_precursor_pep'], 'hypothesis': False})])
+    ms2_precursor_data = data[['feature_id','ms2_peakgroup_pep','ms2_precursor_pep']].dropna(axis=0, how='any')
+    ms2_bm_data = pd.concat([pd.DataFrame({'feature_id': ms2_precursor_data['feature_id'], 'prior': 1-ms2_precursor_data['ms2_peakgroup_pep'], 'evidence': 1-ms2_precursor_data['ms2_precursor_pep'], 'hypothesis': True}), pd.DataFrame({'feature_id': ms2_precursor_data['feature_id'], 'prior': ms2_precursor_data['ms2_peakgroup_pep'], 'evidence': ms2_precursor_data['ms2_precursor_pep'], 'hypothesis': False})])
 
     # missing precursor data
-    missing_precursor_pep = data[['feature_id','ms2_peakgroup_pep']].dropna(axis=0, how='any').drop_duplicates()
-    missing_bm_data = pd.concat([pd.DataFrame({'feature_id': missing_precursor_pep['feature_id'], 'prior': 1-missing_precursor_pep['ms2_peakgroup_pep'], 'evidence': 0, 'hypothesis': True}), pd.DataFrame({'feature_id': missing_precursor_pep['feature_id'], 'prior': missing_precursor_pep['ms2_peakgroup_pep'], 'evidence': 1, 'hypothesis': False})])
+    missing_precursor_data = data[['feature_id','ms2_peakgroup_pep']].dropna(axis=0, how='any').drop_duplicates()
+    missing_bm_data = pd.concat([pd.DataFrame({'feature_id': missing_precursor_data['feature_id'], 'prior': 1-missing_precursor_data['ms2_peakgroup_pep'], 'evidence': 0, 'hypothesis': True}), pd.DataFrame({'feature_id': missing_precursor_data['feature_id'], 'prior': missing_precursor_data['ms2_peakgroup_pep'], 'evidence': 1, 'hypothesis': False})])
 
     # combine precursor data
     precursor_bm_data = pd.concat([ms1_bm_data, ms2_bm_data])
