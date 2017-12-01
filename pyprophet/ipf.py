@@ -42,25 +42,40 @@ def read_pyp_peakgroup_precursor(path, ipf_max_peakgroup_pep, ipf_ms1_scoring, i
 
     return data
 
-
-def read_pyp_transition(path):
+def read_pyp_transition(path, ipf_max_transition_pep, ipf_h0):
+    # Only the evidence is restricted to ipf_max_transition_pep, the peptidoform-space is complete.
     con = sqlite3.connect(path)
 
-    data = pd.read_sql_query("SELECT FEATURE_ID, TRANSITION_ID, 1 - PEP AS POSTERIOR FROM SCORE_TRANSITION INNER JOIN TRANSITION ON SCORE_TRANSITION.TRANSITION_ID = TRANSITION.ID WHERE TRANSITION.TYPE!='' AND TRANSITION.DECOY=0;", con)
+    # transition-level evidence
+    evidence = pd.read_sql_query("SELECT FEATURE_ID, TRANSITION_ID, 1 - PEP AS POSTERIOR FROM SCORE_TRANSITION INNER JOIN TRANSITION ON SCORE_TRANSITION.TRANSITION_ID = TRANSITION.ID WHERE TRANSITION.TYPE!='' AND TRANSITION.DECOY=0 AND PEP < " + str(ipf_max_transition_pep) + ";", con)
+    evidence.columns = [col.lower() for col in evidence.columns]
 
-    data.columns = [col.lower() for col in data.columns]
+    # transition-level bitmask
+    bitmask = pd.read_sql_query("SELECT DISTINCT TRANSITION.ID AS TRANSITION_ID, PEPTIDE_ID, 1 AS BMASK FROM TRANSITION INNER JOIN TRANSITION_PEPTIDE_MAPPING ON TRANSITION.ID = TRANSITION_PEPTIDE_MAPPING.TRANSITION_ID WHERE TRANSITION.TYPE!='' AND TRANSITION.DECOY=0;", con)
+    bitmask.columns = [col.lower() for col in bitmask.columns]
+
+    # potential peptidoforms per feature
+    num_peptidoforms = pd.read_sql_query("SELECT FEATURE_ID, COUNT(DISTINCT PEPTIDE_ID) AS NUM_PEPTIDOFORMS FROM SCORE_TRANSITION INNER JOIN TRANSITION ON SCORE_TRANSITION.TRANSITION_ID = TRANSITION.ID INNER JOIN TRANSITION_PEPTIDE_MAPPING ON TRANSITION.ID = TRANSITION_PEPTIDE_MAPPING.TRANSITION_ID WHERE TRANSITION.TYPE!='' AND TRANSITION.DECOY=0 GROUP BY FEATURE_ID ORDER BY FEATURE_ID;", con)
+    num_peptidoforms.columns = [col.lower() for col in num_peptidoforms.columns]
+
+    # peptidoform space per feature
+    peptidoforms = pd.read_sql_query("SELECT DISTINCT FEATURE_ID, PEPTIDE_ID FROM SCORE_TRANSITION INNER JOIN TRANSITION ON SCORE_TRANSITION.TRANSITION_ID = TRANSITION.ID INNER JOIN TRANSITION_PEPTIDE_MAPPING ON TRANSITION.ID = TRANSITION_PEPTIDE_MAPPING.TRANSITION_ID WHERE TRANSITION.TYPE!='' AND TRANSITION.DECOY=0 ORDER BY FEATURE_ID;", con)
+    peptidoforms.columns = [col.lower() for col in peptidoforms.columns]
+
     con.close()
 
-    return data
+    # add h0 to peptidoform-space if necessary
+    if ipf_h0:
+        peptidoforms = pd.concat([peptidoforms, pd.DataFrame({'feature_id': peptidoforms['feature_id'].unique(), 'peptide_id': -1})])
 
+    # generate transition-peptidoform table
+    trans_pf = pd.merge(evidence, peptidoforms, how='outer', on='feature_id')
 
-def read_pyp_transition_peptidoforms(path):
-    con = sqlite3.connect(path)
+    # apply bitmask
+    trans_pf_bm = pd.merge(trans_pf, bitmask, how='left', on=['transition_id','peptide_id']).fillna(0)
 
-    data = pd.read_sql_query("SELECT TRANSITION_ID, PEPTIDE_ID FROM TRANSITION INNER JOIN TRANSITION_PEPTIDE_MAPPING ON TRANSITION.ID = TRANSITION_PEPTIDE_MAPPING.TRANSITION_ID WHERE TRANSITION.TYPE!='' AND TRANSITION.DECOY=0;", con)
-
-    data.columns = [col.lower() for col in data.columns]
-    con.close()
+    # append number of peptidoforms
+    data = pd.merge(trans_pf_bm, num_peptidoforms, how='inner', on='feature_id')
 
     return data
 
@@ -82,22 +97,21 @@ def prepare_precursor_bm(data):
 
     return pd.DataFrame(data_matrix)
     
-def prepare_transition_bm(data, ipf_h0):
-    data_matrix = []
-    peptidoforms = data['peptidoforms'].apply(pd.Series)[0].str.split("\|").apply(pd.Series, 1).stack().unique()
+def prepare_transition_bm(data):
+    # peptide_id: -1 indicates h0, i.e. the peak group is wrong!
 
-    for i,tr in data.iterrows():
-        for pf in peptidoforms:
-            tr_peptidoforms = tr['peptidoforms'].split("|")
-            if pf in tr_peptidoforms:
-                data_matrix.append({'prior': tr['precursor_peakgroup_pp'] / len(peptidoforms), 'evidence': tr['posterior'], 'hypothesis': pf, 'peptidoforms': tr['peptidoforms']})
-            else:
-                data_matrix.append({'prior': tr['precursor_peakgroup_pp'] / len(peptidoforms), 'evidence': 1 - tr['posterior'], 'hypothesis': pf, 'peptidoforms': tr['peptidoforms']})
+    # initialize priors
+    data.ix[data.peptide_id != -1, 'prior'] = data.ix[data.peptide_id != -1, 'precursor_peakgroup_pp'] / data.ix[data.peptide_id != -1, 'num_peptidoforms'] # potential peptidoforms
+    data.ix[data.peptide_id == -1, 'prior'] = 1 - data.ix[data.peptide_id == -1, 'precursor_peakgroup_pp'] # h0
 
-        if ipf_h0:
-            data_matrix.append({'prior': 1 - tr['precursor_peakgroup_pp'], 'evidence': 1 - tr['posterior'], 'hypothesis': 'h0', 'peptidoforms': tr['peptidoforms']})
+    # set evidence
+    data.ix[data.bmask == 1, 'evidence'] = data.ix[data.bmask == 1, 'posterior'] # we have evidence FOR this peptidoform or h0
+    data.ix[data.bmask == 0, 'evidence'] = 1 - data.ix[data.bmask == 0, 'posterior'] # we have evidence AGAINST this peptidoform or h0
 
-    return pd.DataFrame(data_matrix)
+    data = data[['feature_id','prior','evidence','peptide_id']]
+    data = data.rename(columns=lambda x: x.replace('peptide_id', 'hypothesis'))
+
+    return data
 
 def apply_bm(data):
     # compute likelihood * prior per id & hypothesis
@@ -150,9 +164,11 @@ def precursor_inference(data, ipf_ms1_scoring, ipf_ms2_scoring, ipf_max_precurso
     return inferred_precursors
 
 
-def peptidoform_inference(data, ipf_max_transition_pep, ipf_h0):
+def peptidoform_inference(uis_transition_table, uis_precursor_data):
+    uis_transition_table = pd.merge(uis_transition_table, uis_precursor_data, on='feature_id')
+
     # compute transition posterior probabilities
-    uis_transition_data_bm = data[(data['posterior'] >= 1-ipf_max_transition_pep)].groupby('feature_id').apply(prepare_transition_bm, ipf_h0).reset_index()
+    uis_transition_data_bm = prepare_transition_bm(uis_transition_table)
 
     # compute posterior peptidoform probability
     pp_data = apply_bm(uis_transition_data_bm)
@@ -164,7 +180,7 @@ def peptidoform_inference(data, ipf_max_transition_pep, ipf_h0):
     pp_data['PosteriorFullPeptideName'] = pp_data['hypothesis']
 
     # merge precursor-level data with UIS data
-    result = pp_data.merge(data[['feature_id','precursor_peakgroup_pp']].drop_duplicates(), on=['feature_id'], how='inner')
+    result = pp_data.merge(uis_precursor_data[['feature_id','precursor_peakgroup_pp']].drop_duplicates(), on=['feature_id'], how='inner')
 
     return result
 
@@ -174,36 +190,26 @@ def compute_model_fdr(data):
         fdrs.append((1-data[data >= t]).sum() / len(data[data >= t]))
     return np.array(fdrs)
 
-
 def infer_peptidoforms(infile, outfile, ipf_ms1_scoring, ipf_ms2_scoring, ipf_h0, ipf_max_precursor_pep, ipf_max_peakgroup_pep, ipf_max_precursor_peakgroup_pep, ipf_max_transition_pep):
     logging.info("start IPF (Inference of PeptidoForms)")
 
+    # precursor level
+    logging.info("      prepare precursor-level data")
     uis_precursor_table = read_pyp_peakgroup_precursor(infile, ipf_max_peakgroup_pep, ipf_ms1_scoring, ipf_ms2_scoring)
 
-    # precursor-level inference
-    logging.info("start precursor-level inference")
+    logging.info("      conduct precursor-level inference")
     uis_precursor_data = precursor_inference(uis_precursor_table, ipf_ms1_scoring, ipf_ms2_scoring, ipf_max_precursor_pep)
     uis_precursor_data = uis_precursor_data[(uis_precursor_data['precursor_peakgroup_pp'] >= 1-ipf_max_precursor_peakgroup_pep)]
-    logging.info("end precursor-level inference")
 
-    uis_transition_table = read_pyp_transition(infile)
-    uis_transition_peptidoform_table = read_pyp_transition_peptidoforms(infile)
+    # peptidoform level
+    logging.info("      prepare peptidoform-level data")
+    uis_transition_table = read_pyp_transition(infile, ipf_max_transition_pep, ipf_h0)
 
-    # prepare data for peptidoform inference
-    uis_transition_peptidoform_table['peptide_id'] = uis_transition_peptidoform_table['peptide_id'].apply(str)
-    uis_transition_peptidoform_table = uis_transition_peptidoform_table.groupby('transition_id')['peptide_id'].agg(lambda x: '|'.join(x)).reset_index()
-    uis_transition_peptidoform_table.columns = ['transition_id','peptidoforms']
-    uis_transition_table['transition_id'] = uis_transition_table['transition_id'].astype(int)
-    uis_transition_table = pd.merge(uis_transition_table, uis_transition_peptidoform_table, on='transition_id')
-    uis_transition_table = pd.merge(uis_transition_table, uis_precursor_data, on='feature_id')
+    logging.info("      conduct peptidoform-level inference")
+    uis_peptidoform_data = peptidoform_inference(uis_transition_table, uis_precursor_data)
 
-    # start posterior peptidoform-level inference
-    logging.info("start peptidoform-level inference")
-    uis_peptidoform_data = peptidoform_inference(uis_transition_table, ipf_max_transition_pep, ipf_h0)
-    logging.info("end peptidoform-level inference")
-    # end posterior peptidoform-level inference
-
-    uis_peptidoform_data = uis_peptidoform_data[uis_peptidoform_data['hypothesis']!='h0'][['feature_id','hypothesis','precursor_peakgroup_pp','qvalue','pep']]
+    logging.info("      finalize results")
+    uis_peptidoform_data = uis_peptidoform_data[uis_peptidoform_data['hypothesis']!=-1][['feature_id','hypothesis','precursor_peakgroup_pp','qvalue','pep']]
     uis_peptidoform_data.columns = ['FEATURE_ID','PEPTIDE_ID','PRECURSOR_PEAKGROUP_POSTERIOR','QVALUE','PEP']
 
     if infile != outfile:
