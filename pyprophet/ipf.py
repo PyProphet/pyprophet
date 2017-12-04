@@ -18,6 +18,7 @@ def compute_model_fdr(data):
     return np.array(fdrs)
 
 def read_pyp_peakgroup_precursor(path, ipf_max_peakgroup_pep, ipf_ms1_scoring, ipf_ms2_scoring):
+    logging.info("      prepare precursor-level data")
     # precursors are restricted according to ipf_max_peakgroup_pep to exclude very poor peak groups
     con = sqlite3.connect(path)
 
@@ -40,6 +41,7 @@ def read_pyp_peakgroup_precursor(path, ipf_max_peakgroup_pep, ipf_ms1_scoring, i
     return data
 
 def read_pyp_transition(path, ipf_max_transition_pep, ipf_h0):
+    logging.info("      read peptidoform-level data")
     # only the evidence is restricted to ipf_max_transition_pep, the peptidoform-space is complete
     con = sqlite3.connect(path)
 
@@ -148,15 +150,18 @@ def precursor_inference(data, ipf_ms1_scoring, ipf_ms2_scoring, ipf_max_precurso
         precursor_data = ms2_precursor_data.merge(ms1_precursor_data, on=['feature_id'], how='outer').merge(ms2_pg_data, on=['feature_id'], how='outer')
 
         # prepare precursor-level Bayesian model
+        logging.info("      prepare precursor-level data")
         precursor_data_bm = prepare_precursor_bm(precursor_data)
 
         # compute posterior precursor probability
+        logging.info("      conduct precursor-level inference")
         prec_pp_data = apply_bm(precursor_data_bm)
         prec_pp_data['precursor_peakgroup_pep'] = 1 - prec_pp_data['posterior']
 
         inferred_precursors = prec_pp_data[prec_pp_data['hypothesis']][['feature_id','precursor_peakgroup_pep']]
     else:
         # no precursor-level data on MS1 and/or MS2 should be used; use peak group-level data
+        logging.info("      skip precursor-level inference")
         inferred_precursors = ms2_pg_data.rename(columns=lambda x: x.replace('ms2_peakgroup_pep', 'precursor_peakgroup_pep'))
 
     inferred_precursors = inferred_precursors[(inferred_precursors['precursor_peakgroup_pep'] < ipf_max_precursor_peakgroup_pep)]
@@ -167,9 +172,11 @@ def peptidoform_inference(transition_table, precursor_data):
     transition_table = pd.merge(transition_table, precursor_data, on='feature_id')
 
     # compute transition posterior probabilities
+    logging.info("      prepare peptidoform-level data")
     transition_data_bm = prepare_transition_bm(transition_table)
 
     # compute posterior peptidoform probability
+    logging.info("      conduct peptidoform-level inference")
     pf_pp_data = apply_bm(transition_data_bm)
     pf_pp_data['pep'] = 1 - pf_pp_data['posterior']
 
@@ -185,17 +192,11 @@ def infer_peptidoforms(infile, outfile, ipf_ms1_scoring, ipf_ms2_scoring, ipf_h0
     logging.info("start IPF (Inference of PeptidoForms)")
 
     # precursor level
-    logging.info("      prepare precursor-level data")
     precursor_table = read_pyp_peakgroup_precursor(infile, ipf_max_peakgroup_pep, ipf_ms1_scoring, ipf_ms2_scoring)
-
-    logging.info("      conduct precursor-level inference")
     precursor_data = precursor_inference(precursor_table, ipf_ms1_scoring, ipf_ms2_scoring, ipf_max_precursor_pep, ipf_max_precursor_peakgroup_pep)
 
     # peptidoform level
-    logging.info("      prepare peptidoform-level data")
     peptidoform_table = read_pyp_transition(infile, ipf_max_transition_pep, ipf_h0)
-
-    logging.info("      conduct peptidoform-level inference")
     peptidoform_data = peptidoform_inference(peptidoform_table, precursor_data)
 
     # finalize results and write to table
