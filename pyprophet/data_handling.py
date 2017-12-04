@@ -41,6 +41,18 @@ def isSQLite3(filename):
     else:
         return False
 
+def check_sqlite_table(con, table):
+    table_present = False
+    c = con.cursor()
+    c.execute('SELECT count(name) FROM sqlite_master WHERE type="table" AND name="' + table + '"')
+    if c.fetchone()[0] == 1:
+        table_present = True
+    else:
+        table_present = False
+    c.fetchall()
+
+    return(table_present)
+
 def check_for_unique_blocks(tg_ids):
     seen = set()
     last_tg_id = None

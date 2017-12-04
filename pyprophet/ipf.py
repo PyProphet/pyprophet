@@ -6,33 +6,55 @@ pd.options.display.precision = 6
 
 import numpy as np
 import scipy as sp
+from scipy.stats import rankdata
 import sqlite3
+import sys
 
 from .std_logger import logging
+from .data_handling import check_sqlite_table
 
 def compute_model_fdr(data):
-    # compute model based FDR estimates from posterior probabilities
-    fdrs = []
-    for t in data:
-        fdrs.append((1-data[data >= t]).sum() / len(data[data >= t]))
-    return np.array(fdrs)
+    # compute model based FDR estimates from posterior error probabilities
+    order = np.argsort(data)
+
+    ranks = np.zeros(data.shape[0], dtype=np.int)
+    fdr = np.zeros(data.shape[0])
+
+    # rank data with with maximum ranks for ties
+    ranks[order] = rankdata(data[order], method='max')
+
+    # compute FDR/q-value by using cumulative sum of maximum rank for ties
+    fdr[order] = data[order].cumsum()[ranks[order]-1] / ranks[order]
+
+    return fdr
 
 def read_pyp_peakgroup_precursor(path, ipf_max_peakgroup_pep, ipf_ms1_scoring, ipf_ms2_scoring):
-    logging.info("      prepare precursor-level data")
+    logging.info("      read precursor-level data")
     # precursors are restricted according to ipf_max_peakgroup_pep to exclude very poor peak groups
     con = sqlite3.connect(path)
 
     # only use MS2 precursors
     if not ipf_ms1_scoring and ipf_ms2_scoring:
+        if not check_sqlite_table(con, "SCORE_MS2") or not check_sqlite_table(con, "SCORE_TRANSITION"):
+            sys.exit("Error: Apply scoring to MS2  and transition-level data before running IPF.")
         data = pd.read_sql_query("SELECT FEATURE.ID AS FEATURE_ID, SCORE_MS2.PEP AS MS2_PEAKGROUP_PEP, NULL AS MS1_PRECURSOR_PEP, SCORE_TRANSITION.PEP AS MS2_PRECURSOR_PEP FROM PRECURSOR INNER JOIN FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID INNER JOIN (SELECT FEATURE_ID, PEP FROM SCORE_TRANSITION INNER JOIN TRANSITION ON SCORE_TRANSITION.TRANSITION_ID = TRANSITION.ID WHERE TRANSITION.TYPE='' AND TRANSITION.DECOY=0) AS SCORE_TRANSITION ON FEATURE.ID = SCORE_TRANSITION.FEATURE_ID WHERE PRECURSOR.DECOY=0 AND SCORE_MS2.PEP < " + str(ipf_max_peakgroup_pep) + ";", con)
+
     # only use MS1 precursors
     elif ipf_ms1_scoring and not ipf_ms2_scoring:
+        if not check_sqlite_table(con, "SCORE_MS1") or not check_sqlite_table(con, "SCORE_MS2") or not check_sqlite_table(con, "SCORE_TRANSITION"):
+            sys.exit("Error: Apply scoring to MS1, MS2 and transition-level data before running IPF.")
         data = pd.read_sql_query("SELECT FEATURE.ID AS FEATURE_ID, SCORE_MS2.PEP AS MS2_PEAKGROUP_PEP, SCORE_MS1.PEP AS MS1_PRECURSOR_PEP, NULL AS MS2_PRECURSOR_PEP FROM PRECURSOR INNER JOIN FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID INNER JOIN SCORE_MS1 ON FEATURE.ID = SCORE_MS1.FEATURE_ID INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID WHERE PRECURSOR.DECOY=0 AND SCORE_MS2.PEP < " + str(ipf_max_peakgroup_pep) + ";", con)
+
     # use both MS1 and MS2 precursors
     elif ipf_ms1_scoring and ipf_ms2_scoring:
+        if not check_sqlite_table(con, "SCORE_MS1") or not check_sqlite_table(con, "SCORE_MS2") or not check_sqlite_table(con, "SCORE_TRANSITION"):
+            sys.exit("Error: Apply scoring to MS1, MS2 and transition-level data before running IPF.")
         data = pd.read_sql_query("SELECT FEATURE.ID AS FEATURE_ID, SCORE_MS2.PEP AS MS2_PEAKGROUP_PEP, SCORE_MS1.PEP AS MS1_PRECURSOR_PEP, SCORE_TRANSITION.PEP AS MS2_PRECURSOR_PEP FROM PRECURSOR INNER JOIN FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID INNER JOIN SCORE_MS1 ON FEATURE.ID = SCORE_MS1.FEATURE_ID INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID INNER JOIN (SELECT FEATURE_ID, PEP FROM SCORE_TRANSITION INNER JOIN TRANSITION ON SCORE_TRANSITION.TRANSITION_ID = TRANSITION.ID WHERE TRANSITION.TYPE='' AND TRANSITION.DECOY=0) AS SCORE_TRANSITION ON FEATURE.ID = SCORE_TRANSITION.FEATURE_ID WHERE PRECURSOR.DECOY=0 AND SCORE_MS2.PEP < " + str(ipf_max_peakgroup_pep) + ";", con)
+
     # do not use any precursor information
     else:
+        if not check_sqlite_table(con, "SCORE_MS2") or not check_sqlite_table(con, "SCORE_TRANSITION"):
+            sys.exit("Error: Apply scoring to MS2  and transition-level data before running IPF.")
         data = pd.read_sql_query("SELECT FEATURE.ID AS FEATURE_ID, SCORE_MS2.PEP AS MS2_PEAKGROUP_PEP, NULL AS MS1_PRECURSOR_PEP, NULL AS MS2_PRECURSOR_PEP FROM PRECURSOR INNER JOIN FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID WHERE PRECURSOR.DECOY=0 AND SCORE_MS2.PEP < " + str(ipf_max_peakgroup_pep) + ";", con)
 
     data.columns = [col.lower() for col in data.columns]
@@ -181,7 +203,7 @@ def peptidoform_inference(transition_table, precursor_data):
     pf_pp_data['pep'] = 1 - pf_pp_data['posterior']
 
     # compute model-based FDR
-    pf_pp_data['qvalue'] = compute_model_fdr(pf_pp_data['posterior'].values)
+    pf_pp_data['qvalue'] = compute_model_fdr(pf_pp_data['pep'].values)
 
     # merge precursor-level data with UIS data
     result = pf_pp_data.merge(precursor_data[['feature_id','precursor_peakgroup_pep']].drop_duplicates(), on=['feature_id'], how='inner')

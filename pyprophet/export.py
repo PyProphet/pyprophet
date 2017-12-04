@@ -6,21 +6,9 @@ pd.options.display.precision = 6
 
 import numpy as np
 import sqlite3
-from .data_handling import filterChromByLabels
+from .data_handling import filterChromByLabels, check_sqlite_table
 from .std_logger import logging
 from .report import plot_scores
-
-def _check_sqlite_table(con, table):
-    table_present = False
-    c = con.cursor()
-    c.execute('SELECT count(name) FROM sqlite_master WHERE type="table" AND name="' + table + '"')
-    if c.fetchone()[0] == 1:
-        table_present = True
-    else:
-        table_present = False
-    c.fetchall()
-
-    return(table_present)
 
 def export_tsv(infile, outfile, format, outcsv, transition_quantification, ipf, max_rs_peakgroup_qvalue, peptide, max_global_peptide_qvalue, protein, max_global_protein_qvalue):
 
@@ -28,13 +16,13 @@ def export_tsv(infile, outfile, format, outcsv, transition_quantification, ipf, 
 
     ipf_present = False
     if ipf:
-        ipf_present = _check_sqlite_table(con, "SCORE_IPF")
+        ipf_present = check_sqlite_table(con, "SCORE_IPF")
 
     if ipf_present and ipf:
         if transition_quantification:
-            data = pd.read_sql_query("select run.id as id_run, peptide.id as id_peptide, protein.id as id_protein, peptide_ipf.modified_sequence || '_' || precursor.id as transition_group_id, precursor.decoy as decoy, run.id as run_id, run.filename as filename, feature.exp_RT as RT, feature.norm_RT as iRT, feature.id as id, peptide_ipf.unmodified_sequence as Sequence, peptide_ipf.modified_sequence as FullUniModPeptideName, precursor.charge as Charge, precursor.precursor_mz as mz, feature_ms2.area_intensity as Intensity, feature_ms1.area_intensity as aggr_prec_Peak_Area, feature_ms1.apex_intensity as aggr_prec_Peak_Apex, aggr_Peak_Area, aggr_Peak_Apex, aggr_Fragment_Annotation, protein.protein_accession as ProteinName, precursor.library_rt as assay_rt, feature.delta_rt as delta_rt, feature.left_width as leftWidth, feature.right_width as rightWidth, score_ms1.pep as ms1_pep, score_ms2.pep as ms2_pep, 1-score_ipf.precursor_peakgroup_posterior as precursor_pep, score_ipf.pep as ipf_pep, score_ms2.score as d_score, score_ms2.qvalue as ms2_m_score, score_ipf.qvalue as m_score from precursor join precursor_peptide_mapping on precursor.id = precursor_peptide_mapping.precursor_id join peptide on precursor_peptide_mapping.peptide_id = peptide.id inner join peptide_protein_mapping on peptide.id = peptide_protein_mapping.peptide_id join protein on peptide_protein_mapping.protein_id = protein.id join feature on feature.precursor_id = precursor.id join run on run.id = feature.run_id join feature_ms1 on feature_ms1.feature_id = feature.id join feature_ms2 on feature_ms2.feature_id = feature.id join (select feature_id, group_concat(area_intensity,';') as aggr_Peak_Area, group_concat(apex_intensity,';') as aggr_Peak_Apex, group_concat(transition_id,';') as aggr_Fragment_Annotation from feature_transition inner join transition on feature_transition.transition_id = transition.id where transition.decoy == 0 group by feature_id) as feature_transition on feature_transition.feature_id = feature.id join score_ms1 on score_ms1.feature_id = feature.id join score_ms2 on score_ms2.feature_id = feature.id join score_ipf on score_ipf.feature_id = feature.id join peptide as peptide_ipf on score_ipf.peptide_id = peptide_ipf.id;", con)
+            data = pd.read_sql_query("select run.id as id_run, peptide.id as id_peptide, protein.id as id_protein, peptide_ipf.modified_sequence || '_' || precursor.id as transition_group_id, precursor.decoy as decoy, run.id as run_id, run.filename as filename, feature.exp_RT as RT, feature.norm_RT as iRT, feature.id as id, peptide_ipf.unmodified_sequence as Sequence, peptide_ipf.modified_sequence as FullUniModPeptideName, precursor.charge as Charge, precursor.precursor_mz as mz, feature_ms2.area_intensity as Intensity, feature_ms1.area_intensity as aggr_prec_Peak_Area, feature_ms1.apex_intensity as aggr_prec_Peak_Apex, aggr_Peak_Area, aggr_Peak_Apex, aggr_Fragment_Annotation, protein.protein_accession as ProteinName, precursor.library_rt as assay_rt, feature.delta_rt as delta_rt, feature.left_width as leftWidth, feature.right_width as rightWidth, score_ms1.pep as ms1_pep, score_ms2.pep as ms2_pep, score_ipf.precursor_peakgroup_pep as precursor_pep, score_ipf.pep as ipf_pep, score_ms2.score as d_score, score_ms2.qvalue as ms2_m_score, score_ipf.qvalue as m_score from precursor join precursor_peptide_mapping on precursor.id = precursor_peptide_mapping.precursor_id join peptide on precursor_peptide_mapping.peptide_id = peptide.id inner join peptide_protein_mapping on peptide.id = peptide_protein_mapping.peptide_id join protein on peptide_protein_mapping.protein_id = protein.id join feature on feature.precursor_id = precursor.id join run on run.id = feature.run_id join feature_ms1 on feature_ms1.feature_id = feature.id join feature_ms2 on feature_ms2.feature_id = feature.id join (select feature_id, group_concat(area_intensity,';') as aggr_Peak_Area, group_concat(apex_intensity,';') as aggr_Peak_Apex, group_concat(transition_id,';') as aggr_Fragment_Annotation from feature_transition inner join transition on feature_transition.transition_id = transition.id where transition.decoy == 0 group by feature_id) as feature_transition on feature_transition.feature_id = feature.id join score_ms1 on score_ms1.feature_id = feature.id join score_ms2 on score_ms2.feature_id = feature.id join score_ipf on score_ipf.feature_id = feature.id join peptide as peptide_ipf on score_ipf.peptide_id = peptide_ipf.id;", con)
         else:
-            data = pd.read_sql_query("select run.id as id_run, peptide.id as id_peptide, protein.id as id_protein, peptide_ipf.modified_sequence || '_' || precursor.id as transition_group_id, precursor.decoy as decoy, run.id as run_id, run.filename as filename, feature.exp_RT as RT, feature.norm_RT as iRT, feature.id as id, peptide_ipf.unmodified_sequence as Sequence, peptide_ipf.modified_sequence as FullUniModPeptideName, precursor.charge as Charge, precursor.precursor_mz as mz, feature_ms2.area_intensity as Intensity, feature_ms1.area_intensity as aggr_prec_Peak_Area, feature_ms1.apex_intensity as aggr_prec_Peak_Apex, protein.protein_accession as ProteinName, precursor.library_rt as assay_rt, feature.delta_rt as delta_rt, feature.left_width as leftWidth, feature.right_width as rightWidth, score_ms1.pep as ms1_pep, score_ms2.pep as ms2_pep, 1-score_ipf.precursor_peakgroup_posterior as precursor_pep, score_ipf.pep as ipf_pep, score_ms2.score as d_score, score_ms2.qvalue as ms2_m_score, score_ipf.qvalue as m_score from precursor join precursor_peptide_mapping on precursor.id = precursor_peptide_mapping.precursor_id join peptide on precursor_peptide_mapping.peptide_id = peptide.id inner join peptide_protein_mapping on peptide.id = peptide_protein_mapping.peptide_id join protein on peptide_protein_mapping.protein_id = protein.id join feature on feature.precursor_id = precursor.id join run on run.id = feature.run_id join feature_ms1 on feature_ms1.feature_id = feature.id join feature_ms2 on feature_ms2.feature_id = feature.id join score_ms1 on score_ms1.feature_id = feature.id join score_ms2 on score_ms2.feature_id = feature.id join score_ipf on score_ipf.feature_id = feature.id join peptide as peptide_ipf on score_ipf.peptide_id = peptide_ipf.id;", con)
+            data = pd.read_sql_query("select run.id as id_run, peptide.id as id_peptide, protein.id as id_protein, peptide_ipf.modified_sequence || '_' || precursor.id as transition_group_id, precursor.decoy as decoy, run.id as run_id, run.filename as filename, feature.exp_RT as RT, feature.norm_RT as iRT, feature.id as id, peptide_ipf.unmodified_sequence as Sequence, peptide_ipf.modified_sequence as FullUniModPeptideName, precursor.charge as Charge, precursor.precursor_mz as mz, feature_ms2.area_intensity as Intensity, feature_ms1.area_intensity as aggr_prec_Peak_Area, feature_ms1.apex_intensity as aggr_prec_Peak_Apex, protein.protein_accession as ProteinName, precursor.library_rt as assay_rt, feature.delta_rt as delta_rt, feature.left_width as leftWidth, feature.right_width as rightWidth, score_ms1.pep as ms1_pep, score_ms2.pep as ms2_pep, score_ipf.precursor_peakgroup_pep as precursor_pep, score_ipf.pep as ipf_pep, score_ms2.score as d_score, score_ms2.qvalue as ms2_m_score, score_ipf.qvalue as m_score from precursor join precursor_peptide_mapping on precursor.id = precursor_peptide_mapping.precursor_id join peptide on precursor_peptide_mapping.peptide_id = peptide.id inner join peptide_protein_mapping on peptide.id = peptide_protein_mapping.peptide_id join protein on peptide_protein_mapping.protein_id = protein.id join feature on feature.precursor_id = precursor.id join run on run.id = feature.run_id join feature_ms1 on feature_ms1.feature_id = feature.id join feature_ms2 on feature_ms2.feature_id = feature.id join score_ms1 on score_ms1.feature_id = feature.id join score_ms2 on score_ms2.feature_id = feature.id join score_ipf on score_ipf.feature_id = feature.id join peptide as peptide_ipf on score_ipf.peptide_id = peptide_ipf.id;", con)
 
     else:
         if transition_quantification:
@@ -44,7 +32,7 @@ def export_tsv(infile, outfile, format, outcsv, transition_quantification, ipf, 
 
     peptide_present = False
     if peptide:
-        peptide_present = _check_sqlite_table(con, "SCORE_PEPTIDE")
+        peptide_present = check_sqlite_table(con, "SCORE_PEPTIDE")
 
     if peptide_present and peptide:
         data_peptide_run = pd.read_sql_query("select run_id as id_run, peptide_id as id_peptide, qvalue as m_score_peptide_run_specific from score_peptide where context == 'run-specific';", con)
@@ -61,7 +49,7 @@ def export_tsv(infile, outfile, format, outcsv, transition_quantification, ipf, 
 
     protein_present = False
     if protein:
-        protein_present = _check_sqlite_table(con, "SCORE_PROTEIN")
+        protein_present = check_sqlite_table(con, "SCORE_PROTEIN")
 
     if protein_present and protein:
         data_protein_run = pd.read_sql_query("select run_id as id_run, protein_id as id_protein, qvalue as m_score_protein_run_specific from score_protein where context == 'run-specific';", con)
@@ -99,17 +87,17 @@ def export_score_plots(infile):
 
     con = sqlite3.connect(infile)
 
-    if _check_sqlite_table(con, "SCORE_MS2"):
+    if check_sqlite_table(con, "SCORE_MS2"):
         outfile = infile.split(".osw")[0] + "_ms2_score_plots.pdf"
         table_ms2 = pd.read_sql_query("SELECT *, RUN_ID || '_' || PRECURSOR_ID AS GROUP_ID, VAR_XCORR_SHAPE AS MAIN_VAR_XCORR_SHAPE FROM FEATURE_MS2 INNER JOIN (SELECT RUN_ID, ID, PRECURSOR_ID, EXP_RT FROM FEATURE) AS FEATURE ON FEATURE_MS2.FEATURE_ID = FEATURE.ID INNER JOIN (SELECT ID, DECOY FROM PRECURSOR) AS PRECURSOR ON FEATURE.PRECURSOR_ID = PRECURSOR.ID INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID WHERE RANK == 1 ORDER BY RUN_ID, PRECURSOR.ID ASC, FEATURE.EXP_RT ASC;", con)
         plot_scores(table_ms2, outfile)
 
-    if _check_sqlite_table(con, "SCORE_MS1"):
+    if check_sqlite_table(con, "SCORE_MS1"):
         outfile = infile.split(".osw")[0] + "_ms1_score_plots.pdf"
         table_ms1 = pd.read_sql_query("SELECT *, RUN_ID || '_' || PRECURSOR_ID AS GROUP_ID, VAR_XCORR_SHAPE AS MAIN_VAR_XCORR_SHAPE FROM FEATURE_MS1 INNER JOIN (SELECT RUN_ID, ID, PRECURSOR_ID, EXP_RT FROM FEATURE) AS FEATURE ON FEATURE_MS1.FEATURE_ID = FEATURE.ID INNER JOIN (SELECT ID, DECOY FROM PRECURSOR) AS PRECURSOR ON FEATURE.PRECURSOR_ID = PRECURSOR.ID INNER JOIN SCORE_MS1 ON FEATURE.ID = SCORE_MS1.FEATURE_ID WHERE RANK == 1 ORDER BY RUN_ID, PRECURSOR.ID ASC, FEATURE.EXP_RT ASC;", con)
         plot_scores(table_ms1, outfile)
 
-    if _check_sqlite_table(con, "SCORE_TRANSITION"):
+    if check_sqlite_table(con, "SCORE_TRANSITION"):
         outfile = infile.split(".osw")[0] + "_transition_score_plots.pdf"
         table_transition = pd.read_sql_query("SELECT TRANSITION.DECOY AS DECOY, FEATURE_TRANSITION.*, SCORE_TRANSITION.*, RUN_ID || '_' || FEATURE_TRANSITION.FEATURE_ID || '_' || PRECURSOR_ID || '_' || FEATURE_TRANSITION.TRANSITION_ID AS GROUP_ID, VAR_XCORR_SHAPE AS MAIN_VAR_XCORR_SHAPE FROM FEATURE_TRANSITION INNER JOIN (SELECT RUN_ID, ID, PRECURSOR_ID, EXP_RT FROM FEATURE) AS FEATURE ON FEATURE_TRANSITION.FEATURE_ID = FEATURE.ID INNER JOIN PRECURSOR ON FEATURE.PRECURSOR_ID = PRECURSOR.ID INNER JOIN SCORE_TRANSITION ON FEATURE_TRANSITION.FEATURE_ID = SCORE_TRANSITION.FEATURE_ID AND FEATURE_TRANSITION.TRANSITION_ID = SCORE_TRANSITION.TRANSITION_ID INNER JOIN (SELECT ID, DECOY FROM TRANSITION) AS TRANSITION ON FEATURE_TRANSITION.TRANSITION_ID = TRANSITION.ID ORDER BY RUN_ID, PRECURSOR.ID, FEATURE.EXP_RT, TRANSITION.ID;", con)
         plot_scores(table_transition, outfile)
