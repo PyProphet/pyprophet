@@ -27,8 +27,6 @@ import pandas as pd
 pd.options.display.width = 220
 pd.options.display.precision = 6
 
-import cProfile
-
 import numpy as np
 
 @click.group(chain=True)
