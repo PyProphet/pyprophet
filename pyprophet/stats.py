@@ -412,7 +412,7 @@ def final_err_table(df, num_cut_offs=51):
     sampled_cutoffs = np.linspace(min_ - margin, max_ + margin, num_cut_offs, dtype=np.float32)
 
     # find best matching row index for each sampled cut off:
-    ix = find_nearest_matches(df.cutoff.values, sampled_cutoffs)
+    ix = find_nearest_matches(np.float32(df.cutoff.values), sampled_cutoffs)
 
     # create sub dataframe:
     sampled_df = df.iloc[ix]

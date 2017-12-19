@@ -1,23 +1,29 @@
 # encoding: latin-1
 
 import sys
+import click
 import pandas as pd
 pd.options.display.width = 220
 pd.options.display.precision = 6
 
 import numpy as np
 import sqlite3
-from .stats import error_statistics, lookup_values_from_error_table
+from .stats import error_statistics, lookup_values_from_error_table, final_err_table, summary_err_table
 from .report import save_report
 from shutil import copyfile
 from .std_logger import logging
 
-# Protein Grouping
-from collections import defaultdict as ddict
-
 def statistics_report(data, outfile, context, analyte, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps):
 
     error_stat, pi0 = error_statistics(data[data.decoy==0]['score'], data[data.decoy==1]['score'], pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, parametric, pfdr, True, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps)
+
+    stat_table = final_err_table(error_stat)
+    summary_table = summary_err_table(error_stat)
+
+    # print summary table
+    click.echo("=" * 98)
+    click.echo(summary_table)
+    click.echo("=" * 98)
 
     p_values, s_values, peps, q_values = lookup_values_from_error_table(data["score"].values, error_stat)
     data["p_value"] = p_values
@@ -29,7 +35,7 @@ def statistics_report(data, outfile, context, analyte, parametric, pfdr, pi0_lam
         outfile = outfile + "_" + str(data['run_id'].unique()[0])
 
     # export PDF report
-    save_report(outfile + "_" + context + "_" + analyte + ".pdf", outfile + ": " + context + " " + analyte + "-level error-rate control", data[data.decoy==1]["score"], data[data.decoy==0]["score"], data["score"], data["s_value"], data["q_value"], data[data.decoy==0]["p_value"], pi0)
+    save_report(outfile + "_" + context + "_" + analyte + ".pdf", outfile + ": " + context + " " + analyte + "-level error-rate control", data[data.decoy==1]["score"], data[data.decoy==0]["score"], stat_table["cutoff"], stat_table["svalue"], stat_table["qvalue"], data[data.decoy==0]["p_value"], pi0)
 
     return(data)
 
@@ -81,6 +87,8 @@ def infer_proteins(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_m
 
 # def infer_protein_groups(infile, outfile, peptide_qvalue, context, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps):
 #     import maspy.inference
+#     from collections import defaultdict as ddict
+
 
 #     con = sqlite3.connect(infile)
 
@@ -171,7 +179,7 @@ def infer_peptides(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_m
 
     con.close()
 
-def merge_osw(infiles, outfile, subsample_ratio, test):
+def merge_osw(infiles, outfile, subsample_ratio, global_reduce, test):
     for infile in infiles:
         if infile == infiles[0]:
             # Copy the first file to have a template
@@ -183,6 +191,11 @@ def merge_osw(infiles, outfile, subsample_ratio, test):
             c.execute('DELETE FROM FEATURE_MS1')
             c.execute('DELETE FROM FEATURE_MS2')
             c.execute('DELETE FROM FEATURE_TRANSITION')
+            # c.execute('CREATE UNIQUE INDEX IDX_FEATURE_ID ON FEATURE (ID)')
+            # c.execute('CREATE INDEX IDX_PRECURSOR_ID ON FEATURE (PRECURSOR_ID)')
+            # c.execute('CREATE UNIQUE INDEX IDX_FEATURE_ID_MS1 ON FEATURE_MS1 (FEATURE_ID)')
+            # c.execute('CREATE UNIQUE INDEX IDX_FEATURE_ID_MS2 ON FEATURE_MS2 (FEATURE_ID)')
+            # c.execute('CREATE INDEX IDX_FEATURE_ID_TRANSITION ON FEATURE_TRANSITION (FEATURE_ID)')
             conn.commit()
             c.fetchall()
             conn.close()
@@ -191,16 +204,25 @@ def merge_osw(infiles, outfile, subsample_ratio, test):
         c = conn.cursor()
         c.execute('ATTACH DATABASE "'+ infile + '" AS sdb')
         c.execute('INSERT INTO RUN SELECT * FROM sdb.RUN')
-        if subsample_ratio >= 1.0:
-            c.execute('INSERT INTO FEATURE SELECT * FROM sdb.FEATURE')
+
+        if global_reduce:
+                c.execute('INSERT INTO FEATURE VALUES (ID, PRECURSOR_ID) SELECT ID, PRECURSOR_ID FROM sdb.FEATURE INNER JOIN sdb.SCORE_MS2 ON sdb.FEATURE.ID = sdb.SCORE_MS2.FEATURE_ID WHERE RANK == 1')
+                c.execute('INSERT INTO SCORE_MS2 VALUES (FEATURE_ID, SCORE) SELECT FEATURE_ID, SCORE FROM sdb.SCORE_MS2 WHERE RANK == 1')
+
         else:
-            if not test:
-                c.execute('INSERT INTO FEATURE SELECT * FROM sdb.FEATURE WHERE PRECURSOR_ID IN (SELECT PRECURSOR_ID FROM sdb.FEATURE ORDER BY RANDOM() LIMIT (SELECT ROUND(' + str(subsample_ratio) + '*COUNT(DISTINCT PRECURSOR_ID)) FROM sdb.FEATURE))')
+            if subsample_ratio >= 1.0:
+                c.execute('INSERT INTO FEATURE SELECT * FROM sdb.FEATURE')
+                c.execute('INSERT INTO FEATURE_MS1 SELECT * FROM sdb.FEATURE_MS1')
+                c.execute('INSERT INTO FEATURE_MS2 SELECT * FROM sdb.FEATURE_MS2')
+                c.execute('INSERT INTO FEATURE_TRANSITION SELECT * FROM sdb.FEATURE_TRANSITION')
             else:
-                c.execute('INSERT INTO FEATURE SELECT * FROM sdb.FEATURE WHERE PRECURSOR_ID IN (SELECT PRECURSOR_ID FROM sdb.FEATURE LIMIT (SELECT ROUND(' + str(subsample_ratio) + '*COUNT(DISTINCT PRECURSOR_ID)) FROM sdb.FEATURE))')
-        c.execute('INSERT INTO FEATURE_MS1 SELECT * FROM sdb.FEATURE_MS1 WHERE sdb.FEATURE_MS1.FEATURE_ID IN (SELECT ID FROM FEATURE)')
-        c.execute('INSERT INTO FEATURE_MS2 SELECT * FROM sdb.FEATURE_MS2 WHERE sdb.FEATURE_MS2.FEATURE_ID IN (SELECT ID FROM FEATURE)')
-        c.execute('INSERT INTO FEATURE_TRANSITION SELECT * FROM sdb.FEATURE_TRANSITION WHERE sdb.FEATURE_TRANSITION.FEATURE_ID IN (SELECT ID FROM FEATURE)')
+                if not test:
+                    c.execute('INSERT INTO FEATURE SELECT * FROM sdb.FEATURE WHERE PRECURSOR_ID IN (SELECT PRECURSOR_ID FROM sdb.FEATURE ORDER BY RANDOM() LIMIT (SELECT ROUND(' + str(subsample_ratio) + '*COUNT(DISTINCT PRECURSOR_ID)) FROM sdb.FEATURE))')
+                else:
+                    c.execute('INSERT INTO FEATURE SELECT * FROM sdb.FEATURE WHERE PRECURSOR_ID IN (SELECT PRECURSOR_ID FROM sdb.FEATURE LIMIT (SELECT ROUND(' + str(subsample_ratio) + '*COUNT(DISTINCT PRECURSOR_ID)) FROM sdb.FEATURE))')
+                c.execute('INSERT INTO FEATURE_MS1 SELECT * FROM sdb.FEATURE_MS1 WHERE sdb.FEATURE_MS1.FEATURE_ID IN (SELECT ID FROM FEATURE)')
+                c.execute('INSERT INTO FEATURE_MS2 SELECT * FROM sdb.FEATURE_MS2 WHERE sdb.FEATURE_MS2.FEATURE_ID IN (SELECT ID FROM FEATURE)')
+                c.execute('INSERT INTO FEATURE_TRANSITION SELECT * FROM sdb.FEATURE_TRANSITION WHERE sdb.FEATURE_TRANSITION.FEATURE_ID IN (SELECT ID FROM FEATURE)')
         logging.info("Merging file " + infile + " to " + outfile + ".")
         conn.commit()
         c.fetchall()

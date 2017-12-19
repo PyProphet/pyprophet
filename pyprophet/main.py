@@ -54,7 +54,7 @@ def cli():
 @click.option('--group_id', default="group_id", show_default=True, type=str, help='Group identifier for calculation of statistics.')
 @click.option('--parametric/--no-parametric', default=False, show_default=True, help='Do parametric estimation of p-values.')
 @click.option('--pfdr/--no-pfdr', default=False, show_default=True, help='Compute positive false discovery rate (pFDR) instead of FDR.')
-@click.option('--pi0_lambda', default=[0.05,1.0,0.05], show_default=True, type=(float, float, float), help='Use non-parametric estimation of p-values. Either use <START END STEPS>, e.g. 0.1, 1.0, 0.1 or set to fixed value, e.g. 0.4, 0, 0.', callback=transform_pi0_lambda)
+@click.option('--pi0_lambda', default=[0.1,0.5,0.05], show_default=True, type=(float, float, float), help='Use non-parametric estimation of p-values. Either use <START END STEPS>, e.g. 0.1, 1.0, 0.1 or set to fixed value, e.g. 0.4, 0, 0.', callback=transform_pi0_lambda)
 @click.option('--pi0_method', default='bootstrap', show_default=True, type=click.Choice(['smoother', 'bootstrap']), help='Either "smoother" or "bootstrap"; the method for automatically choosing tuning parameter in the estimation of pi_0, the proportion of true null hypotheses.')
 @click.option('--pi0_smooth_df', default=3, show_default=True, type=int, help='Number of degrees-of-freedom to use when estimating pi_0 with a smoother.')
 @click.option('--pi0_smooth_log_pi0/--no-pi0_smooth_log_pi0', default=False, show_default=True, help='If True and pi0_method = "smoother", pi0 will be estimated by applying a smoother to a scatterplot of log(pi0) estimates against the tuning parameter lambda.')
@@ -217,8 +217,9 @@ def protein(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_method, 
 @click.argument('infiles', nargs=-1, type=click.Path(exists=True))
 @click.option('--out','outfile', type=click.Path(exists=False), help='Merged OSW output file.')
 @click.option('--subsample_ratio', default=1, show_default=True, type=float, help='Subsample ratio used per input file.', callback=transform_subsample_ratio)
+@click.option('--global_reduce/--no-global_reduce', default=False, show_default=True, help='Reduce (MS2-level scored) OSW files for global scoring.')
 @click.option('--test/--no-test', default=False, show_default=True, help='Run in test mode with fixed seed.')
-def merge(infiles, outfile, subsample_ratio, test):
+def merge(infiles, outfile, subsample_ratio, global_reduce, test):
     """
     Merge multiple OSW files and optionally subsample the data for faster learning.
     """
@@ -226,7 +227,7 @@ def merge(infiles, outfile, subsample_ratio, test):
     if len(infiles) < 1:
         sys.exit("Error: At least one PyProphet input file needs to be defined.")
 
-    merge_osw(infiles, outfile, subsample_ratio, test)
+    merge_osw(infiles, outfile, subsample_ratio, global_reduce, test)
 
 # Export TSV
 @cli.command()

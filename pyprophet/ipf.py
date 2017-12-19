@@ -36,7 +36,7 @@ def read_pyp_peakgroup_precursor(path, ipf_max_peakgroup_pep, ipf_ms1_scoring, i
     # only use MS2 precursors
     if not ipf_ms1_scoring and ipf_ms2_scoring:
         if not check_sqlite_table(con, "SCORE_MS2") or not check_sqlite_table(con, "SCORE_TRANSITION"):
-            sys.exit("Error: Apply scoring to MS2  and transition-level data before running IPF.")
+            sys.exit("Error: Apply scoring to MS2 and transition-level data before running IPF.")
         data = pd.read_sql_query("SELECT FEATURE.ID AS FEATURE_ID, SCORE_MS2.PEP AS MS2_PEAKGROUP_PEP, NULL AS MS1_PRECURSOR_PEP, SCORE_TRANSITION.PEP AS MS2_PRECURSOR_PEP FROM PRECURSOR INNER JOIN FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID INNER JOIN (SELECT FEATURE_ID, PEP FROM SCORE_TRANSITION INNER JOIN TRANSITION ON SCORE_TRANSITION.TRANSITION_ID = TRANSITION.ID WHERE TRANSITION.TYPE='' AND TRANSITION.DECOY=0) AS SCORE_TRANSITION ON FEATURE.ID = SCORE_TRANSITION.FEATURE_ID WHERE PRECURSOR.DECOY=0 AND SCORE_MS2.PEP < " + str(ipf_max_peakgroup_pep) + ";", con)
 
     # only use MS1 precursors
