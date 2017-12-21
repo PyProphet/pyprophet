@@ -199,8 +199,8 @@ class PyProphetRunner(object):
             top_targets = result.scored_tables.loc[(result.scored_tables.peak_group_rank == 1) & (result.scored_tables.decoy == 0)]["d_score"].values
             top_decoys = result.scored_tables.loc[(result.scored_tables.peak_group_rank == 1) & (result.scored_tables.decoy == 1)]["d_score"].values
 
-            save_report(extra_writes.get("report_path"), self.outfile, top_decoys, top_targets, cutoffs, svalues, qvalues, pvalues, pi0)
-            click.echo("WRITTEN: " + extra_writes.get("report_path"))
+            save_report(os.path.join(self.prefix + "_" + self.level + "_report.pdf"), self.outfile, top_decoys, top_targets, cutoffs, svalues, qvalues, pvalues, pi0)
+            click.echo("WRITTEN: " + os.path.join(self.prefix + "_" + self.level + "_report.pdf"))
 
     def save_osw_weights(self, weights):
         weights['level'] = self.level
@@ -221,11 +221,11 @@ class PyProphetLearner(PyProphetRunner):
         return (result, scorer, weights)
 
     def extra_writes(self):
-        yield "output_path", os.path.join(self.prefix + "_" + self.level + "_scored.tsv")
-        yield "summ_stat_path", os.path.join(self.prefix + "_" + self.level + "_summary_stat.csv")
-        yield "full_stat_path", os.path.join(self.prefix + "_" + self.level + "_full_stat.csv")
-        yield "trained_weights_path", os.path.join(self.prefix + "_" + self.level + "_weights.csv")
-        yield "report_path", os.path.join(self.prefix + "_" + self.level + "_report.pdf")
+        yield "output_path", os.path.join(self.prefix + "_scored.tsv")
+        yield "summ_stat_path", os.path.join(self.prefix + "_summary_stat.csv")
+        yield "full_stat_path", os.path.join(self.prefix + "_full_stat.csv")
+        yield "trained_weights_path", os.path.join(self.prefix + "_weights.csv")
+        yield "report_path", os.path.join(self.prefix + "_report.pdf")
 
 class PyProphetWeightApplier(PyProphetRunner):
 
@@ -262,7 +262,7 @@ class PyProphetWeightApplier(PyProphetRunner):
         return (result, scorer, weights)
 
     def extra_writes(self):
-        yield "output_path", os.path.join(self.prefix + "_" + self.level + "_scored.tsv")
-        yield "summ_stat_path", os.path.join(self.prefix + "_" + self.level + "_summary_stat.csv")
-        yield "full_stat_path", os.path.join(self.prefix + "_" + self.level + "_full_stat.csv")
-        yield "report_path", os.path.join(self.prefix + "_" + self.level + "_report.pdf")
+        yield "output_path", os.path.join(self.prefix + "_scored.tsv")
+        yield "summ_stat_path", os.path.join(self.prefix + "_summary_stat.csv")
+        yield "full_stat_path", os.path.join(self.prefix + "_full_stat.csv")
+        yield "report_path", os.path.join(self.prefix + "_report.pdf")

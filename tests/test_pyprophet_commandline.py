@@ -41,10 +41,10 @@ def _run_pyprophet_tsv_to_learn_model(regtest, temp_folder, dump_result_files=Fa
         cmdline += " --pi0_lambda=" + pi0_lambda
     stdout = _run_cmdline(cmdline)
 
-    print(pd.read_csv("test_data_ms2_summary_stat.csv", sep=",", nrows=100),file=regtest)
-    print(pd.read_csv("test_data_ms2_full_stat.csv", sep=",", nrows=100),file=regtest)
-    print(pd.read_csv("test_data_ms2_scored.tsv", sep="\t", nrows=100),file=regtest)
-    print(pd.read_csv("test_data_ms2_weights.csv", sep=",", nrows=100),file=regtest)
+    print(pd.read_csv("test_data_summary_stat.csv", sep=",", nrows=100),file=regtest)
+    print(pd.read_csv("test_data_full_stat.csv", sep=",", nrows=100),file=regtest)
+    print(pd.read_csv("test_data_scored.tsv", sep="\t", nrows=100),file=regtest)
+    print(pd.read_csv("test_data_weights.csv", sep=",", nrows=100),file=regtest)
 
 
 def _run_pyprophet_osw_to_learn_model(regtest, temp_folder, dump_result_files=False, parametric=False, pfdr=False, pi0_lambda=False):
@@ -151,7 +151,7 @@ def test_tsv_apply_weights(tmpdir, regtest):
 
     _run_pyprophet_tsv_to_learn_model(regtest, tmpdir.strpath, True)
 
-    _run_cmdline("pyprophet score --pi0_method=smoother --pi0_lambda 0.4 0 0 --in=test_data.txt --apply_weights=test_data_ms2_weights.csv "
+    _run_cmdline("pyprophet score --pi0_method=smoother --pi0_lambda 0.4 0 0 --in=test_data.txt --apply_weights=test_data_weights.csv "
                           "--test")
 
 def test_osw_0(tmpdir, regtest):
