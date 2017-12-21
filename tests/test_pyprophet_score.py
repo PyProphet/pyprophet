@@ -13,7 +13,7 @@ import pytest
 from pyprophet.ipf import read_pyp_peakgroup_precursor
 
 pd.options.display.width = 220
-pd.options.display.precision = 6
+pd.options.display.precision = 4
 
 DATA_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 

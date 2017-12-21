@@ -11,7 +11,7 @@ from numpy.testing import assert_almost_equal
 
 d = pd.options.display
 d.width = 220
-d.precision = 6
+d.precision = 4
 
 def test_0():
     test_in = pd.DataFrame({'feature_id': [0], 'ms1_precursor_pep': [0.4], 'ms2_peakgroup_pep': [0.2], 'ms2_precursor_pep': [0.5]})

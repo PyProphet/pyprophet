@@ -5,7 +5,7 @@ from pyprophet.stats import to_one_dim_array, pnorm, pemp, pi0est, qvalue, bw_nr
 
 import pandas as pd
 pd.options.display.width = 220
-pd.options.display.precision = 6
+pd.options.display.precision = 4
 
 import numpy as np
 import os

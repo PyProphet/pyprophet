@@ -25,7 +25,13 @@ Installation
 
 We strongly advice to install PyProphet in a Python [*virtualenv*](https://virtualenv.pypa.io/en/stable/). PyProphet is compatible with Python 2.7 and provides experimental support for Python 3.
 
-Install *pyprophet* from the Python Package Index (PyPI):
+Install the development version of *pyprophet* from GitHub:
+
+````
+    $ pip install git+https://github.com/PyProphet/pyprophet.git@master
+````
+
+Install the stable version of *pyprophet* from the Python Package Index (PyPI):
 
 ````
     $ pip install pyprophet
