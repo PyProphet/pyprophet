@@ -1,127 +1,127 @@
-                          transition_group_id  decoy               run_id                         filename        RT      iRT                   id            Sequence                   FullUniModPeptideName  Charge  \
-0         EDNTGVVSQTFR(Label:13C(6)15N(4))_69      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  2163.910  14.0083 -9078977811506172301        EDNTGVVSQTFR        EDNTGVVSQTFR(Label:13C(6)15N(4))       2
-1       EDTSDPSLVIAFGR(Label:13C(6)15N(4))_71      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  3967.850  66.3155 -9009602369958523731      EDTSDPSLVIAFGR      EDTSDPSLVIAFGR(Label:13C(6)15N(4))       2
-2           TFDLGEVGR(Label:13C(6)15N(4))_177      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  2870.290  34.4907 -8990894093332793487           TFDLGEVGR           TFDLGEVGR(Label:13C(6)15N(4))       2
-3          TVADVDSLLR(Label:13C(6)15N(4))_297      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  3339.780  48.1039 -8915955323477460297          TVADVDSLLR          TVADVDSLLR(Label:13C(6)15N(4))       2
-4      LGANFEQIPVNSPK(Label:13C(6)15N(2))_244      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  3179.860  43.4668 -8858715981476206597      LGANFEQIPVNSPK      LGANFEQIPVNSPK(Label:13C(6)15N(2))       2
-5          IHNEDYELAR(Label:13C(6)15N(4))_242      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  1477.810  -5.8858 -8719005410755296724          IHNEDYELAR          IHNEDYELAR(Label:13C(6)15N(4))       2
-6           FSGADDTDFR(Label:13C(6)15N(4))_93      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  1928.530   7.1832 -8646066421910515352          FSGADDTDFR          FSGADDTDFR(Label:13C(6)15N(4))       2
-7        IQDFDYTDHTLGR(Label:13C(6)15N(4))_77      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  2656.550  28.2930 -8626691376059112239       IQDFDYTDHTLGR       IQDFDYTDHTLGR(Label:13C(6)15N(4))       2
-8       AGPDGTLFVVDAYK(Label:13C(6)15N(2))_53      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  3916.010  64.8123 -8606920604989566435      AGPDGTLFVVDAYK      AGPDGTLFVVDAYK(Label:13C(6)15N(2))       2
-9       VVDGEEVTEYTTK(Label:13C(6)15N(2))_277      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  2209.820  15.3397 -8581463431490225341       VVDGEEVTEYTTK       VVDGEEVTEYTTK(Label:13C(6)15N(2))       2
-10     FPSPVSHADDLYGK(Label:13C(6)15N(2))_237      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  2735.950  30.5952 -8506288232957066811      FPSPVSHADDLYGK      FPSPVSHADDLYGK(Label:13C(6)15N(2))       2
-11          DATLVNEADK(Label:13C(6)15N(2))_21      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  1494.960  -5.3884 -8506203196169948804          DATLVNEADK          DATLVNEADK(Label:13C(6)15N(2))       2
-12        ILDETLYENAK(Label:13C(6)15N(2))_136      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  2686.770  29.1691 -8440482683030894395         ILDETLYENAK         ILDETLYENAK(Label:13C(6)15N(2))       2
-13     LVEDPQVIAPFLGK(Label:13C(6)15N(2))_337      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  4591.320  84.3937 -7954403927701730016      LVEDPQVIAPFLGK      LVEDPQVIAPFLGK(Label:13C(6)15N(2))       2
-14       VGGPADFLAFPR(Label:13C(6)15N(4))_276      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  4476.930  81.0769 -7825486412107953992        VGGPADFLAFPR        VGGPADFLAFPR(Label:13C(6)15N(4))       2
-15  GVGIISEGDETVEDIAAR(Label:13C(6)15N(4))_58      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  4008.810  67.5031 -7816145050376840843  GVGIISEGDETVEDIAAR  GVGIISEGDETVEDIAAR(Label:13C(6)15N(4))       2
-16      TPAEAIYGEYVDK(Label:13C(6)15N(2))_252      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  3093.800  40.9715 -7808552968752938642       TPAEAIYGEYVDK       TPAEAIYGEYVDK(Label:13C(6)15N(2))       2
-17         GGNFGFGDSR(Label:13C(6)15N(4))_149      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  1984.570   8.8082 -7797929030476974532          GGNFGFGDSR          GGNFGFGDSR(Label:13C(6)15N(4))       2
-18       DFHFPSQSVSFK(Label:13C(6)15N(2))_208      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  3551.830  54.2525 -7790820088685319202        DFHFPSQSVSFK        DFHFPSQSVSFK(Label:13C(6)15N(2))       2
-19        ALGYEDATQALGR(Label:13C(6)15N(4))_1      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  2915.460  35.8003 -7771919224870429764       ALGYEDATQALGR       ALGYEDATQALGR(Label:13C(6)15N(4))       2
-20         VAQLEQVYIR(Label:13C(6)15N(4))_157      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  2897.610  35.2826 -7757580704522409831          VAQLEQVYIR          VAQLEQVYIR(Label:13C(6)15N(4))       2
-21        LLDLTSPEATAK(Label:13C(6)15N(2))_80      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  2921.360  35.9715 -7705858759149035525        LLDLTSPEATAK        LLDLTSPEATAK(Label:13C(6)15N(2))       2
-22         IVDVDLTSEGK(Label:13C(6)15N(2))_35      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  2466.050  22.7693 -7702796230907740575         IVDVDLTSEGK         IVDVDLTSEGK(Label:13C(6)15N(2))       2
-23         LVDSTFLHNK(Label:13C(6)15N(2))_125      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  2177.330  14.3975 -7541234528799769804          LVDSTFLHNK          LVDSTFLHNK(Label:13C(6)15N(2))       2
-24       GTLGLTVAEPIK(Label:13C(6)15N(2))_287      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  3334.300  47.9451 -7336837517957403378        GTLGLTVAEPIK        GTLGLTVAEPIK(Label:13C(6)15N(2))       2
-25       FSTEEEVDYVVK(Label:13C(6)15N(2))_327      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  3148.430  42.5555 -7228914186528368824        FSTEEEVDYVVK        FSTEEEVDYVVK(Label:13C(6)15N(2))       2
-26           DSSSSNVEGR(Label:13C(6)15N(4))_7      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz   367.524 -38.0797 -7157712673420189723          DSSSSNVEGR          DSSSSNVEGR(Label:13C(6)15N(4))       2
-27           HVDYITEK(Label:13C(6)15N(2))_191      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  1131.420 -15.9299 -7100425906303770779            HVDYITEK            HVDYITEK(Label:13C(6)15N(2))       2
-28    LTDVTFPTGQVSSFR(Label:13C(6)15N(4))_100      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  3798.290  61.3988 -7008141259007110079     LTDVTFPTGQVSSFR     LTDVTFPTGQVSSFR(Label:13C(6)15N(4))       2
-29        LDGSITSPGWPK(Label:13C(6)15N(2))_37      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  3024.290  38.9559 -6991584439580303673        LDGSITSPGWPK        LDGSITSPGWPK(Label:13C(6)15N(2))       2
-..                                        ...    ...                  ...                              ...       ...      ...                  ...                 ...                                     ...     ...
-70  AASEIATAELAPTHPIR(Label:13C(6)15N(4))_235      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  2754.990  31.1474 -4579089096808240748   AASEIATAELAPTHPIR   AASEIATAELAPTHPIR(Label:13C(6)15N(4))       2
-71       TGGDEFDEAIIK(Label:13C(6)15N(2))_178      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  3025.170  38.9815 -4539808410625597778        TGGDEFDEAIIK        TGGDEFDEAIIK(Label:13C(6)15N(2))       2
-72      GTAVVNGAFEEIK(Label:13C(6)15N(2))_239      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  3029.520  39.1075 -4495976808403190115       GTAVVNGAFEEIK       GTAVVNGAFEEIK(Label:13C(6)15N(2))       2
-73          AQLTVSSER(Label:13C(6)15N(4))_207      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  1199.890 -13.9444 -4474179539802460946           AQLTVSSER           AQLTVSSER(Label:13C(6)15N(4))       2
-74       ADSTGTLVITDPTR(Label:13C(6)15N(4))_0      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  2661.550  28.4379 -4409520928686189639      ADSTGTLVITDPTR      ADSTGTLVITDPTR(Label:13C(6)15N(4))       2
-75         ESDIIAIVTK(Label:13C(6)15N(2))_262      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  3540.640  53.9280 -4339311501869821870          ESDIIAIVTK          ESDIIAIVTK(Label:13C(6)15N(2))       2
-76     AIDYVEATANSHSR(Label:13C(6)15N(4))_323      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  1788.900   3.1345 -4213710682827324837      AIDYVEATANSHSR      AIDYVEATANSHSR(Label:13C(6)15N(4))       2
-77     YGPLSGVNVVYDQR(Label:13C(6)15N(4))_159      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  3500.580  52.7666 -4195322252177179725      YGPLSGVNVVYDQR      YGPLSGVNVVYDQR(Label:13C(6)15N(4))       2
-78        LGAVADTTELK(Label:13C(6)15N(2))_245      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  2118.940  12.7045 -4146541955602089926         LGAVADTTELK         LGAVADTTELK(Label:13C(6)15N(2))       2
-79     AAGASAQVLGQEGK(Label:13C(6)15N(2))_257      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  1521.110  -4.6303 -4109405113780929799      AAGASAQVLGQEGK      AAGASAQVLGQEGK(Label:13C(6)15N(2))       2
-80     FSQAGSEVSALLGR(Label:13C(6)15N(4))_168      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  3715.510  58.9986 -4045014838689976787      FSQAGSEVSALLGR      FSQAGSEVSALLGR(Label:13C(6)15N(4))       2
-81         VDITYNYPVR(Label:13C(6)15N(4))_129      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  2849.980  33.9018 -4029731266955352788          VDITYNYPVR          VDITYNYPVR(Label:13C(6)15N(4))       2
-82     GENIPEPGIPESFK(Label:13C(6)15N(2))_286      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  3455.420  51.4569 -3993387312722337069      GENIPEPGIPESFK      GENIPEPGIPESFK(Label:13C(6)15N(2))       2
-83      EGYLANFQVLENK(Label:13C(6)15N(2))_210      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  4061.810  69.0399 -3836935184308268027       EGYLANFQVLENK       EGYLANFQVLENK(Label:13C(6)15N(2))       2
-84      LTDVEAQVLDQTTR(Label:13C(6)15N(4))_61      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  3278.490  46.3269 -3751206597519588606      LTDVEAQVLDQTTR      LTDVEAQVLDQTTR(Label:13C(6)15N(4))       2
-85    TVLPDPVFNNTLVTR(Label:13C(6)15N(4))_232      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  4348.670  77.3576 -3723393495768556771     TVLPDPVFNNTLVTR     TVLPDPVFNNTLVTR(Label:13C(6)15N(4))       2
-86         GAFVDAHLLK(Label:13C(6)15N(2))_215      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  2786.020  32.0472 -3691251994571895144          GAFVDAHLLK          GAFVDAHLLK(Label:13C(6)15N(2))       2
-87       IDDLTGELSTSER(Label:13C(6)15N(4))_30      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  2726.580  30.3235 -3689374433140347909       IDDLTGELSTSER       IDDLTGELSTSER(Label:13C(6)15N(4))       2
-88        AEVAALAAENK(Label:13C(6)15N(2))_322      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  1700.970   0.5851 -3549790839793813313         AEVAALAAENK         AEVAALAAENK(Label:13C(6)15N(2))       2
-89     ELGQSGVDTYLQTK(Label:13C(6)15N(2))_325      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  2837.220  33.5316 -3474870037540340849      ELGQSGVDTYLQTK      ELGQSGVDTYLQTK(Label:13C(6)15N(2))       2
-90       LITVEGPDGAGK(Label:13C(6)15N(2))_269      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  2104.290  12.2796 -3408113861523985476        LITVEGPDGAGK        LITVEGPDGAGK(Label:13C(6)15N(2))       2
-91        SNSYFFQNPPK(Label:13C(6)15N(2))_249      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  2800.870  32.4777 -3261447714591002300         SNSYFFQNPPK         SNSYFFQNPPK(Label:13C(6)15N(2))       2
-92       YTIGPILDPETK(Label:13C(6)15N(2))_233      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  3607.870  55.8775 -3228351466849552514        YTIGPILDPETK        YTIGPILDPETK(Label:13C(6)15N(2))       2
-93       DQSVGDPNVDLIR(Label:13C(6)15N(4))_90      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  3010.880  38.5672 -3220457216356394124       DQSVGDPNVDLIR       DQSVGDPNVDLIR(Label:13C(6)15N(4))       2
-94     LEDITTGTYTIHAQK(Label:13C(6)15N(2))_99      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  2517.220  24.2528 -3212703409469281429     LEDITTGTYTIHAQK     LEDITTGTYTIHAQK(Label:13C(6)15N(2))       2
-95      YTDLNSNDVTGLR(Label:13C(6)15N(4))_160      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  2574.810  25.9228 -3196707605593292319       YTDLNSNDVTGLR       YTDLNSNDVTGLR(Label:13C(6)15N(4))       2
-96       GVTEETTTGVLR(Label:13C(6)15N(4))_288      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  2053.150  10.7966 -3129995828656718688        GVTEETTTGVLR        GVTEETTTGVLR(Label:13C(6)15N(4))       2
-97          YVQDGTYTAK(Label:13C(6)15N(2))_85      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  1087.490 -17.2035 -3096050638984928024          YVQDGTYTAK          YVQDGTYTAK(Label:13C(6)15N(2))       2
-98       VGEPVALSEEER(Label:13C(6)15N(4))_158      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  2169.140  14.1601 -2959420398616195477        VGEPVALSEEER        VGEPVALSEEER(Label:13C(6)15N(4))       2
-99      NTDFNGVNNIHQK(Label:13C(6)15N(2))_314      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  1552.530  -3.7192 -2912234918591861719       NTDFNGVNNIHQK       NTDFNGVNNIHQK(Label:13C(6)15N(2))       2
+                          transition_group_id  decoy               run_id                         filename        RT  library_RT  delta_rt      iRT  library_iRT  delta_iRT              ...               rightWidth  \
+0         EDNTGVVSQTFR(Label:13C(6)15N(4))_69      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  2163.910   2100.9782   62.9318  14.0083         12.1     1.9083              ...                2186.2500
+1       EDTSDPSLVIAFGR(Label:13C(6)15N(4))_71      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  3967.850   3938.5515   29.2985  66.3155         65.6     0.7155              ...                3995.9199
+2           TFDLGEVGR(Label:13C(6)15N(4))_177      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  2870.290   2918.4374  -48.1474  34.4907         35.9    -1.4093              ...                2916.1101
+3          TVADVDSLLR(Label:13C(6)15N(4))_297      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  3339.780   3368.3893  -28.6093  48.1039         49.0    -0.8961              ...                3370.3701
+4      LGANFEQIPVNSPK(Label:13C(6)15N(2))_244      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  3179.860   3138.2635   41.5965  43.4668         42.3     1.1668              ...                3197.0701
+5          IHNEDYELAR(Label:13C(6)15N(4))_242      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  1477.810   1551.4218  -73.6118  -5.8858         -3.9    -1.9858              ...                1506.6801
+6           FSGADDTDFR(Label:13C(6)15N(4))_93      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  1928.530   1963.5884  -35.0584   7.1832          8.1    -0.9168              ...                1946.7700
+7        IQDFDYTDHTLGR(Label:13C(6)15N(4))_77      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  2656.550   2719.2246  -62.6746  28.2930         30.1    -1.8070              ...                2674.8501
+8       AGPDGTLFVVDAYK(Label:13C(6)15N(2))_53      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  3916.010   3931.6844  -15.6744  64.8123         65.4    -0.5877              ...                3961.6799
+9       VVDGEEVTEYTTK(Label:13C(6)15N(2))_277      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  2209.820   2224.6224  -14.8024  15.3397         15.7    -0.3603              ...                2227.4299
+10     FPSPVSHADDLYGK(Label:13C(6)15N(2))_237      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  2735.950   2770.7504  -34.8004  30.5952         31.6    -1.0048              ...                2773.7500
+11          DATLVNEADK(Label:13C(6)15N(2))_21      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  1494.960   1431.2009   63.7591  -5.3884         -7.4     2.0116              ...                1523.3400
+12        ILDETLYENAK(Label:13C(6)15N(2))_136      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  2686.770   2708.9262  -22.1562  29.1691         29.8    -0.6309              ...                2705.0601
+13     LVEDPQVIAPFLGK(Label:13C(6)15N(2))_337      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  4591.320   4543.0600   48.2600  84.3937         83.2     1.1937              ...                4613.8301
+14       VGGPADFLAFPR(Label:13C(6)15N(4))_276      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  4476.930   4505.2768  -28.3468  81.0769         82.1    -1.0231              ...                4517.7402
+15  GVGIISEGDETVEDIAAR(Label:13C(6)15N(4))_58      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  4008.810   4051.8988  -43.0888  67.5031         68.9    -1.3969              ...                4037.5000
+16      TPAEAIYGEYVDK(Label:13C(6)15N(2))_252      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  3093.800   3196.6524 -102.8524  40.9715         44.0    -3.0285              ...                3128.6899
+17         GGNFGFGDSR(Label:13C(6)15N(4))_149      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  1984.570   2094.1085 -109.5385   8.8082         11.9    -3.0918              ...                2011.4301
+18       DFHFPSQSVSFK(Label:13C(6)15N(2))_208      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  3551.830   3615.6896  -63.8596  54.2525         56.2    -1.9475              ...                3575.8101
+19        ALGYEDATQALGR(Label:13C(6)15N(4))_1      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  2915.460   2949.3521  -33.8921  35.8003         36.8    -0.9997              ...                2947.5500
+20         VAQLEQVYIR(Label:13C(6)15N(4))_157      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  2897.610   2949.3562  -51.7462  35.2826         36.8    -1.5174              ...                2913.1101
+21        LLDLTSPEATAK(Label:13C(6)15N(2))_80      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  2921.360   2925.3077   -3.9477  35.9715         36.1    -0.1285              ...                2947.3501
+22         IVDVDLTSEGK(Label:13C(6)15N(2))_35      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  2466.050   2324.2296  141.8204  22.7693         18.6     4.1693              ...                2493.1001
+23         LVDSTFLHNK(Label:13C(6)15N(2))_125      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  2177.330   2258.9727  -81.6427  14.3975         16.7    -2.3025              ...                2206.3301
+24       GTLGLTVAEPIK(Label:13C(6)15N(2))_287      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  3334.300   3306.5619   27.7381  47.9451         47.2     0.7451              ...                3350.0901
+25       FSTEEEVDYVVK(Label:13C(6)15N(2))_327      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  3148.430   3196.6541  -48.2241  42.5555         44.0    -1.4445              ...                3173.0701
+26           DSSSSNVEGR(Label:13C(6)15N(4))_7      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz   367.524    311.4861   56.0379 -38.0797        -40.0     1.9203              ...                 383.0950
+27           HVDYITEK(Label:13C(6)15N(2))_191      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  1131.420   1201.0832  -69.6632 -15.9299        -14.1    -1.8299              ...                1157.9500
+28    LTDVTFPTGQVSSFR(Label:13C(6)15N(4))_100      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  3798.290   3794.2974    3.9926  61.3988         61.4    -0.0012              ...                3815.2900
+29        LDGSITSPGWPK(Label:13C(6)15N(2))_37      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  3024.290   3055.8321  -31.5421  38.9559         39.9    -0.9441              ...                3053.1799
+..                                        ...    ...                  ...                              ...       ...         ...       ...      ...          ...        ...              ...                      ...
+70  AASEIATAELAPTHPIR(Label:13C(6)15N(4))_235      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  2754.990   2767.3108  -12.3208  31.1474         31.5    -0.3526              ...                2774.2600
+71       TGGDEFDEAIIK(Label:13C(6)15N(2))_178      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  3025.170   3086.7394  -61.5694  38.9815         40.8    -1.8185              ...                3049.8701
+72      GTAVVNGAFEEIK(Label:13C(6)15N(2))_239      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  3029.520   3076.4412  -46.9212  39.1075         40.5    -1.3925              ...                3053.2800
+73          AQLTVSSER(Label:13C(6)15N(4))_207      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  1199.890   1201.0803   -1.1903 -13.9444        -14.1     0.1556              ...                1215.9800
+74       ADSTGTLVITDPTR(Label:13C(6)15N(4))_0      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  2661.550   2595.5788   65.9712  28.4379         26.5     1.9379              ...                2705.3701
+75         ESDIIAIVTK(Label:13C(6)15N(2))_262      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  3540.640   3577.9084  -37.2684  53.9280         55.1    -1.1720              ...                3568.2700
+76     AIDYVEATANSHSR(Label:13C(6)15N(4))_323      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  1788.900   1853.6785  -64.7785   3.1345          4.9    -1.7655              ...                1811.0300
+77     YGPLSGVNVVYDQR(Label:13C(6)15N(4))_159      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  3500.580   3526.3814  -25.8014  52.7666         53.6    -0.8334              ...                3531.7400
+78        LGAVADTTELK(Label:13C(6)15N(2))_245      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  2118.940   2080.3662   38.5738  12.7045         11.5     1.2045              ...                2137.9500
+79     AAGASAQVLGQEGK(Label:13C(6)15N(2))_257      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  1521.110   1503.3343   17.7757  -4.6303         -5.3     0.6697              ...                1537.4000
+80     FSQAGSEVSALLGR(Label:13C(6)15N(4))_168      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  3715.510   3808.0315  -92.5215  58.9986         61.8    -2.8014              ...                3736.2600
+81         VDITYNYPVR(Label:13C(6)15N(4))_129      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  2849.980   2853.1768   -3.1968  33.9018         34.0    -0.0982              ...                2875.6599
+82     GENIPEPGIPESFK(Label:13C(6)15N(2))_286      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  3455.420   3454.2616    1.1584  51.4569         51.5    -0.0431              ...                3473.6001
+83      EGYLANFQVLENK(Label:13C(6)15N(2))_210      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  4061.810   4106.8541  -45.0441  69.0399         70.5    -1.4601              ...                4088.0901
+84      LTDVEAQVLDQTTR(Label:13C(6)15N(4))_61      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  3278.490   3255.0388   23.4512  46.3269         45.7     0.6269              ...                3296.2800
+85    TVLPDPVFNNTLVTR(Label:13C(6)15N(4))_232      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  4348.670   4292.3331   56.3369  77.3576         75.9     1.4576              ...                4368.3398
+86         GAFVDAHLLK(Label:13C(6)15N(2))_215      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  2786.020   2860.0468  -74.0268  32.0472         34.2    -2.1528              ...                2806.9700
+87       IDDLTGELSTSER(Label:13C(6)15N(4))_30      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  2726.580   2726.0986    0.4814  30.3235         30.3     0.0235              ...                2749.6499
+88        AEVAALAAENK(Label:13C(6)15N(2))_322      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  1700.970   1695.6752    5.2948   0.5851          0.3     0.2851              ...                1724.7600
+89     ELGQSGVDTYLQTK(Label:13C(6)15N(2))_325      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  2837.220   2856.6163  -19.3963  33.5316         34.1    -0.5684              ...                2855.6799
+90       LITVEGPDGAGK(Label:13C(6)15N(2))_269      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  2104.290   2059.7610   44.5290  12.2796         10.9     1.3796              ...                2124.3999
+91        SNSYFFQNPPK(Label:13C(6)15N(2))_249      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  2800.870   2918.4397 -117.5697  32.4777         35.9    -3.4223              ...                2834.7900
+92       YTIGPILDPETK(Label:13C(6)15N(2))_233      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  3607.870   3598.5150    9.3550  55.8775         55.7     0.1775              ...                3633.7500
+93       DQSVGDPNVDLIR(Label:13C(6)15N(4))_90      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  3010.880   2932.1751   78.7049  38.5672         36.3     2.2672              ...                3033.0000
+94     LEDITTGTYTIHAQK(Label:13C(6)15N(2))_99      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  2517.220   2568.1021  -50.8821  24.2528         25.7    -1.4472              ...                2542.0100
+95      YTDLNSNDVTGLR(Label:13C(6)15N(4))_160      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  2574.810   2602.4477  -27.6377  25.9228         26.7    -0.7772              ...                2592.7100
+96       GVTEETTTGVLR(Label:13C(6)15N(4))_288      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  2053.150   2039.1552   13.9948  10.7966         10.3     0.4966              ...                2069.9800
+97          YVQDGTYTAK(Label:13C(6)15N(2))_85      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  1087.490   1101.4711  -13.9811 -17.2035        -17.0    -0.2035              ...                1103.6300
+98       VGEPVALSEEER(Label:13C(6)15N(4))_158      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  2169.140   2166.2316    2.9084  14.1601         14.0     0.1601              ...                2196.3899
+99      NTDFNGVNNIHQK(Label:13C(6)15N(2))_314      0 -8670811102654834151  napedro_L120420_010_SW.mzXML.gz  1552.530   1578.8989  -26.3689  -3.7192         -3.1    -0.6192              ...                1568.6400
 
-                ...               rightWidth  ms1_pep  ms2_pep  precursor_pep     ipf_pep  peak_group_rank  d_score  ms2_m_score     m_score                   ProteinName
-0               ...                2186.2500   0.0003   0.0029     6.4456e-09  0.0000e+00                1   5.3408       0.0033  0.0000e+00           AQUA4SWATH_HMLangeD
-1               ...                3995.9199   0.0003   0.0029     6.1726e-08  0.0000e+00                1   5.2326       0.0033  0.0000e+00           AQUA4SWATH_HMLangeD
-2               ...                2916.1101   0.0003   0.0029     6.4456e-09  0.0000e+00                1   5.1761       0.0033  0.0000e+00              AQUA4SWATH_Lepto
-3               ...                3370.3701   0.0003   0.0029     1.0812e-08  0.0000e+00                1   5.2558       0.0033  0.0000e+00       AQUA4SWATH_Tuberculosis
-4               ...                3197.0701   0.0003   0.0029     6.9818e-10  0.0000e+00                1   5.6685       0.0033  0.0000e+00       AQUA4SWATH_PombeSchmidt
-5               ...                1506.6801   0.0003   0.0029     6.9818e-10  0.0000e+00                1   4.6503       0.0033  0.0000e+00       AQUA4SWATH_PombeSchmidt
-6               ...                1946.7700   0.0003   0.0029     5.3494e-09  0.0000e+00                1   5.6136       0.0033  0.0000e+00           AQUA4SWATH_HMLangeE
-7               ...                2674.8501   0.0003   0.0029     9.6422e-09  0.0000e+00                1   5.3302       0.0033  0.0000e+00           AQUA4SWATH_HMLangeD
-8               ...                3961.6799   0.0003   0.0029     6.9818e-10  0.0000e+00                1   5.6510       0.0033  0.0000e+00           AQUA4SWATH_HMLangeC
-9               ...                2227.4299   0.0003   0.0029     6.9818e-10  0.0000e+00                1   6.0102       0.0033  0.0000e+00               AQUA4SWATH_Spyo
-10              ...                2773.7500   0.0003   0.0029     5.3494e-09  0.0000e+00                1   5.0596       0.0033  0.0000e+00       AQUA4SWATH_PombeSchmidt
-11              ...                1523.3400   0.0003   0.0029     6.9818e-10  0.0000e+00                1   5.2703       0.0033  0.0000e+00           AQUA4SWATH_HMLangeB
-12              ...                2705.0601   0.0003   0.0029     8.5418e-09  0.0000e+00                1   5.6933       0.0033  0.0000e+00           AQUA4SWATH_HMLangeG
-13              ...                4613.8301   0.0003   0.0029     6.9818e-10  0.0000e+00                1   5.5111       0.0033  0.0000e+00             AQUA4SWATH_YeastB
-14              ...                4517.7402   0.0003   0.0029     6.9818e-10  0.0000e+00                1   5.5389       0.0033  0.0000e+00               AQUA4SWATH_Spyo
-15              ...                4037.5000   0.0003   0.0029     1.5210e-09  0.0000e+00                1   5.3229       0.0033  0.0000e+00           AQUA4SWATH_HMLangeC
-16              ...                3128.6899   0.0003   0.0029     6.9818e-10  0.0000e+00                1   5.3842       0.0033  0.0000e+00       AQUA4SWATH_PombeSchmidt
-17              ...                2011.4301   0.0003   0.0029     5.9554e-08  0.0000e+00                1   4.8358       0.0033  0.0000e+00       AQUA4SWATH_HumanEbhardt
-18              ...                3575.8101   0.0903   0.0029     1.2935e-05  0.0000e+00                1   4.8560       0.0033  0.0000e+00  AQUA4SWATH_MycoplasmaSchmidt
-19              ...                2947.5500   0.0003   0.0029     6.9818e-10  0.0000e+00                1   5.5301       0.0033  0.0000e+00           AQUA4SWATH_HMLangeA
-20              ...                2913.1101   0.0003   0.0029     1.0812e-08  0.0000e+00                1   5.5644       0.0033  0.0000e+00       AQUA4SWATH_HumanEbhardt
-21              ...                2947.3501   0.0003   0.0029     5.3494e-09  0.0000e+00                1   5.8430       0.0033  0.0000e+00           AQUA4SWATH_HMLangeD
-22              ...                2493.1001   0.0003   0.0029     8.5418e-09  0.0000e+00                1   4.4611       0.0033  0.0000e+00           AQUA4SWATH_HMLangeB
-23              ...                2206.3301   0.0003   0.0029     6.9818e-10  0.0000e+00                1   4.7215       0.0033  0.0000e+00           AQUA4SWATH_HMLangeF
-24              ...                3350.0901   0.0003   0.0029     6.9818e-10  0.0000e+00                1   5.6522       0.0033  0.0000e+00       AQUA4SWATH_Tuberculosis
-25              ...                3173.0701   0.0003   0.0029     1.2063e-08  0.0000e+00                1   5.0833       0.0033  0.0000e+00             AQUA4SWATH_YeastB
-26              ...                 383.0950   0.0003   0.0029     1.0812e-08  0.0000e+00                1   4.8848       0.0033  0.0000e+00           AQUA4SWATH_HMLangeA
-27              ...                1157.9500   0.0582   0.0250     1.1439e-04  3.4417e-15                1   3.9754       0.0061  1.4377e-17        AQUA4SWATH_MouseSabido
-28              ...                3815.2900   0.0003   0.0029     1.5210e-09  0.0000e+00                1   5.7556       0.0033  0.0000e+00           AQUA4SWATH_HMLangeE
-29              ...                3053.1799   0.0003   0.0029     9.9052e-08  0.0000e+00                1   5.6324       0.0033  0.0000e+00           AQUA4SWATH_HMLangeB
-..              ...                      ...      ...      ...            ...         ...              ...      ...          ...         ...                           ...
-70              ...                2774.2600   0.0003   0.0029     6.9818e-10  0.0000e+00                1   5.8543       0.0033  0.0000e+00       AQUA4SWATH_PombeSchmidt
-71              ...                3049.8701   0.0003   0.0029     1.0812e-08  0.0000e+00                1   5.1021       0.0033  0.0000e+00              AQUA4SWATH_Lepto
-72              ...                3053.2800   0.0003   0.0029     6.9818e-10  0.0000e+00                1   5.6764       0.0033  0.0000e+00       AQUA4SWATH_PombeSchmidt
-73              ...                1215.9800   0.0003   0.0029     5.3494e-09  0.0000e+00                1   5.5264       0.0033  0.0000e+00  AQUA4SWATH_MycoplasmaSchmidt
-74              ...                2705.3701   0.0003   0.0029     5.3494e-09  0.0000e+00                1   5.5783       0.0033  0.0000e+00           AQUA4SWATH_HMLangeA
-75              ...                3568.2700   0.0003   0.0029     1.0812e-08  0.0000e+00                1   5.3112       0.0033  0.0000e+00               AQUA4SWATH_Spyo
-76              ...                1811.0300   0.0003   0.0029     6.9818e-10  0.0000e+00                1   5.4126       0.0033  0.0000e+00             AQUA4SWATH_YeastB
-77              ...                3531.7400   0.0003   0.0029     2.7819e-09  0.0000e+00                1   5.7255       0.0033  0.0000e+00       AQUA4SWATH_HumanEbhardt
-78              ...                2137.9500   0.0003   0.0029     8.5418e-09  0.0000e+00                1   5.7074       0.0033  0.0000e+00       AQUA4SWATH_PombeSchmidt
-79              ...                1537.4000   0.0003   0.0029     6.9818e-10  0.0000e+00                1   5.8350       0.0033  0.0000e+00               AQUA4SWATH_Spyo
-80              ...                3736.2600   0.0003   0.0029     8.5418e-09  0.0000e+00                1   5.1799       0.0033  0.0000e+00              AQUA4SWATH_Lepto
-81              ...                2875.6599   0.0003   0.0029     6.4456e-09  0.0000e+00                1   5.5145       0.0033  0.0000e+00           AQUA4SWATH_HMLangeF
-82              ...                3473.6001   0.0003   0.0029     1.0812e-08  0.0000e+00                1   5.6107       0.0033  0.0000e+00       AQUA4SWATH_Tuberculosis
-83              ...                4088.0901   0.0003   0.0029     1.5210e-09  0.0000e+00                1   5.4068       0.0033  0.0000e+00  AQUA4SWATH_MycoplasmaSchmidt
-84              ...                3296.2800   0.0003   0.0029     6.9818e-10  0.0000e+00                1   5.8951       0.0033  0.0000e+00           AQUA4SWATH_HMLangeC
-85              ...                4368.3398   0.0003   0.0029     6.9818e-10  0.0000e+00                1   5.3382       0.0033  0.0000e+00  AQUA4SWATH_MycoplasmaSchmidt
-86              ...                2806.9700   0.0003   0.0029     2.7819e-09  0.0000e+00                1   5.0945       0.0033  0.0000e+00  AQUA4SWATH_MycoplasmaSchmidt
-87              ...                2749.6499   0.0003   0.0029     2.7819e-09  0.0000e+00                1   5.8259       0.0033  0.0000e+00           AQUA4SWATH_HMLangeB
-88              ...                1724.7600   0.0003   0.0029     1.0812e-08  0.0000e+00                1   5.8819       0.0033  0.0000e+00             AQUA4SWATH_YeastB
-89              ...                2855.6799   0.0003   0.0029     1.0812e-08  0.0000e+00                1   5.6602       0.0033  0.0000e+00             AQUA4SWATH_YeastB
-90              ...                2124.3999   0.0003   0.0029     6.9818e-10  0.0000e+00                1   5.5648       0.0033  0.0000e+00               AQUA4SWATH_Spyo
-91              ...                2834.7900   0.0003   0.0029     6.6123e-08  0.0000e+00                1   4.9825       0.0033  0.0000e+00       AQUA4SWATH_PombeSchmidt
-92              ...                3633.7500   0.0003   0.0029     6.9818e-10  0.0000e+00                1   5.8108       0.0033  0.0000e+00  AQUA4SWATH_MycoplasmaSchmidt
-93              ...                3033.0000   0.0003   0.0029     6.9818e-10  0.0000e+00                1   5.3997       0.0033  0.0000e+00           AQUA4SWATH_HMLangeE
-94              ...                2542.0100   0.0003   0.0029     1.5210e-09  0.0000e+00                1   5.2372       0.0033  0.0000e+00           AQUA4SWATH_HMLangeE
-95              ...                2592.7100   0.0003   0.0029     6.4456e-09  0.0000e+00                1   5.5923       0.0033  0.0000e+00       AQUA4SWATH_HumanEbhardt
-96              ...                2069.9800   0.0003   0.0029     5.3494e-09  0.0000e+00                1   5.8478       0.0033  0.0000e+00       AQUA4SWATH_Tuberculosis
-97              ...                1103.6300   0.0003   0.0029     1.5210e-09  0.0000e+00                1   5.4640       0.0033  0.0000e+00           AQUA4SWATH_HMLangeD
-98              ...                2196.3899   0.0003   0.0029     7.4892e-09  0.0000e+00                1   5.6930       0.0033  0.0000e+00       AQUA4SWATH_HumanEbhardt
-99              ...                1568.6400   0.0003   0.0029     1.5210e-09  0.0000e+00                1   5.5046       0.0033  0.0000e+00             AQUA4SWATH_YeastA
+   ms1_pep ms2_pep  precursor_pep     ipf_pep  peak_group_rank  d_score  ms2_m_score     m_score                   ProteinName
+0   0.0003  0.0029     6.4456e-09  0.0000e+00                1   5.3408       0.0033  0.0000e+00           AQUA4SWATH_HMLangeD
+1   0.0003  0.0029     6.1726e-08  0.0000e+00                1   5.2326       0.0033  0.0000e+00           AQUA4SWATH_HMLangeD
+2   0.0003  0.0029     6.4456e-09  0.0000e+00                1   5.1761       0.0033  0.0000e+00              AQUA4SWATH_Lepto
+3   0.0003  0.0029     1.0812e-08  0.0000e+00                1   5.2558       0.0033  0.0000e+00       AQUA4SWATH_Tuberculosis
+4   0.0003  0.0029     6.9818e-10  0.0000e+00                1   5.6685       0.0033  0.0000e+00       AQUA4SWATH_PombeSchmidt
+5   0.0003  0.0029     6.9818e-10  0.0000e+00                1   4.6503       0.0033  0.0000e+00       AQUA4SWATH_PombeSchmidt
+6   0.0003  0.0029     5.3494e-09  0.0000e+00                1   5.6136       0.0033  0.0000e+00           AQUA4SWATH_HMLangeE
+7   0.0003  0.0029     9.6422e-09  0.0000e+00                1   5.3302       0.0033  0.0000e+00           AQUA4SWATH_HMLangeD
+8   0.0003  0.0029     6.9818e-10  0.0000e+00                1   5.6510       0.0033  0.0000e+00           AQUA4SWATH_HMLangeC
+9   0.0003  0.0029     6.9818e-10  0.0000e+00                1   6.0102       0.0033  0.0000e+00               AQUA4SWATH_Spyo
+10  0.0003  0.0029     5.3494e-09  0.0000e+00                1   5.0596       0.0033  0.0000e+00       AQUA4SWATH_PombeSchmidt
+11  0.0003  0.0029     6.9818e-10  0.0000e+00                1   5.2703       0.0033  0.0000e+00           AQUA4SWATH_HMLangeB
+12  0.0003  0.0029     8.5418e-09  0.0000e+00                1   5.6933       0.0033  0.0000e+00           AQUA4SWATH_HMLangeG
+13  0.0003  0.0029     6.9818e-10  0.0000e+00                1   5.5111       0.0033  0.0000e+00             AQUA4SWATH_YeastB
+14  0.0003  0.0029     6.9818e-10  0.0000e+00                1   5.5389       0.0033  0.0000e+00               AQUA4SWATH_Spyo
+15  0.0003  0.0029     1.5210e-09  0.0000e+00                1   5.3229       0.0033  0.0000e+00           AQUA4SWATH_HMLangeC
+16  0.0003  0.0029     6.9818e-10  0.0000e+00                1   5.3842       0.0033  0.0000e+00       AQUA4SWATH_PombeSchmidt
+17  0.0003  0.0029     5.9554e-08  0.0000e+00                1   4.8358       0.0033  0.0000e+00       AQUA4SWATH_HumanEbhardt
+18  0.0903  0.0029     1.2935e-05  0.0000e+00                1   4.8560       0.0033  0.0000e+00  AQUA4SWATH_MycoplasmaSchmidt
+19  0.0003  0.0029     6.9818e-10  0.0000e+00                1   5.5301       0.0033  0.0000e+00           AQUA4SWATH_HMLangeA
+20  0.0003  0.0029     1.0812e-08  0.0000e+00                1   5.5644       0.0033  0.0000e+00       AQUA4SWATH_HumanEbhardt
+21  0.0003  0.0029     5.3494e-09  0.0000e+00                1   5.8430       0.0033  0.0000e+00           AQUA4SWATH_HMLangeD
+22  0.0003  0.0029     8.5418e-09  0.0000e+00                1   4.4611       0.0033  0.0000e+00           AQUA4SWATH_HMLangeB
+23  0.0003  0.0029     6.9818e-10  0.0000e+00                1   4.7215       0.0033  0.0000e+00           AQUA4SWATH_HMLangeF
+24  0.0003  0.0029     6.9818e-10  0.0000e+00                1   5.6522       0.0033  0.0000e+00       AQUA4SWATH_Tuberculosis
+25  0.0003  0.0029     1.2063e-08  0.0000e+00                1   5.0833       0.0033  0.0000e+00             AQUA4SWATH_YeastB
+26  0.0003  0.0029     1.0812e-08  0.0000e+00                1   4.8848       0.0033  0.0000e+00           AQUA4SWATH_HMLangeA
+27  0.0582  0.0250     1.1439e-04  3.4417e-15                1   3.9754       0.0061  1.4377e-17        AQUA4SWATH_MouseSabido
+28  0.0003  0.0029     1.5210e-09  0.0000e+00                1   5.7556       0.0033  0.0000e+00           AQUA4SWATH_HMLangeE
+29  0.0003  0.0029     9.9052e-08  0.0000e+00                1   5.6324       0.0033  0.0000e+00           AQUA4SWATH_HMLangeB
+..     ...     ...            ...         ...              ...      ...          ...         ...                           ...
+70  0.0003  0.0029     6.9818e-10  0.0000e+00                1   5.8543       0.0033  0.0000e+00       AQUA4SWATH_PombeSchmidt
+71  0.0003  0.0029     1.0812e-08  0.0000e+00                1   5.1021       0.0033  0.0000e+00              AQUA4SWATH_Lepto
+72  0.0003  0.0029     6.9818e-10  0.0000e+00                1   5.6764       0.0033  0.0000e+00       AQUA4SWATH_PombeSchmidt
+73  0.0003  0.0029     5.3494e-09  0.0000e+00                1   5.5264       0.0033  0.0000e+00  AQUA4SWATH_MycoplasmaSchmidt
+74  0.0003  0.0029     5.3494e-09  0.0000e+00                1   5.5783       0.0033  0.0000e+00           AQUA4SWATH_HMLangeA
+75  0.0003  0.0029     1.0812e-08  0.0000e+00                1   5.3112       0.0033  0.0000e+00               AQUA4SWATH_Spyo
+76  0.0003  0.0029     6.9818e-10  0.0000e+00                1   5.4126       0.0033  0.0000e+00             AQUA4SWATH_YeastB
+77  0.0003  0.0029     2.7819e-09  0.0000e+00                1   5.7255       0.0033  0.0000e+00       AQUA4SWATH_HumanEbhardt
+78  0.0003  0.0029     8.5418e-09  0.0000e+00                1   5.7074       0.0033  0.0000e+00       AQUA4SWATH_PombeSchmidt
+79  0.0003  0.0029     6.9818e-10  0.0000e+00                1   5.8350       0.0033  0.0000e+00               AQUA4SWATH_Spyo
+80  0.0003  0.0029     8.5418e-09  0.0000e+00                1   5.1799       0.0033  0.0000e+00              AQUA4SWATH_Lepto
+81  0.0003  0.0029     6.4456e-09  0.0000e+00                1   5.5145       0.0033  0.0000e+00           AQUA4SWATH_HMLangeF
+82  0.0003  0.0029     1.0812e-08  0.0000e+00                1   5.6107       0.0033  0.0000e+00       AQUA4SWATH_Tuberculosis
+83  0.0003  0.0029     1.5210e-09  0.0000e+00                1   5.4068       0.0033  0.0000e+00  AQUA4SWATH_MycoplasmaSchmidt
+84  0.0003  0.0029     6.9818e-10  0.0000e+00                1   5.8951       0.0033  0.0000e+00           AQUA4SWATH_HMLangeC
+85  0.0003  0.0029     6.9818e-10  0.0000e+00                1   5.3382       0.0033  0.0000e+00  AQUA4SWATH_MycoplasmaSchmidt
+86  0.0003  0.0029     2.7819e-09  0.0000e+00                1   5.0945       0.0033  0.0000e+00  AQUA4SWATH_MycoplasmaSchmidt
+87  0.0003  0.0029     2.7819e-09  0.0000e+00                1   5.8259       0.0033  0.0000e+00           AQUA4SWATH_HMLangeB
+88  0.0003  0.0029     1.0812e-08  0.0000e+00                1   5.8819       0.0033  0.0000e+00             AQUA4SWATH_YeastB
+89  0.0003  0.0029     1.0812e-08  0.0000e+00                1   5.6602       0.0033  0.0000e+00             AQUA4SWATH_YeastB
+90  0.0003  0.0029     6.9818e-10  0.0000e+00                1   5.5648       0.0033  0.0000e+00               AQUA4SWATH_Spyo
+91  0.0003  0.0029     6.6123e-08  0.0000e+00                1   4.9825       0.0033  0.0000e+00       AQUA4SWATH_PombeSchmidt
+92  0.0003  0.0029     6.9818e-10  0.0000e+00                1   5.8108       0.0033  0.0000e+00  AQUA4SWATH_MycoplasmaSchmidt
+93  0.0003  0.0029     6.9818e-10  0.0000e+00                1   5.3997       0.0033  0.0000e+00           AQUA4SWATH_HMLangeE
+94  0.0003  0.0029     1.5210e-09  0.0000e+00                1   5.2372       0.0033  0.0000e+00           AQUA4SWATH_HMLangeE
+95  0.0003  0.0029     6.4456e-09  0.0000e+00                1   5.5923       0.0033  0.0000e+00       AQUA4SWATH_HumanEbhardt
+96  0.0003  0.0029     5.3494e-09  0.0000e+00                1   5.8478       0.0033  0.0000e+00       AQUA4SWATH_Tuberculosis
+97  0.0003  0.0029     1.5210e-09  0.0000e+00                1   5.4640       0.0033  0.0000e+00           AQUA4SWATH_HMLangeD
+98  0.0003  0.0029     7.4892e-09  0.0000e+00                1   5.6930       0.0033  0.0000e+00       AQUA4SWATH_HumanEbhardt
+99  0.0003  0.0029     1.5210e-09  0.0000e+00                1   5.5046       0.0033  0.0000e+00             AQUA4SWATH_YeastA
 
-[100 rows x 27 columns]
+[100 rows x 30 columns]
