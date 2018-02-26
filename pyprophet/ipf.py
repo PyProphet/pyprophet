@@ -13,7 +13,9 @@ import sys
 from .std_logger import logging
 from .data_handling import check_sqlite_table
 
-def compute_model_fdr(data):
+def compute_model_fdr(data_in):
+    data = np.asarray(data_in)
+
     # compute model based FDR estimates from posterior error probabilities
     order = np.argsort(data)
 
@@ -130,7 +132,7 @@ def prepare_transition_bm(data):
     data.ix[data.bmask == 1, 'evidence'] = 1-data.ix[data.bmask == 1, 'pep'] # we have evidence FOR this peptidoform or h0
     data.ix[data.bmask == 0, 'evidence'] = data.ix[data.bmask == 0, 'pep'] # we have evidence AGAINST this peptidoform or h0
 
-    data = data[['feature_id','prior','evidence','peptide_id']]
+    data = data[['feature_id','num_peptidoforms','prior','evidence','peptide_id']]
     data = data.rename(columns=lambda x: x.replace('peptide_id', 'hypothesis'))
 
     return data
@@ -190,7 +192,7 @@ def precursor_inference(data, ipf_ms1_scoring, ipf_ms2_scoring, ipf_max_precurso
 
     return inferred_precursors
 
-def peptidoform_inference(transition_table, precursor_data):
+def peptidoform_inference(transition_table, precursor_data, ipf_grouped_fdr):
     transition_table = pd.merge(transition_table, precursor_data, on='feature_id')
 
     # compute transition posterior probabilities
@@ -203,14 +205,17 @@ def peptidoform_inference(transition_table, precursor_data):
     pf_pp_data['pep'] = 1 - pf_pp_data['posterior']
 
     # compute model-based FDR
-    pf_pp_data['qvalue'] = compute_model_fdr(pf_pp_data['pep'].values)
+    if ipf_grouped_fdr:
+        pf_pp_data['qvalue'] = pd.merge(pf_pp_data, transition_data_bm[['feature_id', 'num_peptidoforms']].drop_duplicates(), on=['feature_id'], how='inner').groupby('num_peptidoforms')['pep'].transform(compute_model_fdr)
+    else:
+        pf_pp_data['qvalue'] = compute_model_fdr(pf_pp_data['pep'])
 
     # merge precursor-level data with UIS data
     result = pf_pp_data.merge(precursor_data[['feature_id','precursor_peakgroup_pep']].drop_duplicates(), on=['feature_id'], how='inner')
 
     return result
 
-def infer_peptidoforms(infile, outfile, ipf_ms1_scoring, ipf_ms2_scoring, ipf_h0, ipf_max_precursor_pep, ipf_max_peakgroup_pep, ipf_max_precursor_peakgroup_pep, ipf_max_transition_pep):
+def infer_peptidoforms(infile, outfile, ipf_ms1_scoring, ipf_ms2_scoring, ipf_h0, ipf_grouped_fdr, ipf_max_precursor_pep, ipf_max_peakgroup_pep, ipf_max_precursor_peakgroup_pep, ipf_max_transition_pep):
     logging.info("start IPF (Inference of PeptidoForms)")
 
     # precursor level
@@ -219,7 +224,7 @@ def infer_peptidoforms(infile, outfile, ipf_ms1_scoring, ipf_ms2_scoring, ipf_h0
 
     # peptidoform level
     peptidoform_table = read_pyp_transition(infile, ipf_max_transition_pep, ipf_h0)
-    peptidoform_data = peptidoform_inference(peptidoform_table, precursor_data)
+    peptidoform_data = peptidoform_inference(peptidoform_table, precursor_data, ipf_grouped_fdr)
 
     # finalize results and write to table
     logging.info("      finalize results")
