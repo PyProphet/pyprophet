@@ -1,8 +1,8 @@
 README
 ======
 
-The scripts should be run with `py.test` with installed plugin `pytest-regest`
-(see https://pypi.python.org/pypi/pytest-regtest).
+The scripts should be run with `py.test` (>=3.4.1) with installed plugin `pytest-regest`
+(>=1.0.14 see https://pypi.python.org/pypi/pytest-regtest).
 
 The plugin allows recording of approved output so that later test runs will check if
 the output is still the same. It is simple to use as you can see in `test_via_regression.py`.
