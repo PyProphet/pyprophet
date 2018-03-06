@@ -127,58 +127,31 @@ def infer_peptides(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_m
 
     con.close()
 
-def merge_osw(infiles, outfile, subsample_ratio, global_reduce, test):
+def merge_osw(infiles, outfile, subsample_ratio, test):
     for infile in infiles:
         if infile == infiles[0]:
             # Copy the first file to have a template
             copyfile(infile, outfile)
             conn = sqlite3.connect(outfile)
             c = conn.cursor()
-            c.execute('DELETE FROM RUN')
-            c.execute('DELETE FROM FEATURE')
-            c.execute('DELETE FROM FEATURE_MS1')
-            c.execute('DELETE FROM FEATURE_MS2')
-            c.execute('DELETE FROM FEATURE_TRANSITION')
-            # c.execute('CREATE UNIQUE INDEX IDX_FEATURE_ID ON FEATURE (ID)')
-            # c.execute('CREATE INDEX IDX_PRECURSOR_ID ON FEATURE (PRECURSOR_ID)')
-            # c.execute('CREATE UNIQUE INDEX IDX_FEATURE_ID_MS1 ON FEATURE_MS1 (FEATURE_ID)')
-            # c.execute('CREATE UNIQUE INDEX IDX_FEATURE_ID_MS2 ON FEATURE_MS2 (FEATURE_ID)')
-            # c.execute('CREATE INDEX IDX_FEATURE_ID_TRANSITION ON FEATURE_TRANSITION (FEATURE_ID)')
+            c.executescript('PRAGMA synchronous = OFF; DELETE FROM RUN; DELETE FROM FEATURE; DELETE FROM FEATURE_MS1; DELETE FROM FEATURE_MS2; DELETE FROM FEATURE_TRANSITION')
             conn.commit()
-            c.fetchall()
             conn.close()
             
         conn = sqlite3.connect(outfile)
         c = conn.cursor()
-        c.execute('ATTACH DATABASE "'+ infile + '" AS sdb')
-        c.execute('INSERT INTO RUN SELECT * FROM sdb.RUN')
+        c.executescript('PRAGMA synchronous = OFF; ATTACH DATABASE "'+ infile + '" AS sdb; INSERT INTO RUN SELECT * FROM sdb.RUN')
 
-        if global_reduce:
-                c.execute('INSERT INTO FEATURE VALUES (ID, PRECURSOR_ID) SELECT ID, PRECURSOR_ID FROM sdb.FEATURE INNER JOIN sdb.SCORE_MS2 ON sdb.FEATURE.ID = sdb.SCORE_MS2.FEATURE_ID WHERE RANK == 1')
-                c.execute('INSERT INTO SCORE_MS2 VALUES (FEATURE_ID, SCORE) SELECT FEATURE_ID, SCORE FROM sdb.SCORE_MS2 WHERE RANK == 1')
+        if subsample_ratio >= 1.0:
+            c.executescript('INSERT INTO FEATURE SELECT * FROM sdb.FEATURE; INSERT INTO FEATURE_MS1 SELECT * FROM sdb.FEATURE_MS1; INSERT INTO FEATURE_MS2 SELECT * FROM sdb.FEATURE_MS2; INSERT INTO FEATURE_TRANSITION SELECT * FROM sdb.FEATURE_TRANSITION')
         else:
-            if subsample_ratio >= 1.0:
-                c.execute('INSERT INTO FEATURE SELECT * FROM sdb.FEATURE')
-                c.execute('INSERT INTO FEATURE_MS1 SELECT * FROM sdb.FEATURE_MS1')
-                c.execute('INSERT INTO FEATURE_MS2 SELECT * FROM sdb.FEATURE_MS2')
-                c.execute('INSERT INTO FEATURE_TRANSITION SELECT * FROM sdb.FEATURE_TRANSITION')
+            if not test:
+                c.executescript('INSERT INTO FEATURE SELECT * FROM sdb.FEATURE WHERE PRECURSOR_ID IN (SELECT ID FROM sdb.PRECURSOR ORDER BY RANDOM() LIMIT (SELECT ROUND(' + str(subsample_ratio) + '*COUNT(DISTINCT ID)) FROM sdb.PRECURSOR)); INSERT INTO FEATURE_MS1 SELECT * FROM sdb.FEATURE_MS1 WHERE sdb.FEATURE_MS1.FEATURE_ID IN (SELECT ID FROM FEATURE); INSERT INTO FEATURE_MS2 SELECT * FROM sdb.FEATURE_MS2 WHERE sdb.FEATURE_MS2.FEATURE_ID IN (SELECT ID FROM FEATURE); INSERT INTO FEATURE_TRANSITION SELECT * FROM sdb.FEATURE_TRANSITION WHERE sdb.FEATURE_TRANSITION.FEATURE_ID IN (SELECT ID FROM FEATURE)')
             else:
-                if not test:
-                    c.execute('INSERT INTO FEATURE SELECT * FROM sdb.FEATURE WHERE PRECURSOR_ID IN (SELECT PRECURSOR_ID FROM sdb.FEATURE ORDER BY RANDOM() LIMIT (SELECT ROUND(' + str(subsample_ratio) + '*COUNT(DISTINCT PRECURSOR_ID)) FROM sdb.FEATURE))')
-                else:
-                    c.execute('INSERT INTO FEATURE SELECT * FROM sdb.FEATURE WHERE PRECURSOR_ID IN (SELECT PRECURSOR_ID FROM sdb.FEATURE LIMIT (SELECT ROUND(' + str(subsample_ratio) + '*COUNT(DISTINCT PRECURSOR_ID)) FROM sdb.FEATURE))')
-                c.execute('INSERT INTO FEATURE_MS1 SELECT * FROM sdb.FEATURE_MS1 WHERE sdb.FEATURE_MS1.FEATURE_ID IN (SELECT ID FROM FEATURE)')
-                c.execute('INSERT INTO FEATURE_MS2 SELECT * FROM sdb.FEATURE_MS2 WHERE sdb.FEATURE_MS2.FEATURE_ID IN (SELECT ID FROM FEATURE)')
-                c.execute('INSERT INTO FEATURE_TRANSITION SELECT * FROM sdb.FEATURE_TRANSITION WHERE sdb.FEATURE_TRANSITION.FEATURE_ID IN (SELECT ID FROM FEATURE)')
+                c.executescript('INSERT INTO FEATURE SELECT * FROM sdb.FEATURE WHERE PRECURSOR_ID IN (SELECT ID FROM sdb.PRECURSOR LIMIT (SELECT ROUND(' + str(subsample_ratio) + '*COUNT(DISTINCT ID)) FROM sdb.PRECURSOR)); INSERT INTO FEATURE_MS1 SELECT * FROM sdb.FEATURE_MS1 WHERE sdb.FEATURE_MS1.FEATURE_ID IN (SELECT ID FROM FEATURE); INSERT INTO FEATURE_MS2 SELECT * FROM sdb.FEATURE_MS2 WHERE sdb.FEATURE_MS2.FEATURE_ID IN (SELECT ID FROM FEATURE); INSERT INTO FEATURE_TRANSITION SELECT * FROM sdb.FEATURE_TRANSITION WHERE sdb.FEATURE_TRANSITION.FEATURE_ID IN (SELECT ID FROM FEATURE)')
+
         conn.commit()
-        c.fetchall()
         conn.close()
         logging.info("Merged file " + infile + " to " + outfile + ".")
 
-    conn = sqlite3.connect(outfile)
-    c = conn.cursor()
-    c.execute('VACUUM')
-    conn.commit()
-    c.fetchall()
-    conn.close()
     logging.info("All OSW files were merged.")

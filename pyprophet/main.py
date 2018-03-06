@@ -189,9 +189,8 @@ def protein(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_method, 
 @click.argument('infiles', nargs=-1, type=click.Path(exists=True))
 @click.option('--out','outfile', type=click.Path(exists=False), help='Merged OSW output file.')
 @click.option('--subsample_ratio', default=1, show_default=True, type=float, help='Subsample ratio used per input file.', callback=transform_subsample_ratio)
-@click.option('--global_reduce/--no-global_reduce', default=False, show_default=True, help='Reduce (MS2-level scored) OSW files for global scoring.')
 @click.option('--test/--no-test', default=False, show_default=True, help='Run in test mode with fixed seed.')
-def merge(infiles, outfile, subsample_ratio, global_reduce, test):
+def merge(infiles, outfile, subsample_ratio, test):
     """
     Merge multiple OSW files and optionally subsample the data for faster learning.
     """
@@ -199,7 +198,7 @@ def merge(infiles, outfile, subsample_ratio, global_reduce, test):
     if len(infiles) < 1:
         sys.exit("Error: At least one PyProphet input file needs to be defined.")
 
-    merge_osw(infiles, outfile, subsample_ratio, global_reduce, test)
+    merge_osw(infiles, outfile, subsample_ratio, test)
 
 
 # Export TSV
