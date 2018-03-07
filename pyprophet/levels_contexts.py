@@ -128,30 +128,45 @@ def infer_peptides(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_m
     con.close()
 
 def merge_osw(infiles, outfile, subsample_ratio, test):
+    # Copy the first file to have a template
+    copyfile(infiles[0], outfile)
+    conn = sqlite3.connect(outfile)
+    c = conn.cursor()
+    c.executescript('PRAGMA synchronous = OFF; BEGIN TRANSACTION; DELETE FROM RUN; DELETE FROM FEATURE; DELETE FROM FEATURE_MS1; DELETE FROM FEATURE_MS2; DELETE FROM FEATURE_TRANSITION')
+
     for infile in infiles:
-        if infile == infiles[0]:
-            # Copy the first file to have a template
-            copyfile(infile, outfile)
-            conn = sqlite3.connect(outfile)
-            c = conn.cursor()
-            c.executescript('PRAGMA synchronous = OFF; DELETE FROM RUN; DELETE FROM FEATURE; DELETE FROM FEATURE_MS1; DELETE FROM FEATURE_MS2; DELETE FROM FEATURE_TRANSITION')
-            conn.commit()
-            conn.close()
-            
-        conn = sqlite3.connect(outfile)
-        c = conn.cursor()
-        c.executescript('PRAGMA synchronous = OFF; ATTACH DATABASE "'+ infile + '" AS sdb; INSERT INTO RUN SELECT * FROM sdb.RUN')
+        c.executescript('PRAGMA synchronous = OFF; ATTACH DATABASE "'+ infile + '" AS sdb; ' + 'INSERT INTO RUN SELECT * FROM sdb.RUN; ' + 'DETACH DATABASE sdb')
+        logging.info("Merged runs of file " + infile + " to " + outfile + ".")
 
+    for infile in infiles:
         if subsample_ratio >= 1.0:
-            c.executescript('INSERT INTO FEATURE SELECT * FROM sdb.FEATURE; INSERT INTO FEATURE_MS1 SELECT * FROM sdb.FEATURE_MS1; INSERT INTO FEATURE_MS2 SELECT * FROM sdb.FEATURE_MS2; INSERT INTO FEATURE_TRANSITION SELECT * FROM sdb.FEATURE_TRANSITION')
+            c.executescript('ATTACH DATABASE "'+ infile + '" AS sdb; ' + 'INSERT INTO FEATURE SELECT * FROM sdb.FEATURE; ' + 'DETACH DATABASE sdb')
         else:
-            if not test:
-                c.executescript('INSERT INTO FEATURE SELECT * FROM sdb.FEATURE WHERE PRECURSOR_ID IN (SELECT ID FROM sdb.PRECURSOR ORDER BY RANDOM() LIMIT (SELECT ROUND(' + str(subsample_ratio) + '*COUNT(DISTINCT ID)) FROM sdb.PRECURSOR)); INSERT INTO FEATURE_MS1 SELECT * FROM sdb.FEATURE_MS1 WHERE sdb.FEATURE_MS1.FEATURE_ID IN (SELECT ID FROM FEATURE); INSERT INTO FEATURE_MS2 SELECT * FROM sdb.FEATURE_MS2 WHERE sdb.FEATURE_MS2.FEATURE_ID IN (SELECT ID FROM FEATURE); INSERT INTO FEATURE_TRANSITION SELECT * FROM sdb.FEATURE_TRANSITION WHERE sdb.FEATURE_TRANSITION.FEATURE_ID IN (SELECT ID FROM FEATURE)')
-            else:
-                c.executescript('INSERT INTO FEATURE SELECT * FROM sdb.FEATURE WHERE PRECURSOR_ID IN (SELECT ID FROM sdb.PRECURSOR LIMIT (SELECT ROUND(' + str(subsample_ratio) + '*COUNT(DISTINCT ID)) FROM sdb.PRECURSOR)); INSERT INTO FEATURE_MS1 SELECT * FROM sdb.FEATURE_MS1 WHERE sdb.FEATURE_MS1.FEATURE_ID IN (SELECT ID FROM FEATURE); INSERT INTO FEATURE_MS2 SELECT * FROM sdb.FEATURE_MS2 WHERE sdb.FEATURE_MS2.FEATURE_ID IN (SELECT ID FROM FEATURE); INSERT INTO FEATURE_TRANSITION SELECT * FROM sdb.FEATURE_TRANSITION WHERE sdb.FEATURE_TRANSITION.FEATURE_ID IN (SELECT ID FROM FEATURE)')
+            c.executescript('ATTACH DATABASE "'+ infile + '" AS sdb; ' + 'INSERT INTO FEATURE SELECT * FROM sdb.FEATURE WHERE PRECURSOR_ID IN (SELECT ID FROM sdb.PRECURSOR LIMIT (SELECT ROUND(' + str(subsample_ratio) + '*COUNT(DISTINCT ID)) FROM sdb.PRECURSOR)); ' + 'DETACH DATABASE sdb')
+        logging.info("Merged generic features of file " + infile + " to " + outfile + ".")
 
-        conn.commit()
-        conn.close()
-        logging.info("Merged file " + infile + " to " + outfile + ".")
+    for infile in infiles:
+        if subsample_ratio >= 1.0:
+            c.executescript('ATTACH DATABASE "'+ infile + '" AS sdb; ' + 'INSERT INTO FEATURE_MS1 SELECT * FROM sdb.FEATURE_MS1; ' + 'DETACH DATABASE sdb')
+        else:
+            c.executescript('ATTACH DATABASE "'+ infile + '" AS sdb; ' + 'INSERT INTO FEATURE_MS1 SELECT * FROM sdb.FEATURE_MS1 WHERE sdb.FEATURE_MS1.FEATURE_ID IN (SELECT ID FROM FEATURE); ' + 'DETACH DATABASE sdb')
+        logging.info("Merged MS1 features of file " + infile + " to " + outfile + ".")
+
+    for infile in infiles:
+        if subsample_ratio >= 1.0:
+            c.executescript('ATTACH DATABASE "'+ infile + '" AS sdb; ' + 'INSERT INTO FEATURE_MS2 SELECT * FROM sdb.FEATURE_MS2; ' + 'DETACH DATABASE sdb')
+        else:
+            c.executescript('ATTACH DATABASE "'+ infile + '" AS sdb; ' + 'INSERT INTO FEATURE_MS2 SELECT * FROM sdb.FEATURE_MS2 WHERE sdb.FEATURE_MS2.FEATURE_ID IN (SELECT ID FROM FEATURE); ' + 'DETACH DATABASE sdb')
+        logging.info("Merged MS2 features of file " + infile + " to " + outfile + ".")
+
+    for infile in infiles:
+        if subsample_ratio >= 1.0:
+            c.executescript('ATTACH DATABASE "'+ infile + '" AS sdb; ' + 'INSERT INTO FEATURE_TRANSITION SELECT * FROM sdb.FEATURE_TRANSITION; ' + 'DETACH DATABASE sdb')
+        else:
+            c.executescript('ATTACH DATABASE "'+ infile + '" AS sdb; ' + 'INSERT INTO FEATURE_TRANSITION SELECT * FROM sdb.FEATURE_TRANSITION WHERE sdb.FEATURE_TRANSITION.FEATURE_ID IN (SELECT ID FROM FEATURE); ' + 'DETACH DATABASE sdb')
+        logging.info("Merged transition features of file " + infile + " to " + outfile + ".")
+
+    conn.commit()
+    conn.close()
 
     logging.info("All OSW files were merged.")
