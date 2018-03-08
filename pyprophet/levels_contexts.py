@@ -132,10 +132,10 @@ def merge_osw(infiles, outfile, subsample_ratio, test):
     copyfile(infiles[0], outfile)
     conn = sqlite3.connect(outfile)
     c = conn.cursor()
-    c.executescript('PRAGMA synchronous = OFF; BEGIN TRANSACTION; DELETE FROM RUN; DELETE FROM FEATURE; DELETE FROM FEATURE_MS1; DELETE FROM FEATURE_MS2; DELETE FROM FEATURE_TRANSITION')
+    c.executescript('PRAGMA synchronous = OFF; DELETE FROM RUN; DELETE FROM FEATURE; DELETE FROM FEATURE_MS1; DELETE FROM FEATURE_MS2; DELETE FROM FEATURE_TRANSITION')
 
     for infile in infiles:
-        c.executescript('PRAGMA synchronous = OFF; ATTACH DATABASE "'+ infile + '" AS sdb; ' + 'INSERT INTO RUN SELECT * FROM sdb.RUN; ' + 'DETACH DATABASE sdb')
+        c.executescript('ATTACH DATABASE "'+ infile + '" AS sdb; ' + 'INSERT INTO RUN SELECT * FROM sdb.RUN; ' + 'DETACH DATABASE sdb')
         logging.info("Merged runs of file " + infile + " to " + outfile + ".")
 
     for infile in infiles:
