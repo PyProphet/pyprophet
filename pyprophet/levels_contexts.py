@@ -1,6 +1,7 @@
 # encoding: latin-1
 
 import sys
+import os
 import click
 import pandas as pd
 pd.options.display.width = 220
@@ -12,6 +13,7 @@ from .stats import error_statistics, lookup_values_from_error_table, final_err_t
 from .report import save_report
 from shutil import copyfile
 from .std_logger import logging
+from .data_handling import check_sqlite_table
 
 def statistics_report(data, outfile, context, analyte, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps):
 
@@ -142,7 +144,10 @@ def merge_osw(infiles, outfile, subsample_ratio, test):
         if subsample_ratio >= 1.0:
             c.executescript('ATTACH DATABASE "'+ infile + '" AS sdb; ' + 'INSERT INTO FEATURE SELECT * FROM sdb.FEATURE; ' + 'DETACH DATABASE sdb')
         else:
-            c.executescript('ATTACH DATABASE "'+ infile + '" AS sdb; ' + 'INSERT INTO FEATURE SELECT * FROM sdb.FEATURE WHERE PRECURSOR_ID IN (SELECT ID FROM sdb.PRECURSOR LIMIT (SELECT ROUND(' + str(subsample_ratio) + '*COUNT(DISTINCT ID)) FROM sdb.PRECURSOR)); ' + 'DETACH DATABASE sdb')
+            if test:
+                c.executescript('ATTACH DATABASE "'+ infile + '" AS sdb; ' + 'INSERT INTO FEATURE SELECT * FROM sdb.FEATURE WHERE PRECURSOR_ID IN (SELECT ID FROM sdb.PRECURSOR LIMIT (SELECT ROUND(' + str(subsample_ratio) + '*COUNT(DISTINCT ID)) FROM sdb.PRECURSOR)); ' + 'DETACH DATABASE sdb')
+            else:
+                c.executescript('ATTACH DATABASE "'+ infile + '" AS sdb; ' + 'INSERT INTO FEATURE SELECT * FROM sdb.FEATURE WHERE PRECURSOR_ID IN (SELECT ID FROM sdb.PRECURSOR ORDER BY RANDOM() LIMIT (SELECT ROUND(' + str(subsample_ratio) + '*COUNT(DISTINCT ID)) FROM sdb.PRECURSOR)); ' + 'DETACH DATABASE sdb')
         logging.info("Merged generic features of file " + infile + " to " + outfile + ".")
 
     for infile in infiles:
@@ -170,3 +175,62 @@ def merge_osw(infiles, outfile, subsample_ratio, test):
     conn.close()
 
     logging.info("All OSW files were merged.")
+
+def reduce_osw(infile, outfile):
+    conn = sqlite3.connect(infile)
+    if not check_sqlite_table(conn, "SCORE_MS2"):
+        sys.exit("Error: Apply scoring to MS2 data before reducing file for multi-run scoring.")
+    conn.close()
+
+    try:
+        os.remove(outfile)
+    except OSError:
+        pass
+
+    conn = sqlite3.connect(outfile)
+    c = conn.cursor()
+
+    c.executescript('PRAGMA synchronous = OFF; ATTACH DATABASE "'+ infile + '" AS sdb; ' + 'CREATE TABLE RUN(ID INT PRIMARY KEY NOT NULL,FILENAME TEXT NOT NULL); INSERT INTO RUN SELECT * FROM sdb.RUN; CREATE TABLE SCORE_MS2(FEATURE_ID INTEGER, SCORE REAL); INSERT INTO SCORE_MS2 (FEATURE_ID, SCORE) SELECT FEATURE_ID, SCORE FROM sdb.SCORE_MS2 WHERE RANK == 1; CREATE TABLE FEATURE(ID INT PRIMARY KEY NOT NULL,RUN_ID INT NOT NULL,PRECURSOR_ID INT NOT NULL); INSERT INTO FEATURE (ID, RUN_ID, PRECURSOR_ID) SELECT ID, RUN_ID, PRECURSOR_ID FROM sdb.FEATURE WHERE ID IN (SELECT FEATURE_ID FROM SCORE_MS2)')
+
+    conn.commit()
+    conn.close()
+
+    logging.info("OSW file was reduced for multi-run scoring.")
+
+def merge_oswr(infiles, outfile, templatefile):
+    # Copy the template to the output file
+    copyfile(templatefile, outfile)
+    conn = sqlite3.connect(outfile)
+    c = conn.cursor()
+    c.executescript('PRAGMA synchronous = OFF; DROP TABLE IF EXISTS RUN; DROP TABLE IF EXISTS FEATURE; DROP TABLE IF EXISTS FEATURE_MS1; DROP TABLE IF EXISTS FEATURE_MS2; DROP TABLE IF EXISTS FEATURE_TRANSITION; DROP TABLE IF EXISTS SCORE_MS1; DROP TABLE IF EXISTS SCORE_MS2; DROP TABLE IF EXISTS SCORE_TRANSITION; DROP TABLE IF EXISTS SCORE_PEPTIDE; DROP TABLE IF EXISTS SCORE_PROTEIN; DROP TABLE IF EXISTS SCORE_IPF; CREATE TABLE RUN(ID INT PRIMARY KEY NOT NULL,FILENAME TEXT NOT NULL); CREATE TABLE SCORE_MS2(FEATURE_ID INTEGER, SCORE REAL); CREATE TABLE FEATURE(ID INT PRIMARY KEY NOT NULL,RUN_ID INT NOT NULL,PRECURSOR_ID INT NOT NULL);')
+
+    for infile in infiles:
+        c.executescript('ATTACH DATABASE "'+ infile + '" AS sdb; ' + 'INSERT INTO RUN SELECT * FROM sdb.RUN; ' + 'DETACH DATABASE sdb')
+        logging.info("Merged runs of file " + infile + " to " + outfile + ".")
+
+    for infile in infiles:
+        c.executescript('ATTACH DATABASE "'+ infile + '" AS sdb; ' + 'INSERT INTO FEATURE SELECT * FROM sdb.FEATURE; ' + 'DETACH DATABASE sdb')
+        logging.info("Merged generic features of file " + infile + " to " + outfile + ".")
+
+    for infile in infiles:
+        c.executescript('ATTACH DATABASE "'+ infile + '" AS sdb; ' + 'INSERT INTO SCORE_MS2 SELECT * FROM sdb.SCORE_MS2; ' + 'DETACH DATABASE sdb')
+        logging.info("Merged MS2 scores of file " + infile + " to " + outfile + ".")
+
+    conn.commit()
+    conn.close()
+
+    logging.info("All reduced OSWR files were merged.")
+
+def backpropagate_oswr(infile, outfile, apply_scores):
+    # store data in table
+    if infile != outfile:
+        copyfile(infile, outfile)
+
+    conn = sqlite3.connect(outfile)
+    c = conn.cursor()
+    c.executescript('PRAGMA synchronous = OFF; DROP TABLE IF EXISTS SCORE_PEPTIDE; DROP TABLE IF EXISTS SCORE_PROTEIN; CREATE TABLE SCORE_PEPTIDE (CONTEXT TEXT, RUN_ID INTEGER, PEPTIDE_ID INTEGER, SCORE REAL, PVALUE REAL, QVALUE REAL, PEP REAL); CREATE TABLE SCORE_PROTEIN (CONTEXT TEXT, RUN_ID INTEGER, PROTEIN_ID INTEGER, SCORE REAL, PVALUE REAL, QVALUE REAL, PEP REAL); ATTACH DATABASE "'+ apply_scores + '" AS sdb; INSERT INTO SCORE_PEPTIDE SELECT * FROM sdb.SCORE_PEPTIDE; INSERT INTO SCORE_PROTEIN SELECT * FROM sdb.SCORE_PROTEIN')
+
+    conn.commit()
+    conn.close()
+
+    logging.info("All multi-run data was backpropagated.")

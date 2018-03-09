@@ -16,7 +16,7 @@ import sys
 
 from .runner import PyProphetLearner, PyProphetWeightApplier
 from .ipf import infer_peptidoforms
-from .levels_contexts import infer_peptides, infer_proteins, merge_osw # , infer_protein_groups
+from .levels_contexts import infer_peptides, infer_proteins, merge_osw, reduce_osw, merge_oswr, backpropagate_oswr
 from .export import export_tsv, export_score_plots, filter_sqmass
 
 from .config import (transform_pi0_lambda, transform_threads, transform_subsample_ratio, set_parameters)
@@ -188,9 +188,10 @@ def protein(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_method, 
 @cli.command()
 @click.argument('infiles', nargs=-1, type=click.Path(exists=True))
 @click.option('--out','outfile', type=click.Path(exists=False), help='Merged OSW output file.')
+@click.option('--template','templatefile', type=click.Path(exists=False), help='[Reduced OSWR only] Template PQP or OSW file.')
 @click.option('--subsample_ratio', default=1, show_default=True, type=float, help='Subsample ratio used per input file.', callback=transform_subsample_ratio)
 @click.option('--test/--no-test', default=False, show_default=True, help='Run in test mode with fixed seed.')
-def merge(infiles, outfile, subsample_ratio, test):
+def merge(infiles, outfile, templatefile, subsample_ratio, test):
     """
     Merge multiple OSW files and optionally subsample the data for faster learning.
     """
@@ -198,7 +199,45 @@ def merge(infiles, outfile, subsample_ratio, test):
     if len(infiles) < 1:
         sys.exit("Error: At least one PyProphet input file needs to be defined.")
 
-    merge_osw(infiles, outfile, subsample_ratio, test)
+    if templatefile is None:
+        merge_osw(infiles, outfile, subsample_ratio, test)
+    else:
+        merge_oswr(infiles, outfile, templatefile)
+
+
+# Reduce scored PyProphet file to minimum for global scoring
+@cli.command()
+@click.option('--in', 'infile', required=True, type=click.Path(exists=True), help='Scored PyProphet input file.')
+@click.option('--out','outfile', type=click.Path(exists=False), help='Reduced OSWR output file.')
+def reduce(infile, outfile):
+    """
+    Reduce scored PyProphet file to minimum for global scoring
+    """
+
+    if outfile is None:
+        outfile = infile
+    else:
+        outfile = outfile
+
+    reduce_osw(infile, outfile)
+
+
+# Backpropagate multi-run peptide and protein scores to single files
+@cli.command()
+@click.option('--in', 'infile', required=True, type=click.Path(exists=True), help='Single run PyProphet input file.')
+@click.option('--out','outfile', type=click.Path(exists=False), help='Single run (with multi-run scores) PyProphet output file.')
+@click.option('--apply_scores', required=True, type=click.Path(exists=True), help='PyProphet multi-run scores file to apply.')
+def backpropagate(infile, outfile, apply_scores):
+    """
+    Backpropagate multi-run peptide and protein scores to single files
+    """
+
+    if outfile is None:
+        outfile = infile
+    else:
+        outfile = outfile
+
+    backpropagate_oswr(infile, outfile, apply_scores)
 
 
 # Export TSV
