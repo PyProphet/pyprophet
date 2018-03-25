@@ -103,8 +103,8 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
         pi0_method = CONFIG.get("final_statistics.pi0_method")
         pi0_smooth_df = CONFIG.get("final_statistics.pi0_smooth_df")
         pi0_smooth_log_pi0 = CONFIG.get("final_statistics.pi0_smooth_log_pi0")
-        use_pemp = CONFIG.get("final_statistics.use_pemp")
-        use_pfdr = CONFIG.get("final_statistics.use_pfdr")
+        use_pemp = not CONFIG.get("final_statistics.parametric")
+        use_pfdr = CONFIG.get("final_statistics.pfdr")
 
         td_peaks, bt_peaks = self.select_train_peaks(train, "main_score", fdr, lambda_, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, use_pemp, use_pfdr)
         model = self.inner_learner.learn(td_peaks, bt_peaks, False)
@@ -120,8 +120,8 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
         pi0_method = CONFIG.get("final_statistics.pi0_method")
         pi0_smooth_df = CONFIG.get("final_statistics.pi0_smooth_df")
         pi0_smooth_log_pi0 = CONFIG.get("final_statistics.pi0_smooth_log_pi0")
-        use_pemp = CONFIG.get("final_statistics.use_pemp")
-        use_pfdr = CONFIG.get("final_statistics.use_pfdr")
+        use_pemp = not CONFIG.get("final_statistics.parametric")
+        use_pfdr = CONFIG.get("final_statistics.pfdr")
 
         td_peaks, bt_peaks = self.select_train_peaks(train, "classifier_score", fdr, lambda_, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, use_pemp, use_pfdr)
 
