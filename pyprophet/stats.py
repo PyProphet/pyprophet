@@ -1,39 +1,26 @@
-# encoding: latin-1
-
 from __future__ import division
-
-# openblas + multiprocessing crashes for OPENBLAS_NUM_THREADS > 1 !!!
-import os
-os.putenv("OPENBLAS_NUM_THREADS", "1")
-
-from collections import namedtuple
 
 import numpy as np
 import scipy as sp
-
 import pandas as pd
-pd.options.display.width = 220
-pd.options.display.precision = 6
+import math
+import scipy.stats
+import scipy.special
+import sys
+import multiprocessing
+
+from .optimized import (find_nearest_matches as _find_nearest_matches,
+                       count_num_positives, single_chromatogram_hypothesis_fast)
+from statsmodels.nonparametric.kde import KDEUnivariate
+from collections import namedtuple
+from .config import CONFIG
+from .std_logger import logging
 
 try:
     profile
 except NameError:
     profile = lambda x: x
 
-from .optimized import (find_nearest_matches as _find_nearest_matches,
-                       count_num_positives, single_chromatogram_hypothesis_fast)
-import scipy.special
-import math
-import scipy.stats
-from statsmodels.nonparametric.kde import KDEUnivariate
-
-import sys
-
-from .config import CONFIG
-
-import multiprocessing
-
-from .std_logger import logging
 
 def _ff(a):
     return _find_nearest_matches(*a)
@@ -372,7 +359,9 @@ def stat_metrics(p_values, pi0, use_pfdr):
     fpr = fp / num_null
 
     fdr = fp / num_positives
-    fnr = fn / num_negatives
+
+    np.seterr(divide='ignore') # when estimating the FNR, ignore division by zero error
+    fnr = fn / num_negatives 
     
     if use_pfdr:
         fdr /= (1.0 - (1.0 - p_values) ** num_total)

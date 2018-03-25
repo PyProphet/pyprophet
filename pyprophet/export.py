@@ -1,14 +1,11 @@
-# encoding: latin-1
-
 import pandas as pd
-pd.options.display.width = 220
-pd.options.display.precision = 6
-
 import numpy as np
 import sqlite3
+
 from .data_handling import filterChromByLabels, check_sqlite_table
 from .std_logger import logging
 from .report import plot_scores
+
 
 def export_tsv(infile, outfile, format, outcsv, transition_quantification, ipf, max_rs_peakgroup_pep, max_rs_peakgroup_qvalue, peptide, max_global_peptide_qvalue, protein, max_global_protein_qvalue):
 
@@ -89,6 +86,7 @@ def export_tsv(infile, outfile, format, outcsv, transition_quantification, ipf, 
 
     con.close()
 
+
 def export_score_plots(infile):
 
     con = sqlite3.connect(infile)
@@ -109,6 +107,7 @@ def export_score_plots(infile):
         plot_scores(table_transition, outfile)
 
     con.close()
+
 
 def filter_sqmass(sqmassfiles, infile, max_precursor_pep, max_peakgroup_pep, max_transition_pep):
     con = sqlite3.connect(infile)

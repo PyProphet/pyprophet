@@ -1,27 +1,18 @@
-# encoding: latin-1
-
-# openblas + multiprocessing crashes for OPENBLAS_NUM_THREADS > 1 !!!
-import os
-os.putenv("OPENBLAS_NUM_THREADS", "1")
-
-import random
-
 import pandas as pd
-pd.options.display.width = 220
-pd.options.display.precision = 6
-
 import numpy as np
+import random
+import sys
+import os
+
 from .optimized import find_top_ranked, rank
 from .config import CONFIG
-import sys
+from .std_logger import logging
 
 try:
     profile
 except NameError:
     def profile(fun):
         return fun
-
-from .std_logger import logging
 
 
 def isSQLite3(filename):
@@ -41,6 +32,7 @@ def isSQLite3(filename):
     else:
         return False
 
+
 def check_sqlite_table(con, table):
     table_present = False
     c = con.cursor()
@@ -52,6 +44,7 @@ def check_sqlite_table(con, table):
     c.fetchall()
 
     return(table_present)
+
 
 def check_for_unique_blocks(tg_ids):
     seen = set()
@@ -185,6 +178,7 @@ def prepare_data_table(table, tg_id_name="transition_group_id",
     df = cleanup_and_check(df)
     return df, all_score_columns
 
+
 class Experiment(object):
 
     @profile
@@ -272,6 +266,7 @@ class Experiment(object):
         df = self.df[self.df.is_train == True]
         return Experiment(df)
 
+
 # Filter a sqMass chromatogram file by given input labels
 def filterChromByLabels(infile, outfile, labels):
     import sqlite3
@@ -293,11 +288,13 @@ def filterChromByLabels(infile, outfile, labels):
 
     copyDatabase(c, conn, outfile, keep_ids)
 
+
 def copy_table(c, conn, keep_ids, tbl, id_col):
     stmt = "CREATE TABLE other.%s AS SELECT * FROM %s WHERE %s IN " % (tbl, tbl, id_col)
     stmt += get_ids_stmt(keep_ids) + ";"
     c.execute(stmt)
     conn.commit()
+
 
 def copyDatabase(c, conn, outfile, keep_ids):
     c.execute("ATTACH DATABASE '%s' AS other;" % outfile)
@@ -330,6 +327,7 @@ def copyDatabase(c, conn, outfile, keep_ids):
     c.execute("CREATE INDEX other.chrom_run ON CHROMATOGRAM(RUN_ID);")
 
     conn.commit()
+
 
 def get_ids_stmt(keep_ids):
     ids_stmt = "("

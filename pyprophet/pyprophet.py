@@ -1,10 +1,21 @@
-# encoding: latin-1
-
 from __future__ import division
 
-# openblas + multiprocessing crashes for OPENBLAS_NUM_THREADS > 1 !!!
-import os
-os.putenv("OPENBLAS_NUM_THREADS", "1")
+import pandas as pd
+import numpy as np
+import multiprocessing
+import sys
+import time
+
+from .config import CONFIG
+from .stats import (lookup_values_from_error_table, error_statistics,
+                   mean_and_std_dev, final_err_table, summary_err_table,
+                   posterior_chromatogram_hypotheses_fast)
+from .data_handling import (prepare_data_table, Experiment)
+from .classifiers import (LDALearner)
+from .semi_supervised import (AbstractSemiSupervisedLearner, StandardSemiSupervisedLearner)
+from .std_logger import logging
+from collections import namedtuple
+from contextlib import contextmanager
 
 try:
     profile
@@ -12,33 +23,6 @@ except NameError:
     def profile(fun):
         return fun
 
-
-
-import pandas as pd
-pd.options.display.width = 220
-pd.options.display.precision = 6
-
-import numpy as np
-
-from .config import CONFIG
-
-from .stats import (lookup_values_from_error_table, error_statistics,
-                   mean_and_std_dev, final_err_table, summary_err_table,
-                   posterior_chromatogram_hypotheses_fast)
-
-from .data_handling import (prepare_data_table, Experiment)
-from .classifiers import (LDALearner)
-from .semi_supervised import (AbstractSemiSupervisedLearner, StandardSemiSupervisedLearner)
-
-import multiprocessing
-
-from .std_logger import logging
-
-import time
-
-from collections import namedtuple
-from contextlib import contextmanager
-import sys
 
 @contextmanager
 def timer(name=""):
@@ -309,6 +293,7 @@ class HolyGostQuery(object):
 
         logging.info("Finished scoring and estimation statistics.")
         return result, scorer, classifier_table
+
 
 @profile
 def PyProphet():

@@ -1,17 +1,13 @@
-# encoding: latin-1
-
 import pandas as pd
-pd.options.display.width = 220
-pd.options.display.precision = 6
-
 import numpy as np
 import scipy as sp
-from scipy.stats import rankdata
 import sqlite3
 import sys
 
+from scipy.stats import rankdata
 from .std_logger import logging
 from .data_handling import check_sqlite_table
+
 
 def compute_model_fdr(data_in):
     data = np.asarray(data_in)
@@ -29,6 +25,7 @@ def compute_model_fdr(data_in):
     fdr[order] = data[order].cumsum()[ranks[order]-1] / ranks[order]
 
     return fdr
+
 
 def read_pyp_peakgroup_precursor(path, ipf_max_peakgroup_pep, ipf_ms1_scoring, ipf_ms2_scoring):
     logging.info("      read precursor-level data")
@@ -63,6 +60,7 @@ def read_pyp_peakgroup_precursor(path, ipf_max_peakgroup_pep, ipf_ms1_scoring, i
     con.close()
 
     return data
+
 
 def read_pyp_transition(path, ipf_max_transition_pep, ipf_h0):
     logging.info("      read peptidoform-level data")
@@ -102,6 +100,7 @@ def read_pyp_transition(path, ipf_max_transition_pep, ipf_h0):
 
     return data
 
+
 def prepare_precursor_bm(data):
     # MS1-level precursors
     ms1_precursor_data = data[['feature_id','ms2_peakgroup_pep','ms1_precursor_pep']].dropna(axis=0, how='any')
@@ -121,7 +120,8 @@ def prepare_precursor_bm(data):
     precursor_bm_data = pd.concat([precursor_bm_data, missing_bm_data.ix[~missing_bm_data['feature_id'].isin(precursor_bm_data['feature_id'])]])
 
     return(precursor_bm_data)
-    
+
+
 def prepare_transition_bm(data):
     # peptide_id = -1 indicates h0, i.e. the peak group is wrong!
     # initialize priors
@@ -137,6 +137,7 @@ def prepare_transition_bm(data):
 
     return data
 
+
 def apply_bm(data):
     # compute likelihood * prior per feature & hypothesis
     # all priors are identical but pandas DF multiplication requires aggregation, so we use min()
@@ -150,6 +151,7 @@ def apply_bm(data):
     pp_data['posterior'] = pp_data['likelihood_prior'] / pp_data['likelihood_sum']
 
     return pp_data.fillna(value = 0)
+
 
 def precursor_inference(data, ipf_ms1_scoring, ipf_ms2_scoring, ipf_max_precursor_pep, ipf_max_precursor_peakgroup_pep):
     # prepare MS1-level precursor data
@@ -192,6 +194,7 @@ def precursor_inference(data, ipf_ms1_scoring, ipf_ms2_scoring, ipf_max_precurso
 
     return inferred_precursors
 
+
 def peptidoform_inference(transition_table, precursor_data, ipf_grouped_fdr):
     transition_table = pd.merge(transition_table, precursor_data, on='feature_id')
 
@@ -214,6 +217,7 @@ def peptidoform_inference(transition_table, precursor_data, ipf_grouped_fdr):
     result = pf_pp_data.merge(precursor_data[['feature_id','precursor_peakgroup_pep']].drop_duplicates(), on=['feature_id'], how='inner')
 
     return result
+
 
 def infer_peptidoforms(infile, outfile, ipf_ms1_scoring, ipf_ms2_scoring, ipf_h0, ipf_grouped_fdr, ipf_max_precursor_pep, ipf_max_peakgroup_pep, ipf_max_precursor_peakgroup_pep, ipf_max_transition_pep):
     logging.info("start IPF (Inference of PeptidoForms)")

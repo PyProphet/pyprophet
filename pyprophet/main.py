@@ -1,8 +1,15 @@
-# encoding: latin-1
+import pandas as pd
+import numpy as np
+import click
+import sys
 
-# openblas + multiprocessing crashes for OPENBLAS_NUM_THREADS > 1 !!!
-import os
-os.putenv("OPENBLAS_NUM_THREADS", "1")
+from .std_logger import logging
+from .runner import PyProphetLearner, PyProphetWeightApplier
+from .ipf import infer_peptidoforms
+from .levels_contexts import infer_peptides, infer_proteins, merge_osw, reduce_osw, merge_oswr, backpropagate_oswr
+from .export import export_tsv, export_score_plots, filter_sqmass
+from .config import (transform_pi0_lambda, transform_threads, transform_subsample_ratio, set_parameters)
+from functools import update_wrapper
 
 try:
     profile
@@ -10,24 +17,6 @@ except NameError:
     def profile(fun):
         return fun
 
-import click
-from .std_logger import logging
-import sys
-
-from .runner import PyProphetLearner, PyProphetWeightApplier
-from .ipf import infer_peptidoforms
-from .levels_contexts import infer_peptides, infer_proteins, merge_osw, reduce_osw, merge_oswr, backpropagate_oswr
-from .export import export_tsv, export_score_plots, filter_sqmass
-
-from .config import (transform_pi0_lambda, transform_threads, transform_subsample_ratio, set_parameters)
-
-from functools import update_wrapper
-
-import pandas as pd
-pd.options.display.width = 220
-pd.options.display.precision = 6
-
-import numpy as np
 
 @click.group(chain=True)
 @click.version_option()

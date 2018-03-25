@@ -1,35 +1,25 @@
-# encoding: latin-1
-
-# openblas + multiprocessing crashes for OPENBLAS_NUM_THREADS > 1 !!!
+import abc
+import click
+import sys
 import os
-os.putenv("OPENBLAS_NUM_THREADS", "1")
+import time
+import warnings
+import pandas as pd
+import numpy as np
+import sqlite3
+
+from .pyprophet import PyProphet
+from .config import CONFIG
+from .report import save_report
+from .std_logger import logging
+from .data_handling import isSQLite3
+from shutil import copyfile
 
 try:
     profile
 except NameError:
     def profile(fun):
         return fun
-
-import abc
-import click
-from .std_logger import logging
-import sys
-import time
-import warnings
-
-from .pyprophet import PyProphet
-from .config import CONFIG
-from .report import save_report
-
-
-import pandas as pd
-pd.options.display.width = 220
-pd.options.display.precision = 6
-
-import numpy as np
-import sqlite3
-from shutil import copyfile
-from .data_handling import isSQLite3
 
 
 class PyProphetRunner(object):
@@ -214,6 +204,7 @@ class PyProphetRunner(object):
 
         weights.to_sql("PYPROPHET_WEIGHTS", con, index=False, if_exists='append')
 
+
 class PyProphetLearner(PyProphetRunner):
 
     def run_algo(self):
@@ -226,6 +217,7 @@ class PyProphetLearner(PyProphetRunner):
         yield "full_stat_path", os.path.join(self.prefix + "_full_stat.csv")
         yield "trained_weights_path", os.path.join(self.prefix + "_weights.csv")
         yield "report_path", os.path.join(self.prefix + "_report.pdf")
+
 
 class PyProphetWeightApplier(PyProphetRunner):
 

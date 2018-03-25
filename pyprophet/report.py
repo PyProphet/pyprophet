@@ -18,7 +18,7 @@ def save_report(pdf_path, title, top_decoys, top_targets, cutoffs, svalues, qval
     plt.subplots_adjust(hspace=.5)
 
     plt.subplot(321)
-    plt.title("ROC")
+    plt.title("q-/s-value")
     plt.xlabel('false positive rate (q-value)')
     plt.ylabel('true positive rate (s-value)')
 

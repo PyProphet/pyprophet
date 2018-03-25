@@ -1,19 +1,16 @@
-# encoding: latin-1
-
 import sys
 import os
 import click
 import pandas as pd
-pd.options.display.width = 220
-pd.options.display.precision = 6
-
 import numpy as np
 import sqlite3
+
 from .stats import error_statistics, lookup_values_from_error_table, final_err_table, summary_err_table
 from .report import save_report
 from shutil import copyfile
 from .std_logger import logging
 from .data_handling import check_sqlite_table
+
 
 def statistics_report(data, outfile, context, analyte, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps):
 
@@ -40,6 +37,7 @@ def statistics_report(data, outfile, context, analyte, parametric, pfdr, pi0_lam
     save_report(outfile + "_" + context + "_" + analyte + ".pdf", outfile + ": " + context + " " + analyte + "-level error-rate control", data[data.decoy==1]["score"], data[data.decoy==0]["score"], stat_table["cutoff"], stat_table["svalue"], stat_table["qvalue"], data[data.decoy==0]["p_value"], pi0)
 
     return(data)
+
 
 def infer_proteins(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps):
 
@@ -85,6 +83,7 @@ def infer_proteins(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_m
 
     con.close()
 
+
 def infer_peptides(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps):
 
     con = sqlite3.connect(infile)
@@ -128,6 +127,7 @@ def infer_peptides(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_m
     df.to_sql(table, con, index=False, dtype={"RUN_ID": "INTEGER"}, if_exists='append')
 
     con.close()
+
 
 def merge_osw(infiles, outfile, subsample_ratio, test):
     # Copy the first file to have a template
@@ -176,6 +176,7 @@ def merge_osw(infiles, outfile, subsample_ratio, test):
 
     logging.info("All OSW files were merged.")
 
+
 def reduce_osw(infile, outfile):
     conn = sqlite3.connect(infile)
     if not check_sqlite_table(conn, "SCORE_MS2"):
@@ -196,6 +197,7 @@ def reduce_osw(infile, outfile):
     conn.close()
 
     logging.info("OSW file was reduced for multi-run scoring.")
+
 
 def merge_oswr(infiles, outfile, templatefile):
     # Copy the template to the output file
@@ -220,6 +222,7 @@ def merge_oswr(infiles, outfile, templatefile):
     conn.close()
 
     logging.info("All reduced OSWR files were merged.")
+
 
 def backpropagate_oswr(infile, outfile, apply_scores):
     # store data in table
