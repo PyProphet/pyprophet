@@ -11,7 +11,6 @@ import sqlite3
 from .pyprophet import PyProphet
 from .config import CONFIG
 from .report import save_report
-from .std_logger import logging
 from .data_handling import isSQLite3
 from shutil import copyfile
 

@@ -5,6 +5,7 @@ import numpy as np
 import multiprocessing
 import sys
 import time
+import click
 
 from .config import CONFIG
 from .stats import (lookup_values_from_error_table, error_statistics,
@@ -13,7 +14,6 @@ from .stats import (lookup_values_from_error_table, error_statistics,
 from .data_handling import (prepare_data_table, Experiment)
 from .classifiers import (LDALearner)
 from .semi_supervised import (AbstractSemiSupervisedLearner, StandardSemiSupervisedLearner)
-from .std_logger import logging
 from collections import namedtuple
 from contextlib import contextmanager
 
@@ -38,9 +38,9 @@ def timer(name=""):
     needed -= minutes * 60
 
     if name:
-        logging.info("Time needed for %s: %02d:%02d:%.1f" % (name, hours, minutes, needed))
+        click.echo("Time needed for %s: %02d:%02d:%.1f" % (name, hours, minutes, needed))
     else:
-        logging.info("Time needed: %02d:%02d:%.1f" % (hours, minutes, needed))
+        click.echo("Time needed: %02d:%02d:%.1f" % (hours, minutes, needed))
 
 
 Result = namedtuple("Result", "summary_statistics final_statistics scored_tables")
@@ -130,9 +130,9 @@ class Scorer(object):
         texp["q_value"] = q_values
         texp["s_value"] = s_values
         texp["p_value"] = p_values
-        logging.info("Mean qvalue = %e, std_dev qvalue = %e" % (np.mean(q_values),
+        click.echo("Mean qvalue = %e, std_dev qvalue = %e" % (np.mean(q_values),
                                                                   np.std(q_values, ddof=1)))
-        logging.info("Mean svalue = %e, std_dev svalue = %e" % (np.mean(s_values),
+        click.echo("Mean svalue = %e, std_dev svalue = %e" % (np.mean(s_values),
                                                                   np.std(s_values, ddof=1)))
         texp.add_peak_group_rank()
 
@@ -189,9 +189,9 @@ class HolyGostQuery(object):
 
     def apply_weights(self, table, loaded_weights):
         with timer():
-            logging.info("apply weights")
+            click.echo("apply weights")
             result, scorer, trained_weights = self._apply_weights(table, loaded_weights)
-            logging.info("Finished processing of input data.")
+            click.echo("Finished processing of input data.")
         return result, scorer, trained_weights
 
     def _apply_weights(self, table, loaded_weights):
@@ -211,11 +211,11 @@ class HolyGostQuery(object):
 
         learner = self.semi_supervised_learner
 
-        logging.info("start application of pretrained weights")
+        click.echo("start application of pretrained weights")
         clf_scores = learner.score(experiment, loaded_weights)
         experiment.set_and_rerank("classifier_score", clf_scores)
 
-        logging.info("finished pretrained scoring")
+        click.echo("finished pretrained scoring")
 
         ws = [loaded_weights.flatten()]
         final_classifier = self.semi_supervised_learner.averaged_learner(ws)
@@ -226,9 +226,9 @@ class HolyGostQuery(object):
     def learn_and_apply(self, table):
         with timer():
 
-            logging.info("learn and apply classifier from input data")
+            click.echo("learn and apply classifier from input data")
             result, scorer, trained_weights = self._learn_and_apply(table)
-            logging.info("processing input data finished")
+            click.echo("processing input data finished")
 
         return result, scorer, trained_weights
 
@@ -250,8 +250,8 @@ class HolyGostQuery(object):
         neval = CONFIG.get("xeval.num_iter")
         num_processes = CONFIG.get("num_processes")
 
-        logging.info("Semi-supervised learning of weights:")
-        logging.info("   start learning on  %d folds using %d processes" % (neval, num_processes))
+        click.echo("Semi-supervised learning of weights:")
+        click.echo("   start learning on  %d folds using %d processes" % (neval, num_processes))
 
         if num_processes == 1:
             for k in range(neval):
@@ -268,8 +268,8 @@ class HolyGostQuery(object):
                 ttt_scores = [ti for r in res for ti in r[0]]
                 ttd_scores = [ti for r in res for ti in r[1]]
                 ws.extend([r[2] for r in res])
-        logging.info("   finished learning")
-        logging.info("")
+        click.echo("   finished learning")
+        click.echo("")
 
         # we only use weights from last iteration
         # ws = [ws[-1]]
@@ -291,7 +291,7 @@ class HolyGostQuery(object):
 
         result = Result(summary_statistics, final_statistics, scored_table)
 
-        logging.info("Finished scoring and estimation statistics.")
+        click.echo("Finished scoring and estimation statistics.")
         return result, scorer, classifier_table
 
 

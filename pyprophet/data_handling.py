@@ -1,12 +1,11 @@
 import pandas as pd
 import numpy as np
 import random
+import click
 import sys
 import os
 
 from .optimized import find_top_ranked, rank
-from .config import CONFIG
-from .std_logger import logging
 
 try:
     profile
@@ -80,8 +79,7 @@ def cleanup_and_check(df):
     n_decoy = len(decoy_groups)
     n_target = len(target_groups)
 
-    msg = "Data set contains %d decoy and %d target groups." % (n_decoy, n_target)
-    logging.info(msg)
+    click.echo("Data set contains %d decoy and %d target groups." % (n_decoy, n_target))
     if n_decoy < 10 or n_target < 10:
         sys.exit("Error: At least 10 decoy groups and 10 target groups are required.")
 
@@ -160,7 +158,7 @@ def prepare_data_table(table, tg_id_name="transition_group_id",
         col_name = "var_%d" % i
         col_data = table[v]
         if pd.isnull(col_data).all():
-            logging.warn("Warning: Column %s contains only invalid/missing values. Column will be dropped." % v)
+            click.echo("Warning: Column %s contains only invalid/missing values. Column will be dropped." % v)
             continue
         else:
             used_var_column_names.append(v)
@@ -186,10 +184,10 @@ class Experiment(object):
         self.df = df
 
     def log_summary(self):
-        logging.info("Summary of input data:")
-        logging.info("   %d peak groups" % len(self.df))
-        logging.info("   %d group ids" % len(self.df.tg_id.unique()))
-        logging.info("   %d scores including main score" % (len(self.df.columns.values) - 6))
+        click.echo("Summary of input data:")
+        click.echo("   %d peak groups" % len(self.df))
+        click.echo("   %d group ids" % len(self.df.tg_id.unique()))
+        click.echo("   %d scores including main score" % (len(self.df.columns.values) - 6))
 
     def __getitem__(self, *args):
         return self.df.__getitem__(*args)

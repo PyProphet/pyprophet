@@ -3,7 +3,6 @@ import numpy as np
 import sqlite3
 
 from .data_handling import filterChromByLabels, check_sqlite_table
-from .std_logger import logging
 from .report import plot_scores
 
 

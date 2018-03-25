@@ -14,7 +14,6 @@ from .optimized import (find_nearest_matches as _find_nearest_matches,
 from statsmodels.nonparametric.kde import KDEUnivariate
 from collections import namedtuple
 from .config import CONFIG
-from .std_logger import logging
 
 try:
     profile

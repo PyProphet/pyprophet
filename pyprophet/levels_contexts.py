@@ -8,7 +8,6 @@ import sqlite3
 from .stats import error_statistics, lookup_values_from_error_table, final_err_table, summary_err_table
 from .report import save_report
 from shutil import copyfile
-from .std_logger import logging
 from .data_handling import check_sqlite_table
 
 
@@ -138,7 +137,7 @@ def merge_osw(infiles, outfile, subsample_ratio, test):
 
     for infile in infiles:
         c.executescript('ATTACH DATABASE "'+ infile + '" AS sdb; ' + 'INSERT INTO RUN SELECT * FROM sdb.RUN; ' + 'DETACH DATABASE sdb')
-        logging.info("Merged runs of file " + infile + " to " + outfile + ".")
+        click.echo("Merged runs of file " + infile + " to " + outfile + ".")
 
     for infile in infiles:
         if subsample_ratio >= 1.0:
@@ -148,33 +147,33 @@ def merge_osw(infiles, outfile, subsample_ratio, test):
                 c.executescript('ATTACH DATABASE "'+ infile + '" AS sdb; ' + 'INSERT INTO FEATURE SELECT * FROM sdb.FEATURE WHERE PRECURSOR_ID IN (SELECT ID FROM sdb.PRECURSOR LIMIT (SELECT ROUND(' + str(subsample_ratio) + '*COUNT(DISTINCT ID)) FROM sdb.PRECURSOR)); ' + 'DETACH DATABASE sdb')
             else:
                 c.executescript('ATTACH DATABASE "'+ infile + '" AS sdb; ' + 'INSERT INTO FEATURE SELECT * FROM sdb.FEATURE WHERE PRECURSOR_ID IN (SELECT ID FROM sdb.PRECURSOR ORDER BY RANDOM() LIMIT (SELECT ROUND(' + str(subsample_ratio) + '*COUNT(DISTINCT ID)) FROM sdb.PRECURSOR)); ' + 'DETACH DATABASE sdb')
-        logging.info("Merged generic features of file " + infile + " to " + outfile + ".")
+        click.echo("Merged generic features of file " + infile + " to " + outfile + ".")
 
     for infile in infiles:
         if subsample_ratio >= 1.0:
             c.executescript('ATTACH DATABASE "'+ infile + '" AS sdb; ' + 'INSERT INTO FEATURE_MS1 SELECT * FROM sdb.FEATURE_MS1; ' + 'DETACH DATABASE sdb')
         else:
             c.executescript('ATTACH DATABASE "'+ infile + '" AS sdb; ' + 'INSERT INTO FEATURE_MS1 SELECT * FROM sdb.FEATURE_MS1 WHERE sdb.FEATURE_MS1.FEATURE_ID IN (SELECT ID FROM FEATURE); ' + 'DETACH DATABASE sdb')
-        logging.info("Merged MS1 features of file " + infile + " to " + outfile + ".")
+        click.echo("Merged MS1 features of file " + infile + " to " + outfile + ".")
 
     for infile in infiles:
         if subsample_ratio >= 1.0:
             c.executescript('ATTACH DATABASE "'+ infile + '" AS sdb; ' + 'INSERT INTO FEATURE_MS2 SELECT * FROM sdb.FEATURE_MS2; ' + 'DETACH DATABASE sdb')
         else:
             c.executescript('ATTACH DATABASE "'+ infile + '" AS sdb; ' + 'INSERT INTO FEATURE_MS2 SELECT * FROM sdb.FEATURE_MS2 WHERE sdb.FEATURE_MS2.FEATURE_ID IN (SELECT ID FROM FEATURE); ' + 'DETACH DATABASE sdb')
-        logging.info("Merged MS2 features of file " + infile + " to " + outfile + ".")
+        click.echo("Merged MS2 features of file " + infile + " to " + outfile + ".")
 
     for infile in infiles:
         if subsample_ratio >= 1.0:
             c.executescript('ATTACH DATABASE "'+ infile + '" AS sdb; ' + 'INSERT INTO FEATURE_TRANSITION SELECT * FROM sdb.FEATURE_TRANSITION; ' + 'DETACH DATABASE sdb')
         else:
             c.executescript('ATTACH DATABASE "'+ infile + '" AS sdb; ' + 'INSERT INTO FEATURE_TRANSITION SELECT * FROM sdb.FEATURE_TRANSITION WHERE sdb.FEATURE_TRANSITION.FEATURE_ID IN (SELECT ID FROM FEATURE); ' + 'DETACH DATABASE sdb')
-        logging.info("Merged transition features of file " + infile + " to " + outfile + ".")
+        click.echo("Merged transition features of file " + infile + " to " + outfile + ".")
 
     conn.commit()
     conn.close()
 
-    logging.info("All OSW files were merged.")
+    click.echo("All OSW files were merged.")
 
 
 def reduce_osw(infile, outfile):
@@ -196,7 +195,7 @@ def reduce_osw(infile, outfile):
     conn.commit()
     conn.close()
 
-    logging.info("OSW file was reduced for multi-run scoring.")
+    click.eco("OSW file was reduced for multi-run scoring.")
 
 
 def merge_oswr(infiles, outfile, templatefile):
@@ -208,20 +207,20 @@ def merge_oswr(infiles, outfile, templatefile):
 
     for infile in infiles:
         c.executescript('ATTACH DATABASE "'+ infile + '" AS sdb; ' + 'INSERT INTO RUN SELECT * FROM sdb.RUN; ' + 'DETACH DATABASE sdb')
-        logging.info("Merged runs of file " + infile + " to " + outfile + ".")
+        click.eco("Merged runs of file " + infile + " to " + outfile + ".")
 
     for infile in infiles:
         c.executescript('ATTACH DATABASE "'+ infile + '" AS sdb; ' + 'INSERT INTO FEATURE SELECT * FROM sdb.FEATURE; ' + 'DETACH DATABASE sdb')
-        logging.info("Merged generic features of file " + infile + " to " + outfile + ".")
+        click.eco("Merged generic features of file " + infile + " to " + outfile + ".")
 
     for infile in infiles:
         c.executescript('ATTACH DATABASE "'+ infile + '" AS sdb; ' + 'INSERT INTO SCORE_MS2 SELECT * FROM sdb.SCORE_MS2; ' + 'DETACH DATABASE sdb')
-        logging.info("Merged MS2 scores of file " + infile + " to " + outfile + ".")
+        click.eco("Merged MS2 scores of file " + infile + " to " + outfile + ".")
 
     conn.commit()
     conn.close()
 
-    logging.info("All reduced OSWR files were merged.")
+    click.eco("All reduced OSWR files were merged.")
 
 
 def backpropagate_oswr(infile, outfile, apply_scores):
@@ -236,4 +235,4 @@ def backpropagate_oswr(infile, outfile, apply_scores):
     conn.commit()
     conn.close()
 
-    logging.info("All multi-run data was backpropagated.")
+    click.eco("All multi-run data was backpropagated.")

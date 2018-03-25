@@ -3,7 +3,6 @@ import numpy as np
 import click
 import sys
 
-from .std_logger import logging
 from .runner import PyProphetLearner, PyProphetWeightApplier
 from .ipf import infer_peptidoforms
 from .levels_contexts import infer_peptides, infer_proteins, merge_osw, reduce_osw, merge_oswr, backpropagate_oswr

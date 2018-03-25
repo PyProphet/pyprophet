@@ -1,23 +1,15 @@
-# encoding: latin-1
+import numpy as np
+import click
 
-# openblas + multiprocessing crashes for OPENBLAS_NUM_THREADS > 1 !!!
-import os
-os.putenv("OPENBLAS_NUM_THREADS", "1")
+from .data_handling import Experiment
+from .classifiers import AbstractLearner
+from .config import CONFIG
+from .stats import mean_and_std_dev, find_cutoff
 
 try:
     profile
 except NameError:
     profile = lambda x: x
-
-from .data_handling import Experiment
-from .classifiers import AbstractLearner
-from .config import CONFIG
-
-import numpy as np
-from .stats import mean_and_std_dev, find_cutoff
-
-
-from .std_logger import logging
 
 
 class AbstractSemiSupervisedLearner(object):
@@ -39,7 +31,7 @@ class AbstractSemiSupervisedLearner(object):
         assert isinstance(experiment, Experiment)
 
         num_iter = CONFIG.get("semi_supervised_learner.num_iter")
-        logging.info("      learn on cross-validation fold")
+        click.echo("      learn on cross-validation fold")
 
         fraction = CONFIG.get("xeval.fraction")
         is_test = CONFIG.get("is_test")
