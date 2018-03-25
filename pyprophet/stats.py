@@ -13,7 +13,7 @@ from .optimized import (find_nearest_matches as _find_nearest_matches,
                        count_num_positives, single_chromatogram_hypothesis_fast)
 from statsmodels.nonparametric.kde import KDEUnivariate
 from collections import namedtuple
-from .config import CONFIG
+# from .config import CONFIG
 
 try:
     profile
@@ -26,15 +26,15 @@ def _ff(a):
 
 
 def find_nearest_matches(x, y):
-    num_processes = CONFIG.get("num_processes")
-    if num_processes > 1:
-        pool = multiprocessing.Pool(processes=num_processes)
-        batch_size = int(math.ceil(len(y) / num_processes))
-        parts = [(x, y[i:i + batch_size]) for i in range(0, len(y),
-                                                         batch_size)]
-        res = pool.map(_ff, parts)
-        res_par = np.hstack(res)
-        return res_par
+    # num_processes = CONFIG.get("num_processes")
+    # if num_processes > 1:
+    #     pool = multiprocessing.Pool(processes=num_processes)
+    #     batch_size = int(math.ceil(len(y) / num_processes))
+    #     parts = [(x, y[i:i + batch_size]) for i in range(0, len(y),
+    #                                                      batch_size)]
+    #     res = pool.map(_ff, parts)
+    #     res_par = np.hstack(res)
+    #     return res_par
     return _find_nearest_matches(x, y)
 
 

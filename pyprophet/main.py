@@ -7,7 +7,7 @@ from .runner import PyProphetLearner, PyProphetWeightApplier
 from .ipf import infer_peptidoforms
 from .levels_contexts import infer_peptides, infer_proteins, merge_osw, reduce_osw, merge_oswr, backpropagate_oswr
 from .export import export_tsv, export_score_plots, filter_sqmass
-from .config import (transform_pi0_lambda, transform_threads, transform_subsample_ratio, set_parameters)
+from .config import (transform_pi0_lambda, transform_threads, transform_subsample_ratio)
 from functools import update_wrapper
 
 try:
@@ -34,10 +34,10 @@ def cli():
 # Semi-supervised learning
 @click.option('--apply_weights', type=click.Path(exists=True), help='Apply PyProphet score weights file instead of semi-supervised learning.')
 @click.option('--xeval_fraction', default=0.5, show_default=True, type=float, help='Data fraction used for cross-validation of semi-supervised learning step.')
-@click.option('--xeval_iterations', default=10, show_default=True, type=int, help='Number of iterations for cross-validation of semi-supervised learning step.')
-@click.option('--initial_fdr', default=0.15, show_default=True, type=float, help='Initial FDR cutoff for best scoring targets.')
-@click.option('--iteration_fdr', default=0.02, show_default=True, type=float, help='Iteration FDR cutoff for best scoring targets.')
-@click.option('--ss_iterations', default=10, show_default=True, type=int, help='Number of iterations for semi-supervised learning step.')
+@click.option('--xeval_num_iter', default=10, show_default=True, type=int, help='Number of iterations for cross-validation of semi-supervised learning step.')
+@click.option('--ss_initial_fdr', default=0.15, show_default=True, type=float, help='Initial FDR cutoff for best scoring targets.')
+@click.option('--ss_iteration_fdr', default=0.02, show_default=True, type=float, help='Iteration FDR cutoff for best scoring targets.')
+@click.option('--ss_num_iter', default=10, show_default=True, type=int, help='Number of iterations for semi-supervised learning step.')
 # Statistics
 @click.option('--group_id', default="group_id", show_default=True, type=str, help='Group identifier for calculation of statistics.')
 @click.option('--parametric/--no-parametric', default=False, show_default=True, help='Do parametric estimation of p-values.')
@@ -63,7 +63,7 @@ def cli():
 # Processing
 @click.option('--threads', default=1, show_default=True, type=int, help='Number of threads used for semi-supervised learning. -1 means all available CPUs.', callback=transform_threads)
 @click.option('--test/--no-test', default=False, show_default=True, help='Run in test mode with fixed seed.')
-def score(infile, outfile, apply_weights, xeval_fraction, xeval_iterations, initial_fdr, iteration_fdr, ss_iterations, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, level, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn, tric_chromprob, threads, test):
+def score(infile, outfile, apply_weights, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, level, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn, tric_chromprob, threads, test):
     """
     Conduct semi-supervised learning and error-rate estimation for MS1, MS2 and transition-level data. 
     """
@@ -73,12 +73,10 @@ def score(infile, outfile, apply_weights, xeval_fraction, xeval_iterations, init
     else:
         outfile = outfile
 
-    set_parameters(xeval_fraction, xeval_iterations, initial_fdr, iteration_fdr, ss_iterations, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, tric_chromprob, threads, test)
-
     if not apply_weights:
-        PyProphetLearner(infile, outfile, level, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn).run()
+        PyProphetLearner(infile, outfile, group_id, level, xeval_num_iter, xeval_fraction, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, not parametric, pfdr, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, test, threads, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn).run()
     else:
-        PyProphetWeightApplier(infile, outfile, level, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn, apply_weights).run()
+        PyProphetWeightApplier(infile, outfile, group_id, level, xeval_num_iter, xeval_fraction, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, not parametric, pfdr, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, test, threads, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn, apply_weights).run()
 
 
 # IPF
