@@ -230,7 +230,6 @@ def pi0est(p_values, lambda_ = np.arange(0.05,1.0,0.05), pi0_method = "smoother"
 
     return {'pi0': pi0, 'pi0_lambda': pi0_lambda, 'lambda_': lambda_, 'pi0_smooth': pi0Smooth}
 
-
 @profile
 def qvalue(p_values, pi0, pfdr = False):
     p = np.array(p_values)
@@ -346,7 +345,7 @@ def lfdr(p_values, pi0, trunc = True, monotone = True, transf = "probit", adj = 
 
 
 @profile
-def stat_metrics(p_values, pi0, use_pfdr):
+def stat_metrics(p_values, pi0, pfdr):
     num_total = len(p_values)
     num_positives = count_num_positives(p_values)
     num_negatives = num_total - num_positives
@@ -362,7 +361,7 @@ def stat_metrics(p_values, pi0, use_pfdr):
     np.seterr(divide='ignore') # when estimating the FNR, ignore division by zero error
     fnr = fn / num_negatives 
     
-    if use_pfdr:
+    if pfdr:
         fdr /= (1.0 - (1.0 - p_values) ** num_total)
         fdr[p_values == 0] = 1.0 / num_total
 
@@ -432,7 +431,7 @@ def summary_err_table(df, qvalues=[0, 0.01, 0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5]
 
 
 @profile
-def error_statistics(target_scores, decoy_scores, lambda_, pi0_method = "smoother", pi0_smooth_df = 3, pi0_smooth_log_pi0 = False, use_pemp = False, use_pfdr = False, compute_lfdr = False, lfdr_trunc = True, lfdr_monotone = True, lfdr_transf = "probit", lfdr_adj = 1.5, lfdr_eps = np.power(10.0,-8)):
+def error_statistics(target_scores, decoy_scores, parametric, pfdr, pi0_lambda, pi0_method = "smoother", pi0_smooth_df = 3, pi0_smooth_log_pi0 = False, compute_lfdr = False, lfdr_trunc = True, lfdr_monotone = True, lfdr_transf = "probit", lfdr_adj = 1.5, lfdr_eps = np.power(10.0,-8)):
     """ takes list of decoy and target scores and creates error statistics for target values"""
 
     target_scores = to_one_dim_array(target_scores)
@@ -442,21 +441,21 @@ def error_statistics(target_scores, decoy_scores, lambda_, pi0_method = "smoothe
     decoy_scores = np.sort(decoy_scores[~np.isnan(decoy_scores)])
 
     # compute p-values using decoy scores
-    if use_pemp:
-        # non-parametric
-        target_pvalues = pemp(target_scores, decoy_scores)
-    else:
+    if parametric:
         # parametric
         target_pvalues = pnorm(target_scores, decoy_scores)
+    else:
+        # non-parametric
+        target_pvalues = pemp(target_scores, decoy_scores)
 
     # estimate pi0
-    pi0 = pi0est(target_pvalues, lambda_, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0)
+    pi0 = pi0est(target_pvalues, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0)
 
     # compute q-value
-    target_qvalues = qvalue(target_pvalues, pi0['pi0'], use_pfdr)
+    target_qvalues = qvalue(target_pvalues, pi0['pi0'], pfdr)
 
     # compute other metrics
-    metrics = stat_metrics(target_pvalues, pi0['pi0'], use_pfdr)
+    metrics = stat_metrics(target_pvalues, pi0['pi0'], pfdr)
 
     # generate main statistics table
     error_stat = pd.DataFrame({'cutoff': target_scores, 'pvalue': target_pvalues, 'qvalue': target_qvalues, 'svalue': metrics['svalue'], 'tp': metrics['tp'], 'fp': metrics['fp'], 'tn': metrics['tn'], 'fn': metrics['fn'], 'fpr': metrics['fpr'], 'fdr': metrics['fdr'], 'fnr': metrics['fnr']})
@@ -468,13 +467,13 @@ def error_statistics(target_scores, decoy_scores, lambda_, pi0_method = "smoothe
     return error_stat, pi0
 
 
-def find_cutoff(target_scores, decoy_scores, fdr, lambda_, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, use_pemp, use_pfdr):
+def find_cutoff(tt_scores, td_scores, cutoff_fdr, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0):
     """ finds cut off target score for specified false discovery rate fdr """
 
-    error_stat, pi0 = error_statistics(target_scores, decoy_scores, lambda_, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, use_pemp, use_pfdr, False)
+    error_stat, pi0 = error_statistics(tt_scores, td_scores, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, False)
     if not len(error_stat):
         sys.exit("Error: Too little data for calculating error statistcs.")
-    i0 = (error_stat.qvalue - fdr).abs().argmin()
+    i0 = (error_stat.qvalue - cutoff_fdr).abs().argmin()
     cutoff = error_stat.iloc[i0]["cutoff"]
     return cutoff
 

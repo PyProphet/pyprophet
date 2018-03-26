@@ -70,7 +70,7 @@ def calculate_params_for_d_score(classifier, experiment):
 
 class Scorer(object):
 
-    def __init__(self, classifier, score_columns, experiment, group_id, use_pemp, use_pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps):
+    def __init__(self, classifier, score_columns, experiment, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, tric_chromprob):
 
         self.classifier = classifier
         self.score_columns = score_columns
@@ -79,8 +79,8 @@ class Scorer(object):
         experiment["d_score"] = (final_score - self.mu) / self.nu
 
         self.group_id = group_id
-        self.use_pemp = use_pemp
-        self.use_pfdr = use_pfdr
+        self.parametric = parametric
+        self.pfdr = pfdr
         self.pi0_lambda = pi0_lambda
         self.pi0_method = pi0_method
         self.pi0_smooth_df = pi0_smooth_df
@@ -90,24 +90,25 @@ class Scorer(object):
         self.lfdr_transformation = lfdr_transformation
         self.lfdr_adj = lfdr_adj
         self.lfdr_eps = lfdr_eps
+        self.tric_chromprob = tric_chromprob
 
-        all_tt_scores = experiment.get_top_target_peaks()["d_score"]
-        all_td_scores = experiment.get_top_decoy_peaks()["d_score"]
+        target_scores = experiment.get_top_target_peaks()["d_score"]
+        decoy_scores = experiment.get_top_decoy_peaks()["d_score"]
 
-        self.error_stat, self.pi0 = error_statistics(all_tt_scores,
-                                                      all_td_scores,
-                                                      self.pi0_lambda,
-                                                      self.pi0_method, 
-                                                      self.pi0_smooth_df, 
-                                                      self.pi0_smooth_log_pi0, 
-                                                      self.use_pemp,
-                                                      self.use_pfdr,
-                                                      True, # compute_lfdr
-                                                      self.lfdr_truncate,
-                                                      self.lfdr_monotone,
-                                                      self.lfdr_transformation,
-                                                      self.lfdr_adj,
-                                                      self.lfdr_eps)
+        self.error_stat, self.pi0 = error_statistics(target_scores,
+                                                     decoy_scores,
+                                                     self.parametric,
+                                                     self.pfdr,
+                                                     self.pi0_lambda,
+                                                     self.pi0_method, 
+                                                     self.pi0_smooth_df, 
+                                                     self.pi0_smooth_log_pi0, 
+                                                     True, # compute_lfdr
+                                                     self.lfdr_truncate,
+                                                     self.lfdr_monotone,
+                                                     self.lfdr_transformation,
+                                                     self.lfdr_adj,
+                                                     self.lfdr_eps)
 
         self.number_target_pg = len(experiment.df[experiment.df.is_decoy.eq(False)])
         self.number_target_peaks = len(experiment.get_top_target_peaks().df)
@@ -137,7 +138,7 @@ class Scorer(object):
 
         df = table.join(texp[["d_score", "p_value", "q_value", "pep", "peak_group_rank"]])
 
-        if False: #CONFIG.get("tric_chromprob"):
+        if self.tric_chromprob:
             df = self.add_chromatogram_probabilities(df, texp)
 
         return df
@@ -175,29 +176,26 @@ class HolyGostQuery(object):
         See below how PyProphet parameterises this class.
     """
 
-    def __init__(self, semi_supervised_learner, group_id, xeval_num_iter, xeval_fraction, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, use_pemp, use_pfdr, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, is_test, num_processes):
+    def __init__(self, semi_supervised_learner, ss_num_iter, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, tric_chromprob, threads, test):
         assert isinstance(semi_supervised_learner,
                           AbstractSemiSupervisedLearner)
         self.semi_supervised_learner = semi_supervised_learner
-        self.group_id = group_id
-        self.xeval_num_iter = xeval_num_iter
-        self.xeval_fraction = xeval_fraction
-        self.ss_initial_fdr = ss_initial_fdr
-        self.ss_iteration_fdr = ss_iteration_fdr
         self.ss_num_iter = ss_num_iter
+        self.group_id = group_id
+        self.parametric = parametric
+        self.pfdr = pfdr
         self.pi0_lambda = pi0_lambda
         self.pi0_method = pi0_method
-        self.pi0_smooth_df = xeval_fraction
+        self.pi0_smooth_df = pi0_smooth_df
         self.pi0_smooth_log_pi0 = pi0_smooth_log_pi0
-        self.use_pemp = use_pemp
-        self.use_pfdr = use_pfdr
         self.lfdr_truncate = lfdr_truncate
         self.lfdr_monotone = lfdr_monotone
         self.lfdr_transformation = lfdr_transformation
         self.lfdr_adj = lfdr_adj
         self.lfdr_eps = lfdr_eps
-        self.is_test = is_test
-        self.num_processes = num_processes
+        self.tric_chromprob = tric_chromprob
+        self.threads = threads
+        self.test = test
 
     def _setup_experiment(self, table):
         prepared_table, score_columns = prepare_data_table(table, tg_id_name=self.group_id)
@@ -258,7 +256,7 @@ class HolyGostQuery(object):
         return self._build_result(table, final_classifier, score_columns, experiment)
 
     def _learn(self, experiment):
-        if self.is_test:  # for reliable results
+        if self.test:  # for reliable results
             experiment.df.sort_values("tg_id", ascending=True, inplace=True)
 
         learner = self.semi_supervised_learner
@@ -267,16 +265,16 @@ class HolyGostQuery(object):
         neval = self.ss_num_iter
 
         click.echo("Semi-supervised learning of weights:")
-        click.echo("   start learning on  %d folds using %d processes" % (neval, self.num_processes))
+        click.echo("   start learning on  %d folds using %d processes" % (neval, self.threads))
 
-        if self.num_processes == 1:
+        if self.threads == 1:
             for k in range(neval):
                 (ttt_scores, ttd_scores, w) = learner.learn_randomized(experiment)
                 ws.append(w.flatten())
         else:
-            pool = multiprocessing.Pool(processes=self.num_processes)
+            pool = multiprocessing.Pool(processes=self.threads)
             while neval:
-                remaining = max(0, neval - self.num_processes)
+                remaining = max(0, neval - self.threads)
                 todo = neval - remaining
                 neval -= todo
                 args = ((learner, "learn_randomized", (experiment, )), ) * todo
@@ -299,7 +297,7 @@ class HolyGostQuery(object):
         weights = final_classifier.get_parameters()
         classifier_table = pd.DataFrame({'score': score_columns, 'weight': weights})
 
-        scorer = Scorer(final_classifier, score_columns, experiment, self.group_id, self.use_pemp, self.use_pfdr, self.pi0_lambda, self.pi0_method, self.pi0_smooth_df, self.pi0_smooth_log_pi0, self.lfdr_truncate, self.lfdr_monotone, self.lfdr_transformation, self.lfdr_adj, self.lfdr_eps)
+        scorer = Scorer(final_classifier, score_columns, experiment, self.group_id, self.parametric, self.pfdr, self.pi0_lambda, self.pi0_method, self.pi0_smooth_df, self.pi0_smooth_log_pi0, self.lfdr_truncate, self.lfdr_monotone, self.lfdr_transformation, self.lfdr_adj, self.lfdr_eps, self.tric_chromprob)
 
         scored_table = scorer.score(table)
 
@@ -312,5 +310,5 @@ class HolyGostQuery(object):
 
 
 @profile
-def PyProphet(group_id, xeval_num_iter, xeval_fraction, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, use_pemp, use_pfdr, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, is_test, num_processes):
-    return HolyGostQuery(StandardSemiSupervisedLearner(LDALearner(), xeval_num_iter, xeval_fraction, is_test, ss_initial_fdr, ss_iteration_fdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, use_pemp, use_pfdr), group_id, xeval_num_iter, xeval_fraction, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, use_pemp, use_pfdr, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, is_test, num_processes)
+def PyProphet(xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, tric_chromprob, threads, test):
+    return HolyGostQuery(StandardSemiSupervisedLearner(LDALearner(), xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, test), ss_num_iter, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, tric_chromprob, threads, test)

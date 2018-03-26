@@ -74,9 +74,9 @@ def score(infile, outfile, apply_weights, xeval_fraction, xeval_num_iter, ss_ini
         outfile = outfile
 
     if not apply_weights:
-        PyProphetLearner(infile, outfile, group_id, level, xeval_num_iter, xeval_fraction, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, not parametric, pfdr, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, test, threads, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn).run()
+        PyProphetLearner(infile, outfile, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, level, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn, tric_chromprob, threads, test).run()
     else:
-        PyProphetWeightApplier(infile, outfile, group_id, level, xeval_num_iter, xeval_fraction, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, not parametric, pfdr, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, test, threads, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn, apply_weights).run()
+        PyProphetWeightApplier(infile, outfile, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, level, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn, tric_chromprob, threads, test, apply_weights).run()
 
 
 # IPF

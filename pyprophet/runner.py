@@ -27,7 +27,7 @@ class PyProphetRunner(object):
     """Base class for workflow of command line tool
     """
 
-    def __init__(self, infile, outfile, group_id, level, xeval_num_iter, xeval_fraction, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, use_pemp, use_pfdr, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, is_test, num_processes, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn):
+    def __init__(self, infile, outfile, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, level, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn, tric_chromprob, threads, test):
         def read_tsv(infile):
             table = pd.read_csv(infile, "\t")
             return(table)
@@ -59,27 +59,29 @@ class PyProphetRunner(object):
 
         self.infile = infile
         self.outfile = outfile
-        self.prefix = os.path.splitext(outfile)[0]
-        self.group_id = group_id
-        self.level = level
-        self.xeval_num_iter = xeval_num_iter
         self.xeval_fraction = xeval_fraction
+        self.xeval_num_iter = xeval_num_iter
         self.ss_initial_fdr = ss_initial_fdr
         self.ss_iteration_fdr = ss_iteration_fdr
         self.ss_num_iter = ss_num_iter
+        self.group_id = group_id
+        self.parametric = parametric
+        self.pfdr = pfdr
         self.pi0_lambda = pi0_lambda
         self.pi0_method = pi0_method
         self.pi0_smooth_df = pi0_smooth_df
         self.pi0_smooth_log_pi0 = pi0_smooth_log_pi0
-        self.use_pemp = use_pemp
-        self.use_pfdr = use_pfdr
         self.lfdr_truncate = lfdr_truncate
         self.lfdr_monotone = lfdr_monotone
         self.lfdr_transformation = lfdr_transformation
         self.lfdr_adj = lfdr_adj
         self.lfdr_eps = lfdr_eps
-        self.is_test = is_test
-        self.num_processes = num_processes
+        self.level = level
+        self.tric_chromprob = tric_chromprob
+        self.threads = threads
+        self.test = test
+
+        self.prefix = os.path.splitext(outfile)[0]
 
     @abc.abstractmethod
     def run_algo(self):
@@ -225,7 +227,7 @@ class PyProphetRunner(object):
 class PyProphetLearner(PyProphetRunner):
 
     def run_algo(self):
-        (result, scorer, weights) = PyProphet(self.group_id, self.xeval_num_iter, self.xeval_fraction, self.ss_initial_fdr, self.ss_iteration_fdr, self.ss_num_iter, self.pi0_lambda, self.pi0_method, self.pi0_smooth_df, self.pi0_smooth_log_pi0, self.use_pemp, self.use_pfdr, self.lfdr_truncate, self.lfdr_monotone, self.lfdr_transformation, self.lfdr_adj, self.lfdr_eps, self.is_test, self.num_processes).learn_and_apply(self.table)
+        (result, scorer, weights) = PyProphet(self.xeval_fraction, self.xeval_num_iter, self.ss_initial_fdr, self.ss_iteration_fdr, self.ss_num_iter, self.group_id, self.parametric, self.pfdr, self.pi0_lambda, self.pi0_method, self.pi0_smooth_df, self.pi0_smooth_log_pi0, self.lfdr_truncate, self.lfdr_monotone, self.lfdr_transformation, self.lfdr_adj, self.lfdr_eps, self.tric_chromprob, self.threads, self.test).learn_and_apply(self.table)
         return (result, scorer, weights)
 
     def extra_writes(self):
@@ -238,8 +240,8 @@ class PyProphetLearner(PyProphetRunner):
 
 class PyProphetWeightApplier(PyProphetRunner):
 
-    def __init__(self, infile, outfile, group_id, level, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn, apply_weights):
-        super(PyProphetWeightApplier, self).__init__(infile, outfile, group_id, level, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn)
+    def __init__(self, infile, outfile, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, level, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn, tric_chromprob, threads, test, apply_weights):
+        super(PyProphetWeightApplier, self).__init__(infile, outfile, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, level, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn, tric_chromprob, threads, test)
         if not os.path.exists(apply_weights):
             sys.exit("Error: Weights file %s does not exist." % apply_weights)
         if self.mode == "tsv":
@@ -267,7 +269,7 @@ class PyProphetWeightApplier(PyProphetRunner):
                 raise
 
     def run_algo(self):
-        (result, scorer, weights) = PyProphet(self.group_id, self.xeval_num_iter, self.xeval_fraction, self.ss_initial_fdr, self.ss_iteration_fdr, self.ss_num_iter, self.pi0_lambda, self.pi0_method, self.pi0_smooth_df, self.pi0_smooth_log_pi0, self.use_pemp, self.use_pfdr, self.lfdr_truncate, self.lfdr_monotone, self.lfdr_transformation, self.lfdr_adj, self.lfdr_eps, self.is_test, self.num_processes).apply_weights(self.table, self.persisted_weights)
+        (result, scorer, weights) = PyProphet(self.xeval_fraction, self.xeval_num_iter, self.ss_initial_fdr, self.ss_iteration_fdr, self.ss_num_iter, self.group_id, self.parametric, self.pfdr, self.pi0_lambda, self.pi0_method, self.pi0_smooth_df, self.pi0_smooth_log_pi0, self.lfdr_truncate, self.lfdr_monotone, self.lfdr_transformation, self.lfdr_adj, self.lfdr_eps, self.tric_chromprob, self.threads, self.test).apply_weights(self.table, self.persisted_weights)
         return (result, scorer, weights)
 
     def extra_writes(self):
