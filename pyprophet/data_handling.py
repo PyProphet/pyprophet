@@ -14,7 +14,30 @@ except NameError:
         return fun
 
 
-def isSQLite3(filename):
+# Parameter transformation functions
+def transform_pi0_lambda(ctx, param, value):
+  if value[1] == 0 and value[2] == 0:
+      pi0_lambda = value[0]
+  elif 0 <= value[0] < 1 and value[0] <= value[1] <= 1 and 0 < value[2] < 1:
+      pi0_lambda = np.arange(value[0], value[1], value[2])
+  else:
+      sys.exit('Error: Wrong input values for pi0_lambda. pi0_lambda must be within [0,1).')
+  return(pi0_lambda)
+
+
+def transform_threads(ctx, param, value):
+    if value == -1:
+        value = multiprocessing.cpu_count()
+    return(value)
+
+
+def transform_subsample_ratio(ctx, param, value):
+    if value < 0 or value > 1:
+      sys.exit('Error: Wrong input values for subsample_ratio. subsample_ratio must be within [0,1].')
+    return(value)
+
+
+def is_sqlite_file(filename):
     # https://stackoverflow.com/questions/12932607/how-to-check-with-python-and-sqlite3-if-one-sqlite-database-file-exists
     from os.path import isfile, getsize
 
@@ -35,7 +58,7 @@ def isSQLite3(filename):
 def check_sqlite_table(con, table):
     table_present = False
     c = con.cursor()
-    c.execute('SELECT count(name) FROM sqlite_master WHERE type="table" AND name="' + table + '"')
+    c.execute('SELECT count(name) FROM sqlite_master WHERE type="table" AND name="%s"' % table)
     if c.fetchone()[0] == 1:
         table_present = True
     else:
@@ -79,7 +102,7 @@ def cleanup_and_check(df):
     n_decoy = len(decoy_groups)
     n_target = len(target_groups)
 
-    click.echo("Data set contains %d decoy and %d target groups." % (n_decoy, n_target))
+    click.echo("Info: Data set contains %d decoy and %d target groups." % (n_decoy, n_target))
     if n_decoy < 10 or n_target < 10:
         sys.exit("Error: At least 10 decoy groups and 10 target groups are required.")
 
@@ -99,8 +122,7 @@ def prepare_data_table(table, tg_id_name="transition_group_id",
         missing = set(score_columns) - set(header)
         if missing:
             missing_txt = ", ".join(["'%s'" % m for m in missing])
-            msg = "Error: Column(s) %s missing in input file to apply scorer." % missing_txt
-            sys.exit(msg)
+            sys.exit("Error: Column(s) %s missing in input file to apply scorer." % missing_txt)
 
     assert tg_id_name in header, "Error: Column %s is not in input file(s)." % tg_id_name
     assert decoy_name in header, "Error: Column %s is not in input file(s)." % decoy_name
@@ -184,10 +206,10 @@ class Experiment(object):
         self.df = df
 
     def log_summary(self):
-        click.echo("Summary of input data:")
-        click.echo("   %d peak groups" % len(self.df))
-        click.echo("   %d group ids" % len(self.df.tg_id.unique()))
-        click.echo("   %d scores including main score" % (len(self.df.columns.values) - 6))
+        click.echo("Info: Summary of input data:")
+        click.echo("Info: %d peak groups" % len(self.df))
+        click.echo("Info: %d group ids" % len(self.df.tg_id.unique()))
+        click.echo("Info: %d scores including main score" % (len(self.df.columns.values) - 6))
 
     def __getitem__(self, *args):
         return self.df.__getitem__(*args)
@@ -263,75 +285,4 @@ class Experiment(object):
     def get_train_peaks(self):
         df = self.df[self.df.is_train == True]
         return Experiment(df)
-
-
-# Filter a sqMass chromatogram file by given input labels
-def filterChromByLabels(infile, outfile, labels):
-    import sqlite3
-    conn = sqlite3.connect(infile)
-    c = conn.cursor()
-
-    labels = [ "'" + l + "'" for l in labels]
-    labels_stmt = get_ids_stmt(labels)
-
-    stmt = "SELECT ID FROM CHROMATOGRAM WHERE NATIVE_ID IN %s" % labels_stmt
-    keep_ids = [i[0] for i in list(c.execute(stmt))]
-    print("Keep %s chromatograms" % len(keep_ids) )
-
-    nr_chrom = list(c.execute("SELECT COUNT(*) FROM CHROMATOGRAM"))[0][0]
-    nr_spec = list(c.execute("SELECT COUNT(*) FROM SPECTRUM"))[0][0]
-
-    assert(nr_chrom > 0)
-    assert(nr_spec == 0)
-
-    copyDatabase(c, conn, outfile, keep_ids)
-
-
-def copy_table(c, conn, keep_ids, tbl, id_col):
-    stmt = "CREATE TABLE other.%s AS SELECT * FROM %s WHERE %s IN " % (tbl, tbl, id_col)
-    stmt += get_ids_stmt(keep_ids) + ";"
-    c.execute(stmt)
-    conn.commit()
-
-
-def copyDatabase(c, conn, outfile, keep_ids):
-    c.execute("ATTACH DATABASE '%s' AS other;" % outfile)
-
-    # Tables: 
-    #  - DATA
-    #  - SPECTRUM
-    #  - RUN
-    #  - RUN_EXTRA
-    #  - CHROMATOGRAM
-    #  - PRODUCT
-    #  - PRECURSOR
-
-    # copy over data that matches the selected ids
-    copy_table(c, conn, keep_ids, "PRECURSOR", "CHROMATOGRAM_ID")
-    copy_table(c, conn, keep_ids, "PRODUCT", "CHROMATOGRAM_ID")
-    copy_table(c, conn, keep_ids, "DATA", "CHROMATOGRAM_ID")
-    copy_table(c, conn, keep_ids, "CHROMATOGRAM", "ID")
-
-    # copy over data and create indices
-    c.execute("CREATE TABLE other.RUN AS SELECT * FROM RUN");
-    c.execute("CREATE TABLE other.SPECTRUM AS SELECT * FROM SPECTRUM");
-    c.execute("CREATE TABLE other.RUN_EXTRA AS SELECT * FROM RUN_EXTRA");
-
-    c.execute("CREATE INDEX other.data_chr_idx ON DATA(CHROMATOGRAM_ID);")
-    c.execute("CREATE INDEX other.data_sp_idx ON DATA(SPECTRUM_ID);")
-    c.execute("CREATE INDEX other.spec_rt_idx ON SPECTRUM(RETENTION_TIME);")
-    c.execute("CREATE INDEX other.spec_mslevel ON SPECTRUM(MSLEVEL);")
-    c.execute("CREATE INDEX other.spec_run ON SPECTRUM(RUN_ID);")
-    c.execute("CREATE INDEX other.chrom_run ON CHROMATOGRAM(RUN_ID);")
-
-    conn.commit()
-
-
-def get_ids_stmt(keep_ids):
-    ids_stmt = "("
-    for myid in keep_ids:
-        ids_stmt += str(myid) + ","
-    ids_stmt = ids_stmt[:-1]
-    ids_stmt += ")"
-    return ids_stmt 
 

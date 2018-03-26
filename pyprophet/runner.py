@@ -10,7 +10,7 @@ import sqlite3
 
 from .pyprophet import PyProphet
 from .report import save_report
-from .data_handling import isSQLite3
+from .data_handling import is_sqlite_file
 from shutil import copyfile
 
 try:
@@ -36,11 +36,74 @@ class PyProphetRunner(object):
             con = sqlite3.connect(infile)
 
             if level == "ms2":
-                table = pd.read_sql_query("SELECT *, RUN_ID || '_' || PRECURSOR_ID AS GROUP_ID, VAR_XCORR_SHAPE AS MAIN_VAR_XCORR_SHAPE FROM FEATURE_MS2 INNER JOIN (SELECT RUN_ID, ID, PRECURSOR_ID, EXP_RT FROM FEATURE) AS FEATURE ON FEATURE_ID = FEATURE.ID INNER JOIN (SELECT ID, DECOY FROM PRECURSOR) AS PRECURSOR ON FEATURE.PRECURSOR_ID = PRECURSOR.ID ORDER BY RUN_ID, PRECURSOR.ID ASC, FEATURE.EXP_RT ASC;", con)
+                table = pd.read_sql_query('''
+SELECT *,
+       RUN_ID || '_' || PRECURSOR_ID AS GROUP_ID,
+       VAR_XCORR_SHAPE AS MAIN_VAR_XCORR_SHAPE
+FROM FEATURE_MS2
+INNER JOIN
+  (SELECT RUN_ID,
+          ID,
+          PRECURSOR_ID,
+          EXP_RT
+   FROM FEATURE) AS FEATURE ON FEATURE_ID = FEATURE.ID
+INNER JOIN
+  (SELECT ID,
+          DECOY
+   FROM PRECURSOR) AS PRECURSOR ON FEATURE.PRECURSOR_ID = PRECURSOR.ID
+ORDER BY RUN_ID,
+         PRECURSOR.ID ASC,
+         FEATURE.EXP_RT ASC;
+''', con)
             elif level == "ms1":
-                table = pd.read_sql_query("SELECT *, RUN_ID || '_' || PRECURSOR_ID AS GROUP_ID, VAR_XCORR_SHAPE AS MAIN_VAR_XCORR_SHAPE FROM FEATURE_MS1 INNER JOIN (SELECT RUN_ID, ID, PRECURSOR_ID, EXP_RT FROM FEATURE) AS FEATURE ON FEATURE_ID = FEATURE.ID INNER JOIN (SELECT ID, DECOY FROM PRECURSOR) AS PRECURSOR ON FEATURE.PRECURSOR_ID = PRECURSOR.ID ORDER BY  RUN_ID, PRECURSOR.ID ASC, FEATURE.EXP_RT ASC;", con)
+                table = pd.read_sql_query('''
+SELECT *,
+       RUN_ID || '_' || PRECURSOR_ID AS GROUP_ID,
+       VAR_XCORR_SHAPE AS MAIN_VAR_XCORR_SHAPE
+FROM FEATURE_MS1
+INNER JOIN
+  (SELECT RUN_ID,
+          ID,
+          PRECURSOR_ID,
+          EXP_RT
+   FROM FEATURE) AS FEATURE ON FEATURE_ID = FEATURE.ID
+INNER JOIN
+  (SELECT ID,
+          DECOY
+   FROM PRECURSOR) AS PRECURSOR ON FEATURE.PRECURSOR_ID = PRECURSOR.ID
+ORDER BY RUN_ID,
+         PRECURSOR.ID ASC,
+         FEATURE.EXP_RT ASC;
+    ''', con)
             elif level == "transition":
-                table = pd.read_sql_query("SELECT TRANSITION.DECOY AS DECOY, FEATURE_TRANSITION.*, RUN_ID || '_' || FEATURE_TRANSITION.FEATURE_ID || '_' || PRECURSOR_ID || '_' || TRANSITION_ID AS GROUP_ID, VAR_XCORR_SHAPE AS MAIN_VAR_XCORR_SHAPE FROM FEATURE_TRANSITION INNER JOIN (SELECT RUN_ID, ID, PRECURSOR_ID, EXP_RT FROM FEATURE) AS FEATURE ON FEATURE_TRANSITION.FEATURE_ID = FEATURE.ID INNER JOIN PRECURSOR ON FEATURE.PRECURSOR_ID = PRECURSOR.ID INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID INNER JOIN (SELECT ID, DECOY FROM TRANSITION) AS TRANSITION ON FEATURE_TRANSITION.TRANSITION_ID = TRANSITION.ID WHERE RANK <= " + str(ipf_max_peakgroup_rank) + " AND PEP <= " + str(ipf_max_peakgroup_pep) + " AND VAR_ISOTOPE_OVERLAP_SCORE <= " + str(ipf_max_transition_isotope_overlap) + " AND VAR_LOG_SN_SCORE > " + str(ipf_min_transition_sn) + " AND PRECURSOR.DECOY == 0 ORDER BY  RUN_ID, PRECURSOR.ID, FEATURE.EXP_RT, TRANSITION.ID;", con)
+                table = pd.read_sql_query('''
+SELECT TRANSITION.DECOY AS DECOY,
+       FEATURE_TRANSITION.*,
+       RUN_ID || '_' || FEATURE_TRANSITION.FEATURE_ID || '_' || PRECURSOR_ID || '_' || TRANSITION_ID AS GROUP_ID,
+       VAR_XCORR_SHAPE AS MAIN_VAR_XCORR_SHAPE
+FROM FEATURE_TRANSITION
+INNER JOIN
+  (SELECT RUN_ID,
+          ID,
+          PRECURSOR_ID,
+          EXP_RT
+   FROM FEATURE) AS FEATURE ON FEATURE_TRANSITION.FEATURE_ID = FEATURE.ID
+INNER JOIN PRECURSOR ON FEATURE.PRECURSOR_ID = PRECURSOR.ID
+INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
+INNER JOIN
+  (SELECT ID,
+          DECOY
+   FROM TRANSITION) AS TRANSITION ON FEATURE_TRANSITION.TRANSITION_ID = TRANSITION.ID
+WHERE RANK <= %s
+  AND PEP <= %s
+  AND VAR_ISOTOPE_OVERLAP_SCORE <= %s
+  AND VAR_LOG_SN_SCORE > %s
+  AND PRECURSOR.DECOY == 0
+ORDER BY RUN_ID,
+         PRECURSOR.ID,
+         FEATURE.EXP_RT,
+         TRANSITION.ID;
+''' % (ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn), con)
             else:
                 sys.exit("Error: Unspecified data level selected.")
 
@@ -50,7 +113,7 @@ class PyProphetRunner(object):
 
             return(table)
 
-        if isSQLite3(infile):
+        if is_sqlite_file(infile):
             self.mode = 'osw'
             self.table = read_osw(infile, level, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn)
         else:
@@ -116,29 +179,29 @@ class PyProphetRunner(object):
         seconds = int(needed)
         msecs = int(1000 * (needed - seconds))
 
-        click.echo("TOTAL TIME: %d seconds and %d msecs wall time" % (seconds, msecs))
+        click.echo("Info: Total time: %d seconds and %d msecs wall time" % (seconds, msecs))
 
     def print_summary(self, result):
         if result.summary_statistics is not None:
-            click.echo("=" * 98)
+            click.echo("=" * 80)
             click.echo(result.summary_statistics)
-            click.echo("=" * 98)
+            click.echo("=" * 80)
 
     def save_tsv_results(self, result, extra_writes, pi0):
         summ_stat_path = extra_writes.get("summ_stat_path")
         if summ_stat_path is not None:
             result.summary_statistics.to_csv(summ_stat_path, sep=",", index=False)
-            click.echo("WRITTEN: " + summ_stat_path)
+            click.echo("Info: %s written." % summ_stat_path)
 
         full_stat_path = extra_writes.get("full_stat_path")
         if full_stat_path is not None:
             result.final_statistics.to_csv(full_stat_path, sep=",", index=False)
-            click.echo("WRITTEN: " + full_stat_path)
+            click.echo("Info: %s written." % full_stat_path)
 
         output_path = extra_writes.get("output_path")
         if output_path is not None:
             result.scored_tables.to_csv(output_path, sep="\t", index=False)
-            click.echo("WRITTEN: " + output_path)
+            click.echo("Info: %s written." % output_path)
 
         if result.final_statistics is not None:
             cutoffs = result.final_statistics["cutoff"].values
@@ -150,14 +213,14 @@ class PyProphetRunner(object):
             top_decoys = result.scored_tables.loc[(result.scored_tables.peak_group_rank == 1) & (result.scored_tables.decoy == 1)]["d_score"].values
 
             save_report(extra_writes.get("report_path"), output_path, top_decoys, top_targets, cutoffs, svalues, qvalues, pvalues, pi0)
-            click.echo("WRITTEN: " + extra_writes.get("report_path"))
+            click.echo("Info: %s written." % extra_writes.get("report_path"))
 
     def save_tsv_weights(self, weights, extra_writes):
         weights['level'] = self.level
         trained_weights_path = extra_writes.get("trained_weights_path")
         if trained_weights_path is not None:
             weights.to_csv(trained_weights_path, sep=",", index=False)
-            click.echo("WRITTEN: " + trained_weights_path)
+            click.echo("Info: %s written." % trained_weights_path)
 
     def save_osw_results(self, result, extra_writes, pi0):
         if self.infile != self.outfile:
@@ -167,7 +230,7 @@ class PyProphetRunner(object):
 
         if self.level == "ms2":
             c = con.cursor()
-            c.execute('DROP TABLE IF EXISTS SCORE_MS2')
+            c.execute('DROP TABLE IF EXISTS SCORE_MS2;')
             con.commit()
             c.fetchall()
 
@@ -177,7 +240,7 @@ class PyProphetRunner(object):
             df.to_sql(table, con, index=False)
         elif self.level == "ms1":
             c = con.cursor()
-            c.execute('DROP TABLE IF EXISTS SCORE_MS1')
+            c.execute('DROP TABLE IF EXISTS SCORE_MS1;')
             con.commit()
             c.fetchall()
 
@@ -187,7 +250,7 @@ class PyProphetRunner(object):
             df.to_sql(table, con, index=False)
         elif self.level == "transition":
             c = con.cursor()
-            c.execute('DROP TABLE IF EXISTS SCORE_TRANSITION')
+            c.execute('DROP TABLE IF EXISTS SCORE_TRANSITION;')
             con.commit()
             c.fetchall()
 
@@ -197,7 +260,7 @@ class PyProphetRunner(object):
             df.to_sql(table, con, index=False)
 
         con.close()
-        click.echo("WRITTEN: " + self.outfile)
+        click.echo("Info: %s written." % self.outfile)
 
         if result.final_statistics is not None:
             cutoffs = result.final_statistics["cutoff"].values
@@ -209,16 +272,16 @@ class PyProphetRunner(object):
             top_decoys = result.scored_tables.loc[(result.scored_tables.peak_group_rank == 1) & (result.scored_tables.decoy == 1)]["d_score"].values
 
             save_report(os.path.join(self.prefix + "_" + self.level + "_report.pdf"), self.outfile, top_decoys, top_targets, cutoffs, svalues, qvalues, pvalues, pi0)
-            click.echo("WRITTEN: " + os.path.join(self.prefix + "_" + self.level + "_report.pdf"))
+            click.echo("Info: %s written." %  os.path.join(self.prefix + "_" + self.level + "_report.pdf"))
 
     def save_osw_weights(self, weights):
         weights['level'] = self.level
         con = sqlite3.connect(self.outfile)
 
         c = con.cursor()
-        c.execute('SELECT count(name) FROM sqlite_master WHERE type="table" AND name="PYPROPHET_WEIGHTS"')
+        c.execute('SELECT count(name) FROM sqlite_master WHERE type="table" AND name="PYPROPHET_WEIGHTS";')
         if c.fetchone()[0] == 1:
-            c.execute('DELETE FROM PYPROPHET_WEIGHTS WHERE LEVEL =="' + self.level + '"')
+            c.execute('DELETE FROM PYPROPHET_WEIGHTS WHERE LEVEL =="%s"' % self.level)
         c.fetchall()
 
         weights.to_sql("PYPROPHET_WEIGHTS", con, index=False, if_exists='append')
@@ -257,7 +320,7 @@ class PyProphetWeightApplier(PyProphetRunner):
             try:
                 con = sqlite3.connect(apply_weights)
 
-                data = pd.read_sql_query("SELECT * FROM PYPROPHET_WEIGHTS WHERE LEVEL=='" + self.level + "'", con)
+                data = pd.read_sql_query("SELECT * FROM PYPROPHET_WEIGHTS WHERE LEVEL=='%s'" % self.level, con)
                 data.columns = [col.lower() for col in data.columns]
                 con.close()
                 self.persisted_weights = data

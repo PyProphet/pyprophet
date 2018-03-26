@@ -28,7 +28,7 @@ def compute_model_fdr(data_in):
 
 
 def read_pyp_peakgroup_precursor(path, ipf_max_peakgroup_pep, ipf_ms1_scoring, ipf_ms2_scoring):
-    click.echo("      read precursor-level data")
+    click.echo("Info: Reading precursor-level data.")
     # precursors are restricted according to ipf_max_peakgroup_pep to exclude very poor peak groups
     con = sqlite3.connect(path)
 
@@ -36,25 +36,81 @@ def read_pyp_peakgroup_precursor(path, ipf_max_peakgroup_pep, ipf_ms1_scoring, i
     if not ipf_ms1_scoring and ipf_ms2_scoring:
         if not check_sqlite_table(con, "SCORE_MS2") or not check_sqlite_table(con, "SCORE_TRANSITION"):
             sys.exit("Error: Apply scoring to MS2 and transition-level data before running IPF.")
-        data = pd.read_sql_query("SELECT FEATURE.ID AS FEATURE_ID, SCORE_MS2.PEP AS MS2_PEAKGROUP_PEP, NULL AS MS1_PRECURSOR_PEP, SCORE_TRANSITION.PEP AS MS2_PRECURSOR_PEP FROM PRECURSOR INNER JOIN FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID INNER JOIN (SELECT FEATURE_ID, PEP FROM SCORE_TRANSITION INNER JOIN TRANSITION ON SCORE_TRANSITION.TRANSITION_ID = TRANSITION.ID WHERE TRANSITION.TYPE='' AND TRANSITION.DECOY=0) AS SCORE_TRANSITION ON FEATURE.ID = SCORE_TRANSITION.FEATURE_ID WHERE PRECURSOR.DECOY=0 AND SCORE_MS2.PEP < " + str(ipf_max_peakgroup_pep) + ";", con)
+        data = pd.read_sql_query('''
+SELECT FEATURE.ID AS FEATURE_ID,
+       SCORE_MS2.PEP AS MS2_PEAKGROUP_PEP,
+       NULL AS MS1_PRECURSOR_PEP,
+       SCORE_TRANSITION.PEP AS MS2_PRECURSOR_PEP
+FROM PRECURSOR
+INNER JOIN FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID
+INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
+INNER JOIN
+  (SELECT FEATURE_ID,
+          PEP
+   FROM SCORE_TRANSITION
+   INNER JOIN TRANSITION ON SCORE_TRANSITION.TRANSITION_ID = TRANSITION.ID
+   WHERE TRANSITION.TYPE=''
+     AND TRANSITION.DECOY=0) AS SCORE_TRANSITION ON FEATURE.ID = SCORE_TRANSITION.FEATURE_ID
+WHERE PRECURSOR.DECOY=0
+  AND SCORE_MS2.PEP < %s;
+''' % ipf_max_peakgroup_pep, con)
 
     # only use MS1 precursors
     elif ipf_ms1_scoring and not ipf_ms2_scoring:
         if not check_sqlite_table(con, "SCORE_MS1") or not check_sqlite_table(con, "SCORE_MS2") or not check_sqlite_table(con, "SCORE_TRANSITION"):
             sys.exit("Error: Apply scoring to MS1, MS2 and transition-level data before running IPF.")
-        data = pd.read_sql_query("SELECT FEATURE.ID AS FEATURE_ID, SCORE_MS2.PEP AS MS2_PEAKGROUP_PEP, SCORE_MS1.PEP AS MS1_PRECURSOR_PEP, NULL AS MS2_PRECURSOR_PEP FROM PRECURSOR INNER JOIN FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID INNER JOIN SCORE_MS1 ON FEATURE.ID = SCORE_MS1.FEATURE_ID INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID WHERE PRECURSOR.DECOY=0 AND SCORE_MS2.PEP < " + str(ipf_max_peakgroup_pep) + ";", con)
+        data = pd.read_sql_query('''
+SELECT FEATURE.ID AS FEATURE_ID,
+       SCORE_MS2.PEP AS MS2_PEAKGROUP_PEP,
+       SCORE_MS1.PEP AS MS1_PRECURSOR_PEP,
+       NULL AS MS2_PRECURSOR_PEP
+FROM PRECURSOR
+INNER JOIN FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID
+INNER JOIN SCORE_MS1 ON FEATURE.ID = SCORE_MS1.FEATURE_ID
+INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
+WHERE PRECURSOR.DECOY=0
+  AND SCORE_MS2.PEP < %s;
+''' % ipf_max_peakgroup_pep, con)
 
     # use both MS1 and MS2 precursors
     elif ipf_ms1_scoring and ipf_ms2_scoring:
         if not check_sqlite_table(con, "SCORE_MS1") or not check_sqlite_table(con, "SCORE_MS2") or not check_sqlite_table(con, "SCORE_TRANSITION"):
             sys.exit("Error: Apply scoring to MS1, MS2 and transition-level data before running IPF.")
-        data = pd.read_sql_query("SELECT FEATURE.ID AS FEATURE_ID, SCORE_MS2.PEP AS MS2_PEAKGROUP_PEP, SCORE_MS1.PEP AS MS1_PRECURSOR_PEP, SCORE_TRANSITION.PEP AS MS2_PRECURSOR_PEP FROM PRECURSOR INNER JOIN FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID INNER JOIN SCORE_MS1 ON FEATURE.ID = SCORE_MS1.FEATURE_ID INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID INNER JOIN (SELECT FEATURE_ID, PEP FROM SCORE_TRANSITION INNER JOIN TRANSITION ON SCORE_TRANSITION.TRANSITION_ID = TRANSITION.ID WHERE TRANSITION.TYPE='' AND TRANSITION.DECOY=0) AS SCORE_TRANSITION ON FEATURE.ID = SCORE_TRANSITION.FEATURE_ID WHERE PRECURSOR.DECOY=0 AND SCORE_MS2.PEP < " + str(ipf_max_peakgroup_pep) + ";", con)
+        data = pd.read_sql_query('''
+SELECT FEATURE.ID AS FEATURE_ID,
+       SCORE_MS2.PEP AS MS2_PEAKGROUP_PEP,
+       SCORE_MS1.PEP AS MS1_PRECURSOR_PEP,
+       SCORE_TRANSITION.PEP AS MS2_PRECURSOR_PEP
+FROM PRECURSOR
+INNER JOIN FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID
+INNER JOIN SCORE_MS1 ON FEATURE.ID = SCORE_MS1.FEATURE_ID
+INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
+INNER JOIN
+  (SELECT FEATURE_ID,
+          PEP
+   FROM SCORE_TRANSITION
+   INNER JOIN TRANSITION ON SCORE_TRANSITION.TRANSITION_ID = TRANSITION.ID
+   WHERE TRANSITION.TYPE=''
+     AND TRANSITION.DECOY=0) AS SCORE_TRANSITION ON FEATURE.ID = SCORE_TRANSITION.FEATURE_ID
+WHERE PRECURSOR.DECOY=0
+  AND SCORE_MS2.PEP < %s;
+''' % ipf_max_peakgroup_pep, con)
 
     # do not use any precursor information
     else:
         if not check_sqlite_table(con, "SCORE_MS2") or not check_sqlite_table(con, "SCORE_TRANSITION"):
             sys.exit("Error: Apply scoring to MS2  and transition-level data before running IPF.")
-        data = pd.read_sql_query("SELECT FEATURE.ID AS FEATURE_ID, SCORE_MS2.PEP AS MS2_PEAKGROUP_PEP, NULL AS MS1_PRECURSOR_PEP, NULL AS MS2_PRECURSOR_PEP FROM PRECURSOR INNER JOIN FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID WHERE PRECURSOR.DECOY=0 AND SCORE_MS2.PEP < " + str(ipf_max_peakgroup_pep) + ";", con)
+        data = pd.read_sql_query('''
+SELECT FEATURE.ID AS FEATURE_ID,
+       SCORE_MS2.PEP AS MS2_PEAKGROUP_PEP,
+       NULL AS MS1_PRECURSOR_PEP,
+       NULL AS MS2_PRECURSOR_PEP
+FROM PRECURSOR
+INNER JOIN FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID
+INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
+WHERE PRECURSOR.DECOY=0
+  AND SCORE_MS2.PEP < %s;
+''' % ipf_max_peakgroup_pep, con)
 
     data.columns = [col.lower() for col in data.columns]
     con.close()
@@ -63,24 +119,60 @@ def read_pyp_peakgroup_precursor(path, ipf_max_peakgroup_pep, ipf_ms1_scoring, i
 
 
 def read_pyp_transition(path, ipf_max_transition_pep, ipf_h0):
-    click.echo("      read peptidoform-level data")
+    click.echo("Info: Reading peptidoform-level data.")
     # only the evidence is restricted to ipf_max_transition_pep, the peptidoform-space is complete
     con = sqlite3.connect(path)
 
     # transition-level evidence
-    evidence = pd.read_sql_query("SELECT FEATURE_ID, TRANSITION_ID, PEP FROM SCORE_TRANSITION INNER JOIN TRANSITION ON SCORE_TRANSITION.TRANSITION_ID = TRANSITION.ID WHERE TRANSITION.TYPE!='' AND TRANSITION.DECOY=0 AND PEP < " + str(ipf_max_transition_pep) + ";", con)
+    evidence = pd.read_sql_query('''
+SELECT FEATURE_ID,
+       TRANSITION_ID,
+       PEP
+FROM SCORE_TRANSITION
+INNER JOIN TRANSITION ON SCORE_TRANSITION.TRANSITION_ID = TRANSITION.ID
+WHERE TRANSITION.TYPE!=''
+  AND TRANSITION.DECOY=0
+  AND PEP < %s;
+ ''' % ipf_max_transition_pep, con)
     evidence.columns = [col.lower() for col in evidence.columns]
 
     # transition-level bitmask
-    bitmask = pd.read_sql_query("SELECT DISTINCT TRANSITION.ID AS TRANSITION_ID, PEPTIDE_ID, 1 AS BMASK FROM TRANSITION INNER JOIN TRANSITION_PEPTIDE_MAPPING ON TRANSITION.ID = TRANSITION_PEPTIDE_MAPPING.TRANSITION_ID WHERE TRANSITION.TYPE!='' AND TRANSITION.DECOY=0;", con)
+    bitmask = pd.read_sql_query('''
+SELECT DISTINCT TRANSITION.ID AS TRANSITION_ID,
+                PEPTIDE_ID,
+                1 AS BMASK
+FROM TRANSITION
+INNER JOIN TRANSITION_PEPTIDE_MAPPING ON TRANSITION.ID = TRANSITION_PEPTIDE_MAPPING.TRANSITION_ID
+WHERE TRANSITION.TYPE!=''
+  AND TRANSITION.DECOY=0;
+''', con)
     bitmask.columns = [col.lower() for col in bitmask.columns]
 
     # potential peptidoforms per feature
-    num_peptidoforms = pd.read_sql_query("SELECT FEATURE_ID, COUNT(DISTINCT PEPTIDE_ID) AS NUM_PEPTIDOFORMS FROM SCORE_TRANSITION INNER JOIN TRANSITION ON SCORE_TRANSITION.TRANSITION_ID = TRANSITION.ID INNER JOIN TRANSITION_PEPTIDE_MAPPING ON TRANSITION.ID = TRANSITION_PEPTIDE_MAPPING.TRANSITION_ID WHERE TRANSITION.TYPE!='' AND TRANSITION.DECOY=0 GROUP BY FEATURE_ID ORDER BY FEATURE_ID;", con)
+    num_peptidoforms = pd.read_sql_query('''
+SELECT FEATURE_ID,
+       COUNT(DISTINCT PEPTIDE_ID) AS NUM_PEPTIDOFORMS
+FROM SCORE_TRANSITION
+INNER JOIN TRANSITION ON SCORE_TRANSITION.TRANSITION_ID = TRANSITION.ID
+INNER JOIN TRANSITION_PEPTIDE_MAPPING ON TRANSITION.ID = TRANSITION_PEPTIDE_MAPPING.TRANSITION_ID
+WHERE TRANSITION.TYPE!=''
+  AND TRANSITION.DECOY=0
+GROUP BY FEATURE_ID
+ORDER BY FEATURE_ID;
+''', con)
     num_peptidoforms.columns = [col.lower() for col in num_peptidoforms.columns]
 
     # peptidoform space per feature
-    peptidoforms = pd.read_sql_query("SELECT DISTINCT FEATURE_ID, PEPTIDE_ID FROM SCORE_TRANSITION INNER JOIN TRANSITION ON SCORE_TRANSITION.TRANSITION_ID = TRANSITION.ID INNER JOIN TRANSITION_PEPTIDE_MAPPING ON TRANSITION.ID = TRANSITION_PEPTIDE_MAPPING.TRANSITION_ID WHERE TRANSITION.TYPE!='' AND TRANSITION.DECOY=0 ORDER BY FEATURE_ID;", con)
+    peptidoforms = pd.read_sql_query('''
+SELECT DISTINCT FEATURE_ID,
+                PEPTIDE_ID
+FROM SCORE_TRANSITION
+INNER JOIN TRANSITION ON SCORE_TRANSITION.TRANSITION_ID = TRANSITION.ID
+INNER JOIN TRANSITION_PEPTIDE_MAPPING ON TRANSITION.ID = TRANSITION_PEPTIDE_MAPPING.TRANSITION_ID
+WHERE TRANSITION.TYPE!=''
+  AND TRANSITION.DECOY=0
+ORDER BY FEATURE_ID;
+''', con)
     peptidoforms.columns = [col.lower() for col in peptidoforms.columns]
 
     con.close()
@@ -176,18 +268,18 @@ def precursor_inference(data, ipf_ms1_scoring, ipf_ms2_scoring, ipf_max_precurso
         precursor_data = ms2_precursor_data.merge(ms1_precursor_data, on=['feature_id'], how='outer').merge(ms2_pg_data, on=['feature_id'], how='outer')
 
         # prepare precursor-level Bayesian model
-        click.echo("      prepare precursor-level data")
+        click.echo("Info: Preparing precursor-level data.")
         precursor_data_bm = prepare_precursor_bm(precursor_data)
 
         # compute posterior precursor probability
-        click.echo("      conduct precursor-level inference")
+        click.echo("Info: Conducting precursor-level inference.")
         prec_pp_data = apply_bm(precursor_data_bm)
         prec_pp_data['precursor_peakgroup_pep'] = 1 - prec_pp_data['posterior']
 
         inferred_precursors = prec_pp_data[prec_pp_data['hypothesis']][['feature_id','precursor_peakgroup_pep']]
     else:
         # no precursor-level data on MS1 and/or MS2 should be used; use peak group-level data
-        click.echo("      skip precursor-level inference")
+        click.echo("Info: Skipping precursor-level inference.")
         inferred_precursors = ms2_pg_data.rename(columns=lambda x: x.replace('ms2_peakgroup_pep', 'precursor_peakgroup_pep'))
 
     inferred_precursors = inferred_precursors[(inferred_precursors['precursor_peakgroup_pep'] < ipf_max_precursor_peakgroup_pep)]
@@ -199,11 +291,11 @@ def peptidoform_inference(transition_table, precursor_data, ipf_grouped_fdr):
     transition_table = pd.merge(transition_table, precursor_data, on='feature_id')
 
     # compute transition posterior probabilities
-    click.echo("      prepare peptidoform-level data")
+    click.echo("Info: Preparing peptidoform-level data.")
     transition_data_bm = prepare_transition_bm(transition_table)
 
     # compute posterior peptidoform probability
-    click.echo("      conduct peptidoform-level inference")
+    click.echo("Info: Conducting peptidoform-level inference.")
     pf_pp_data = apply_bm(transition_data_bm)
     pf_pp_data['pep'] = 1 - pf_pp_data['posterior']
 
@@ -220,7 +312,7 @@ def peptidoform_inference(transition_table, precursor_data, ipf_grouped_fdr):
 
 
 def infer_peptidoforms(infile, outfile, ipf_ms1_scoring, ipf_ms2_scoring, ipf_h0, ipf_grouped_fdr, ipf_max_precursor_pep, ipf_max_peakgroup_pep, ipf_max_precursor_peakgroup_pep, ipf_max_transition_pep):
-    click.echo("start IPF (Inference of PeptidoForms)")
+    click.echo("Info: Starting IPF (Inference of PeptidoForms).")
 
     # precursor level
     precursor_table = read_pyp_peakgroup_precursor(infile, ipf_max_peakgroup_pep, ipf_ms1_scoring, ipf_ms2_scoring)
@@ -231,7 +323,7 @@ def infer_peptidoforms(infile, outfile, ipf_ms1_scoring, ipf_ms2_scoring, ipf_h0
     peptidoform_data = peptidoform_inference(peptidoform_table, precursor_data, ipf_grouped_fdr)
 
     # finalize results and write to table
-    click.echo("      finalize results")
+    click.echo("Info: Storing results.")
     peptidoform_data = peptidoform_data[peptidoform_data['hypothesis']!=-1][['feature_id','hypothesis','precursor_peakgroup_pep','qvalue','pep']]
     peptidoform_data.columns = ['FEATURE_ID','PEPTIDE_ID','PRECURSOR_PEAKGROUP_PEP','QVALUE','PEP']
 
@@ -242,5 +334,3 @@ def infer_peptidoforms(infile, outfile, ipf_ms1_scoring, ipf_ms2_scoring, ipf_h0
 
     peptidoform_data.to_sql("SCORE_IPF", con, index=False, if_exists='replace')
     con.close()
-
-    click.echo("end IPF")

@@ -37,9 +37,9 @@ def timer(name=""):
     needed -= minutes * 60
 
     if name:
-        click.echo("Time needed for %s: %02d:%02d:%.1f" % (name, hours, minutes, needed))
+        click.echo("Info: Time needed for %s: %02d:%02d:%.1f" % (name, hours, minutes, needed))
     else:
-        click.echo("Time needed: %02d:%02d:%.1f" % (hours, minutes, needed))
+        click.echo("Info: Time needed: %02d:%02d:%.1f" % (hours, minutes, needed))
 
 
 Result = namedtuple("Result", "summary_statistics final_statistics scored_tables")
@@ -130,9 +130,9 @@ class Scorer(object):
         texp["q_value"] = q_values
         texp["s_value"] = s_values
         texp["p_value"] = p_values
-        click.echo("Mean qvalue = %e, std_dev qvalue = %e" % (np.mean(q_values),
+        click.echo("Info: Mean qvalue = %e, std_dev qvalue = %e" % (np.mean(q_values),
                                                                   np.std(q_values, ddof=1)))
-        click.echo("Mean svalue = %e, std_dev svalue = %e" % (np.mean(s_values),
+        click.echo("Info: Mean svalue = %e, std_dev svalue = %e" % (np.mean(s_values),
                                                                   np.std(s_values, ddof=1)))
         texp.add_peak_group_rank()
 
@@ -205,9 +205,9 @@ class HolyGostQuery(object):
 
     def apply_weights(self, table, loaded_weights):
         with timer():
-            click.echo("apply weights")
+            click.echo("Info: Applying weights.")
             result, scorer, trained_weights = self._apply_weights(table, loaded_weights)
-            click.echo("Finished processing of input data.")
+            click.echo("Info: Finished processing of input data.")
         return result, scorer, trained_weights
 
     def _apply_weights(self, table, loaded_weights):
@@ -227,11 +227,11 @@ class HolyGostQuery(object):
 
         learner = self.semi_supervised_learner
 
-        click.echo("start application of pretrained weights")
+        click.echo("Info: Start application of pretrained weights.")
         clf_scores = learner.score(experiment, loaded_weights)
         experiment.set_and_rerank("classifier_score", clf_scores)
 
-        click.echo("finished pretrained scoring")
+        click.echo("Info: Finished pretrained scoring.")
 
         ws = [loaded_weights.flatten()]
         final_classifier = self.semi_supervised_learner.averaged_learner(ws)
@@ -242,9 +242,9 @@ class HolyGostQuery(object):
     def learn_and_apply(self, table):
         with timer():
 
-            click.echo("learn and apply classifier from input data")
+            click.echo("Info: Learn and apply classifier from input data.")
             result, scorer, trained_weights = self._learn_and_apply(table)
-            click.echo("processing input data finished")
+            click.echo("Info: Processing input data finished.")
 
         return result, scorer, trained_weights
 
@@ -264,8 +264,8 @@ class HolyGostQuery(object):
 
         neval = self.ss_num_iter
 
-        click.echo("Semi-supervised learning of weights:")
-        click.echo("   start learning on  %d folds using %d processes" % (neval, self.threads))
+        click.echo("Info: Semi-supervised learning of weights:")
+        click.echo("Info: Start learning on  %d folds using %d processes." % (neval, self.threads))
 
         if self.threads == 1:
             for k in range(neval):
@@ -282,8 +282,7 @@ class HolyGostQuery(object):
                 ttt_scores = [ti for r in res for ti in r[0]]
                 ttd_scores = [ti for r in res for ti in r[1]]
                 ws.extend([r[2] for r in res])
-        click.echo("   finished learning")
-        click.echo("")
+        click.echo("Info: Finished learning.")
 
         # we only use weights from last iteration
         # ws = [ws[-1]]
@@ -305,7 +304,7 @@ class HolyGostQuery(object):
 
         result = Result(summary_statistics, final_statistics, scored_table)
 
-        click.echo("Finished scoring and estimation statistics.")
+        click.echo("Info: Finished scoring and estimation statistics.")
         return result, scorer, classifier_table
 
 

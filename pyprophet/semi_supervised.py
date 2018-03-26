@@ -34,7 +34,7 @@ class AbstractSemiSupervisedLearner(object):
     def learn_randomized(self, experiment):
         assert isinstance(experiment, Experiment)
 
-        click.echo("      learn on cross-validation fold")
+        click.echo("Info: Learning on cross-validation fold.")
 
         experiment.split_for_xval(self.xeval_fraction, self.test)
         train = experiment.get_train_peaks()

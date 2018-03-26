@@ -12,7 +12,7 @@ from numpy import linspace, concatenate, around
 def save_report(pdf_path, title, top_decoys, top_targets, cutoffs, svalues, qvalues, pvalues, pi0):
 
     if plt is None:
-        raise ImportError("you need matplotlib package to create a report")
+        raise ImportError("Error: The matplotlib package is required to create a report.")
 
     plt.figure(figsize=(10, 15))
     plt.subplots_adjust(hspace=.5)
@@ -83,7 +83,7 @@ def save_report(pdf_path, title, top_decoys, top_targets, cutoffs, svalues, qval
 def plot_scores(df, out):
 
     if plt is None:
-        raise ImportError("you need matplotlib package to create a report")
+        raise ImportError("Error: The matplotlib package is required to create a report.")
 
     score_columns = ["SCORE"] + [c for c in df.columns if c.startswith("MAIN_VAR_")] + [c for c in df.columns if c.startswith("VAR_")]
 

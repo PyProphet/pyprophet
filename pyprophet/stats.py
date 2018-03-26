@@ -39,7 +39,7 @@ def find_nearest_matches(x, y):
 
 
 def to_one_dim_array(values, as_type=None):
-    """ converst list or flattnes n-dim array to 1-dim array if possible"""
+    """ Converts list or flattens n-dim array to 1-dim array if possible """
 
     if isinstance(values, (list, tuple)):
         values = np.array(values, dtype=np.float32)
@@ -54,7 +54,7 @@ def to_one_dim_array(values, as_type=None):
 
 @profile
 def lookup_values_from_error_table(scores, err_df):
-    """ find best matching q-value for each score in 'scores' """
+    """ Find matching q-value for each score in 'scores' """
     ix = find_nearest_matches(np.float32(err_df.cutoff.values), np.float32(scores))
     return err_df.pvalue.iloc[ix].values, err_df.svalue.iloc[ix].values, err_df.pep.iloc[ix].values, err_df.qvalue.iloc[ix].values
 
@@ -62,7 +62,7 @@ def lookup_values_from_error_table(scores, err_df):
 def posterior_chromatogram_hypotheses_fast(experiment, prior_chrom_null):
     """ Compute posterior probabilities for each chromatogram
 
-    For each chromatogram (each transition_group), all hypothesis of all peaks
+    For each chromatogram (each group_id / peptide precursor), all hypothesis of all peaks
     being correct (and all others false) as well as the h0 (all peaks are
     false) are computed.
 
@@ -131,9 +131,7 @@ def pnorm(stat, stat0):
 
 
 def pemp(stat, stat0):
-    """ Computes empirical values identically to bioconductor/qvalue empPvals
-    returns the pvalues of stat based on the distribution of stat0.
-    """
+    """ Computes empirical values identically to bioconductor/qvalue empPvals """
 
     assert len(stat0) > 0
     assert len(stat) > 0
@@ -163,7 +161,7 @@ def pemp(stat, stat0):
 
 @profile
 def pi0est(p_values, lambda_ = np.arange(0.05,1.0,0.05), pi0_method = "smoother", smooth_df = 3, smooth_log_pi0 = False):
-    """ estimate pi0 with method of storey"""
+    """ Estimate pi0 according to bioconductor/qvalue """
 
     # Compare to bioconductor/qvalue reference implementation
     # import rpy2
@@ -275,7 +273,7 @@ def bw_nrd0(x):
 
 @profile
 def lfdr(p_values, pi0, trunc = True, monotone = True, transf = "probit", adj = 1.5, eps = np.power(10.0,-8)):
-    """ estimate local FDR / posterior error probability from p-values with method of storey"""
+    """ Estimate local FDR / posterior error probability from p-values according to bioconductor/qvalue """
     p = np.array(p_values)
 
     # Compare to bioconductor/qvalue reference implementation
@@ -388,8 +386,8 @@ def stat_metrics(p_values, pi0, pfdr):
 
 @profile
 def final_err_table(df, num_cut_offs=51):
-    """ create artificial cutoff sample points from given range of cutoff
-    values in df, number of sample points is 'num_cut_offs'"""
+    """ Create artificial cutoff sample points from given range of cutoff
+    values in df, number of sample points is 'num_cut_offs' """
 
     cutoffs = df.cutoff.values
     min_ = min(cutoffs)
@@ -412,7 +410,7 @@ def final_err_table(df, num_cut_offs=51):
 
 @profile
 def summary_err_table(df, qvalues=[0, 0.01, 0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5]):
-    """ summary error table for some typical q-values """
+    """ Summary error table for some typical q-values """
 
     qvalues = to_one_dim_array(qvalues)
     # find best matching fows in df for given qvalues:
@@ -432,7 +430,7 @@ def summary_err_table(df, qvalues=[0, 0.01, 0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5]
 
 @profile
 def error_statistics(target_scores, decoy_scores, parametric, pfdr, pi0_lambda, pi0_method = "smoother", pi0_smooth_df = 3, pi0_smooth_log_pi0 = False, compute_lfdr = False, lfdr_trunc = True, lfdr_monotone = True, lfdr_transf = "probit", lfdr_adj = 1.5, lfdr_eps = np.power(10.0,-8)):
-    """ takes list of decoy and target scores and creates error statistics for target values"""
+    """ Takes list of decoy and target scores and creates error statistics for target values """
 
     target_scores = to_one_dim_array(target_scores)
     target_scores = np.sort(target_scores[~np.isnan(target_scores)])
@@ -468,7 +466,7 @@ def error_statistics(target_scores, decoy_scores, parametric, pfdr, pi0_lambda, 
 
 
 def find_cutoff(tt_scores, td_scores, cutoff_fdr, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0):
-    """ finds cut off target score for specified false discovery rate fdr """
+    """ Finds cut off target score for specified false discovery rate fdr """
 
     error_stat, pi0 = error_statistics(tt_scores, td_scores, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, False)
     if not len(error_stat):
