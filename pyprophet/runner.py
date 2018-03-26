@@ -234,8 +234,13 @@ ORDER BY RUN_ID,
             con.commit()
             c.fetchall()
 
-            df = result.scored_tables[['feature_id','d_score','peak_group_rank','p_value','q_value','pep']]
-            df.columns = ['FEATURE_ID','SCORE','RANK','PVALUE','QVALUE','PEP']
+            df = result.scored_tables
+            if 'h_score' in df.columns:
+                df = df[['feature_id','d_score','h_score','h0_score','peak_group_rank','p_value','q_value','pep']]
+                df.columns = ['FEATURE_ID','SCORE','HSCORE','H0SCORE','RANK','PVALUE','QVALUE','PEP']
+            else:
+                df = df[['feature_id','d_score','peak_group_rank','p_value','q_value','pep']]
+                df.columns = ['FEATURE_ID','SCORE','RANK','PVALUE','QVALUE','PEP']
             table = "SCORE_MS2"
             df.to_sql(table, con, index=False)
         elif self.level == "ms1":
@@ -244,8 +249,13 @@ ORDER BY RUN_ID,
             con.commit()
             c.fetchall()
 
-            df = result.scored_tables[['feature_id','d_score','peak_group_rank','p_value','q_value','pep']]
-            df.columns = ['FEATURE_ID','SCORE','RANK','PVALUE','QVALUE','PEP']
+            df = result.scored_tables
+            if 'h_score' in df.columns:
+                df = df[['feature_id','d_score','h_score','h0_score','peak_group_rank','p_value','q_value','pep']]
+                df.columns = ['FEATURE_ID','SCORE','HSCORE','H0SCORE','RANK','PVALUE','QVALUE','PEP']
+            else:
+                df = df[['feature_id','d_score','peak_group_rank','p_value','q_value','pep']]
+                df.columns = ['FEATURE_ID','SCORE','RANK','PVALUE','QVALUE','PEP']
             table = "SCORE_MS1"
             df.to_sql(table, con, index=False)
         elif self.level == "transition":

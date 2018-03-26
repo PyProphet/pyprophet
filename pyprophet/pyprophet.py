@@ -144,8 +144,7 @@ class Scorer(object):
         return df
 
     def add_chromatogram_probabilities(self, scored_table, texp):
-        prior_chrom_null = self.error_stat.num_null / self.error_stat.num_total
-        allhypothesis, h0 = posterior_chromatogram_hypotheses_fast(texp, prior_chrom_null)
+        allhypothesis, h0 = posterior_chromatogram_hypotheses_fast(texp, self.pi0['pi0'])
         texp.df["h_score"] = allhypothesis
         texp.df["h0_score"] = h0
         scored_table = scored_table.join(texp[["h_score", "h0_score"]])
@@ -265,7 +264,7 @@ class HolyGostQuery(object):
         neval = self.ss_num_iter
 
         click.echo("Info: Semi-supervised learning of weights:")
-        click.echo("Info: Start learning on  %d folds using %d processes." % (neval, self.threads))
+        click.echo("Info: Start learning on %d folds using %d processes." % (neval, self.threads))
 
         if self.threads == 1:
             for k in range(neval):
