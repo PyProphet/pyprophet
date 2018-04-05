@@ -1,26 +1,22 @@
-# encoding: latin-1
+import numpy as np
+import click
 
-# openblas + multiprocessing crashes for OPENBLAS_NUM_THREADS > 1 !!!
-import os
-os.putenv("OPENBLAS_NUM_THREADS", "1")
+from .data_handling import Experiment
+from .classifiers import AbstractLearner
+from .stats import mean_and_std_dev, find_cutoff
 
 try:
     profile
 except NameError:
     profile = lambda x: x
 
-from data_handling import Experiment
-from classifiers import AbstractLearner
-from config import CONFIG
-
-import numpy as np
-from stats import mean_and_std_dev, find_cutoff
-
-
-from std_logger import logging
-
 
 class AbstractSemiSupervisedLearner(object):
+
+    def __init__(self, xeval_fraction, xeval_num_iter, test):
+        self.xeval_fraction = xeval_fraction
+        self.xeval_num_iter = xeval_num_iter
+        self.test = test
 
     def start_semi_supervised_learning(self, train):
         raise NotImplementedError()
@@ -38,12 +34,9 @@ class AbstractSemiSupervisedLearner(object):
     def learn_randomized(self, experiment):
         assert isinstance(experiment, Experiment)
 
-        num_iter = CONFIG.get("semi_supervised_learner.num_iter")
-        logging.info("start learn_randomized")
+        click.echo("Info: Learning on cross-validation fold.")
 
-        fraction = CONFIG.get("xeval.fraction")
-        is_test = CONFIG.get("is_test")
-        experiment.split_for_xval(fraction, is_test)
+        experiment.split_for_xval(self.xeval_fraction, self.test)
         train = experiment.get_train_peaks()
 
         train.rank_by("main_score")
@@ -53,7 +46,7 @@ class AbstractSemiSupervisedLearner(object):
         train.set_and_rerank("classifier_score", clf_scores)
 
         # semi supervised iteration:
-        for inner in range(num_iter):
+        for inner in range(self.xeval_num_iter):
             params, clf_scores = self.iter_semi_supervised_learning(train)
             train.set_and_rerank("classifier_score", clf_scores)
 
@@ -73,21 +66,30 @@ class AbstractSemiSupervisedLearner(object):
         top_test_target_scores = top_test_peaks.get_target_peaks()["classifier_score"]
         top_test_decoy_scores = top_test_peaks.get_decoy_peaks()["classifier_score"]
 
-        logging.info("end learn_randomized")
-
         return top_test_target_scores, top_test_decoy_scores, params
 
 
 class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
 
-    def __init__(self, inner_learner):
+    def __init__(self, inner_learner, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, test):
         assert isinstance(inner_learner, AbstractLearner)
+        AbstractSemiSupervisedLearner.__init__(self, xeval_fraction, xeval_num_iter, test)
         self.inner_learner = inner_learner
+        self.xeval_fraction = xeval_fraction
+        self.xeval_num_iter = xeval_num_iter
+        self.ss_initial_fdr = ss_initial_fdr
+        self.ss_iteration_fdr = ss_iteration_fdr
+        self.parametric = parametric
+        self.pfdr = pfdr
+        self.pi0_lambda = pi0_lambda
+        self.pi0_method = pi0_method
+        self.pi0_smooth_df = pi0_smooth_df
+        self.pi0_smooth_log_pi0 = pi0_smooth_log_pi0
 
-    def select_train_peaks(self, train, sel_column, fdr, lambda_, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, use_pemp, use_pfdr):
+    def select_train_peaks(self, train, sel_column, cutoff_fdr, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0):
         assert isinstance(train, Experiment)
-        assert isinstance(sel_column, basestring)
-        assert isinstance(fdr, float)
+        assert isinstance(sel_column, str)
+        assert isinstance(cutoff_fdr, float)
 
         tt_peaks = train.get_top_target_peaks()
         tt_scores = tt_peaks[sel_column]
@@ -95,20 +97,12 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
         td_scores = td_peaks[sel_column]
 
         # find cutoff fdr from scores and only use best target peaks:
-        cutoff = find_cutoff(tt_scores, td_scores, fdr, lambda_, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, use_pemp, use_pfdr)
+        cutoff = find_cutoff(tt_scores, td_scores, cutoff_fdr, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0)
         best_target_peaks = tt_peaks.filter_(tt_scores >= cutoff)
         return td_peaks, best_target_peaks
 
     def start_semi_supervised_learning(self, train):
-        fdr = CONFIG.get("semi_supervised_learner.initial_fdr")
-        lambda_ = CONFIG.get("final_statistics.lambda")
-        pi0_method = CONFIG.get("final_statistics.pi0_method")
-        pi0_smooth_df = CONFIG.get("final_statistics.pi0_smooth_df")
-        pi0_smooth_log_pi0 = CONFIG.get("final_statistics.pi0_smooth_log_pi0")
-        use_pemp = CONFIG.get("final_statistics.use_pemp")
-        use_pfdr = CONFIG.get("final_statistics.use_pfdr")
-
-        td_peaks, bt_peaks = self.select_train_peaks(train, "main_score", fdr, lambda_, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, use_pemp, use_pfdr)
+        td_peaks, bt_peaks = self.select_train_peaks(train, "main_score", self.ss_initial_fdr, self.parametric, self.pfdr, self.pi0_lambda, self.pi0_method, self.pi0_smooth_df, self.pi0_smooth_log_pi0)
         model = self.inner_learner.learn(td_peaks, bt_peaks, False)
         w = model.get_parameters()
         clf_scores = model.score(train, False)
@@ -117,15 +111,7 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
 
     @profile
     def iter_semi_supervised_learning(self, train):
-        fdr = CONFIG.get("semi_supervised_learner.iteration_fdr")
-        lambda_ = CONFIG.get("final_statistics.lambda")
-        pi0_method = CONFIG.get("final_statistics.pi0_method")
-        pi0_smooth_df = CONFIG.get("final_statistics.pi0_smooth_df")
-        pi0_smooth_log_pi0 = CONFIG.get("final_statistics.pi0_smooth_log_pi0")
-        use_pemp = CONFIG.get("final_statistics.use_pemp")
-        use_pfdr = CONFIG.get("final_statistics.use_pfdr")
-
-        td_peaks, bt_peaks = self.select_train_peaks(train, "classifier_score", fdr, lambda_, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, use_pemp, use_pfdr)
+        td_peaks, bt_peaks = self.select_train_peaks(train, "classifier_score", self.ss_iteration_fdr, self.parametric, self.pfdr, self.pi0_lambda, self.pi0_method, self.pi0_smooth_df, self.pi0_smooth_log_pi0)
 
         model = self.inner_learner.learn(td_peaks, bt_peaks, True)
         w = model.get_parameters()

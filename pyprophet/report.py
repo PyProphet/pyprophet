@@ -1,8 +1,7 @@
-# needed for headless environment:
-
 try:
     import matplotlib
     matplotlib.use('Agg')
+    from matplotlib.backends.backend_pdf import PdfPages
     import matplotlib.pyplot as plt
 except ImportError:
     plt = None
@@ -10,33 +9,16 @@ except ImportError:
 from scipy.stats import gaussian_kde
 from numpy import linspace, concatenate, around
 
-from config import CONFIG, set_pandas_print_options
-
-
-class Protein:
-
-    def __init__(self, name):
-        self.peptides = set()
-        self.name = name
-
-    def add_peptide(self, peptide):
-        self.peptides.update([peptide])
-
-    def get_concat_peptides(self):
-        return "".join(self.peptides)
-
-
-def save_report(report_path, prefix, decoys, targets, top_decoys, top_targets, cutoffs, svalues,
-                qvalues, pvalues, pi0):
+def save_report(pdf_path, title, top_decoys, top_targets, cutoffs, svalues, qvalues, pvalues, pi0):
 
     if plt is None:
-        raise ImportError("you need matplotlib package to create a report")
+        raise ImportError("Error: The matplotlib package is required to create a report.")
 
     plt.figure(figsize=(10, 15))
     plt.subplots_adjust(hspace=.5)
 
     plt.subplot(321)
-    plt.title(prefix + "\n\nROC")
+    plt.title("q-/s-value")
     plt.xlabel('false positive rate (q-value)')
     plt.ylabel('true positive rate (s-value)')
 
@@ -54,9 +36,9 @@ def save_report(report_path, prefix, decoys, targets, top_decoys, top_targets, c
     plt.plot(cutoffs, qvalues, color='r', label="FPR (q-value)")
 
     plt.subplot(323)
-    plt.title(CONFIG.get("group_id") + " d-score distributions")
+    plt.title("group d-score distributions")
     plt.xlabel("d-score")
-    plt.ylabel("# of " + CONFIG.get("group_id"))
+    plt.ylabel("# of groups")
     plt.hist(
         [top_targets, top_decoys], 20, color=['g', 'r'], label=['target', 'decoy'], histtype='bar')
     plt.legend(loc=2)
@@ -70,7 +52,7 @@ def save_report(report_path, prefix, decoys, targets, top_decoys, top_targets, c
     ddensity._compute_covariance()
     xs = linspace(min(concatenate((top_targets, top_decoys))), max(
         concatenate((top_targets, top_decoys))), 200)
-    plt.title(CONFIG.get("group_id") + " d-score densities")
+    plt.title("group d-score densities")
     plt.xlabel("d-score")
     plt.ylabel("density")
     plt.plot(xs, tdensity(xs), color='g', label='target')
@@ -79,7 +61,7 @@ def save_report(report_path, prefix, decoys, targets, top_decoys, top_targets, c
 
     plt.subplot(325)
     if pvalues is not None:
-        counts, __, __ = plt.hist(pvalues, bins=40, normed=True)
+        counts, __, __ = plt.hist(pvalues, bins=20, normed=True)
         plt.plot([0, 1], [pi0['pi0'], pi0['pi0']], "r")
         plt.title("p-value density histogram: $\pi_0$ = " + str(around(pi0['pi0'], decimals=3)))
         plt.xlabel("p-value")
@@ -92,59 +74,51 @@ def save_report(report_path, prefix, decoys, targets, top_decoys, top_targets, c
         plt.xlim([0,1])
         plt.ylim([0,1])
         plt.title("$\pi_0$ smoothing fit plot")
-        plt.xlabel("lambda")
+        plt.xlabel("$\lambda$")
         plt.ylabel("$\pi_0$($\lambda$)")
 
-    plt.savefig(report_path)
+    plt.suptitle(title)
+    plt.savefig(pdf_path)
 
-    return cutoffs, svalues, qvalues, top_targets, top_decoys
+def plot_scores(df, out):
 
+    if plt is None:
+        raise ImportError("Error: The matplotlib package is required to create a report.")
 
-def mayu_cols():
-    interesting_cols = ['run_id', CONFIG.get("group_id"), 'Sequence', 'ProteinName', 'm_score',
-                        'Charge']
-    return interesting_cols
+    score_columns = ["SCORE"] + [c for c in df.columns if c.startswith("MAIN_VAR_")] + [c for c in df.columns if c.startswith("VAR_")]
 
+    with PdfPages(out) as pdf:
+        for idx in score_columns:
+            top_targets = df[df["DECOY"] == 0][idx]
+            top_decoys = df[df["DECOY"] == 1][idx]
 
-def export_mayu(mayu_cutoff_file, mayu_fasta_file, mayu_csv_file, scored_table, final_stat):
+            if not (top_targets.isnull().values.any() or top_targets.isnull().values.any()):
+                tdensity = gaussian_kde(top_targets)
+                tdensity.covariance_factor = lambda: .25
+                tdensity._compute_covariance()
+                ddensity = gaussian_kde(top_decoys)
+                ddensity.covariance_factor = lambda: .25
+                ddensity._compute_covariance()
+                xs = linspace(min(concatenate((top_targets, top_decoys))), max(
+                    concatenate((top_targets, top_decoys))), 200)
 
-    interesting_cols = mayu_cols()
-    # write MAYU CSV input file
-    mayu_csv = scored_table.df[scored_table.df["peak_group_rank"] == 1][interesting_cols]
-    row_index = [str(i) for i in range(len(mayu_csv.index))]
-    mayu_csv['Identifier'] = ("run" + mayu_csv['run_id'].astype('|S10') + "." + row_index
-                              + "." + row_index + "." + mayu_csv['Charge'].astype('|S10'))
-    mayu_csv['Mod'] = ''
-    mayu_csv['m_score'] = 1 - mayu_csv['m_score']
-    mayu_csv = mayu_csv[['Identifier', 'Sequence', 'ProteinName', 'Mod', 'm_score']]
-    mayu_csv.columns = ['Identifier', 'Sequence', 'Protein', 'Mod', 'MScore']
-    mayu_csv.to_csv(mayu_csv_file, sep=",", index=False)
+                plt.figure(figsize=(10, 10))
+                plt.subplots_adjust(hspace=.5)
 
-    # write MAYU FASTA input file
-    mayu_fasta = scored_table.df[scored_table.df["peak_group_rank"] == 1]
-    mayu_fasta_file_out = open(mayu_fasta_file, "w")
+                plt.subplot(211)
+                plt.title(idx)
+                plt.xlabel(idx)
+                plt.ylabel("# of groups")
+                plt.hist(
+                    [top_targets, top_decoys], 20, color=['g', 'r'], label=['target', 'decoy'], histtype='bar')
+                plt.legend(loc=2)
 
-    protein_dic = {}
-    for entry in mayu_fasta[['ProteinName', 'Sequence']].iterrows():
-        peptide = entry[1]['Sequence']
-        protein = entry[1]['ProteinName']
-        if protein not in protein_dic:
-            p = Protein(protein)
-            protein_dic[protein] = p
-        protein_dic[protein].add_peptide(peptide)
+                plt.subplot(212)
+                plt.xlabel(idx)
+                plt.ylabel("density")
+                plt.plot(xs, tdensity(xs), color='g', label='target')
+                plt.plot(xs, ddensity(xs), color='r', label='decoy')
+                plt.legend(loc=2)
 
-    for k in protein_dic:
-        protein = protein_dic[k]
-        mayu_fasta_file_out.write(">%s\n" % protein.name)
-        mayu_fasta_file_out.write(protein.get_concat_peptides())
-        mayu_fasta_file_out.write("\n")
-
-    # write MAYU cutoff input file
-    mayu_cutoff = (final_stat.ix[0]['FP'] + final_stat.ix[0]['TN']) / \
-                  (final_stat.ix[0]['TP'] + final_stat.ix[0]['FN']
-                   + final_stat.ix[0]['FP'] + final_stat.ix[0]['TN'])
-
-    mayu_cutoff_file_out = open(mayu_cutoff_file, "w")
-    mayu_cutoff_file_out.write("%s" % mayu_cutoff)
-
-    return True
+                pdf.savefig()
+                plt.close()

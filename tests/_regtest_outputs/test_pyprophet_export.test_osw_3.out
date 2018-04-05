@@ -1,0 +1,5 @@
+Empty DataFrame
+Columns: [transition_group_id, decoy, run_id, filename, RT, assay_rt, delta_rt, iRT, assay_iRT, delta_iRT, id, SEQUENCE, FullUniModPeptideName, Charge, mz, Intensity, aggr_prec_peak_area, aggr_prec_peak_apex, leftWidth, rightWidth, peak_group_rank, d_score, m_score, ProteinName, m_score_protein_run_specific, m_score_protein_experiment_wide, m_score_protein_global]
+Index: []
+
+[0 rows x 27 columns]

@@ -1,0 +1,30 @@
+sudo: required
+dist: trusty
+language: python
+python:
+  - "2.7"
+  - "3.4"
+  - "3.5"
+  - "3.6"
+before_install:
+ - sudo apt-get update
+install:
+  - pip install -U setuptools
+  - pip install -U pytest
+  - pip install -U pytest-regtest
+  - pip install -U Click
+  - pip install -U numpy
+  - pip install -U scipy
+  - pip install -U pandas
+  - pip install -U scikit-learn
+  - pip install -U numexpr
+  - pip install -U statsmodels
+  - pip install -U matplotlib
+  - pip install -U seaborn
+  - travis_retry python setup.py develop
+script: 
+  - if [[ $TRAVIS_PYTHON_VERSION == 2* ]]; then py.test tests/; fi
+  - if [[ $TRAVIS_PYTHON_VERSION == 3.4* ]]; then py.test tests/; fi
+  - if [[ $TRAVIS_PYTHON_VERSION == 3.5* ]]; then py.test tests/; fi
+  - if [[ $TRAVIS_PYTHON_VERSION == 3.6* ]]; then py.test tests/; fi
+cache: pip

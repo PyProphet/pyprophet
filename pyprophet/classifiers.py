@@ -1,19 +1,8 @@
-# encoding: latin-1
-
-# openblas + multiprocessing crashes for OPENBLAS_NUM_THREADS > 1 !!!
-import os
-os.putenv("OPENBLAS_NUM_THREADS", "1")
-
-try:
-    profile
-except NameError:
-    profile = lambda x: x
-
-from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 import numpy as np
 import inspect
 
-from data_handling import Experiment
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from .data_handling import Experiment
 
 
 class AbstractLearner(object):

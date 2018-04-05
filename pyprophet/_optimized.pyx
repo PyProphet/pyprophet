@@ -1,4 +1,3 @@
-# encoding: latin-1
 cimport cython
 cimport libc.stdlib
 cimport numpy as np

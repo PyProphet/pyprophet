@@ -1,23 +1,9 @@
+import sys
+import numpy
 from setuptools import setup, find_packages
 from distutils.extension import Extension
 
-
-min_numpy_version = (1, 9, 0)
-
-try:
-    import numpy
-except ImportError:
-    print ("need at least numpy %d.%d.%d" % min_numpy_version)
-else:
-    vtuple = tuple(map(int, numpy.__version__.split(".")))
-    msg = "need at least numpy %s, found %s" % (min_numpy_version, vtuple)
-    assert vtuple >= min_numpy_version, msg
-
-
-######################################################################
-version = (0, 24, 2)  # NEVER FORGET TO UPDATE version.py AS WELL !!!
-######################################################################
-
+version = (2, 0, 0)
 
 ext_modules = [Extension("pyprophet._optimized", ["pyprophet/_optimized.c"])]
 
@@ -25,9 +11,9 @@ setup(name='pyprophet',
       version="%d.%d.%d" % version,
       author="Uwe Schmitt",
       author_email="rocksportrocker@gmail.com",
-      description="Python reimplementation of mProphet peak scoring",
+      description="PyProphet: Semi-supervised learning and scoring of OpenSWATH results.",
       license="BSD",
-      url="http://github.com/uweschmitt/pyprophet",
+      url="https://github.com/PyProphet",
       packages=find_packages(exclude=['ez_setup', 'examples', 'tests']),
       include_package_data=True,
       include_dirs=[numpy.get_include()],
@@ -42,9 +28,11 @@ setup(name='pyprophet',
       ],
       zip_safe=False,
       install_requires=[
-          "numpy >= %d.%d.%d" % min_numpy_version,
-          "pandas >= 0.17",
+          "Click",
+          "numpy >= 1.9.0",
           "scipy >= 0.9.0",
+          "pandas >= 0.17",
+          "cython",
           "numexpr >= 2.1",
           "scikit-learn >= 0.17",
           "statsmodels >= 0.8.0",
@@ -53,7 +41,7 @@ setup(name='pyprophet',
       ],
       entry_points={
           'console_scripts': [
-              "pyprophet=pyprophet.main:main",
+              "pyprophet=pyprophet.main:cli",
               ]
       },
       ext_modules=ext_modules,
