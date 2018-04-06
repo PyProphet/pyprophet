@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/PyProphet/pyprophet.svg?branch=master)](https://travis-ci.org/PyProphet/pyprophet) [![Project Stats](https://www.openhub.net/p/PyProphet/widgets/project_thin_badge.gif)](https://www.openhub.net/p/PyProphet)
+
 PyProphet
 =========
 
