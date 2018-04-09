@@ -27,7 +27,7 @@ class PyProphetRunner(object):
     """Base class for workflow of command line tool
     """
 
-    def __init__(self, infile, outfile, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, level, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn, tric_chromprob, threads, test):
+    def __init__(self, infile, outfile, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, ss_main_score, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, level, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn, tric_chromprob, threads, test):
         def read_tsv(infile):
             table = pd.read_csv(infile, "\t")
             return(table)
@@ -39,7 +39,7 @@ class PyProphetRunner(object):
                 table = pd.read_sql_query('''
 SELECT *,
        RUN_ID || '_' || PRECURSOR_ID AS GROUP_ID,
-       VAR_XCORR_SHAPE AS MAIN_VAR_XCORR_SHAPE
+       %s AS MAIN_SCORE
 FROM FEATURE_MS2
 INNER JOIN
   (SELECT RUN_ID,
@@ -54,12 +54,12 @@ INNER JOIN
 ORDER BY RUN_ID,
          PRECURSOR.ID ASC,
          FEATURE.EXP_RT ASC;
-''', con)
+''' % (ss_main_score), con)
             elif level == "ms1":
                 table = pd.read_sql_query('''
 SELECT *,
        RUN_ID || '_' || PRECURSOR_ID AS GROUP_ID,
-       VAR_XCORR_SHAPE AS MAIN_VAR_XCORR_SHAPE
+       %s AS MAIN_SCORE
 FROM FEATURE_MS1
 INNER JOIN
   (SELECT RUN_ID,
@@ -74,13 +74,13 @@ INNER JOIN
 ORDER BY RUN_ID,
          PRECURSOR.ID ASC,
          FEATURE.EXP_RT ASC;
-    ''', con)
+''' % (ss_main_score), con)
             elif level == "transition":
                 table = pd.read_sql_query('''
 SELECT TRANSITION.DECOY AS DECOY,
        FEATURE_TRANSITION.*,
        RUN_ID || '_' || FEATURE_TRANSITION.FEATURE_ID || '_' || PRECURSOR_ID || '_' || TRANSITION_ID AS GROUP_ID,
-       VAR_XCORR_SHAPE AS MAIN_VAR_XCORR_SHAPE
+       %s AS MAIN_SCORE
 FROM FEATURE_TRANSITION
 INNER JOIN
   (SELECT RUN_ID,
@@ -103,7 +103,7 @@ ORDER BY RUN_ID,
          PRECURSOR.ID,
          FEATURE.EXP_RT,
          TRANSITION.ID;
-''' % (ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn), con)
+''' % (ss_main_score, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn), con)
             else:
                 sys.exit("Error: Unspecified data level selected.")
 
@@ -127,6 +127,7 @@ ORDER BY RUN_ID,
         self.ss_initial_fdr = ss_initial_fdr
         self.ss_iteration_fdr = ss_iteration_fdr
         self.ss_num_iter = ss_num_iter
+        self.ss_main_score = ss_main_score
         self.group_id = group_id
         self.parametric = parametric
         self.pfdr = pfdr
@@ -313,8 +314,8 @@ class PyProphetLearner(PyProphetRunner):
 
 class PyProphetWeightApplier(PyProphetRunner):
 
-    def __init__(self, infile, outfile, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, level, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn, tric_chromprob, threads, test, apply_weights):
-        super(PyProphetWeightApplier, self).__init__(infile, outfile, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, level, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn, tric_chromprob, threads, test)
+    def __init__(self, infile, outfile, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, ss_main_score, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, level, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn, tric_chromprob, threads, test, apply_weights):
+        super(PyProphetWeightApplier, self).__init__(infile, outfile, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, ss_main_score, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, level, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn, tric_chromprob, threads, test)
         if not os.path.exists(apply_weights):
             sys.exit("Error: Weights file %s does not exist." % apply_weights)
         if self.mode == "tsv":
