@@ -237,6 +237,7 @@ def backpropagate(infile, outfile, apply_scores):
 @click.option('--csv/--no-csv', 'outcsv', default=False, show_default=True, help='Export CSV instead of TSV file.')
 # Context
 @click.option('--transition_quantification/--no-transition_quantification', default=True, show_default=True, help='[format: legacy] Report aggregated transition-level quantification.')
+@click.option('--max_transition_pep', default=0.7, show_default=True, type=float, help='[format: legacy] Maximum PEP to retain scored transitions for quantification (requires transition-level scoring).')
 @click.option('--ipf/--no-ipf', default=True, show_default=True, help='Use IPF peptidoform-level data if available. Replaces FullPeptideName and m_score columns with IPF estimates. Note: Results do not contain decoys.')
 @click.option('--max_rs_peakgroup_pep', default=0.4, show_default=True, type=float, help='[format: matrix/legacy] Filter results to maximum run-specific peak group-level (IPF: peptidoform-level) PEP.')
 @click.option('--max_rs_peakgroup_qvalue', default=0.01, show_default=True, type=float, help='[format: matrix] Filter results to maximum run-specific peak group-level q-value.')
@@ -244,7 +245,7 @@ def backpropagate(infile, outfile, apply_scores):
 @click.option('--max_global_peptide_qvalue', default=0.01, show_default=True, type=float, help='[format: matrix/legacy] Filter results to maximum global peptide-level q-value.')
 @click.option('--protein/--no-protein', default=True, show_default=True, help='Append protein-level error-rate estimates if available.')
 @click.option('--max_global_protein_qvalue', default=0.01, show_default=True, type=float, help='[format: matrix/legacy] Filter results to maximum global protein-level q-value.')
-def export(infile, outfile, format, outcsv, transition_quantification, ipf, max_rs_peakgroup_pep, max_rs_peakgroup_qvalue, peptide, max_global_peptide_qvalue, protein, max_global_protein_qvalue):
+def export(infile, outfile, format, outcsv, transition_quantification, max_transition_pep, ipf, max_rs_peakgroup_pep, max_rs_peakgroup_qvalue, peptide, max_global_peptide_qvalue, protein, max_global_protein_qvalue):
     """
     Export TSV/CSV tables
     """
@@ -259,7 +260,7 @@ def export(infile, outfile, format, outcsv, transition_quantification, ipf, max_
         else:
             outfile = outfile
 
-        export_tsv(infile, outfile, format, outcsv, transition_quantification, ipf, max_rs_peakgroup_pep, max_rs_peakgroup_qvalue, peptide, max_global_peptide_qvalue, protein, max_global_protein_qvalue)
+        export_tsv(infile, outfile, format, outcsv, transition_quantification, max_transition_pep, ipf, max_rs_peakgroup_pep, max_rs_peakgroup_qvalue, peptide, max_global_peptide_qvalue, protein, max_global_protein_qvalue)
 
 
 # Filter sqMass files
