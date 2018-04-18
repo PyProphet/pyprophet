@@ -333,8 +333,7 @@ def export_score_plots(infile):
         outfile = infile.split(".osw")[0] + "_ms2_score_plots.pdf"
         table_ms2 = pd.read_sql_query('''
 SELECT *,
-       RUN_ID || '_' || PRECURSOR_ID AS GROUP_ID,
-       VAR_XCORR_SHAPE AS MAIN_VAR_XCORR_SHAPE
+       RUN_ID || '_' || PRECURSOR_ID AS GROUP_ID
 FROM FEATURE_MS2
 INNER JOIN
   (SELECT RUN_ID,
@@ -358,8 +357,7 @@ ORDER BY RUN_ID,
         outfile = infile.split(".osw")[0] + "_ms1_score_plots.pdf"
         table_ms1 = pd.read_sql_query('''
 SELECT *,
-       RUN_ID || '_' || PRECURSOR_ID AS GROUP_ID,
-       VAR_XCORR_SHAPE AS MAIN_VAR_XCORR_SHAPE
+       RUN_ID || '_' || PRECURSOR_ID AS GROUP_ID
 FROM FEATURE_MS1
 INNER JOIN
   (SELECT RUN_ID,
@@ -385,8 +383,7 @@ ORDER BY RUN_ID,
 SELECT TRANSITION.DECOY AS DECOY,
        FEATURE_TRANSITION.*,
        SCORE_TRANSITION.*,
-       RUN_ID || '_' || FEATURE_TRANSITION.FEATURE_ID || '_' || PRECURSOR_ID || '_' || FEATURE_TRANSITION.TRANSITION_ID AS GROUP_ID,
-       VAR_XCORR_SHAPE AS MAIN_VAR_XCORR_SHAPE
+       RUN_ID || '_' || FEATURE_TRANSITION.FEATURE_ID || '_' || PRECURSOR_ID || '_' || FEATURE_TRANSITION.TRANSITION_ID AS GROUP_ID
 FROM FEATURE_TRANSITION
 INNER JOIN
   (SELECT RUN_ID,
