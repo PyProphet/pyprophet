@@ -6,7 +6,7 @@ from .data_handling import check_sqlite_table
 from .report import plot_scores
 
 
-def export_tsv(infile, outfile, format, outcsv, transition_quantification, ipf, max_rs_peakgroup_pep, max_rs_peakgroup_qvalue, peptide, max_global_peptide_qvalue, protein, max_global_protein_qvalue):
+def export_tsv(infile, outfile, format, outcsv, transition_quantification, max_transition_pep, ipf, max_rs_peakgroup_pep, max_rs_peakgroup_qvalue, peptide, max_global_peptide_qvalue, protein, max_global_protein_qvalue):
 
     con = sqlite3.connect(infile)
 
@@ -14,9 +14,9 @@ def export_tsv(infile, outfile, format, outcsv, transition_quantification, ipf, 
     if ipf:
         ipf_present = check_sqlite_table(con, "SCORE_IPF")
 
+    # Main query for IPF
     if ipf_present and ipf:
-        if transition_quantification:
-            query = '''
+	    query = '''
 SELECT RUN.ID AS id_run,
        PEPTIDE.ID AS id_peptide,
        PEPTIDE_IPF.MODIFIED_SEQUENCE || '_' || PRECURSOR.ID AS transition_group_id,
@@ -30,67 +30,7 @@ SELECT RUN.ID AS id_run,
        PRECURSOR.LIBRARY_RT AS assay_iRT,
        FEATURE.NORM_RT - PRECURSOR.LIBRARY_RT AS delta_iRT,
        FEATURE.ID AS id,
-       PEPTIDE_IPF.UNMODIFIED_SEQUENCE AS SEQUENCE,
-       PEPTIDE_IPF.MODIFIED_SEQUENCE AS FullUniModPeptideName,
-       PRECURSOR.CHARGE AS Charge,
-       PRECURSOR.PRECURSOR_MZ AS mz,
-       FEATURE_MS2.AREA_INTENSITY AS Intensity,
-       FEATURE_MS1.AREA_INTENSITY AS aggr_prec_peak_area,
-       FEATURE_MS1.APEX_INTENSITY AS aggr_prec_peak_apex,
-       aggr_peak_area,
-       aggr_peak_apex,
-       aggr_fragment_annotation,
-       FEATURE.LEFT_WIDTH AS leftWidth,
-       FEATURE.RIGHT_WIDTH AS rightWidth,
-       SCORE_MS1.PEP AS ms1_pep,
-       SCORE_MS2.PEP AS ms2_pep,
-       SCORE_IPF.PRECURSOR_PEAKGROUP_PEP AS precursor_pep,
-       SCORE_IPF.PEP AS ipf_pep,
-       SCORE_MS2.RANK AS peak_group_rank,
-       SCORE_MS2.SCORE AS d_score,
-       SCORE_MS2.QVALUE AS ms2_m_score,
-       SCORE_IPF.QVALUE AS m_score
-FROM PRECURSOR
-INNER JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
-INNER JOIN PEPTIDE ON PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
-INNER JOIN FEATURE ON FEATURE.PRECURSOR_ID = PRECURSOR.ID
-INNER JOIN RUN ON RUN.ID = FEATURE.RUN_ID
-LEFT JOIN FEATURE_MS1 ON FEATURE_MS1.FEATURE_ID = FEATURE.ID
-LEFT JOIN FEATURE_MS2 ON FEATURE_MS2.FEATURE_ID = FEATURE.ID
-INNER JOIN
-  (SELECT FEATURE_ID,
-          GROUP_CONCAT(AREA_INTENSITY,';') AS aggr_peak_area,
-          GROUP_CONCAT(APEX_INTENSITY,';') AS aggr_peak_apex,
-          GROUP_CONCAT(TRANSITION_ID,';') AS aggr_fragment_annotation
-   FROM FEATURE_TRANSITION
-   INNER JOIN TRANSITION ON FEATURE_TRANSITION.TRANSITION_ID = TRANSITION.ID
-   WHERE TRANSITION.DECOY == 0
-   GROUP BY FEATURE_ID) AS FEATURE_TRANSITION ON FEATURE_TRANSITION.FEATURE_ID = FEATURE.ID
-LEFT JOIN SCORE_MS1 ON SCORE_MS1.FEATURE_ID = FEATURE.ID
-LEFT JOIN SCORE_MS2 ON SCORE_MS2.FEATURE_ID = FEATURE.ID
-LEFT JOIN SCORE_IPF ON SCORE_IPF.FEATURE_ID = FEATURE.ID
-INNER JOIN PEPTIDE AS PEPTIDE_IPF ON SCORE_IPF.PEPTIDE_ID = PEPTIDE_IPF.ID
-WHERE SCORE_IPF.PEP <= %s
-ORDER BY transition_group_id,
-         peak_group_rank;
-''' % max_rs_peakgroup_pep
-
-        else:
-            query = '''
-SELECT RUN.ID AS id_run,
-       PEPTIDE.ID AS id_peptide,
-       PEPTIDE_IPF.MODIFIED_SEQUENCE || '_' || PRECURSOR.ID AS transition_group_id,
-       PRECURSOR.DECOY AS decoy,
-       RUN.ID AS run_id,
-       RUN.FILENAME AS filename,
-       FEATURE.EXP_RT AS RT,
-       FEATURE.EXP_RT - FEATURE.DELTA_RT AS assay_rt,
-       FEATURE.DELTA_RT AS delta_rt,
-       FEATURE.NORM_RT AS iRT,
-       PRECURSOR.LIBRARY_RT AS assay_iRT,
-       FEATURE.NORM_RT - PRECURSOR.LIBRARY_RT AS delta_iRT,
-       FEATURE.ID AS id,
-       PEPTIDE_IPF.UNMODIFIED_SEQUENCE AS SEQUENCE,
+       PEPTIDE_IPF.UNMODIFIED_SEQUENCE AS Sequence,
        PEPTIDE_IPF.MODIFIED_SEQUENCE AS FullUniModPeptideName,
        PRECURSOR.CHARGE AS Charge,
        PRECURSOR.PRECURSOR_MZ AS mz,
@@ -122,10 +62,9 @@ WHERE SCORE_IPF.PEP <= %s
 ORDER BY transition_group_id,
          peak_group_rank;
 ''' % max_rs_peakgroup_pep
-
+	# Main query for standard OpenSWATH
     else:
-        if transition_quantification:
-            query = '''
+	    query = '''
 SELECT RUN.ID AS id_run,
        PEPTIDE.ID AS id_peptide,
        PRECURSOR.ID AS transition_group_id,
@@ -139,57 +78,7 @@ SELECT RUN.ID AS id_run,
        PRECURSOR.LIBRARY_RT AS assay_iRT,
        FEATURE.NORM_RT - PRECURSOR.LIBRARY_RT AS delta_iRT,
        FEATURE.ID AS id,
-       PEPTIDE.UNMODIFIED_SEQUENCE AS SEQUENCE,
-       PEPTIDE.MODIFIED_SEQUENCE AS FullUniModPeptideName,
-       PRECURSOR.CHARGE AS Charge,
-       PRECURSOR.PRECURSOR_MZ AS mz,
-       FEATURE_MS2.AREA_INTENSITY AS Intensity,
-       FEATURE_MS1.AREA_INTENSITY AS aggr_prec_peak_area,
-       FEATURE_MS1.APEX_INTENSITY AS aggr_prec_peak_apex,
-       aggr_peak_area,
-       aggr_peak_apex,
-       aggr_fragment_annotation,
-       FEATURE.LEFT_WIDTH AS leftWidth,
-       FEATURE.RIGHT_WIDTH AS rightWidth,
-       SCORE_MS2.RANK AS peak_group_rank,
-       SCORE_MS2.SCORE AS d_score,
-       SCORE_MS2.QVALUE AS m_score
-FROM PRECURSOR
-INNER JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
-INNER JOIN PEPTIDE ON PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
-INNER JOIN FEATURE ON FEATURE.PRECURSOR_ID = PRECURSOR.ID
-INNER JOIN RUN ON RUN.ID = FEATURE.RUN_ID
-LEFT JOIN FEATURE_MS1 ON FEATURE_MS1.FEATURE_ID = FEATURE.ID
-LEFT JOIN FEATURE_MS2 ON FEATURE_MS2.FEATURE_ID = FEATURE.ID
-INNER JOIN
-  (SELECT FEATURE_ID,
-          GROUP_CONCAT(AREA_INTENSITY,';') AS aggr_peak_area,
-          GROUP_CONCAT(APEX_INTENSITY,';') AS aggr_peak_apex,
-          GROUP_CONCAT(TRANSITION_ID,';') AS aggr_fragment_annotation
-   FROM FEATURE_TRANSITION
-   INNER JOIN TRANSITION ON FEATURE_TRANSITION.TRANSITION_ID = TRANSITION.ID
-   GROUP BY FEATURE_ID) AS FEATURE_TRANSITION ON FEATURE_TRANSITION.FEATURE_ID = FEATURE.ID
-LEFT JOIN SCORE_MS2 ON SCORE_MS2.FEATURE_ID = FEATURE.ID
-WHERE SCORE_MS2.PEP <= %s
-ORDER BY transition_group_id,
-         peak_group_rank;
-''' % max_rs_peakgroup_pep
-        else:
-            query = '''
-SELECT RUN.ID AS id_run,
-       PEPTIDE.ID AS id_peptide,
-       PRECURSOR.ID AS transition_group_id,
-       PRECURSOR.DECOY AS decoy,
-       RUN.ID AS run_id,
-       RUN.FILENAME AS filename,
-       FEATURE.EXP_RT AS RT,
-       FEATURE.EXP_RT - FEATURE.DELTA_RT AS assay_rt,
-       FEATURE.DELTA_RT AS delta_rt,
-       FEATURE.NORM_RT AS iRT,
-       PRECURSOR.LIBRARY_RT AS assay_iRT,
-       FEATURE.NORM_RT - PRECURSOR.LIBRARY_RT AS delta_iRT,
-       FEATURE.ID AS id,
-       PEPTIDE.UNMODIFIED_SEQUENCE AS SEQUENCE,
+       PEPTIDE.UNMODIFIED_SEQUENCE AS Sequence,
        PEPTIDE.MODIFIED_SEQUENCE AS FullUniModPeptideName,
        PRECURSOR.CHARGE AS Charge,
        PRECURSOR.PRECURSOR_MZ AS mz,
@@ -216,6 +105,34 @@ ORDER BY transition_group_id,
 
     # Execute main SQLite query
     data = pd.read_sql_query(query, con)
+
+    # Append transition-level quantities
+    if transition_quantification:
+        if check_sqlite_table(con, "SCORE_TRANSITION"):
+            transition_query = '''
+SELECT FEATURE_TRANSITION.FEATURE_ID AS id,
+      GROUP_CONCAT(AREA_INTENSITY,';') AS aggr_peak_area,
+      GROUP_CONCAT(APEX_INTENSITY,';') AS aggr_peak_apex,
+      GROUP_CONCAT(FEATURE_TRANSITION.TRANSITION_ID,';') AS aggr_fragment_annotation
+FROM FEATURE_TRANSITION
+INNER JOIN TRANSITION ON FEATURE_TRANSITION.TRANSITION_ID = TRANSITION.ID
+INNER JOIN SCORE_TRANSITION ON FEATURE_TRANSITION.TRANSITION_ID = SCORE_TRANSITION.TRANSITION_ID AND FEATURE_TRANSITION.FEATURE_ID = SCORE_TRANSITION.FEATURE_ID
+WHERE TRANSITION.DECOY == 0 AND SCORE_TRANSITION.PEP <= %s
+GROUP BY FEATURE_TRANSITION.FEATURE_ID
+''' % max_transition_pep
+        else:
+            transition_query = '''
+SELECT FEATURE_ID AS id,
+      GROUP_CONCAT(AREA_INTENSITY,';') AS aggr_peak_area,
+      GROUP_CONCAT(APEX_INTENSITY,';') AS aggr_peak_apex,
+      GROUP_CONCAT(TRANSITION_ID,';') AS aggr_fragment_annotation
+FROM FEATURE_TRANSITION
+INNER JOIN TRANSITION ON FEATURE_TRANSITION.TRANSITION_ID = TRANSITION.ID
+WHERE TRANSITION.DECOY == 0
+GROUP BY FEATURE_ID
+'''
+        data_transition = pd.read_sql_query(transition_query, con)
+        data = pd.merge(data, data_transition, how='inner', on=['id'])
 
     # Append concatenated protein identifier
     data_protein = pd.read_sql_query('''

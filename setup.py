@@ -3,17 +3,15 @@ import numpy
 from setuptools import setup, find_packages
 from distutils.extension import Extension
 
-version = (2, 0, 0)
-
 ext_modules = [Extension("pyprophet._optimized", ["pyprophet/_optimized.c"])]
 
 setup(name='pyprophet',
-      version="%d.%d.%d" % version,
+      version="2.0.dev1",
       author="Uwe Schmitt",
       author_email="rocksportrocker@gmail.com",
       description="PyProphet: Semi-supervised learning and scoring of OpenSWATH results.",
       license="BSD",
-      url="https://github.com/PyProphet",
+      url="https://github.com/PyProphet/pyprophet",
       packages=find_packages(exclude=['ez_setup', 'examples', 'tests']),
       include_package_data=True,
       include_dirs=[numpy.get_include()],

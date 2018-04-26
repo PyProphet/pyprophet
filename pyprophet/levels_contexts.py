@@ -234,7 +234,7 @@ WHERE PRECURSOR_ID IN
         FROM sdb.PRECURSOR));
 
 DETACH DATABASE sdb;
-''' % infile, subsample_ratio)
+''' % (infile, subsample_ratio))
         click.echo("Info: Merged generic features of file %s to %s." % (infile, outfile))
 
     for infile in infiles:
@@ -340,7 +340,6 @@ PRAGMA synchronous = OFF;
 
 ATTACH DATABASE "%s" AS sdb;
 
-' + '
 CREATE TABLE RUN(ID INT PRIMARY KEY NOT NULL,
                  FILENAME TEXT NOT NULL);
 
