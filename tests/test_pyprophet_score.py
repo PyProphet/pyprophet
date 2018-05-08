@@ -32,7 +32,7 @@ def _run_pyprophet_tsv_to_learn_model(regtest, temp_folder, dump_result_files=Fa
     os.chdir(temp_folder)
     data_path = os.path.join(DATA_FOLDER, "test_data.txt")
     shutil.copy(data_path, temp_folder)
-    cmdline = "pyprophet score --pi0_method=smoother --pi0_lambda 0.4 0 0 --in=test_data.txt --test"
+    cmdline = "pyprophet score --pi0_method=smoother --pi0_lambda 0.4 0 0 --in=test_data.txt --test --ss_iteration_fdr=0.02"
     if parametric:
         cmdline += " --parametric"
     if pfdr:
@@ -52,7 +52,7 @@ def _run_pyprophet_osw_to_learn_model(regtest, temp_folder, dump_result_files=Fa
     data_path = os.path.join(DATA_FOLDER, "test_data.osw")
     shutil.copy(data_path, temp_folder)
     # MS1-level
-    cmdline = "pyprophet score --in=test_data.osw --level=ms1 --test"
+    cmdline = "pyprophet score --in=test_data.osw --level=ms1 --test --ss_iteration_fdr=0.02"
     if parametric:
         cmdline += " --parametric"
     if pfdr:
@@ -61,7 +61,7 @@ def _run_pyprophet_osw_to_learn_model(regtest, temp_folder, dump_result_files=Fa
         cmdline += " --pi0_lambda=" + pi0_lambda
 
     # MS2-level
-    cmdline += " score --in=test_data.osw --level=ms2 --test"
+    cmdline += " score --in=test_data.osw --level=ms2 --test --ss_iteration_fdr=0.02"
     if parametric:
         cmdline += " --parametric"
     if pfdr:
@@ -70,7 +70,7 @@ def _run_pyprophet_osw_to_learn_model(regtest, temp_folder, dump_result_files=Fa
         cmdline += " --pi0_lambda=" + pi0_lambda
 
     # transition-level
-    cmdline += " score --in=test_data.osw --level=transition --test"
+    cmdline += " score --in=test_data.osw --level=transition --test --ss_iteration_fdr=0.02"
     if parametric:
         cmdline += " --parametric"
     if pfdr:
@@ -101,7 +101,7 @@ def test_tsv_apply_weights(tmpdir, regtest):
     _run_pyprophet_tsv_to_learn_model(regtest, tmpdir.strpath, True)
 
     _run_cmdline("pyprophet score --pi0_method=smoother --pi0_lambda 0.4 0 0 --in=test_data.txt --apply_weights=test_data_weights.csv "
-                          "--test")
+                          "--test --ss_iteration_fdr=0.02")
 
 def test_osw_0(tmpdir, regtest):
     _run_pyprophet_osw_to_learn_model(regtest, tmpdir.strpath, True, pi0_lambda="0 0 0")
@@ -117,7 +117,7 @@ def test_not_unique_tg_id_blocks(tmpdir):
     os.chdir(tmpdir.strpath)
     data_path = os.path.join(DATA_FOLDER, "test_invalid_data.txt")
     shutil.copy(data_path, tmpdir.strpath)
-    cmdline = "pyprophet score --pi0_method=smoother --pi0_lambda 0.4 0 0 --in=test_invalid_data.txt --test"
+    cmdline = "pyprophet score --pi0_method=smoother --pi0_lambda 0.4 0 0 --in=test_invalid_data.txt --test --ss_iteration_fdr=0.02"
 
     with pytest.raises(subprocess.CalledProcessError) as exc_info:
         subprocess.check_output(cmdline, shell=True, stderr=subprocess.STDOUT)

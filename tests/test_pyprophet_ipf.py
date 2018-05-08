@@ -33,13 +33,13 @@ def _run_ipf(regtest, temp_folder, dump_result_files=False, ipf_ms1_scoring=True
     data_path = os.path.join(DATA_FOLDER, "test_data.osw")
     shutil.copy(data_path, temp_folder)
     # MS1-level
-    cmdline = "pyprophet score --in=test_data.osw --level=ms1 --test --pi0_lambda=0.1 0 0"
+    cmdline = "pyprophet score --in=test_data.osw --level=ms1 --test --pi0_lambda=0.1 0 0 --ss_iteration_fdr=0.02"
 
     # MS2-level
-    cmdline += " score --in=test_data.osw --level=ms2 --test --pi0_lambda=0.001 0 0"
+    cmdline += " score --in=test_data.osw --level=ms2 --test --pi0_lambda=0.001 0 0 --ss_iteration_fdr=0.02"
 
     # transition-level
-    cmdline += " score --in=test_data.osw --level=transition --test --pi0_lambda=0.1 0 0"
+    cmdline += " score --in=test_data.osw --level=transition --test --pi0_lambda=0.1 0 0 --ss_iteration_fdr=0.02"
 
     # transition-level
     cmdline += " ipf --in=test_data.osw"
