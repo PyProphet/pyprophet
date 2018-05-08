@@ -31,7 +31,7 @@ def _run_peptide(regtest, temp_folder):
     data_path = os.path.join(DATA_FOLDER, "test_data.osw")
     shutil.copy(data_path, temp_folder)
     # MS1-level
-    cmdline = "pyprophet score --in=test_data.osw --level=ms2 --test --pi0_lambda=0.001 0 0"
+    cmdline = "pyprophet score --in=test_data.osw --level=ms2 --test --pi0_lambda=0.001 0 0 --ss_iteration_fdr=0.02"
 
     # peptide-level
     cmdline += " peptide --pi0_lambda=0.001 0 0 --in=test_data.osw --context=run-specific"
@@ -56,7 +56,7 @@ def _run_protein(regtest, temp_folder):
     data_path = os.path.join(DATA_FOLDER, "test_data.osw")
     shutil.copy(data_path, temp_folder)
     # MS1-level
-    cmdline = "pyprophet score --in=test_data.osw --level=ms2 --test --pi0_lambda=0.001 0 0"
+    cmdline = "pyprophet score --in=test_data.osw --level=ms2 --test --pi0_lambda=0.001 0 0 --ss_iteration_fdr=0.02"
 
     # protein-level
     cmdline += " protein --pi0_lambda=0 0 0 --in=test_data.osw --context=run-specific"
