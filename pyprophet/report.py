@@ -61,7 +61,7 @@ def save_report(pdf_path, title, top_decoys, top_targets, cutoffs, svalues, qval
 
     plt.subplot(325)
     if pvalues is not None:
-        counts, __, __ = plt.hist(pvalues, bins=20, normed=True)
+        counts, __, __ = plt.hist(pvalues, bins=20, density=True)
         plt.plot([0, 1], [pi0['pi0'], pi0['pi0']], "r")
         plt.title("p-value density histogram: $\pi_0$ = " + str(around(pi0['pi0'], decimals=3)))
         plt.xlabel("p-value")
