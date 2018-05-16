@@ -44,7 +44,7 @@ def _run_osw(regtest, temp_folder, transition_quantification=False, peptide=Fals
     cmdline += " protein --pi0_lambda=0 0 0 --in=test_data.osw --context=global"
 
     # export
-    cmdline += " export --in=test_data.osw --max_rs_peakgroup_pep=1"
+    cmdline += " export --in=test_data.osw --max_rs_peakgroup_pep=1 --format=legacy_merged"
 
     if not transition_quantification:
         cmdline += " --no-transition_quantification"
@@ -77,7 +77,7 @@ def _run_ipf(regtest, temp_folder, transition_quantification=False, ipf=False):
     cmdline += " ipf --in=test_data.osw"
 
     # export
-    cmdline += " export --in=test_data.osw --no-peptide --no-protein --max_rs_peakgroup_pep=1"
+    cmdline += " export --in=test_data.osw --no-peptide --no-protein --max_rs_peakgroup_pep=1 --format=legacy_merged"
 
     if not transition_quantification:
         cmdline += " --no-transition_quantification"
