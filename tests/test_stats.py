@@ -4,7 +4,9 @@ from __future__ import print_function
 from pyprophet.stats import to_one_dim_array, pnorm, pemp, pi0est, qvalue, bw_nrd0, lfdr, stat_metrics
 
 import pandas as pd
-pd.options.display.width = 220
+pd.options.display.max_rows = 500
+pd.options.display.max_columns = 500
+pd.options.display.width = 1000
 pd.options.display.precision = 4
 
 import numpy as np
