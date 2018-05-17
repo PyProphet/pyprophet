@@ -310,7 +310,7 @@ GROUP BY PEPTIDE_ID;
 
     if format == 'legacy_split':
         data = data.drop(['id_run','id_peptide'], axis=1)
-        data.groupby('filename').apply(lambda x: x.to_csv(os.path.splitext(os.path.basename(x['filename'][0]))[0] + '.tsv', sep=sep, index=False))
+        data.groupby('filename').apply(lambda x: x.to_csv(os.path.basename(x['filename'].values[0]) + '.tsv', sep=sep, index=False))
     elif format == 'legacy_merged':
         data.drop(['id_run','id_peptide'], axis=1).to_csv(outfile, sep=sep, index=False)
     elif format == 'matrix':
