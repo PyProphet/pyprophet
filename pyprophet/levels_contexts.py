@@ -45,8 +45,10 @@ def infer_proteins(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_m
     if context in ['global','experiment-wide','run-specific']:
         if context == 'global':
             run_id = 'NULL'
+            group_id = 'RUN_ID || "_" || PROTEIN.ID'
         else:
             run_id = 'RUN_ID'
+            group_id = 'RUN_ID || "_" || PROTEIN.ID'
 
         con.executescript('''
 CREATE INDEX IF NOT EXISTS idx_peptide_protein_mapping_protein_id ON PEPTIDE_PROTEIN_MAPPING (PROTEIN_ID);
@@ -62,7 +64,7 @@ CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);
 
         data = pd.read_sql_query('''
 SELECT %s AS RUN_ID,
-       PROTEIN.ID AS GROUP_ID,
+       %s AS GROUP_ID,
        PROTEIN.ID AS PROTEIN_ID,
        PRECURSOR.DECOY AS DECOY,
        SCORE,
@@ -86,7 +88,7 @@ INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
 GROUP BY GROUP_ID
 HAVING MAX(SCORE)
 ORDER BY SCORE DESC
-''' % (run_id, context), con)
+''' % (run_id, group_id, context), con)
     else:
         sys.exit("Error: Unspecified context selected.")
 
@@ -126,8 +128,10 @@ def infer_peptides(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_m
     if context in ['global','experiment-wide','run-specific']:
         if context == 'global':
             run_id = 'NULL'
+            group_id = 'PEPTIDE.ID'
         else:
             run_id = 'RUN_ID'
+            group_id = 'RUN_ID || "_" || PEPTIDE.ID'
 
         con.executescript('''
 CREATE INDEX IF NOT EXISTS idx_peptide_peptide_id ON PEPTIDE (ID);
@@ -141,7 +145,7 @@ CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);
 
         data = pd.read_sql_query('''
 SELECT %s AS RUN_ID,
-       PEPTIDE.ID AS GROUP_ID,
+       %s AS GROUP_ID,
        PEPTIDE.ID AS PEPTIDE_ID,
        PRECURSOR.DECOY,
        SCORE,
@@ -154,7 +158,7 @@ INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
 GROUP BY GROUP_ID
 HAVING MAX(SCORE)
 ORDER BY SCORE DESC
-''' % (run_id, context), con)
+''' % (run_id, group_id, context), con)
     else:
         sys.exit("Error: Unspecified context selected.")
 
