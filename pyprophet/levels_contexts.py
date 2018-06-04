@@ -45,7 +45,7 @@ def infer_proteins(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_m
     if context in ['global','experiment-wide','run-specific']:
         if context == 'global':
             run_id = 'NULL'
-            group_id = 'RUN_ID || "_" || PROTEIN.ID'
+            group_id = 'PROTEIN.ID'
         else:
             run_id = 'RUN_ID'
             group_id = 'RUN_ID || "_" || PROTEIN.ID'
