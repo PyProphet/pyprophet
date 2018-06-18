@@ -14,6 +14,7 @@ from pyprophet.ipf import read_pyp_peakgroup_precursor
 
 pd.options.display.expand_frame_repr = False
 pd.options.display.precision = 4
+pd.options.display.max_columns = None
 
 DATA_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 
