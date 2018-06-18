@@ -4,8 +4,9 @@ from __future__ import print_function
 from pyprophet.stats import to_one_dim_array, pnorm, pemp, pi0est, qvalue, bw_nrd0, lfdr, stat_metrics
 
 import pandas as pd
-pd.options.display.width = 220
+pd.options.display.expand_frame_repr = False
 pd.options.display.precision = 4
+pd.options.display.max_columns = None
 
 import numpy as np
 import os
@@ -34,7 +35,7 @@ def test_pi0est(tmpdir):
     data_path = os.path.join(DATA_FOLDER, "test_lfdr_ref_data.csv")
     shutil.copy(data_path,tmpdir.strpath)
 
-    stat = pd.read_csv('test_lfdr_ref_data.csv', delimiter=',').sort_values("p")
+    stat = pd.read_csv('test_lfdr_ref_data.csv', delimiter=',').sort_index(axis=1).sort_values("p")
 
     # For comparison with R/bioconductor reference implementation
     # np.testing.assert_almost_equal(pi0est(stat['p'], lambda_ = 0.4)['pi0'], 0.6971609)
@@ -53,7 +54,7 @@ def test_qvalue(tmpdir, regtest):
     data_path = os.path.join(DATA_FOLDER, "test_qvalue_ref_data.csv")
     shutil.copy(data_path, tmpdir.strpath)
 
-    stat = pd.read_csv('test_qvalue_ref_data.csv', delimiter=',').sort_values("p")
+    stat = pd.read_csv('test_qvalue_ref_data.csv', delimiter=',').sort_index(axis=1).sort_values("p")
 
     # For comparison with R/bioconductor reference implementation
     np.testing.assert_almost_equal(qvalue(stat['p'], 0.669926026474838, pfdr=False), stat['q_default'].values, decimal=4)
@@ -71,7 +72,7 @@ def test_lfdr(tmpdir, regtest):
     data_path = os.path.join(DATA_FOLDER, "test_lfdr_ref_data.csv")
     shutil.copy(data_path, tmpdir.strpath)
 
-    stat = pd.read_csv('test_lfdr_ref_data.csv', delimiter=',').sort_values("p")
+    stat = pd.read_csv('test_lfdr_ref_data.csv', delimiter=',').sort_index(axis=1).sort_values("p")
 
     # For comparison with R/bioconductor reference implementation
     np.testing.assert_almost_equal(lfdr(stat['p'], 0.669926026474838), stat['lfdr_default'].values, decimal=3)
@@ -92,8 +93,8 @@ def test_stat_metrics(tmpdir, regtest):
 
     stat = pd.read_csv('test_lfdr_ref_data.csv', delimiter=',').sort_values("p")
 
-    print(stat_metrics(to_one_dim_array(stat['p']), 0.669926026474838, False), file=regtest)
-    print(stat_metrics(to_one_dim_array(stat['p']), 0.669926026474838, True), file=regtest)
+    print(stat_metrics(to_one_dim_array(stat['p']), 0.669926026474838, False).sort_index(axis=1), file=regtest)
+    print(stat_metrics(to_one_dim_array(stat['p']), 0.669926026474838, True).sort_index(axis=1), file=regtest)
 
 
 def test_random(regtest):

@@ -12,8 +12,9 @@ import pytest
 
 from pyprophet.ipf import read_pyp_peakgroup_precursor
 
-pd.options.display.width = 220
+pd.options.display.expand_frame_repr = False
 pd.options.display.precision = 4
+pd.options.display.max_columns = None
 
 DATA_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 
@@ -41,10 +42,10 @@ def _run_pyprophet_tsv_to_learn_model(regtest, temp_folder, dump_result_files=Fa
         cmdline += " --pi0_lambda=" + pi0_lambda
     stdout = _run_cmdline(cmdline)
 
-    print(pd.read_csv("test_data_summary_stat.csv", sep=",", nrows=100),file=regtest)
-    print(pd.read_csv("test_data_full_stat.csv", sep=",", nrows=100),file=regtest)
-    print(pd.read_csv("test_data_scored.tsv", sep="\t", nrows=100),file=regtest)
-    print(pd.read_csv("test_data_weights.csv", sep=",", nrows=100),file=regtest)
+    print(pd.read_csv("test_data_summary_stat.csv", sep=",", nrows=100).sort_index(axis=1),file=regtest)
+    print(pd.read_csv("test_data_full_stat.csv", sep=",", nrows=100).sort_index(axis=1),file=regtest)
+    print(pd.read_csv("test_data_scored.tsv", sep="\t", nrows=100).sort_index(axis=1),file=regtest)
+    print(pd.read_csv("test_data_weights.csv", sep=",", nrows=100).sort_index(axis=1),file=regtest)
 
 
 def _run_pyprophet_osw_to_learn_model(regtest, temp_folder, dump_result_files=False, parametric=False, pfdr=False, pi0_lambda=False):
@@ -82,7 +83,7 @@ def _run_pyprophet_osw_to_learn_model(regtest, temp_folder, dump_result_files=Fa
 
     table = read_pyp_peakgroup_precursor("test_data.osw", 1.0, True, True)
 
-    print(table.head(100),file=regtest)
+    print(table.head(100).sort_index(axis=1),file=regtest)
 
 def test_tsv_0(tmpdir, regtest):
     _run_pyprophet_tsv_to_learn_model(regtest, tmpdir.strpath, True)

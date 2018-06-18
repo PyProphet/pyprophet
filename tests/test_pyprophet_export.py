@@ -10,8 +10,9 @@ import sqlite3
 
 import pytest
 
-pd.options.display.width = 220
+pd.options.display.expand_frame_repr = False
 pd.options.display.precision = 4
+pd.options.display.max_columns = None
 
 DATA_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 
@@ -57,7 +58,7 @@ def _run_osw(regtest, temp_folder, transition_quantification=False, peptide=Fals
 
     stdout = _run_cmdline(cmdline)
 
-    print(pd.read_csv("test_data.tsv", sep="\t", nrows=100),file=regtest)
+    print(pd.read_csv("test_data.tsv", sep="\t", nrows=100).sort_index(axis=1),file=regtest)
 
 
 def _run_ipf(regtest, temp_folder, transition_quantification=False, ipf=False):
@@ -87,7 +88,7 @@ def _run_ipf(regtest, temp_folder, transition_quantification=False, ipf=False):
 
     stdout = _run_cmdline(cmdline)
 
-    print(pd.read_csv("test_data.tsv", sep="\t", nrows=100),file=regtest)
+    print(pd.read_csv("test_data.tsv", sep="\t", nrows=100).sort_index(axis=1),file=regtest)
 
 
 def test_osw_0(tmpdir, regtest):
