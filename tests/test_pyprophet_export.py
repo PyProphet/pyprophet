@@ -10,7 +10,9 @@ import sqlite3
 
 import pytest
 
-pd.options.display.width = 220
+pd.options.display.max_rows = 500
+pd.options.display.max_columns = 500
+pd.options.display.width = 1000
 pd.options.display.precision = 4
 
 DATA_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
@@ -44,7 +46,7 @@ def _run_osw(regtest, temp_folder, transition_quantification=False, peptide=Fals
     cmdline += " protein --pi0_lambda=0 0 0 --in=test_data.osw --context=global"
 
     # export
-    cmdline += " export --in=test_data.osw --max_rs_peakgroup_pep=1"
+    cmdline += " export --in=test_data.osw --max_rs_peakgroup_pep=1 --format=legacy_merged"
 
     if not transition_quantification:
         cmdline += " --no-transition_quantification"
@@ -77,7 +79,7 @@ def _run_ipf(regtest, temp_folder, transition_quantification=False, ipf=False):
     cmdline += " ipf --in=test_data.osw"
 
     # export
-    cmdline += " export --in=test_data.osw --no-peptide --no-protein --max_rs_peakgroup_pep=1"
+    cmdline += " export --in=test_data.osw --no-peptide --no-protein --max_rs_peakgroup_pep=1 --format=legacy_merged"
 
     if not transition_quantification:
         cmdline += " --no-transition_quantification"
