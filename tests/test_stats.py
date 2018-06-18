@@ -90,10 +90,10 @@ def test_stat_metrics(tmpdir, regtest):
     data_path = os.path.join(DATA_FOLDER, "test_lfdr_ref_data.csv")
     shutil.copy(data_path, tmpdir.strpath)
 
-    stat = pd.read_csv('test_lfdr_ref_data.csv', delimiter=',').sort_index(axis=1).sort_values("p")
+    stat = pd.read_csv('test_lfdr_ref_data.csv', delimiter=',').sort_values("p")
 
-    print(stat_metrics(to_one_dim_array(stat['p']), 0.669926026474838, False), file=regtest)
-    print(stat_metrics(to_one_dim_array(stat['p']), 0.669926026474838, True), file=regtest)
+    print(stat_metrics(to_one_dim_array(stat['p']), 0.669926026474838, False).sort_index(axis=1), file=regtest)
+    print(stat_metrics(to_one_dim_array(stat['p']), 0.669926026474838, True).sort_index(axis=1), file=regtest)
 
 
 def test_random(regtest):
