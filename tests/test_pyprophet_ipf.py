@@ -12,7 +12,7 @@ import pytest
 
 from pyprophet.ipf import read_pyp_peakgroup_precursor
 
-pd.options.display.width = 220
+pd.options.display.expand_frame_repr = False
 pd.options.display.precision = 4
 
 DATA_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
@@ -62,19 +62,19 @@ def _run_ipf(regtest, temp_folder, dump_result_files=False, ipf_ms1_scoring=True
 
     # validate precursor-level data
     precursor_data = read_pyp_peakgroup_precursor("test_data.osw", 1.0, True, True)
-    print(precursor_data.head(100),file=regtest)
+    print(precursor_data.sort_index(axis=1).head(100),file=regtest)
 
     # validate transition-level data
     transition_data = pd.read_sql_query("SELECT * FROM SCORE_TRANSITION LIMIT 100;", con)
     transition_data.columns = [col.lower() for col in transition_data.columns]
 
-    print(transition_data.head(100),file=regtest)
+    print(transition_data.sort_index(axis=1).head(100),file=regtest)
 
     # validate IPF-level data
     ipf_data = pd.read_sql_query("SELECT * FROM SCORE_IPF LIMIT 100;", con)
     ipf_data.columns = [col.lower() for col in ipf_data.columns]
 
-    print(ipf_data.head(100),file=regtest)
+    print(ipf_data.sort_index(axis=1).head(100),file=regtest)
 
     con.close()
 

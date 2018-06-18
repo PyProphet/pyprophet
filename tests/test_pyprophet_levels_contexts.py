@@ -10,7 +10,7 @@ import sqlite3
 
 import pytest
 
-pd.options.display.width = 220
+pd.options.display.expand_frame_repr = False
 pd.options.display.precision = 4
 
 DATA_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
@@ -46,7 +46,7 @@ def _run_peptide(regtest, temp_folder):
     transition_data = pd.read_sql_query("SELECT * FROM SCORE_PEPTIDE LIMIT 100;", con)
     transition_data.columns = [col.lower() for col in transition_data.columns]
 
-    print(transition_data.head(100),file=regtest)
+    print(transition_data.sort_index(axis=1).head(100),file=regtest)
 
     con.close()
 
@@ -71,7 +71,7 @@ def _run_protein(regtest, temp_folder):
     transition_data = pd.read_sql_query("SELECT * FROM SCORE_PROTEIN LIMIT 100;", con)
     transition_data.columns = [col.lower() for col in transition_data.columns]
 
-    print(transition_data.head(100),file=regtest)
+    print(transition_data.sort_index(axis=1).head(100),file=regtest)
 
     con.close()
 
