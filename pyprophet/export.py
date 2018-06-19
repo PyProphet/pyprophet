@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import sqlite3
 import click
+import os
 
 from .data_handling import check_sqlite_table
 from .report import plot_scores
@@ -307,7 +308,10 @@ GROUP BY PEPTIDE_ID;
     else:
         sep = "\t"
 
-    if format == 'legacy':
+    if format == 'legacy_split':
+        data = data.drop(['id_run','id_peptide'], axis=1)
+        data.groupby('filename').apply(lambda x: x.to_csv(os.path.basename(x['filename'].values[0]) + '.tsv', sep=sep, index=False))
+    elif format == 'legacy_merged':
         data.drop(['id_run','id_peptide'], axis=1).to_csv(outfile, sep=sep, index=False)
     elif format == 'matrix':
         # select top ranking peak group only
