@@ -355,10 +355,11 @@ def stat_metrics(p_values, pi0, pfdr):
 
     fpr = fp / num_null
 
-    fdr = fp / num_positives
+    # fdr = fp / num_positives # produces divide by zero warnining
+    fdr = np.divide(fp, num_positives, out=np.zeros_like(fp), where=num_positives!=0)
 
-    np.seterr(divide='ignore') # when estimating the FNR, ignore division by zero error
-    fnr = fn / num_negatives 
+    # fnr = fn / num_negatives # produces divide by zero warnining
+    fnr = np.divide(fn, num_negatives, out=np.zeros_like(fn), where=num_negatives!=0)
     
     if pfdr:
         fdr /= (1.0 - (1.0 - p_values) ** num_total)
