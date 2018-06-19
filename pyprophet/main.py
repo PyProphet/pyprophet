@@ -232,8 +232,8 @@ def backpropagate(infile, outfile, apply_scores):
 @cli.command()
 # File handling
 @click.option('--in', 'infile', required=True, type=click.Path(exists=True), help='PyProphet input file.')
-@click.option('--out', 'outfile', type=click.Path(exists=False), help='Output TSV/CSV (matrix, legacy) file.')
-@click.option('--format', default='legacy', show_default=True, type=click.Choice(['matrix', 'legacy','score_plots']), help='Export format, either matrix, legacy (mProphet/PyProphet) or score_plots format.')
+@click.option('--out', 'outfile', type=click.Path(exists=False), help='Output TSV/CSV (matrix, legacy_split, legacy_merged) file.')
+@click.option('--format', default='legacy_split', show_default=True, type=click.Choice(['matrix', 'legacy_split', 'legacy_merged','score_plots']), help='Export format, either matrix, legacy_split/legacy_merged (mProphet/PyProphet) or score_plots format.')
 @click.option('--csv/--no-csv', 'outcsv', default=False, show_default=True, help='Export CSV instead of TSV file.')
 # Context
 @click.option('--transition_quantification/--no-transition_quantification', default=True, show_default=True, help='[format: legacy] Report aggregated transition-level quantification.')
