@@ -217,11 +217,11 @@ def prepare_precursor_bm(data):
 def prepare_transition_bm(data):
     # peptide_id = -1 indicates h0, i.e. the peak group is wrong!
     # initialize priors
-    data.ix[data.peptide_id != -1, 'prior'] = 1-data.ix[data.peptide_id != -1, 'precursor_peakgroup_pep'] / data.ix[data.peptide_id != -1, 'num_peptidoforms'] # potential peptidoforms
+    data.ix[data.peptide_id != -1, 'prior'] = (1-data.ix[data.peptide_id != -1, 'precursor_peakgroup_pep']) / data.ix[data.peptide_id != -1, 'num_peptidoforms'] # potential peptidoforms
     data.ix[data.peptide_id == -1, 'prior'] = data.ix[data.peptide_id == -1, 'precursor_peakgroup_pep'] # h0
 
     # set evidence
-    data.ix[data.bmask == 1, 'evidence'] = 1-data.ix[data.bmask == 1, 'pep'] # we have evidence FOR this peptidoform or h0
+    data.ix[data.bmask == 1, 'evidence'] = (1-data.ix[data.bmask == 1, 'pep']) # we have evidence FOR this peptidoform or h0
     data.ix[data.bmask == 0, 'evidence'] = data.ix[data.bmask == 0, 'pep'] # we have evidence AGAINST this peptidoform or h0
 
     data = data[['feature_id','num_peptidoforms','prior','evidence','peptide_id']]
