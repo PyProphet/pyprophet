@@ -352,12 +352,14 @@ def stat_metrics(p_values, pi0, pfdr):
     fp = num_null * p_values
     tn = num_null * (1.0 - p_values)
     fn = num_negatives - num_null * (1.0 - p_values)
+
     fpr = fp / num_null
 
-    fdr = fp / num_positives
+    # fdr = fp / num_positives # produces divide by zero warnining
+    fdr = np.divide(fp, num_positives, out=np.zeros_like(fp), where=num_positives!=0)
 
-    np.seterr(divide='ignore') # when estimating the FNR, ignore division by zero error
-    fnr = fn / num_negatives 
+    # fnr = fn / num_negatives # produces divide by zero warnining
+    fnr = np.divide(fn, num_negatives, out=np.zeros_like(fn), where=num_negatives!=0)
     
     if pfdr:
         fdr /= (1.0 - (1.0 - p_values) ** num_total)
@@ -400,7 +402,7 @@ def final_err_table(df, num_cut_offs=51):
     ix = find_nearest_matches(np.float32(df.cutoff.values), sampled_cutoffs)
 
     # create sub dataframe:
-    sampled_df = df.iloc[ix]
+    sampled_df = df.iloc[ix].copy()
     sampled_df.cutoff = sampled_cutoffs
     # remove 'old' index from input df:
     sampled_df.reset_index(inplace=True, drop=True)
@@ -416,7 +418,7 @@ def summary_err_table(df, qvalues=[0, 0.01, 0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5]
     # find best matching fows in df for given qvalues:
     ix = find_nearest_matches(np.float32(df.qvalue.values), qvalues)
     # extract sub table
-    df_sub = df.iloc[ix]
+    df_sub = df.iloc[ix].copy()
     # remove duplicate hits, mark them with None / NAN:
     for i_sub, (i0, i1) in enumerate(zip(ix, ix[1:])):
         if i1 == i0:
@@ -471,7 +473,7 @@ def find_cutoff(tt_scores, td_scores, cutoff_fdr, parametric, pfdr, pi0_lambda, 
     error_stat, pi0 = error_statistics(tt_scores, td_scores, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, False)
     if not len(error_stat):
         sys.exit("Error: Too little data for calculating error statistcs.")
-    i0 = (error_stat.qvalue - cutoff_fdr).abs().argmin()
+    i0 = (error_stat.qvalue - cutoff_fdr).abs().idxmin()
     cutoff = error_stat.iloc[i0]["cutoff"]
     return cutoff
 

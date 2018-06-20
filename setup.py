@@ -34,8 +34,7 @@ setup(name='pyprophet',
           "numexpr >= 2.1",
           "scikit-learn >= 0.17",
           "statsmodels >= 0.8.0",
-          "matplotlib",
-          "seaborn"
+          "matplotlib"
       ],
       entry_points={
           'console_scripts': [

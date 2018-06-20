@@ -203,7 +203,7 @@ class Experiment(object):
 
     @profile
     def __init__(self, df):
-        self.df = df
+        self.df = df.copy()
 
     def log_summary(self):
         click.echo("Info: Summary of input data:")
@@ -279,8 +279,8 @@ class Experiment(object):
         target_ids = target_ids[:int(len(target_ids) * fraction) + 1]
         learn_ids = np.concatenate((decoy_ids, target_ids))
         ix_learn = df.tg_id.isin(learn_ids)
-        df.is_train.loc[ix_learn] = True
-        df.is_train.loc[~ix_learn] = False
+        df.loc[ix_learn,'is_train'] = True
+        df.loc[~ix_learn,'is_train'] = False
 
     def get_train_peaks(self):
         df = self.df[self.df.is_train == True]
