@@ -187,7 +187,7 @@ GROUP BY FEATURE_ID
         click.echo("Info: Reading transition-level results.")
         con.executescript(idx_transition_query) # Add indices
         data_transition = pd.read_sql_query(transition_query, con)
-        data = pd.merge(data, data_transition, how='inner', on=['id'])
+        data = pd.merge(data, data_transition, how='left', on=['id'])
 
     # Append concatenated protein identifier
     click.echo("Info: Reading protein identifiers.")
