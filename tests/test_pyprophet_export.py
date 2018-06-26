@@ -61,7 +61,7 @@ def _run_osw(regtest, temp_folder, transition_quantification=False, peptide=Fals
     print(pd.read_csv("test_data.tsv", sep="\t", nrows=100).sort_index(axis=1),file=regtest)
 
 
-def _run_ipf(regtest, temp_folder, transition_quantification=False, ipf=False):
+def _run_ipf(regtest, temp_folder, transition_quantification=False, ipf="openswath"):
     os.chdir(temp_folder)
     data_path = os.path.join(DATA_FOLDER, "test_data.osw")
     shutil.copy(data_path, temp_folder)
@@ -83,8 +83,7 @@ def _run_ipf(regtest, temp_folder, transition_quantification=False, ipf=False):
     if not transition_quantification:
         cmdline += " --no-transition_quantification"
 
-    if not ipf:
-        cmdline += " --no-ipf"
+    cmdline += " --ipf=" + ipf
 
     stdout = _run_cmdline(cmdline)
 
@@ -104,10 +103,13 @@ def test_osw_3(tmpdir, regtest):
     _run_osw(regtest, tmpdir.strpath, False, False, True)
 
 def test_ipf_0(tmpdir, regtest):
-    _run_ipf(regtest, tmpdir.strpath, False, False)
+    _run_ipf(regtest, tmpdir.strpath, False, "openswath")
 
 def test_ipf_1(tmpdir, regtest):
-    _run_ipf(regtest, tmpdir.strpath, True, False)
+    _run_ipf(regtest, tmpdir.strpath, True, "openswath")
 
 def test_ipf_2(tmpdir, regtest):
-    _run_ipf(regtest, tmpdir.strpath, False, True)
+    _run_ipf(regtest, tmpdir.strpath, False, "peptidoform")
+
+def test_ipf_3(tmpdir, regtest):
+    _run_ipf(regtest, tmpdir.strpath, False, "augmented")
