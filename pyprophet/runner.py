@@ -10,7 +10,7 @@ import sqlite3
 
 from .pyprophet import PyProphet
 from .report import save_report
-from .data_handling import is_sqlite_file
+from .data_handling import is_sqlite_file, check_sqlite_table
 from shutil import copyfile
 
 try:
@@ -36,6 +36,8 @@ class PyProphetRunner(object):
             con = sqlite3.connect(infile)
 
             if level == "ms2" or level == "ms1ms2":
+                if not check_sqlite_table(con, "FEATURE_MS2"):
+                    sys.exit("Error: MS2-level feature table not present in file.")
                 table = pd.read_sql_query('''
 SELECT *,
        RUN_ID || '_' || PRECURSOR_ID AS GROUP_ID,
@@ -56,6 +58,8 @@ ORDER BY RUN_ID,
          FEATURE.EXP_RT ASC;
 ''' % (ss_main_score), con)
             elif level == "ms1":
+                if not check_sqlite_table(con, "FEATURE_MS1"):
+                    sys.exit("Error: MS1-level feature table not present in file.")
                 table = pd.read_sql_query('''
 SELECT *,
        RUN_ID || '_' || PRECURSOR_ID AS GROUP_ID,
@@ -76,6 +80,8 @@ ORDER BY RUN_ID,
          FEATURE.EXP_RT ASC;
 ''' % (ss_main_score), con)
             elif level == "transition":
+                if not check_sqlite_table(con, "FEATURE_TRANSITION"):
+                    sys.exit("Error: Transition-level feature table not present in file.")
                 table = pd.read_sql_query('''
 SELECT TRANSITION.DECOY AS DECOY,
        FEATURE_TRANSITION.*,
@@ -109,6 +115,8 @@ ORDER BY RUN_ID,
 
             # Append MS1 scores to MS2 table if selected
             if level == "ms1ms2":
+                if not check_sqlite_table(con, "FEATURE_MS1"):
+                    sys.exit("Error: MS1-level feature table not present in file.")
                 ms1_table = pd.read_sql_query('SELECT * FROM FEATURE_MS1;', con)
 
                 ms1_scores = [c for c in ms1_table.columns if c.startswith("VAR_")]
@@ -126,6 +134,7 @@ ORDER BY RUN_ID,
 
             return(table)
 
+        # Main function
         if is_sqlite_file(infile):
             self.mode = 'osw'
             self.table = read_osw(infile, level, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn)
