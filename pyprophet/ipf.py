@@ -7,7 +7,7 @@ import click
 
 from scipy.stats import rankdata
 from .data_handling import check_sqlite_table
-
+from shutil import copyfile
 
 def compute_model_fdr(data_in):
     data = np.asarray(data_in)
