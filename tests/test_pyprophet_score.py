@@ -48,7 +48,7 @@ def _run_pyprophet_tsv_to_learn_model(regtest, temp_folder, dump_result_files=Fa
     print(pd.read_csv("test_data_weights.csv", sep=",", nrows=100).sort_index(axis=1),file=regtest)
 
 
-def _run_pyprophet_osw_to_learn_model(regtest, temp_folder, dump_result_files=False, parametric=False, pfdr=False, pi0_lambda=False):
+def _run_pyprophet_osw_to_learn_model(regtest, temp_folder, dump_result_files=False, parametric=False, pfdr=False, pi0_lambda=False, ms1ms2=False):
     os.chdir(temp_folder)
     data_path = os.path.join(DATA_FOLDER, "test_data.osw")
     shutil.copy(data_path, temp_folder)
@@ -62,7 +62,10 @@ def _run_pyprophet_osw_to_learn_model(regtest, temp_folder, dump_result_files=Fa
         cmdline += " --pi0_lambda=" + pi0_lambda
 
     # MS2-level
-    cmdline += " score --in=test_data.osw --level=ms2 --test --ss_iteration_fdr=0.02"
+    if ms1ms2:
+        cmdline += " score --in=test_data.osw --level=ms1ms2 --test --ss_iteration_fdr=0.02"
+    else:
+        cmdline += " score --in=test_data.osw --level=ms2 --test --ss_iteration_fdr=0.02"
     if parametric:
         cmdline += " --parametric"
     if pfdr:
@@ -97,6 +100,7 @@ def test_tsv_2(tmpdir, regtest):
 def test_tsv_3(tmpdir, regtest):
     _run_pyprophet_tsv_to_learn_model(regtest, tmpdir.strpath, True, False, False, "0.3 0.55 0.05")
 
+
 def test_tsv_apply_weights(tmpdir, regtest):
 
     _run_pyprophet_tsv_to_learn_model(regtest, tmpdir.strpath, True)
@@ -112,6 +116,9 @@ def test_osw_1(tmpdir, regtest):
 
 def test_osw_2(tmpdir, regtest):
     _run_pyprophet_osw_to_learn_model(regtest, tmpdir.strpath, True, False, True, pi0_lambda="0 0 0")
+
+def test_osw_3(tmpdir, regtest):
+    _run_pyprophet_osw_to_learn_model(regtest, tmpdir.strpath, True, False, True, pi0_lambda="0 0 0", ms1ms2=True)
 
 def test_not_unique_tg_id_blocks(tmpdir):
 
