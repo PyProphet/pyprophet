@@ -2,6 +2,8 @@ import numpy as np
 import inspect
 
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from sklearn.svm import NuSVC
+from sklearn.ensemble import RandomForestClassifier
 from .data_handling import Experiment
 
 
@@ -66,4 +68,71 @@ class LDALearner(LinearLearner):
 
     def set_parameters(self, w):
         self.scalings = w
+        return self
+
+
+class SVMLearner(AbstractLearner):
+
+    def __init__(self):
+        self.classifier = None
+        self.scalings = None
+
+    def learn(self, decoy_peaks, target_peaks, use_main_score=True):
+        assert isinstance(decoy_peaks, Experiment)
+        assert isinstance(target_peaks, Experiment)
+
+        X0 = decoy_peaks.get_feature_matrix(use_main_score)
+        X1 = target_peaks.get_feature_matrix(use_main_score)
+        X = np.vstack((X0, X1))
+        y = np.zeros((X.shape[0],))
+        y[X0.shape[0]:] = 1.0
+        classifier = NuSVC(nu=0.1, probability=True)
+        classifier.fit(X, y)
+        self.classifier = classifier
+        return self
+
+    def score(self, peaks, use_main_score):
+        X = peaks.get_feature_matrix(use_main_score)
+        result = self.classifier.predict_proba(X)
+        return result[:,1].astype(np.float32)
+
+    def get_parameters(self):
+        return self.classifier
+
+    def set_parameters(self, w):
+        self.classifier = w
+        return self
+
+
+class RFLearner(AbstractLearner):
+
+    def __init__(self):
+        self.classifier = None
+        self.scalings = None
+
+    def learn(self, decoy_peaks, target_peaks, use_main_score=True):
+        assert isinstance(decoy_peaks, Experiment)
+        assert isinstance(target_peaks, Experiment)
+
+        X0 = decoy_peaks.get_feature_matrix(use_main_score)
+        X1 = target_peaks.get_feature_matrix(use_main_score)
+        X = np.vstack((X0, X1))
+        y = np.zeros((X.shape[0],))
+        y[X0.shape[0]:] = 1.0
+        classifier = RandomForestClassifier()
+        classifier.fit(X, y)
+        self.classifier = classifier
+        self.scalings = classifier.feature_importances_.flatten()
+        return self
+
+    def score(self, peaks, use_main_score):
+        X = peaks.get_feature_matrix(use_main_score)
+        result = self.classifier.predict_proba(X)
+        return result[:,1].astype(np.float32)
+
+    def get_parameters(self):
+        return self.classifier
+
+    def set_parameters(self, w):
+        self.classifier = w
         return self

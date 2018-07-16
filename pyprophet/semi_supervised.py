@@ -121,6 +121,9 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
     def averaged_learner(self, params):
         return self.inner_learner.averaged_learner(params)
 
+    def set_learner(self, model):
+        return self.inner_learner.set_parameters(model)
+
     def score(self, df, params):
         self.inner_learner.set_parameters(params)
         return self.inner_learner.score(df, True)
