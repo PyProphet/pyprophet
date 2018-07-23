@@ -53,12 +53,12 @@ SELECT RUN.ID AS id_run,
        FEATURE.NORM_RT - PRECURSOR.LIBRARY_RT AS delta_iRT,
        FEATURE.ID AS id,
        PEPTIDE_IPF.UNMODIFIED_SEQUENCE AS Sequence,
-       PEPTIDE_IPF.MODIFIED_SEQUENCE AS FullUniModPeptideName,
+       PEPTIDE_IPF.MODIFIED_SEQUENCE AS FullPeptideName,
        PRECURSOR.CHARGE AS Charge,
        PRECURSOR.PRECURSOR_MZ AS mz,
        FEATURE_MS2.AREA_INTENSITY AS Intensity,
-       FEATURE_MS1.AREA_INTENSITY AS aggr_prec_peak_area,
-       FEATURE_MS1.APEX_INTENSITY AS aggr_prec_peak_apex,
+       FEATURE_MS1.AREA_INTENSITY AS aggr_prec_Peak_Area,
+       FEATURE_MS1.APEX_INTENSITY AS aggr_prec_Peak_Apex,
        FEATURE.LEFT_WIDTH AS leftWidth,
        FEATURE.RIGHT_WIDTH AS rightWidth,
        SCORE_MS1.PEP AS ms1_pep,
@@ -117,12 +117,12 @@ SELECT RUN.ID AS id_run,
        FEATURE.NORM_RT - PRECURSOR.LIBRARY_RT AS delta_iRT,
        FEATURE.ID AS id,
        PEPTIDE.UNMODIFIED_SEQUENCE AS Sequence,
-       PEPTIDE.MODIFIED_SEQUENCE AS FullUniModPeptideName,
+       PEPTIDE.MODIFIED_SEQUENCE AS FullPeptideName,
        PRECURSOR.CHARGE AS Charge,
        PRECURSOR.PRECURSOR_MZ AS mz,
        FEATURE_MS2.AREA_INTENSITY AS Intensity,
-       FEATURE_MS1.AREA_INTENSITY AS aggr_prec_peak_area,
-       FEATURE_MS1.APEX_INTENSITY AS aggr_prec_peak_apex,
+       FEATURE_MS1.AREA_INTENSITY AS aggr_prec_Peak_Area,
+       FEATURE_MS1.APEX_INTENSITY AS aggr_prec_Peak_Apex,
        FEATURE.LEFT_WIDTH AS leftWidth,
        FEATURE.RIGHT_WIDTH AS rightWidth,
        SCORE_MS2.RANK AS peak_group_rank,
@@ -159,9 +159,9 @@ CREATE INDEX IF NOT EXISTS idx_feature_transition_feature_id ON FEATURE_TRANSITI
 '''
             transition_query = '''
 SELECT FEATURE_TRANSITION.FEATURE_ID AS id,
-      GROUP_CONCAT(AREA_INTENSITY,';') AS aggr_peak_area,
-      GROUP_CONCAT(APEX_INTENSITY,';') AS aggr_peak_apex,
-      GROUP_CONCAT(FEATURE_TRANSITION.TRANSITION_ID,';') AS aggr_fragment_annotation
+      GROUP_CONCAT(AREA_INTENSITY,';') AS aggr_Peak_Area,
+      GROUP_CONCAT(APEX_INTENSITY,';') AS aggr_Peak_Apex,
+      GROUP_CONCAT(FEATURE_TRANSITION.TRANSITION_ID,';') AS aggr_Fragment_Annotation
 FROM FEATURE_TRANSITION
 INNER JOIN TRANSITION ON FEATURE_TRANSITION.TRANSITION_ID = TRANSITION.ID
 INNER JOIN SCORE_TRANSITION ON FEATURE_TRANSITION.TRANSITION_ID = SCORE_TRANSITION.TRANSITION_ID AND FEATURE_TRANSITION.FEATURE_ID = SCORE_TRANSITION.FEATURE_ID
@@ -177,9 +177,9 @@ CREATE INDEX IF NOT EXISTS idx_feature_transition_feature_id ON FEATURE_TRANSITI
 '''
             transition_query = '''
 SELECT FEATURE_ID AS id,
-      GROUP_CONCAT(AREA_INTENSITY,';') AS aggr_peak_area,
-      GROUP_CONCAT(APEX_INTENSITY,';') AS aggr_peak_apex,
-      GROUP_CONCAT(TRANSITION_ID,';') AS aggr_fragment_annotation
+      GROUP_CONCAT(AREA_INTENSITY,';') AS aggr_Peak_Area,
+      GROUP_CONCAT(APEX_INTENSITY,';') AS aggr_Peak_Apex,
+      GROUP_CONCAT(TRANSITION_ID,';') AS aggr_Fragment_Annotation
 FROM FEATURE_TRANSITION
 INNER JOIN TRANSITION ON FEATURE_TRANSITION.TRANSITION_ID = TRANSITION.ID
 GROUP BY FEATURE_ID
@@ -319,8 +319,8 @@ GROUP BY PEPTIDE_ID;
         # limit peak groups to q-value cutoff
         data = data[data['m_score'] < max_rs_peakgroup_qvalue]
         # restructure dataframe to matrix
-        data = data[['transition_group_id','Sequence','FullUniModPeptideName','ProteinName','filename','Intensity']]
-        data = data.pivot_table(index=['transition_group_id','Sequence','FullUniModPeptideName','ProteinName'], columns='filename', values='Intensity')
+        data = data[['transition_group_id','Sequence','FullPeptideName','ProteinName','filename','Intensity']]
+        data = data.pivot_table(index=['transition_group_id','Sequence','FullPeptideName','ProteinName'], columns='filename', values='Intensity')
         data.to_csv(outfile, sep=sep, index=True)
 
     con.close()
