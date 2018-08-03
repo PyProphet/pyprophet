@@ -42,6 +42,9 @@ def infer_proteins(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_m
 
     con = sqlite3.connect(infile)
 
+    if not check_sqlite_table(con, "SCORE_MS2"):
+        sys.exit("Error: Apply scoring to MS2-level data before running protein-level scoring.")
+
     if context in ['global','experiment-wide','run-specific']:
         if context == 'global':
             run_id = 'NULL'
@@ -124,6 +127,9 @@ ORDER BY SCORE DESC
 def infer_peptides(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps):
 
     con = sqlite3.connect(infile)
+
+    if not check_sqlite_table(con, "SCORE_MS2"):
+        sys.exit("Error: Apply scoring to MS2-level data before running peptide-level scoring.")
 
     if context in ['global','experiment-wide','run-specific']:
         if context == 'global':
