@@ -8,7 +8,7 @@ from .data_handling import check_sqlite_table
 from .report import plot_scores
 
 
-def export_tsv(infile, outfile, format, outcsv, transition_quantification, max_transition_pep, ipf, max_rs_peakgroup_pep, max_rs_peakgroup_qvalue, peptide, max_global_peptide_qvalue, protein, max_global_protein_qvalue):
+def export_tsv(infile, outfile, format, outcsv, transition_quantification, max_transition_pep, ipf, ipf_max_peptidoform_pep, max_rs_peakgroup_qvalue, peptide, max_global_peptide_qvalue, protein, max_global_protein_qvalue):
 
     con = sqlite3.connect(infile)
 
@@ -80,10 +80,10 @@ LEFT JOIN SCORE_MS1 ON SCORE_MS1.FEATURE_ID = FEATURE.ID
 LEFT JOIN SCORE_MS2 ON SCORE_MS2.FEATURE_ID = FEATURE.ID
 LEFT JOIN SCORE_IPF ON SCORE_IPF.FEATURE_ID = FEATURE.ID
 INNER JOIN PEPTIDE AS PEPTIDE_IPF ON SCORE_IPF.PEPTIDE_ID = PEPTIDE_IPF.ID
-WHERE SCORE_IPF.PEP <= %s
+WHERE SCORE_MS2.QVALUE < %s AND SCORE_IPF.PEP < %s
 ORDER BY transition_group_id,
          peak_group_rank;
-''' % max_rs_peakgroup_pep
+''' % (max_rs_peakgroup_qvalue, ipf_max_peptidoform_pep)
     # Main query for augmented IPF
     elif ipf_present and ipf=='augmented':
         idx_query = '''
@@ -121,12 +121,12 @@ SELECT RUN.ID AS id_run,
        FEATURE.NORM_RT - PRECURSOR.LIBRARY_RT AS delta_iRT,
        FEATURE.ID AS id,
        PEPTIDE.UNMODIFIED_SEQUENCE AS Sequence,
-       PEPTIDE.MODIFIED_SEQUENCE AS FullUniModPeptideName,
+       PEPTIDE.MODIFIED_SEQUENCE AS FullPeptideName,
        PRECURSOR.CHARGE AS Charge,
        PRECURSOR.PRECURSOR_MZ AS mz,
        FEATURE_MS2.AREA_INTENSITY AS Intensity,
-       FEATURE_MS1.AREA_INTENSITY AS aggr_prec_peak_area,
-       FEATURE_MS1.APEX_INTENSITY AS aggr_prec_peak_apex,
+       FEATURE_MS1.AREA_INTENSITY AS aggr_prec_Peak_Area,
+       FEATURE_MS1.APEX_INTENSITY AS aggr_prec_Peak_Apex,
        FEATURE.LEFT_WIDTH AS leftWidth,
        FEATURE.RIGHT_WIDTH AS rightWidth,
        SCORE_MS2.RANK AS peak_group_rank,
@@ -143,10 +143,10 @@ LEFT JOIN FEATURE_MS1 ON FEATURE_MS1.FEATURE_ID = FEATURE.ID
 LEFT JOIN FEATURE_MS2 ON FEATURE_MS2.FEATURE_ID = FEATURE.ID
 LEFT JOIN SCORE_MS1 ON SCORE_MS1.FEATURE_ID = FEATURE.ID
 LEFT JOIN SCORE_MS2 ON SCORE_MS2.FEATURE_ID = FEATURE.ID
-WHERE SCORE_MS2.PEP <= %s
+WHERE SCORE_MS2.QVALUE < %s
 ORDER BY transition_group_id,
          peak_group_rank;
-''' % max_rs_peakgroup_pep
+''' % max_rs_peakgroup_qvalue
         query_augmented = '''
 SELECT FEATURE_ID AS id,
        MODIFIED_SEQUENCE AS ipf_FullUniModPeptideName,
@@ -154,8 +154,9 @@ SELECT FEATURE_ID AS id,
        PEP AS ipf_peptidoform_pep,
        QVALUE AS ipf_peptidoform_m_score
 FROM SCORE_IPF
-INNER JOIN PEPTIDE ON SCORE_IPF.PEPTIDE_ID = PEPTIDE.ID;
-'''
+INNER JOIN PEPTIDE ON SCORE_IPF.PEPTIDE_ID = PEPTIDE.ID
+WHERE SCORE_IPF.PEP < %s;
+''' % ipf_max_peptidoform_pep
 	# Main query for standard OpenSWATH
     else:
         idx_query = '''
@@ -208,10 +209,10 @@ INNER JOIN RUN ON RUN.ID = FEATURE.RUN_ID
 LEFT JOIN FEATURE_MS1 ON FEATURE_MS1.FEATURE_ID = FEATURE.ID
 LEFT JOIN FEATURE_MS2 ON FEATURE_MS2.FEATURE_ID = FEATURE.ID
 LEFT JOIN SCORE_MS2 ON SCORE_MS2.FEATURE_ID = FEATURE.ID
-WHERE SCORE_MS2.PEP <= %s
+WHERE SCORE_MS2.QVALUE < %s
 ORDER BY transition_group_id,
          peak_group_rank;
-''' % max_rs_peakgroup_pep
+''' % max_rs_peakgroup_qvalue
 
     # Execute main SQLite query
     click.echo("Info: Reading peak group-level results.")
@@ -245,7 +246,7 @@ SELECT FEATURE_TRANSITION.FEATURE_ID AS id,
 FROM FEATURE_TRANSITION
 INNER JOIN TRANSITION ON FEATURE_TRANSITION.TRANSITION_ID = TRANSITION.ID
 INNER JOIN SCORE_TRANSITION ON FEATURE_TRANSITION.TRANSITION_ID = SCORE_TRANSITION.TRANSITION_ID AND FEATURE_TRANSITION.FEATURE_ID = SCORE_TRANSITION.FEATURE_ID
-WHERE TRANSITION.DECOY == 0 AND SCORE_TRANSITION.PEP <= %s
+WHERE TRANSITION.DECOY == 0 AND SCORE_TRANSITION.PEP < %s
 GROUP BY FEATURE_TRANSITION.FEATURE_ID
 ''' % max_transition_pep
         else:
@@ -396,8 +397,6 @@ GROUP BY PEPTIDE_ID;
     elif format == 'matrix':
         # select top ranking peak group only
         data = data.iloc[data.groupby(['run_id','transition_group_id']).apply(lambda x: x['m_score'].idxmin())]
-        # limit peak groups to q-value cutoff
-        data = data[data['m_score'] < max_rs_peakgroup_qvalue]
         # restructure dataframe to matrix
         data = data[['transition_group_id','Sequence','FullPeptideName','ProteinName','filename','Intensity']]
         data = data.pivot_table(index=['transition_group_id','Sequence','FullPeptideName','ProteinName'], columns='filename', values='Intensity')
