@@ -8,7 +8,7 @@ from .data_handling import check_sqlite_table
 from .report import plot_scores
 
 
-def export_tsv(infile, outfile, format, outcsv, transition_quantification, max_transition_pep, ipf, max_rs_peakgroup_pep, max_rs_peakgroup_qvalue, peptide, max_global_peptide_qvalue, protein, max_global_protein_qvalue):
+def export_tsv(infile, outfile, format, outcsv, transition_quantification, max_transition_pep, ipf, ipf_max_peptidoform_pep, max_rs_peakgroup_qvalue, peptide, max_global_peptide_qvalue, protein, max_global_protein_qvalue):
 
     con = sqlite3.connect(infile)
 
@@ -16,8 +16,8 @@ def export_tsv(infile, outfile, format, outcsv, transition_quantification, max_t
     if ipf:
         ipf_present = check_sqlite_table(con, "SCORE_IPF")
 
-    # Main query for IPF
-    if ipf_present and ipf:
+    # Main query for peptidoform IPF
+    if ipf_present and ipf=='peptidoform':
         idx_query = '''
 CREATE INDEX IF NOT EXISTS idx_precursor_precursor_id ON PRECURSOR (ID);
 CREATE INDEX IF NOT EXISTS idx_precursor_peptide_mapping_precursor_id ON PRECURSOR_PEPTIDE_MAPPING (PRECURSOR_ID);
@@ -80,10 +80,83 @@ LEFT JOIN SCORE_MS1 ON SCORE_MS1.FEATURE_ID = FEATURE.ID
 LEFT JOIN SCORE_MS2 ON SCORE_MS2.FEATURE_ID = FEATURE.ID
 LEFT JOIN SCORE_IPF ON SCORE_IPF.FEATURE_ID = FEATURE.ID
 INNER JOIN PEPTIDE AS PEPTIDE_IPF ON SCORE_IPF.PEPTIDE_ID = PEPTIDE_IPF.ID
-WHERE SCORE_IPF.PEP <= %s
+WHERE SCORE_MS2.QVALUE < %s AND SCORE_IPF.PEP < %s
 ORDER BY transition_group_id,
          peak_group_rank;
-''' % max_rs_peakgroup_pep
+''' % (max_rs_peakgroup_qvalue, ipf_max_peptidoform_pep)
+    # Main query for augmented IPF
+    elif ipf_present and ipf=='augmented':
+        idx_query = '''
+CREATE INDEX IF NOT EXISTS idx_precursor_precursor_id ON PRECURSOR (ID);
+CREATE INDEX IF NOT EXISTS idx_precursor_peptide_mapping_precursor_id ON PRECURSOR_PEPTIDE_MAPPING (PRECURSOR_ID);
+CREATE INDEX IF NOT EXISTS idx_feature_precursor_id ON FEATURE (PRECURSOR_ID);
+
+CREATE INDEX IF NOT EXISTS idx_precursor_peptide_mapping_peptide_id ON PRECURSOR_PEPTIDE_MAPPING (PEPTIDE_ID);
+CREATE INDEX IF NOT EXISTS idx_peptide_peptide_id ON PEPTIDE (ID);
+
+CREATE INDEX IF NOT EXISTS idx_run_run_id ON RUN (ID);
+CREATE INDEX IF NOT EXISTS idx_feature_run_id ON FEATURE (RUN_ID);
+
+CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
+CREATE INDEX IF NOT EXISTS idx_feature_ms1_feature_id ON FEATURE_MS1 (FEATURE_ID);
+CREATE INDEX IF NOT EXISTS idx_feature_ms2_feature_id ON FEATURE_MS2 (FEATURE_ID);
+CREATE INDEX IF NOT EXISTS idx_score_ms1_feature_id ON SCORE_MS1 (FEATURE_ID);
+CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);
+CREATE INDEX IF NOT EXISTS idx_score_ipf_feature_id ON SCORE_IPF (FEATURE_ID);
+
+CREATE INDEX IF NOT EXISTS idx_score_ipf_peptide_id ON SCORE_IPF (PEPTIDE_ID);
+'''
+        query = '''
+SELECT RUN.ID AS id_run,
+       PEPTIDE.ID AS id_peptide,
+       PRECURSOR.ID AS transition_group_id,
+       PRECURSOR.DECOY AS decoy,
+       RUN.ID AS run_id,
+       RUN.FILENAME AS filename,
+       FEATURE.EXP_RT AS RT,
+       FEATURE.EXP_RT - FEATURE.DELTA_RT AS assay_rt,
+       FEATURE.DELTA_RT AS delta_rt,
+       FEATURE.NORM_RT AS iRT,
+       PRECURSOR.LIBRARY_RT AS assay_iRT,
+       FEATURE.NORM_RT - PRECURSOR.LIBRARY_RT AS delta_iRT,
+       FEATURE.ID AS id,
+       PEPTIDE.UNMODIFIED_SEQUENCE AS Sequence,
+       PEPTIDE.MODIFIED_SEQUENCE AS FullPeptideName,
+       PRECURSOR.CHARGE AS Charge,
+       PRECURSOR.PRECURSOR_MZ AS mz,
+       FEATURE_MS2.AREA_INTENSITY AS Intensity,
+       FEATURE_MS1.AREA_INTENSITY AS aggr_prec_Peak_Area,
+       FEATURE_MS1.APEX_INTENSITY AS aggr_prec_Peak_Apex,
+       FEATURE.LEFT_WIDTH AS leftWidth,
+       FEATURE.RIGHT_WIDTH AS rightWidth,
+       SCORE_MS2.RANK AS peak_group_rank,
+       SCORE_MS2.SCORE AS d_score,
+       SCORE_MS2.QVALUE AS m_score,
+       SCORE_MS1.PEP AS ms1_pep,
+       SCORE_MS2.PEP AS ms2_pep
+FROM PRECURSOR
+INNER JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
+INNER JOIN PEPTIDE ON PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
+INNER JOIN FEATURE ON FEATURE.PRECURSOR_ID = PRECURSOR.ID
+INNER JOIN RUN ON RUN.ID = FEATURE.RUN_ID
+LEFT JOIN FEATURE_MS1 ON FEATURE_MS1.FEATURE_ID = FEATURE.ID
+LEFT JOIN FEATURE_MS2 ON FEATURE_MS2.FEATURE_ID = FEATURE.ID
+LEFT JOIN SCORE_MS1 ON SCORE_MS1.FEATURE_ID = FEATURE.ID
+LEFT JOIN SCORE_MS2 ON SCORE_MS2.FEATURE_ID = FEATURE.ID
+WHERE SCORE_MS2.QVALUE < %s
+ORDER BY transition_group_id,
+         peak_group_rank;
+''' % max_rs_peakgroup_qvalue
+        query_augmented = '''
+SELECT FEATURE_ID AS id,
+       MODIFIED_SEQUENCE AS ipf_FullUniModPeptideName,
+       PRECURSOR_PEAKGROUP_PEP AS ipf_precursor_peakgroup_pep,
+       PEP AS ipf_peptidoform_pep,
+       QVALUE AS ipf_peptidoform_m_score
+FROM SCORE_IPF
+INNER JOIN PEPTIDE ON SCORE_IPF.PEPTIDE_ID = PEPTIDE.ID
+WHERE SCORE_IPF.PEP < %s;
+''' % ipf_max_peptidoform_pep
 	# Main query for standard OpenSWATH
     else:
         idx_query = '''
@@ -136,15 +209,23 @@ INNER JOIN RUN ON RUN.ID = FEATURE.RUN_ID
 LEFT JOIN FEATURE_MS1 ON FEATURE_MS1.FEATURE_ID = FEATURE.ID
 LEFT JOIN FEATURE_MS2 ON FEATURE_MS2.FEATURE_ID = FEATURE.ID
 LEFT JOIN SCORE_MS2 ON SCORE_MS2.FEATURE_ID = FEATURE.ID
-WHERE SCORE_MS2.PEP <= %s
+WHERE SCORE_MS2.QVALUE < %s
 ORDER BY transition_group_id,
          peak_group_rank;
-''' % max_rs_peakgroup_pep
+''' % max_rs_peakgroup_qvalue
 
     # Execute main SQLite query
     click.echo("Info: Reading peak group-level results.")
     con.executescript(idx_query) # Add indices
     data = pd.read_sql_query(query, con)
+
+    # Augment OpenSWATH results with IPF scores
+    if ipf_present and ipf=='augmented':
+      data_augmented = pd.read_sql_query(query_augmented, con)
+
+      data_augmented = data_augmented.groupby('id').apply(lambda x: pd.Series({'ipf_FullUniModPeptideName': ";".join(x[x['ipf_peptidoform_pep'] == np.min(x['ipf_peptidoform_pep'])]['ipf_FullUniModPeptideName']), 'ipf_precursor_peakgroup_pep': x[x['ipf_peptidoform_pep'] == np.min(x['ipf_peptidoform_pep'])]['ipf_precursor_peakgroup_pep'].values[0], 'ipf_peptidoform_pep': x[x['ipf_peptidoform_pep'] == np.min(x['ipf_peptidoform_pep'])]['ipf_peptidoform_pep'].values[0], 'ipf_peptidoform_m_score': x[x['ipf_peptidoform_pep'] == np.min(x['ipf_peptidoform_pep'])]['ipf_peptidoform_m_score'].values[0]})).reset_index(level='id')
+
+      data = pd.merge(data, data_augmented, how='left', on='id')
 
     # Append transition-level quantities
     if transition_quantification:
@@ -165,7 +246,7 @@ SELECT FEATURE_TRANSITION.FEATURE_ID AS id,
 FROM FEATURE_TRANSITION
 INNER JOIN TRANSITION ON FEATURE_TRANSITION.TRANSITION_ID = TRANSITION.ID
 INNER JOIN SCORE_TRANSITION ON FEATURE_TRANSITION.TRANSITION_ID = SCORE_TRANSITION.TRANSITION_ID AND FEATURE_TRANSITION.FEATURE_ID = SCORE_TRANSITION.FEATURE_ID
-WHERE TRANSITION.DECOY == 0 AND SCORE_TRANSITION.PEP <= %s
+WHERE TRANSITION.DECOY == 0 AND SCORE_TRANSITION.PEP < %s
 GROUP BY FEATURE_TRANSITION.FEATURE_ID
 ''' % max_transition_pep
         else:
@@ -187,7 +268,7 @@ GROUP BY FEATURE_ID
         click.echo("Info: Reading transition-level results.")
         con.executescript(idx_transition_query) # Add indices
         data_transition = pd.read_sql_query(transition_query, con)
-        data = pd.merge(data, data_transition, how='inner', on=['id'])
+        data = pd.merge(data, data_transition, how='left', on=['id'])
 
     # Append concatenated protein identifier
     click.echo("Info: Reading protein identifiers.")
@@ -316,8 +397,6 @@ GROUP BY PEPTIDE_ID;
     elif format == 'matrix':
         # select top ranking peak group only
         data = data.iloc[data.groupby(['run_id','transition_group_id']).apply(lambda x: x['m_score'].idxmin())]
-        # limit peak groups to q-value cutoff
-        data = data[data['m_score'] < max_rs_peakgroup_qvalue]
         # restructure dataframe to matrix
         data = data[['transition_group_id','Sequence','FullPeptideName','ProteinName','filename','Intensity']]
         data = data.pivot_table(index=['transition_group_id','Sequence','FullPeptideName','ProteinName'], columns='filename', values='Intensity')
