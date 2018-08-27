@@ -40,8 +40,7 @@ class PyProphetRunner(object):
                     sys.exit("Error: MS2-level feature table not present in file.")
                 table = pd.read_sql_query('''
 SELECT *,
-       RUN_ID || '_' || PRECURSOR_ID AS GROUP_ID,
-       %s AS MAIN_SCORE
+       RUN_ID || '_' || PRECURSOR_ID AS GROUP_ID
 FROM FEATURE_MS2
 INNER JOIN
   (SELECT RUN_ID,
@@ -56,14 +55,13 @@ INNER JOIN
 ORDER BY RUN_ID,
          PRECURSOR.ID ASC,
          FEATURE.EXP_RT ASC;
-''' % (ss_main_score), con)
+''', con)
             elif level == "ms1":
                 if not check_sqlite_table(con, "FEATURE_MS1"):
                     sys.exit("Error: MS1-level feature table not present in file.")
                 table = pd.read_sql_query('''
 SELECT *,
-       RUN_ID || '_' || PRECURSOR_ID AS GROUP_ID,
-       %s AS MAIN_SCORE
+       RUN_ID || '_' || PRECURSOR_ID AS GROUP_ID
 FROM FEATURE_MS1
 INNER JOIN
   (SELECT RUN_ID,
@@ -78,15 +76,14 @@ INNER JOIN
 ORDER BY RUN_ID,
          PRECURSOR.ID ASC,
          FEATURE.EXP_RT ASC;
-''' % (ss_main_score), con)
+''', con)
             elif level == "transition":
                 if not check_sqlite_table(con, "FEATURE_TRANSITION"):
                     sys.exit("Error: Transition-level feature table not present in file.")
                 table = pd.read_sql_query('''
 SELECT TRANSITION.DECOY AS DECOY,
        FEATURE_TRANSITION.*,
-       RUN_ID || '_' || FEATURE_TRANSITION.FEATURE_ID || '_' || PRECURSOR_ID || '_' || TRANSITION_ID AS GROUP_ID,
-       %s AS MAIN_SCORE
+       RUN_ID || '_' || FEATURE_TRANSITION.FEATURE_ID || '_' || PRECURSOR_ID || '_' || TRANSITION_ID AS GROUP_ID
 FROM FEATURE_TRANSITION
 INNER JOIN
   (SELECT RUN_ID,
@@ -109,7 +106,7 @@ ORDER BY RUN_ID,
          PRECURSOR.ID,
          FEATURE.EXP_RT,
          TRANSITION.ID;
-''' % (ss_main_score, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn), con)
+''' % (ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn), con)
             else:
                 sys.exit("Error: Unspecified data level selected.")
 
@@ -127,11 +124,14 @@ ORDER BY RUN_ID,
 
             # Format table
             table.columns = [col.lower() for col in table.columns]
+
+            # Mark main score column
+            if ss_main_score.lower() in table.columns:
+                table = table.rename(index=str, columns={ss_main_score.lower(): "main_"+ss_main_score.lower()})
+            else:
+                sys.exit("Error: Main score column not present in data.")
+
             con.close()
-
-            # Remove untagged main score from table
-            table = table.drop(ss_main_score, axis=1)
-
             return(table)
 
         # Main function
