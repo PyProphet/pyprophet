@@ -4,8 +4,8 @@ import inspect
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.svm import NuSVC
 from sklearn.ensemble import RandomForestClassifier
+import xgboost as xgb
 from .data_handling import Experiment
-
 
 class AbstractLearner(object):
 
@@ -129,6 +129,51 @@ class RFLearner(AbstractLearner):
         X = peaks.get_feature_matrix(use_main_score)
         result = self.classifier.predict_proba(X)
         return result[:,1].astype(np.float32)
+
+    def get_parameters(self):
+        return self.classifier
+
+    def set_parameters(self, w):
+        self.classifier = w
+        return self
+
+class XGBLearner(AbstractLearner):
+
+    def __init__(self):
+        self.classifier = None
+        self.scalings = None
+
+    def learn(self, decoy_peaks, target_peaks, use_main_score=True):
+        assert isinstance(decoy_peaks, Experiment)
+        assert isinstance(target_peaks, Experiment)
+
+        X0 = decoy_peaks.get_feature_matrix(use_main_score)
+        X1 = target_peaks.get_feature_matrix(use_main_score)
+        X = np.vstack((X0, X1))
+        y = np.zeros((X.shape[0],))
+        y[X0.shape[0]:] = 1.0
+
+        # prepare training data
+        dtrain = xgb.DMatrix(X, label=y)
+
+        # specify parameters
+        param = {'max_depth': 2, 'eta': 1, 'silent': 1, 'objective': 'binary:logistic'}
+        param['nthread'] = 4
+        param['eval_metric'] = 'auc'
+
+        # learning
+        num_round = 10
+        classifier = xgb.train(param, dtrain, num_round)
+
+        self.classifier = classifier
+        # self.scalings = xgb.importance(feature_names = sparse_matrix@Dimnames[[2]], model = classifier)
+        return self
+
+    def score(self, peaks, use_main_score):
+        X = peaks.get_feature_matrix(use_main_score)
+        dtest = xgb.DMatrix(X)
+        result = self.classifier.predict(dtest)
+        return result.astype(np.float32)
 
     def get_parameters(self):
         return self.classifier

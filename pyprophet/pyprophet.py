@@ -12,7 +12,7 @@ from .stats import (lookup_values_from_error_table, error_statistics,
                    mean_and_std_dev, final_err_table, summary_err_table,
                    posterior_chromatogram_hypotheses_fast)
 from .data_handling import (prepare_data_table, Experiment)
-from .classifiers import (LDALearner, SVMLearner, RFLearner)
+from .classifiers import (LDALearner, SVMLearner, RFLearner, XGBLearner)
 from .semi_supervised import (AbstractSemiSupervisedLearner, StandardSemiSupervisedLearner)
 from collections import namedtuple
 from contextlib import contextmanager
@@ -291,7 +291,7 @@ class HolyGostQuery(object):
             # ws = [ws[-1]]
 
             final_classifier = self.semi_supervised_learner.averaged_learner(ws)
-        elif self.classifier == "RandomForest" or self.classifier == "SVM":
+        elif self.classifier == "XGBoost" or self.classifier == "RandomForest" or self.classifier == "SVM":
             (ttt_scores, ttd_scores, model) = learner.learn_randomized(experiment)
             final_classifier = learner.set_learner(model)
 
@@ -304,6 +304,8 @@ class HolyGostQuery(object):
             classifier_table = pd.DataFrame({'score': score_columns, 'weight': weights})
         elif self.classifier == "RandomForest" or self.classifier == "SVM":
             classifier_table = pickle.dumps(final_classifier.get_parameters())
+        elif self.classifier == "XGBoost":
+            classifier_table = None
 
         scorer = Scorer(final_classifier, score_columns, experiment, self.group_id, self.parametric, self.pfdr, self.pi0_lambda, self.pi0_method, self.pi0_smooth_df, self.pi0_smooth_log_pi0, self.lfdr_truncate, self.lfdr_monotone, self.lfdr_transformation, self.lfdr_adj, self.lfdr_eps, self.tric_chromprob)
 
@@ -325,5 +327,7 @@ def PyProphet(classifier, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_ite
         return HolyGostQuery(StandardSemiSupervisedLearner(SVMLearner(), xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, test), classifier, ss_num_iter, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, tric_chromprob, threads, test)
     elif classifier == "RandomForest":
         return HolyGostQuery(StandardSemiSupervisedLearner(RFLearner(), xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, test), classifier, ss_num_iter, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, tric_chromprob, threads, test)
+    elif classifier == "XGBoost":
+        return HolyGostQuery(StandardSemiSupervisedLearner(XGBLearner(), xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, test), classifier, ss_num_iter, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, tric_chromprob, threads, test)
     else:
         sys.exit("Error: Classifier not supported.")

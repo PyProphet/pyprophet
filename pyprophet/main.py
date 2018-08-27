@@ -34,7 +34,7 @@ def cli():
 @click.option('--in', 'infile', required=True, type=click.Path(exists=True), help='PyProphet input file.')
 @click.option('--out', 'outfile', type=click.Path(exists=False), help='PyProphet output file.')
 # Semi-supervised learning
-@click.option('--classifier', default='LDA', show_default=True, type=click.Choice(['LDA', 'SVM', 'RandomForest']), help='Either a "LDA", Nu-Support Vector Classification "SVM" or "RandomForest" classifier is used for semi-supervised learning.')
+@click.option('--classifier', default='LDA', show_default=True, type=click.Choice(['LDA', 'SVM', 'RandomForest', 'XGBoost']), help='Either a "LDA", Nu-Support Vector Classification "SVM", "RandomForest" or "XGBoost" classifier is used for semi-supervised learning.')
 @click.option('--apply_weights', type=click.Path(exists=True), help='Apply PyProphet score weights file instead of semi-supervised learning.')
 @click.option('--xeval_fraction', default=0.5, show_default=True, type=float, help='Data fraction used for cross-validation of semi-supervised learning step.')
 @click.option('--xeval_num_iter', default=10, show_default=True, type=int, help='Number of iterations for cross-validation of semi-supervised learning step.')
