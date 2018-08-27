@@ -240,11 +240,12 @@ ORDER BY RUN_ID,
             click.echo("Info: %s written." % extra_writes.get("report_path"))
 
     def save_tsv_weights(self, weights, extra_writes):
-        weights['level'] = self.level
-        trained_weights_path = extra_writes.get("trained_weights_path")
-        if trained_weights_path is not None:
-            weights.to_csv(trained_weights_path, sep=",", index=False)
-            click.echo("Info: %s written." % trained_weights_path)
+        if self.classifier == "LDA":
+            weights['level'] = self.level
+            trained_weights_path = extra_writes.get("trained_weights_path")
+            if trained_weights_path is not None:
+                weights.to_csv(trained_weights_path, sep=",", index=False)
+                click.echo("Info: %s written." % trained_weights_path)
 
     def save_osw_results(self, result, extra_writes, pi0):
         if self.infile != self.outfile:
@@ -309,16 +310,17 @@ ORDER BY RUN_ID,
             click.echo("Info: %s written." %  os.path.join(self.prefix + "_" + self.level + "_report.pdf"))
 
     def save_osw_weights(self, weights):
-        weights['level'] = self.level
-        con = sqlite3.connect(self.outfile)
+        if self.classifier == "LDA":
+            weights['level'] = self.level
+            con = sqlite3.connect(self.outfile)
 
-        c = con.cursor()
-        c.execute('SELECT count(name) FROM sqlite_master WHERE type="table" AND name="PYPROPHET_WEIGHTS";')
-        if c.fetchone()[0] == 1:
-            c.execute('DELETE FROM PYPROPHET_WEIGHTS WHERE LEVEL =="%s"' % self.level)
-        c.fetchall()
+            c = con.cursor()
+            c.execute('SELECT count(name) FROM sqlite_master WHERE type="table" AND name="PYPROPHET_WEIGHTS";')
+            if c.fetchone()[0] == 1:
+                c.execute('DELETE FROM PYPROPHET_WEIGHTS WHERE LEVEL =="%s"' % self.level)
+            c.fetchall()
 
-        weights.to_sql("PYPROPHET_WEIGHTS", con, index=False, if_exists='append')
+            weights.to_sql("PYPROPHET_WEIGHTS", con, index=False, if_exists='append')
 
 
 class PyProphetLearner(PyProphetRunner):
@@ -332,6 +334,7 @@ class PyProphetLearner(PyProphetRunner):
         yield "summ_stat_path", os.path.join(self.prefix + "_summary_stat.csv")
         yield "full_stat_path", os.path.join(self.prefix + "_full_stat.csv")
         yield "trained_weights_path", os.path.join(self.prefix + "_weights.csv")
+        yield "trained_model_path", os.path.join(self.prefix + "_model.bin")
         yield "report_path", os.path.join(self.prefix + "_report.pdf")
 
 

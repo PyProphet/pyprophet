@@ -302,10 +302,8 @@ class HolyGostQuery(object):
         if self.classifier == "LDA":
             weights = final_classifier.get_parameters()
             classifier_table = pd.DataFrame({'score': score_columns, 'weight': weights})
-        elif self.classifier == "RandomForest" or self.classifier == "SVM":
+        elif self.classifier == "RandomForest" or self.classifier == "SVM" or self.classifier == "XGBoost":
             classifier_table = pickle.dumps(final_classifier.get_parameters())
-        elif self.classifier == "XGBoost":
-            classifier_table = None
 
         scorer = Scorer(final_classifier, score_columns, experiment, self.group_id, self.parametric, self.pfdr, self.pi0_lambda, self.pi0_method, self.pi0_smooth_df, self.pi0_smooth_log_pi0, self.lfdr_truncate, self.lfdr_monotone, self.lfdr_transformation, self.lfdr_adj, self.lfdr_eps, self.tric_chromprob)
 

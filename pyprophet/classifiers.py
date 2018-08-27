@@ -75,7 +75,6 @@ class SVMLearner(AbstractLearner):
 
     def __init__(self):
         self.classifier = None
-        self.scalings = None
 
     def learn(self, decoy_peaks, target_peaks, use_main_score=True):
         assert isinstance(decoy_peaks, Experiment)
@@ -108,7 +107,6 @@ class RFLearner(AbstractLearner):
 
     def __init__(self):
         self.classifier = None
-        self.scalings = None
 
     def learn(self, decoy_peaks, target_peaks, use_main_score=True):
         assert isinstance(decoy_peaks, Experiment)
@@ -122,7 +120,6 @@ class RFLearner(AbstractLearner):
         classifier = RandomForestClassifier()
         classifier.fit(X, y)
         self.classifier = classifier
-        self.scalings = classifier.feature_importances_.flatten()
         return self
 
     def score(self, peaks, use_main_score):
@@ -141,7 +138,6 @@ class XGBLearner(AbstractLearner):
 
     def __init__(self):
         self.classifier = None
-        self.scalings = None
 
     def learn(self, decoy_peaks, target_peaks, use_main_score=True):
         assert isinstance(decoy_peaks, Experiment)
@@ -166,7 +162,6 @@ class XGBLearner(AbstractLearner):
         classifier = xgb.train(param, dtrain, num_round)
 
         self.classifier = classifier
-        # self.scalings = xgb.importance(feature_names = sparse_matrix@Dimnames[[2]], model = classifier)
         return self
 
     def score(self, peaks, use_main_score):
