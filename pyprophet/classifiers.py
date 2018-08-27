@@ -161,6 +161,8 @@ class XGBLearner(AbstractLearner):
         num_round = 10
         classifier = xgb.train(param, dtrain, num_round)
 
+        print(classifier.get_score(importance_type='gain'))
+
         self.classifier = classifier
         return self
 
