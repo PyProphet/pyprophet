@@ -7,6 +7,7 @@ import sys
 import time
 import click
 import pickle
+import operator
 
 from .stats import (lookup_values_from_error_table, error_statistics,
                    mean_and_std_dev, final_err_table, summary_err_table,
@@ -304,6 +305,12 @@ class HolyGostQuery(object):
             classifier_table = pd.DataFrame({'score': score_columns, 'weight': weights})
         elif self.classifier == "RandomForest" or self.classifier == "SVM" or self.classifier == "XGBoost":
             classifier_table = pickle.dumps(final_classifier.get_parameters())
+
+            mapper = {'f{0}'.format(i): v for i, v in enumerate(score_columns)}
+            mapped = {mapper[k]: v for k, v in final_classifier.importance.items()}
+
+            for key, value in reversed(sorted(mapped.items(), key=operator.itemgetter(1))):
+                click.echo("Info: Importance of %s: %s" % (key, value))
 
         scorer = Scorer(final_classifier, score_columns, experiment, self.group_id, self.parametric, self.pfdr, self.pi0_lambda, self.pi0_method, self.pi0_smooth_df, self.pi0_smooth_log_pi0, self.lfdr_truncate, self.lfdr_monotone, self.lfdr_transformation, self.lfdr_adj, self.lfdr_eps, self.tric_chromprob)
 

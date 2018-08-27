@@ -138,6 +138,7 @@ class XGBLearner(AbstractLearner):
 
     def __init__(self):
         self.classifier = None
+        self.importance = None
 
     def learn(self, decoy_peaks, target_peaks, use_main_score=True):
         assert isinstance(decoy_peaks, Experiment)
@@ -161,7 +162,7 @@ class XGBLearner(AbstractLearner):
         num_round = 10
         classifier = xgb.train(param, dtrain, num_round)
 
-        print(classifier.get_score(importance_type='gain'))
+        self.importance = classifier.get_score(importance_type='gain')
 
         self.classifier = classifier
         return self
