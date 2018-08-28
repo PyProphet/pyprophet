@@ -6,14 +6,13 @@ import multiprocessing
 import sys
 import time
 import click
-import pickle
 import operator
 
 from .stats import (lookup_values_from_error_table, error_statistics,
                    mean_and_std_dev, final_err_table, summary_err_table,
                    posterior_chromatogram_hypotheses_fast)
 from .data_handling import (prepare_data_table, Experiment)
-from .classifiers import (LDALearner, SVMLearner, RFLearner, XGBLearner)
+from .classifiers import (LDALearner, XGBLearner)
 from .semi_supervised import (AbstractSemiSupervisedLearner, StandardSemiSupervisedLearner)
 from collections import namedtuple
 from contextlib import contextmanager
@@ -216,10 +215,13 @@ class HolyGostQuery(object):
 
         experiment, score_columns = self._setup_experiment(table)
 
-        if np.all(score_columns == loaded_weights['score'].values):
-            weights = loaded_weights['weight'].values
-        else:
-            sys.exit("Error: Scores in weights file do not match data.")
+        if self.classifier == "LDA":
+            if np.all(score_columns == loaded_weights['score'].values):
+                weights = loaded_weights['weight'].values
+            else:
+                sys.exit("Error: Scores in weights file do not match data.")
+        elif self.classifier == "XGBoost":
+            weights = loaded_weights
 
         final_classifier = self._apply_weights_on_exp(experiment, weights)
 
@@ -235,8 +237,11 @@ class HolyGostQuery(object):
 
         click.echo("Info: Finished pretrained scoring.")
 
-        ws = [loaded_weights.flatten()]
-        final_classifier = self.semi_supervised_learner.averaged_learner(ws)
+        if self.classifier == "LDA":
+            ws = [loaded_weights.flatten()]
+            final_classifier = self.semi_supervised_learner.averaged_learner(ws)
+        elif self.classifier == "XGBoost":
+            final_classifier = self.semi_supervised_learner.set_learner(loaded_weights)
 
         return final_classifier
 
@@ -292,7 +297,7 @@ class HolyGostQuery(object):
             # ws = [ws[-1]]
 
             final_classifier = self.semi_supervised_learner.averaged_learner(ws)
-        elif self.classifier == "XGBoost" or self.classifier == "RandomForest" or self.classifier == "SVM":
+        elif self.classifier == "XGBoost":
             (ttt_scores, ttd_scores, model) = learner.learn_randomized(experiment)
             final_classifier = learner.set_learner(model)
 
@@ -303,8 +308,8 @@ class HolyGostQuery(object):
         if self.classifier == "LDA":
             weights = final_classifier.get_parameters()
             classifier_table = pd.DataFrame({'score': score_columns, 'weight': weights})
-        elif self.classifier == "RandomForest" or self.classifier == "SVM" or self.classifier == "XGBoost":
-            classifier_table = pickle.dumps(final_classifier.get_parameters())
+        elif self.classifier == "XGBoost":
+            classifier_table = final_classifier.get_parameters()
 
             mapper = {'f{0}'.format(i): v for i, v in enumerate(score_columns)}
             mapped = {mapper[k]: v for k, v in final_classifier.importance.items()}
@@ -325,14 +330,10 @@ class HolyGostQuery(object):
 
 
 @profile
-def PyProphet(classifier, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, tric_chromprob, threads, test):
+def PyProphet(classifier, xgb_params, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, tric_chromprob, threads, test):
     if classifier == "LDA":
         return HolyGostQuery(StandardSemiSupervisedLearner(LDALearner(), xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, test), classifier, ss_num_iter, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, tric_chromprob, threads, test)
-    elif classifier == "SVM":
-        return HolyGostQuery(StandardSemiSupervisedLearner(SVMLearner(), xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, test), classifier, ss_num_iter, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, tric_chromprob, threads, test)
-    elif classifier == "RandomForest":
-        return HolyGostQuery(StandardSemiSupervisedLearner(RFLearner(), xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, test), classifier, ss_num_iter, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, tric_chromprob, threads, test)
     elif classifier == "XGBoost":
-        return HolyGostQuery(StandardSemiSupervisedLearner(XGBLearner(), xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, test), classifier, ss_num_iter, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, tric_chromprob, threads, test)
+        return HolyGostQuery(StandardSemiSupervisedLearner(XGBLearner(xgb_params, threads), xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, test), classifier, ss_num_iter, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, tric_chromprob, threads, test)
     else:
         sys.exit("Error: Classifier not supported.")
