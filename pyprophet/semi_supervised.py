@@ -68,6 +68,29 @@ class AbstractSemiSupervisedLearner(object):
 
         return top_test_target_scores, top_test_decoy_scores, params
 
+    def learn_final(self, experiment):
+        assert isinstance(experiment, Experiment)
+
+        click.echo("Info: Learning on cross-validated scores.")
+
+        experiment.rank_by("classifier_score")
+
+        params, clf_scores = self.iter_semi_supervised_learning(experiment)
+        experiment.set_and_rerank("classifier_score", clf_scores)
+
+        # after semi supervised iteration: classify full dataset
+        clf_scores = self.score(experiment, params)
+        mu, nu = mean_and_std_dev(clf_scores)
+        experiment.set_and_rerank("classifier_score", clf_scores)
+
+        td_scores = experiment.get_top_decoy_peaks()["classifier_score"]
+
+        mu, nu = mean_and_std_dev(td_scores)
+        experiment["classifier_score"] = (experiment["classifier_score"] - mu) / nu
+        experiment.rank_by("classifier_score")
+
+        return params
+
 
 class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
 

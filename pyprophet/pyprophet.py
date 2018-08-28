@@ -268,37 +268,48 @@ class HolyGostQuery(object):
 
         learner = self.semi_supervised_learner
 
+        ws = [] # weights/models
+        ttt = [] # top test targets
+        ttd = [] # top test decoys
+
+        neval = self.ss_num_iter
+
+        click.echo("Info: Semi-supervised learning of weights:")
+        click.echo("Info: Start learning on %d folds using %d processes." % (neval, self.threads))
+
+        if self.threads == 1:
+            for k in range(neval):
+                (ttt_scores, ttd_scores, w) = learner.learn_randomized(experiment)
+                ttt.append(ttt_scores)
+                ttd.append(ttd_scores)
+                ws.append(w)
+        else:
+            pool = multiprocessing.Pool(processes=self.threads)
+            while neval:
+                remaining = max(0, neval - self.threads)
+                todo = neval - remaining
+                neval -= todo
+                args = ((learner, "learn_randomized", (experiment, )), ) * todo
+                res = pool.map(unwrap_self_for_multiprocessing, args)
+                ttt_scores = [r[0] for r in res]
+                ttd_scores = [r[1] for r in res]
+                ttt.extend(ttt_scores)
+                ttd.extend(ttd_scores)
+                ws.extend([r[2] for r in res])
+        click.echo("Info: Finished learning.")
+
         if self.classifier == "LDA":
-            ws = []
-
-            neval = self.ss_num_iter
-
-            click.echo("Info: Semi-supervised learning of weights:")
-            click.echo("Info: Start learning on %d folds using %d processes." % (neval, self.threads))
-
-            if self.threads == 1:
-                for k in range(neval):
-                    (ttt_scores, ttd_scores, w) = learner.learn_randomized(experiment)
-                    ws.append(w.flatten())
-            else:
-                pool = multiprocessing.Pool(processes=self.threads)
-                while neval:
-                    remaining = max(0, neval - self.threads)
-                    todo = neval - remaining
-                    neval -= todo
-                    args = ((learner, "learn_randomized", (experiment, )), ) * todo
-                    res = pool.map(unwrap_self_for_multiprocessing, args)
-                    ttt_scores = [ti for r in res for ti in r[0]]
-                    ttd_scores = [ti for r in res for ti in r[1]]
-                    ws.extend([r[2] for r in res])
-            click.echo("Info: Finished learning.")
-
-            # we only use weights from last iteration
-            # ws = [ws[-1]]
-
             final_classifier = self.semi_supervised_learner.averaged_learner(ws)
         elif self.classifier == "XGBoost":
-            (ttt_scores, ttd_scores, model) = learner.learn_randomized(experiment)
+            # Generate average scores over all folds
+            ttt_avg = pd.concat(ttt, axis=1).mean(axis=1)
+            ttd_avg = pd.concat(ttd, axis=1).mean(axis=1)
+            integrated_scores = pd.concat([ttt_avg, ttd_avg], axis=0)
+
+            experiment.set_and_rerank("classifier_score", integrated_scores)
+
+            # Learn final model
+            model = learner.learn_final(experiment)
             final_classifier = learner.set_learner(model)
 
         return final_classifier
@@ -330,10 +341,10 @@ class HolyGostQuery(object):
 
 
 @profile
-def PyProphet(classifier, xgb_params, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, tric_chromprob, threads, test):
+def PyProphet(classifier, xgb_hyperparams, xgb_params, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, tric_chromprob, threads, test):
     if classifier == "LDA":
         return HolyGostQuery(StandardSemiSupervisedLearner(LDALearner(), xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, test), classifier, ss_num_iter, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, tric_chromprob, threads, test)
     elif classifier == "XGBoost":
-        return HolyGostQuery(StandardSemiSupervisedLearner(XGBLearner(xgb_params, threads), xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, test), classifier, ss_num_iter, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, tric_chromprob, threads, test)
+        return HolyGostQuery(StandardSemiSupervisedLearner(XGBLearner(xgb_hyperparams, xgb_params, threads), xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, test), classifier, ss_num_iter, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, tric_chromprob, threads, test)
     else:
         sys.exit("Error: Classifier not supported.")

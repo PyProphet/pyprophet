@@ -2,6 +2,7 @@ import numpy as np
 import inspect
 
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from sklearn.model_selection import train_test_split
 import xgboost as xgb
 from .data_handling import Experiment
 
@@ -75,9 +76,10 @@ class LDALearner(LinearLearner):
 
 class XGBLearner(AbstractLearner):
 
-    def __init__(self, xgb_params, threads):
+    def __init__(self, xgb_hyperparams, xgb_params, threads):
         self.classifier = None
         self.importance = None
+        self.xgb_hyperparams = xgb_hyperparams
         self.xgb_params = xgb_params
         self.threads = threads
 
@@ -91,12 +93,13 @@ class XGBLearner(AbstractLearner):
         y = np.zeros((X.shape[0],))
         y[X0.shape[0]:] = 1.0
 
-        # prepare training data
-        dtrain = xgb.DMatrix(X, label=y)
+        # prepare training and validation data
+        X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=self.xgb_hyperparams['test_size'], random_state=42)
+        dtrain = xgb.DMatrix(X_train, label=y_train)
+        dval = xgb.DMatrix(X_val, label=y_val)
 
-        # learning
-        num_round = 10
-        classifier = xgb.train(self.xgb_params, dtrain, num_round)
+        # learn model
+        classifier = xgb.train(params=self.xgb_params, dtrain=dtrain, num_boost_round=self.xgb_hyperparams['num_boost_round'], evals=[(dval,"validation")], early_stopping_rounds=self.xgb_hyperparams['early_stopping_rounds'], verbose_eval=False)
 
         self.importance = classifier.get_score(importance_type='gain')
         self.classifier = classifier
