@@ -33,6 +33,7 @@ setup(name='pyprophet',
           "cython",
           "numexpr >= 2.1",
           "scikit-learn >= 0.17",
+          "xgboost",
           "statsmodels >= 0.8.0",
           "matplotlib"
       ],
