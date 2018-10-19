@@ -77,6 +77,7 @@ class Scorer(object):
         self.score_columns = score_columns
         self.mu, self.nu = calculate_params_for_d_score(classifier, experiment)
         final_score = classifier.score(experiment, True)
+        experiment["r_score"] = final_score
         experiment["d_score"] = (final_score - self.mu) / self.nu
 
         self.group_id = group_id
@@ -122,6 +123,7 @@ class Scorer(object):
         prepared_table, __ = prepare_data_table(table, tg_id_name=self.group_id, score_columns=self.score_columns)
         texp = Experiment(prepared_table)
         score = self.classifier.score(texp, True)
+        texp["r_score"] = score
         texp["d_score"] = (score - self.mu) / self.nu
 
         p_values, s_values, peps, q_values = lookup_values_from_error_table(texp["d_score"].values,
@@ -137,7 +139,7 @@ class Scorer(object):
                                                                   np.std(s_values, ddof=1)))
         texp.add_peak_group_rank()
 
-        df = table.join(texp[["d_score", "p_value", "q_value", "pep", "peak_group_rank"]])
+        df = table.join(texp[["r_score", "d_score", "p_value", "q_value", "pep", "peak_group_rank"]])
 
         if self.tric_chromprob:
             df = self.add_chromatogram_probabilities(df, texp)
