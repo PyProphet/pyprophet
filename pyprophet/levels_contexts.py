@@ -340,19 +340,6 @@ DETACH DATABASE sdb;
 ''' % infile)
         click.echo("Info: Subsampled transition features of file %s to %s." % (infile, outfile))
 
-        con.executescript('''
-CREATE INDEX IF NOT EXISTS idx_peptide_protein_mapping_protein_id ON PEPTIDE_PROTEIN_MAPPING (PROTEIN_ID);
-CREATE INDEX IF NOT EXISTS idx_peptide_protein_mapping_peptide_id ON PEPTIDE_PROTEIN_MAPPING (PEPTIDE_ID);
-CREATE INDEX IF NOT EXISTS idx_peptide_peptide_id ON PEPTIDE (ID);
-CREATE INDEX IF NOT EXISTS idx_precursor_peptide_mapping_peptide_id ON PRECURSOR_PEPTIDE_MAPPING (PEPTIDE_ID);
-CREATE INDEX IF NOT EXISTS idx_precursor_peptide_mapping_precursor_id ON PRECURSOR_PEPTIDE_MAPPING (PRECURSOR_ID);
-CREATE INDEX IF NOT EXISTS idx_precursor_precursor_id ON PRECURSOR (ID);
-CREATE INDEX IF NOT EXISTS idx_feature_precursor_id ON FEATURE (PRECURSOR_ID);
-CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
-CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);
-''')
-        click.echo("Info: Create indices finished." % (infile, outfile))
-
     conn.commit()
     conn.close()
 
