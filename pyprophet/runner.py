@@ -39,6 +39,14 @@ class PyProphetRunner(object):
             if level == "ms2" or level == "ms1ms2":
                 if not check_sqlite_table(con, "FEATURE_MS2"):
                     sys.exit("Error: MS2-level feature table not present in file.")
+
+                con.executescript('''
+CREATE INDEX IF NOT EXISTS idx_precursor_precursor_id ON PRECURSOR (ID);
+CREATE INDEX IF NOT EXISTS idx_feature_precursor_id ON FEATURE (PRECURSOR_ID);
+CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
+CREATE INDEX IF NOT EXISTS idx_feature_ms2_feature_id ON FEATURE_MS2 (FEATURE_ID);
+''')
+
                 table = pd.read_sql_query('''
 SELECT *,
        RUN_ID || '_' || PRECURSOR_ID AS GROUP_ID
@@ -60,6 +68,14 @@ ORDER BY RUN_ID,
             elif level == "ms1":
                 if not check_sqlite_table(con, "FEATURE_MS1"):
                     sys.exit("Error: MS1-level feature table not present in file.")
+
+                con.executescript('''
+CREATE INDEX IF NOT EXISTS idx_precursor_precursor_id ON PRECURSOR (ID);
+CREATE INDEX IF NOT EXISTS idx_feature_precursor_id ON FEATURE (PRECURSOR_ID);
+CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
+CREATE INDEX IF NOT EXISTS idx_feature_ms1_feature_id ON FEATURE_MS1 (FEATURE_ID);
+''')
+
                 table = pd.read_sql_query('''
 SELECT *,
        RUN_ID || '_' || PRECURSOR_ID AS GROUP_ID
@@ -81,6 +97,17 @@ ORDER BY RUN_ID,
             elif level == "transition":
                 if not check_sqlite_table(con, "FEATURE_TRANSITION"):
                     sys.exit("Error: Transition-level feature table not present in file.")
+
+                con.executescript('''
+CREATE INDEX IF NOT EXISTS idx_transition_id ON TRANSITION (ID);
+CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);
+CREATE INDEX IF NOT EXISTS idx_precursor_precursor_id ON PRECURSOR (ID);
+CREATE INDEX IF NOT EXISTS idx_feature_precursor_id ON FEATURE (PRECURSOR_ID);
+CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
+CREATE INDEX IF NOT EXISTS idx_feature_transition_feature_id ON FEATURE_TRANSITION (FEATURE_ID);
+CREATE INDEX IF NOT EXISTS idx_feature_transition_transition_id ON FEATURE_TRANSITION (TRANSITION_ID);
+''')
+
                 table = pd.read_sql_query('''
 SELECT TRANSITION.DECOY AS DECOY,
        FEATURE_TRANSITION.*,
