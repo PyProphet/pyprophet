@@ -197,50 +197,41 @@ ORDER BY SCORE DESC
     con.close()
 
 
-def merge_osw(infiles, outfile, subsample_ratio, test):
-    # Copy the first file to have a template
-    copyfile(infiles[0], outfile)
+def subsample_osw(infile, outfile, subsample_ratio, test):
+    conn = sqlite3.connect(infile)
+    ms1_present = check_sqlite_table(conn, "FEATURE_MS1")
+    ms2_present = check_sqlite_table(conn, "FEATURE_MS2")
+    transition_present = check_sqlite_table(conn, "FEATURE_TRANSITION")
+    conn.close()
+
     conn = sqlite3.connect(outfile)
     c = conn.cursor()
+
     c.executescript('''
 PRAGMA synchronous = OFF;
 
-DELETE FROM RUN;
-
-DELETE FROM FEATURE;
-
-DELETE FROM FEATURE_MS1;
-
-DELETE FROM FEATURE_MS2;
-
-DELETE FROM FEATURE_TRANSITION;
-''')
-
-    for infile in infiles:
-        c.executescript('''
 ATTACH DATABASE "%s" AS sdb;
 
-INSERT INTO RUN SELECT * FROM sdb.RUN;
+CREATE TABLE RUN AS SELECT * FROM sdb.RUN;
 
 DETACH DATABASE sdb;
 ''' % infile)
-        click.echo("Info: Merged runs of file %s to %s." % (infile, outfile))
+    click.echo("Info: Propagated runs of file %s to %s." % (infile, outfile))
 
-    for infile in infiles:
-        if subsample_ratio >= 1.0:
-            c.executescript('''
+    if subsample_ratio >= 1.0:
+        c.executescript('''
 ATTACH DATABASE "%s" AS sdb; 
 
-INSERT INTO FEATURE SELECT * FROM sdb.FEATURE; 
+CREATE TABLE FEATURE AS SELECT * FROM sdb.FEATURE; 
 
 DETACH DATABASE sdb;
 ''' % infile)
-        else:
-            if test:
-                c.executescript('''
+    else:
+        if test:
+            c.executescript('''
 ATTACH DATABASE "%s" AS sdb;
 
-INSERT INTO FEATURE
+CREATE TABLE FEATURE AS 
 SELECT *
 FROM sdb.FEATURE
 WHERE PRECURSOR_ID IN
@@ -252,11 +243,11 @@ WHERE PRECURSOR_ID IN
 
 DETACH DATABASE sdb;
 ''' % (infile, subsample_ratio))
-            else:
-                c.executescript('''
+        else:
+            c.executescript('''
 ATTACH DATABASE "%s" AS sdb;
 
-INSERT INTO FEATURE
+CREATE TABLE FEATURE AS 
 SELECT *
 FROM sdb.FEATURE
 WHERE PRECURSOR_ID IN
@@ -269,14 +260,14 @@ WHERE PRECURSOR_ID IN
 
 DETACH DATABASE sdb;
 ''' % (infile, subsample_ratio))
-        click.echo("Info: Merged generic features of file %s to %s." % (infile, outfile))
+    click.echo("Info: Subsampled generic features of file %s to %s." % (infile, outfile))
 
-    for infile in infiles:
+    if ms1_present:
         if subsample_ratio >= 1.0:
             c.executescript('''
 ATTACH DATABASE "%s" AS sdb;
 
-INSERT INTO FEATURE_MS1
+CREATE TABLE FEATURE_MS1 AS 
 SELECT *
 FROM sdb.FEATURE_MS1;
 
@@ -286,7 +277,7 @@ DETACH DATABASE sdb;
             c.executescript('''
 ATTACH DATABASE "%s" AS sdb;
 
-INSERT INTO FEATURE_MS1
+CREATE TABLE FEATURE_MS1 AS 
 SELECT *
 FROM sdb.FEATURE_MS1
 WHERE sdb.FEATURE_MS1.FEATURE_ID IN
@@ -295,14 +286,14 @@ WHERE sdb.FEATURE_MS1.FEATURE_ID IN
 
 DETACH DATABASE sdb;
 ''' % infile)
-        click.echo("Info: Merged MS1 features of file %s to %s." % (infile, outfile))
+        click.echo("Info: Subsampled MS1 features of file %s to %s." % (infile, outfile))
 
-    for infile in infiles:
+    if ms2_present:
         if subsample_ratio >= 1.0:
             c.executescript('''
 ATTACH DATABASE "%s" AS sdb;
 
-INSERT INTO FEATURE_MS2
+CREATE TABLE FEATURE_MS2 AS 
 SELECT *
 FROM sdb.FEATURE_MS2;
 
@@ -312,7 +303,7 @@ DETACH DATABASE sdb;
             c.executescript('''
 ATTACH DATABASE "%s" AS sdb;
 
-INSERT INTO FEATURE_MS2
+CREATE TABLE FEATURE_MS2 AS 
 SELECT *
 FROM sdb.FEATURE_MS2
 WHERE sdb.FEATURE_MS2.FEATURE_ID IN
@@ -321,14 +312,14 @@ WHERE sdb.FEATURE_MS2.FEATURE_ID IN
 
 DETACH DATABASE sdb;
 ''' % infile)
-        click.echo("Info: Merged MS2 features of file %s to %s." % (infile, outfile))
+        click.echo("Info: Subsampled MS2 features of file %s to %s." % (infile, outfile))
 
-    for infile in infiles:
+    if transition_present:
         if subsample_ratio >= 1.0:
             c.executescript('''
 ATTACH DATABASE "%s" AS sdb;
 
-INSERT INTO FEATURE_TRANSITION
+CREATE TABLE FEATURE_TRANSITION AS 
 SELECT *
 FROM sdb.FEATURE_TRANSITION;
 
@@ -338,7 +329,7 @@ DETACH DATABASE sdb;
             c.executescript('''
 ATTACH DATABASE "%s" AS sdb;
 
-INSERT INTO FEATURE_TRANSITION
+CREATE TABLE FEATURE_TRANSITION AS 
 SELECT *
 FROM sdb.FEATURE_TRANSITION
 WHERE sdb.FEATURE_TRANSITION.FEATURE_ID IN
@@ -347,12 +338,12 @@ WHERE sdb.FEATURE_TRANSITION.FEATURE_ID IN
 
 DETACH DATABASE sdb;
 ''' % infile)
-        click.echo("Info: Merged transition features of file %s to %s." % (infile, outfile))
+        click.echo("Info: Subsampled transition features of file %s to %s." % (infile, outfile))
 
     conn.commit()
     conn.close()
 
-    click.echo("Info: All OSW files were merged.")
+    click.echo("Info: OSW file was subsampled.")
 
 
 def reduce_osw(infile, outfile):
@@ -409,6 +400,126 @@ WHERE ID IN
     click.echo("Info: OSW file was reduced for multi-run scoring.")
 
 
+def merge_osw(infiles, outfile, templatefile):
+    conn = sqlite3.connect(infiles[0])
+    reduced = check_sqlite_table(conn, "SCORE_MS2")
+    conn.close()
+
+    if reduced:
+        merge_oswr(infiles, outfile, templatefile)
+    else:
+        merge_osws(infiles, outfile, templatefile)
+
+
+def merge_osws(infiles, outfile, templatefile):
+    # Copy the first file to have a template
+    copyfile(templatefile, outfile)
+    conn = sqlite3.connect(outfile)
+    c = conn.cursor()
+    c.executescript('''
+PRAGMA synchronous = OFF;
+
+ATTACH DATABASE "%s" AS sdb;
+
+DROP TABLE IF EXISTS RUN;
+
+DROP TABLE IF EXISTS FEATURE;
+
+DROP TABLE IF EXISTS FEATURE_MS1;
+
+DROP TABLE IF EXISTS FEATURE_MS2;
+
+DROP TABLE IF EXISTS FEATURE_TRANSITION;
+
+DROP TABLE IF EXISTS SCORE_MS1;
+
+DROP TABLE IF EXISTS SCORE_MS2;
+
+DROP TABLE IF EXISTS SCORE_TRANSITION;
+
+DROP TABLE IF EXISTS SCORE_PEPTIDE;
+
+DROP TABLE IF EXISTS SCORE_PROTEIN;
+
+DROP TABLE IF EXISTS SCORE_IPF;
+
+CREATE TABLE RUN AS SELECT * FROM sdb.RUN LIMIT 0;
+
+CREATE TABLE FEATURE AS SELECT * FROM sdb.FEATURE LIMIT 0;
+
+CREATE TABLE FEATURE_MS1 AS SELECT * FROM sdb.FEATURE_MS1 LIMIT 0;
+
+CREATE TABLE FEATURE_MS2 AS SELECT * FROM sdb.FEATURE_MS2 LIMIT 0;
+
+CREATE TABLE FEATURE_TRANSITION AS SELECT * FROM sdb.FEATURE_TRANSITION LIMIT 0;
+
+DETACH DATABASE sdb;
+
+VACUUM;
+''' % (infiles[0]))
+
+    for infile in infiles:
+        c.executescript('''
+ATTACH DATABASE "%s" AS sdb;
+
+INSERT INTO RUN SELECT * FROM sdb.RUN;
+
+DETACH DATABASE sdb;
+''' % infile)
+        click.echo("Info: Merged runs of file %s to %s." % (infile, outfile))
+
+    for infile in infiles:
+        c.executescript('''
+ATTACH DATABASE "%s" AS sdb; 
+
+INSERT INTO FEATURE SELECT * FROM sdb.FEATURE; 
+
+DETACH DATABASE sdb;
+''' % infile)
+        click.echo("Info: Merged generic features of file %s to %s." % (infile, outfile))
+
+    for infile in infiles:
+        c.executescript('''
+ATTACH DATABASE "%s" AS sdb;
+
+INSERT INTO FEATURE_MS1
+SELECT *
+FROM sdb.FEATURE_MS1;
+
+DETACH DATABASE sdb;
+''' % infile)
+        click.echo("Info: Merged MS1 features of file %s to %s." % (infile, outfile))
+
+    for infile in infiles:
+        c.executescript('''
+ATTACH DATABASE "%s" AS sdb;
+
+INSERT INTO FEATURE_MS2
+SELECT *
+FROM sdb.FEATURE_MS2;
+
+DETACH DATABASE sdb;
+''' % infile)
+        click.echo("Info: Merged MS2 features of file %s to %s." % (infile, outfile))
+
+    for infile in infiles:
+        c.executescript('''
+ATTACH DATABASE "%s" AS sdb;
+
+INSERT INTO FEATURE_TRANSITION
+SELECT *
+FROM sdb.FEATURE_TRANSITION;
+
+DETACH DATABASE sdb;
+''' % infile)
+        click.echo("Info: Merged transition features of file %s to %s." % (infile, outfile))
+
+    conn.commit()
+    conn.close()
+
+    click.echo("Info: All OSWS files were merged.")
+
+
 def merge_oswr(infiles, outfile, templatefile):
     # Copy the template to the output file
     copyfile(templatefile, outfile)
@@ -447,6 +558,8 @@ CREATE TABLE SCORE_MS2(FEATURE_ID INTEGER, SCORE REAL);
 CREATE TABLE FEATURE(ID INT PRIMARY KEY NOT NULL,
                      RUN_ID INT NOT NULL,
                      PRECURSOR_ID INT NOT NULL);
+
+VACUUM;
 ''')
 
     for infile in infiles:

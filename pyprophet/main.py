@@ -5,11 +5,12 @@ import sys
 
 from .runner import PyProphetLearner, PyProphetWeightApplier
 from .ipf import infer_peptidoforms
-from .levels_contexts import infer_peptides, infer_proteins, merge_osw, reduce_osw, merge_oswr, backpropagate_oswr
+from .levels_contexts import infer_peptides, infer_proteins, subsample_osw, reduce_osw, merge_osw, backpropagate_oswr
 from .export import export_tsv, export_score_plots
 from .filter import filter_sqmass
 from .data_handling import (transform_pi0_lambda, transform_threads, transform_subsample_ratio)
 from functools import update_wrapper
+import sqlite3
 
 try:
     profile
@@ -172,25 +173,23 @@ def protein(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_method, 
     infer_proteins(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps)
 
 
-# Merging & subsampling of multiple runs
+# Subsample OpenSWATH file to minimum for integrated scoring
 @cli.command()
-@click.argument('infiles', nargs=-1, type=click.Path(exists=True))
-@click.option('--out','outfile', type=click.Path(exists=False), help='Merged OSW output file.')
-@click.option('--template','templatefile', type=click.Path(exists=False), help='[Reduced OSWR only] Template PQP or OSW file.')
+@click.option('--in', 'infile', required=True, type=click.Path(exists=True), help='OpenSWATH input file.')
+@click.option('--out','outfile', type=click.Path(exists=False), help='Subsampled OSWS output file.')
 @click.option('--subsample_ratio', default=1, show_default=True, type=float, help='Subsample ratio used per input file.', callback=transform_subsample_ratio)
 @click.option('--test/--no-test', default=False, show_default=True, help='Run in test mode with fixed seed.')
-def merge(infiles, outfile, templatefile, subsample_ratio, test):
+def subsample(infile, outfile, subsample_ratio, test):
     """
-    Merge multiple OSW files and optionally subsample the data for faster learning.
+    Subsample OpenSWATH file to minimum for integrated scoring
     """
 
-    if len(infiles) < 1:
-        sys.exit("Error: At least one PyProphet input file needs to be defined.")
-
-    if templatefile is None:
-        merge_osw(infiles, outfile, subsample_ratio, test)
+    if outfile is None:
+        outfile = infile
     else:
-        merge_oswr(infiles, outfile, templatefile)
+        outfile = outfile
+
+    subsample_osw(infile, outfile, subsample_ratio, test)
 
 
 # Reduce scored PyProphet file to minimum for global scoring
@@ -208,6 +207,22 @@ def reduce(infile, outfile):
         outfile = outfile
 
     reduce_osw(infile, outfile)
+
+
+# Merging of multiple runs
+@cli.command()
+@click.argument('infiles', nargs=-1, type=click.Path(exists=True))
+@click.option('--out','outfile', required=True, type=click.Path(exists=False), help='Merged OSW output file.')
+@click.option('--template','templatefile', required=True, type=click.Path(exists=False), help='Template OSW file.')
+def merge(infiles, outfile, templatefile):
+    """
+    Merge multiple OSW files and optionally subsample the data for faster learning.
+    """
+
+    if len(infiles) < 1:
+        sys.exit("Error: At least one PyProphet input file needs to be defined.")
+
+    merge_osw(infiles, outfile, templatefile)
 
 
 # Backpropagate multi-run peptide and protein scores to single files

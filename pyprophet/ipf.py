@@ -209,7 +209,7 @@ def prepare_precursor_bm(data):
     # combine precursor data
     precursor_bm_data = pd.concat([ms1_bm_data, ms2_bm_data])
     # append missing precursors if no MS1/MS2 evidence is available
-    precursor_bm_data = pd.concat([precursor_bm_data, missing_bm_data.ix[~missing_bm_data['feature_id'].isin(precursor_bm_data['feature_id'])]])
+    precursor_bm_data = pd.concat([precursor_bm_data, missing_bm_data.loc[~missing_bm_data['feature_id'].isin(precursor_bm_data['feature_id'])]])
 
     return(precursor_bm_data)
 
@@ -217,12 +217,12 @@ def prepare_precursor_bm(data):
 def prepare_transition_bm(data):
     # peptide_id = -1 indicates h0, i.e. the peak group is wrong!
     # initialize priors
-    data.ix[data.peptide_id != -1, 'prior'] = (1-data.ix[data.peptide_id != -1, 'precursor_peakgroup_pep']) / data.ix[data.peptide_id != -1, 'num_peptidoforms'] # potential peptidoforms
-    data.ix[data.peptide_id == -1, 'prior'] = data.ix[data.peptide_id == -1, 'precursor_peakgroup_pep'] # h0
+    data.loc[data.peptide_id != -1, 'prior'] = (1-data.loc[data.peptide_id != -1, 'precursor_peakgroup_pep']) / data.loc[data.peptide_id != -1, 'num_peptidoforms'] # potential peptidoforms
+    data.loc[data.peptide_id == -1, 'prior'] = data.loc[data.peptide_id == -1, 'precursor_peakgroup_pep'] # h0
 
     # set evidence
-    data.ix[data.bmask == 1, 'evidence'] = (1-data.ix[data.bmask == 1, 'pep']) # we have evidence FOR this peptidoform or h0
-    data.ix[data.bmask == 0, 'evidence'] = data.ix[data.bmask == 0, 'pep'] # we have evidence AGAINST this peptidoform or h0
+    data.loc[data.bmask == 1, 'evidence'] = (1-data.loc[data.bmask == 1, 'pep']) # we have evidence FOR this peptidoform or h0
+    data.loc[data.bmask == 0, 'evidence'] = data.loc[data.bmask == 0, 'pep'] # we have evidence AGAINST this peptidoform or h0
 
     data = data[['feature_id','num_peptidoforms','prior','evidence','peptide_id']]
     data = data.rename(columns=lambda x: x.replace('peptide_id', 'hypothesis'))
