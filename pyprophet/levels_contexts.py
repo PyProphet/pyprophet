@@ -603,7 +603,7 @@ def backpropagate_oswr(infile, outfile, apply_scores):
         script.append(create_table_fmt.format('SCORE_PROTEIN'))
 
     # copy across the tables
-    script.append(f'ATTACH DATABASE "{apply_scores}" AS sdb;')
+    script.append('ATTACH DATABASE "{apply_scores}" AS sdb;')
     insert_table_fmt = 'INSERT INTO {0}\nSELECT *\nFROM sdb.{0};'
     if peptide_present:
         script.append(insert_table_fmt.format('SCORE_PEPTIDE'))
