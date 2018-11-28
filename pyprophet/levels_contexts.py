@@ -583,24 +583,20 @@ def backpropagate_oswr(infile, outfile, apply_scores):
 
     # find out what tables exist in the scores
     score_con = sqlite3.connect(apply_scores)
-    transition_present = check_sqlite_table(score_con, "SCORE_TRANSITION")
     peptide_present = check_sqlite_table(score_con, "SCORE_PEPTIDE")
     protein_present = check_sqlite_table(score_con, "SCORE_PROTEIN")
     score_con.close()
-    if not (transition_present or peptide_present or protein_present):
-        sys.exit('You must have at least one score table present')
+    if not (peptide_present or protein_present):
+        sys.exit('Error: Backpropagation requires peptide or protein-level contexts.')
 
     # build up the list
     script = list()
     script.append('PRAGMA synchronous = OFF;')
-    script.append('DROP TABLE IF EXISTS SCORE_TRANSITION;')
     script.append('DROP TABLE IF EXISTS SCORE_PEPTIDE;')
     script.append('DROP TABLE IF EXISTS SCORE_PROTEIN;')
 
     # create the tables
     create_table_fmt = 'CREATE TABLE {} (CONTEXT TEXT, RUN_ID INTEGER, PEPTIDE_ID INTEGER, SCORE REAL, PVALUE REAL, QVALUE REAL, PEP REAL);'
-    if transition_present:
-        script.append(create_table_fmt.format('SCORE_TRANSITION'))
     if peptide_present:
         script.append(create_table_fmt.format('SCORE_PEPTIDE'))
     if protein_present:
@@ -609,8 +605,6 @@ def backpropagate_oswr(infile, outfile, apply_scores):
     # copy across the tables
     script.append(f'ATTACH DATABASE "{apply_scores}" AS sdb;')
     insert_table_fmt = 'INSERT INTO {0}\nSELECT *\nFROM sdb.{0};'
-    if transition_present:
-        script.append(insert_table_fmt.format('SCORE_TRANSITION'))
     if peptide_present:
         script.append(insert_table_fmt.format('SCORE_PEPTIDE'))
     if protein_present:
