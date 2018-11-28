@@ -581,30 +581,45 @@ def backpropagate_oswr(infile, outfile, apply_scores):
     if infile != outfile:
         copyfile(infile, outfile)
 
+    # find out what tables exist in the scores
+    score_con = sqlite3.connect(apply_scores)
+    transition_present = check_sqlite_table(score_con, "SCORE_TRANSITION")
+    peptide_present = check_sqlite_table(score_con, "SCORE_PEPTIDE")
+    protein_present = check_sqlite_table(score_con, "SCORE_PROTEIN")
+    score_con.close()
+    if not (transition_present or peptide_present or protein_present):
+        sys.exit('You must have at least one score table present')
+
+    # build up the list
+    script = list()
+    script.append('PRAGMA synchronous = OFF;')
+    script.append('DROP TABLE IF EXISTS SCORE_TRANSITION;')
+    script.append('DROP TABLE IF EXISTS SCORE_PEPTIDE;')
+    script.append('DROP TABLE IF EXISTS SCORE_PROTEIN;')
+
+    # create the tables
+    create_table_fmt = 'CREATE TABLE {} (CONTEXT TEXT, RUN_ID INTEGER, PEPTIDE_ID INTEGER, SCORE REAL, PVALUE REAL, QVALUE REAL, PEP REAL);'
+    if transition_present:
+        script.append(create_table_fmt.format('SCORE_TRANSITION'))
+    if peptide_present:
+        script.append(create_table_fmt.format('SCORE_PEPTIDE'))
+    if protein_present:
+        script.append(create_table_fmt.format('SCORE_PROTEIN'))
+
+    # copy across the tables
+    script.append(f'ATTACH DATABASE "{apply_scores}" AS sdb;')
+    insert_table_fmt = 'INSERT INTO {0}\nSELECT *\nFROM sdb.{0};'
+    if transition_present:
+        script.append(insert_table_fmt.format('SCORE_TRANSITION'))
+    if peptide_present:
+        script.append(insert_table_fmt.format('SCORE_PEPTIDE'))
+    if protein_present:
+        script.append(insert_table_fmt.format('SCORE_PROTEIN'))
+
+    # execute the script
     conn = sqlite3.connect(outfile)
     c = conn.cursor()
-    c.executescript('''
-PRAGMA synchronous = OFF;
-
-DROP TABLE IF EXISTS SCORE_PEPTIDE;
-
-DROP TABLE IF EXISTS SCORE_PROTEIN;
-
-CREATE TABLE SCORE_PEPTIDE (CONTEXT TEXT, RUN_ID INTEGER, PEPTIDE_ID INTEGER, SCORE REAL, PVALUE REAL, QVALUE REAL, PEP REAL);
-
-CREATE TABLE SCORE_PROTEIN (CONTEXT TEXT, RUN_ID INTEGER, PROTEIN_ID INTEGER, SCORE REAL, PVALUE REAL, QVALUE REAL, PEP REAL);
-
-ATTACH DATABASE "%s" AS sdb;
-
-INSERT INTO SCORE_PEPTIDE
-SELECT *
-FROM sdb.SCORE_PEPTIDE;
-
-INSERT INTO SCORE_PROTEIN
-SELECT *
-FROM sdb.SCORE_PROTEIN;
-''' % apply_scores)
-
+    c.executescript('\n'.join(script))
     conn.commit()
     conn.close()
 
