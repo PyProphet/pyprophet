@@ -306,8 +306,8 @@ def lfdr(p_values, pi0, trunc = True, monotone = True, transf = "probit", adj = 
         bw = bw_nrd0(x)
         myd = KDEUnivariate(x)
         myd.fit(bw=adj*bw, gridsize = 512)
-        splinefit = sp.interpolate.make_interp_spline(myd.support, myd.density)
-        y = splinefit(x)
+        splinefit = sp.interpolate.splrep(myd.support, myd.density)
+        y = sp.interpolate.splev(x, splinefit)
         # myd = density(x, adjust = 1.5) # R reference function
         # mys = smoothspline(x = myd.rx2('x'), y = myd.rx2('y')) # R reference function
         # y = predict(mys, x).rx2('y') # R reference function
@@ -321,8 +321,8 @@ def lfdr(p_values, pi0, trunc = True, monotone = True, transf = "probit", adj = 
         myd = KDEUnivariate(x)
         myd.fit(bw=adj*bw, gridsize = 512)
 
-        splinefit = sp.interpolate.make_interp_spline(myd.support, myd.density)
-        y = splinefit(x)
+        splinefit = sp.interpolate.splrep(myd.support, myd.density)
+        y = sp.interpolate.splev(x, splinefit)
         # myd = density(x, adjust = 1.5) # R reference function
         # mys = smoothspline(x = myd.rx2('x'), y = myd.rx2('y')) # R reference function
         # y = predict(mys, x).rx2('y') # R reference function
