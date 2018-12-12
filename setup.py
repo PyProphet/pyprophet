@@ -6,7 +6,7 @@ from distutils.extension import Extension
 ext_modules = [Extension("pyprophet._optimized", ["pyprophet/_optimized.c"])]
 
 setup(name='pyprophet',
-      version="2.0.2",
+      version="2.0.3",
       author="Uwe Schmitt",
       author_email="rocksportrocker@gmail.com",
       description="PyProphet: Semi-supervised learning and scoring of OpenSWATH results.",
