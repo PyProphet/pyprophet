@@ -4,6 +4,7 @@ import random
 import click
 import sys
 import os
+import multiprocessing
 
 from .optimized import find_top_ranked, rank
 
