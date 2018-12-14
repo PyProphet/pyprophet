@@ -596,11 +596,10 @@ def backpropagate_oswr(infile, outfile, apply_scores):
     script.append('DROP TABLE IF EXISTS SCORE_PROTEIN;')
 
     # create the tables
-    create_table_fmt = 'CREATE TABLE {} (CONTEXT TEXT, RUN_ID INTEGER, PEPTIDE_ID INTEGER, SCORE REAL, PVALUE REAL, QVALUE REAL, PEP REAL);'
     if peptide_present:
-        script.append(create_table_fmt.format('SCORE_PEPTIDE'))
+        script.append('CREATE TABLE SCORE_PEPTIDE (CONTEXT TEXT, RUN_ID INTEGER, PEPTIDE_ID INTEGER, SCORE REAL, PVALUE REAL, QVALUE REAL, PEP REAL);')
     if protein_present:
-        script.append(create_table_fmt.format('SCORE_PROTEIN'))
+        script.append('CREATE TABLE SCORE_PROTEIN (CONTEXT TEXT, RUN_ID INTEGER, PROTEIN_ID INTEGER, SCORE REAL, PVALUE REAL, QVALUE REAL, PEP REAL);')
 
     # copy across the tables
     script.append('ATTACH DATABASE "{}" AS sdb;'.format(apply_scores))
