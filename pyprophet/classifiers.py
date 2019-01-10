@@ -131,7 +131,10 @@ class XGBLearner(AbstractLearner):
 
         click.echo("Info: Optimal hyperparameters: {}".format(best))
 
-        self.xgb_params = {'silent': 1, 'objective': 'binary:logitraw', 'eval_metric': 'auc', **best}
+        self.xgb_params = best
+        self.xgb_params['silent'] = 1
+        self.xgb_params['objective'] = 'binary:logitraw'
+        self.xgb_params['eval_metric'] = 'auc'
 
         return self
 
