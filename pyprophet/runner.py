@@ -232,10 +232,7 @@ ORDER BY RUN_ID,
 
         elif self.mode == 'osw':
             self.save_osw_results(result, extra_writes, scorer.pi0)
-            if self.classifier == 'LDA':
-                self.save_osw_weights(weights)
-            elif self.classifier == 'XGBoost':
-                self.save_bin_weights(weights, extra_writes)
+            self.save_osw_weights(weights)
 
         seconds = int(needed)
         msecs = int(1000 * (needed - seconds))
@@ -346,16 +343,31 @@ ORDER BY RUN_ID,
             click.echo("Info: %s written." %  os.path.join(self.prefix + "_" + self.level + "_report.pdf"))
 
     def save_osw_weights(self, weights):
-        weights['level'] = self.level
-        con = sqlite3.connect(self.outfile)
+        if self.classifier == "LDA":
+            weights['level'] = self.level
+            con = sqlite3.connect(self.outfile)
 
-        c = con.cursor()
-        c.execute('SELECT count(name) FROM sqlite_master WHERE type="table" AND name="PYPROPHET_WEIGHTS";')
-        if c.fetchone()[0] == 1:
-            c.execute('DELETE FROM PYPROPHET_WEIGHTS WHERE LEVEL =="%s"' % self.level)
-        c.fetchall()
+            c = con.cursor()
+            c.execute('SELECT count(name) FROM sqlite_master WHERE type="table" AND name="PYPROPHET_WEIGHTS";')
+            if c.fetchone()[0] == 1:
+                c.execute('DELETE FROM PYPROPHET_WEIGHTS WHERE LEVEL =="%s"' % self.level)
+            c.close()
 
-        weights.to_sql("PYPROPHET_WEIGHTS", con, index=False, if_exists='append')
+            weights.to_sql("PYPROPHET_WEIGHTS", con, index=False, if_exists='append')
+
+        elif self.classifier == "XGBoost":
+            con = sqlite3.connect(self.outfile)
+
+            c = con.cursor()
+            c.execute('SELECT count(name) FROM sqlite_master WHERE type="table" AND name="PYPROPHET_XGB";')
+            if c.fetchone()[0] == 1:
+                c.execute('DELETE FROM PYPROPHET_XGB WHERE LEVEL =="%s"' % self.level)
+            else:
+                c.execute('CREATE TABLE PYPROPHET_XGB (level TEXT, xgb BLOB)')
+
+            c.execute('INSERT INTO PYPROPHET_XGB VALUES(?, ?)', [self.level, pickle.dumps(weights)])
+            con.commit()
+            c.close()
 
     def save_bin_weights(self, weights, extra_writes):
         trained_weights_path = extra_writes.get("trained_model_path_" + self.level)
@@ -417,8 +429,16 @@ class PyProphetWeightApplier(PyProphetRunner):
                     traceback.print_exc()
                     raise
             elif self.classifier == "XGBoost":
-                with open(apply_weights, 'rb') as file:
-                    self.persisted_weights = pickle.load(file)
+                try:
+                    con = sqlite3.connect(apply_weights)
+
+                    data = con.execute("SELECT xgb FROM PYPROPHET_XGB WHERE LEVEL=='%s'" % self.level).fetchone()
+                    con.close()
+                    self.persisted_weights = pickle.loads(data[0])
+                except Exception:
+                    import traceback
+                    traceback.print_exc()
+                    raise
                 
     def run_algo(self):
         (result, scorer, weights) = PyProphet(self.classifier, self.xgb_hyperparams, self.xgb_params, self.xeval_fraction, self.xeval_num_iter, self.ss_initial_fdr, self.ss_iteration_fdr, self.ss_num_iter, self.group_id, self.parametric, self.pfdr, self.pi0_lambda, self.pi0_method, self.pi0_smooth_df, self.pi0_smooth_log_pi0, self.lfdr_truncate, self.lfdr_monotone, self.lfdr_transformation, self.lfdr_adj, self.lfdr_eps, self.tric_chromprob, self.threads, self.test).apply_weights(self.table, self.persisted_weights)
