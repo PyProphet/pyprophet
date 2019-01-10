@@ -2,7 +2,7 @@ import numpy as np
 import click
 
 from .data_handling import Experiment
-from .classifiers import AbstractLearner
+from .classifiers import AbstractLearner, XGBLearner
 from .stats import mean_and_std_dev, find_cutoff
 
 try:
@@ -16,6 +16,7 @@ class AbstractSemiSupervisedLearner(object):
     def __init__(self, xeval_fraction, xeval_num_iter, test):
         self.xeval_fraction = xeval_fraction
         self.xeval_num_iter = xeval_num_iter
+        self.xeval_tune_iter = np.floor(xeval_num_iter / 3)
         self.test = test
 
     def start_semi_supervised_learning(self, train):
@@ -48,7 +49,7 @@ class AbstractSemiSupervisedLearner(object):
         # semi supervised iteration:
         for inner in range(self.xeval_num_iter):
             # tune third iteration of semi-supervised learning
-            if inner == 2:
+            if inner == self.xeval_tune_iter:
                 params, clf_scores = self.tune_semi_supervised_learning(train)
             else:
                 params, clf_scores = self.iter_semi_supervised_learning(train)
@@ -148,7 +149,7 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
     def tune_semi_supervised_learning(self, train):
         td_peaks, bt_peaks = self.select_train_peaks(train, "classifier_score", self.ss_iteration_fdr, self.parametric, self.pfdr, self.pi0_lambda, self.pi0_method, self.pi0_smooth_df, self.pi0_smooth_log_pi0)
 
-        if self.inner_learner.xgb_hyperparams['autotune']:
+        if isinstance(self.inner_learner, XGBLearner) and self.inner_learner.xgb_hyperparams['autotune']:
             self.inner_learner.tune(td_peaks, bt_peaks, True)
 
         model = self.inner_learner.learn(td_peaks, bt_peaks, True)
