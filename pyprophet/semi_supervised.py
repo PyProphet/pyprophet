@@ -47,7 +47,11 @@ class AbstractSemiSupervisedLearner(object):
 
         # semi supervised iteration:
         for inner in range(self.xeval_num_iter):
-            params, clf_scores = self.iter_semi_supervised_learning(train)
+            # tune third iteration of semi-supervised learning
+            if inner == 2:
+                params, clf_scores = self.tune_semi_supervised_learning(train)
+            else:
+                params, clf_scores = self.iter_semi_supervised_learning(train)
             train.set_and_rerank("classifier_score", clf_scores)
 
         # after semi supervised iteration: classify full dataset
@@ -75,7 +79,7 @@ class AbstractSemiSupervisedLearner(object):
 
         experiment.rank_by("classifier_score")
 
-        params, clf_scores = self.iter_semi_supervised_learning(experiment)
+        params, clf_scores = self.tune_semi_supervised_learning(experiment)
         experiment.set_and_rerank("classifier_score", clf_scores)
 
         # after semi supervised iteration: classify full dataset
@@ -135,6 +139,17 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
     @profile
     def iter_semi_supervised_learning(self, train):
         td_peaks, bt_peaks = self.select_train_peaks(train, "classifier_score", self.ss_iteration_fdr, self.parametric, self.pfdr, self.pi0_lambda, self.pi0_method, self.pi0_smooth_df, self.pi0_smooth_log_pi0)
+
+        model = self.inner_learner.learn(td_peaks, bt_peaks, True)
+        w = model.get_parameters()
+        clf_scores = model.score(train, True)
+        return w, clf_scores
+
+    def tune_semi_supervised_learning(self, train):
+        td_peaks, bt_peaks = self.select_train_peaks(train, "classifier_score", self.ss_iteration_fdr, self.parametric, self.pfdr, self.pi0_lambda, self.pi0_method, self.pi0_smooth_df, self.pi0_smooth_log_pi0)
+
+        if self.inner_learner.xgb_hyperparams['autotune']:
+            self.inner_learner.tune(td_peaks, bt_peaks, True)
 
         model = self.inner_learner.learn(td_peaks, bt_peaks, True)
         w = model.get_parameters()

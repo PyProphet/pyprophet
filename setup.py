@@ -34,6 +34,7 @@ setup(name='pyprophet',
           "numexpr >= 2.1",
           "scikit-learn >= 0.17",
           "xgboost",
+          "hyperopt",
           "statsmodels >= 0.8.0",
           "matplotlib"
       ],
