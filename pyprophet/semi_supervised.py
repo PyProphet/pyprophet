@@ -16,7 +16,6 @@ class AbstractSemiSupervisedLearner(object):
     def __init__(self, xeval_fraction, xeval_num_iter, test):
         self.xeval_fraction = xeval_fraction
         self.xeval_num_iter = xeval_num_iter
-        self.xeval_tune_iter = np.floor(xeval_num_iter / 3)
         self.test = test
 
     def start_semi_supervised_learning(self, train):
@@ -48,11 +47,11 @@ class AbstractSemiSupervisedLearner(object):
 
         # semi supervised iteration:
         for inner in range(self.xeval_num_iter):
-            # tune third iteration of semi-supervised learning
-            if inner == self.xeval_tune_iter:
-                params, clf_scores = self.tune_semi_supervised_learning(train)
-            else:
-                params, clf_scores = self.iter_semi_supervised_learning(train)
+            # # tune first iteration of semi-supervised learning
+            # if inner == 0:
+            #     params, clf_scores = self.tune_semi_supervised_learning(train)
+            # else:
+            params, clf_scores = self.iter_semi_supervised_learning(train)
             train.set_and_rerank("classifier_score", clf_scores)
 
         # after semi supervised iteration: classify full dataset

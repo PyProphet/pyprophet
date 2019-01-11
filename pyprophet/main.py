@@ -82,11 +82,11 @@ def score(infile, outfile, classifier, xgb_autotune, apply_weights, xeval_fracti
         outfile = outfile
 
     # Prepare XGBoost-specific parameters
-    xgb_hyperparams = {'autotune': xgb_autotune, 'autotune_num_rounds': 100, 'num_boost_round': 100, 'early_stopping_rounds': 10, 'test_size': 0.33}
+    xgb_hyperparams = {'autotune': xgb_autotune, 'autotune_num_rounds': 10, 'num_boost_round': 100, 'early_stopping_rounds': 10, 'test_size': 0.33}
 
     xgb_params = {'eta': 0.3, 'gamma': 0, 'max_depth': 6, 'min_child_weight': 1, 'subsample': 1, 'colsample_bytree': 1, 'colsample_bylevel': 1, 'colsample_bynode': 1, 'lambda': 1, 'alpha': 0, 'scale_pos_weight': 1, 'silent': 1, 'objective': 'binary:logitraw', 'nthread': 1, 'eval_metric': 'auc'}
 
-    xgb_params_space = {'eta': hp.uniform('eta', 0.0, 0.3), 'gamma': hp.uniform('gamma', 0.0, 0.5), 'max_depth': hp.quniform('max_depth', 2, 8, 1), 'min_child_weight': hp.quniform('min_child_weight', 1, 5, 1), 'subsample': hp.uniform('subsample', 0.5, 1.0), 'colsample_bytree': hp.uniform('colsample_bytree', 0.5, 1.0), 'colsample_bylevel': hp.uniform('colsample_bylevel', 0.5, 1.0), 'colsample_bynode': hp.uniform('colsample_bynode', 0.5, 1.0), 'lambda': hp.uniform('lambda', 0.0, 1.0), 'alpha': hp.uniform('alpha', 0.0, 1.0), 'scale_pos_weight': hp.uniform('scale_pos_weight', 0.0, 1.0), 'silent': 1, 'objective': 'binary:logitraw', 'nthread': 1, 'eval_metric': 'auc'}
+    xgb_params_space = {'eta': hp.uniform('eta', 0.0, 0.3), 'gamma': hp.uniform('gamma', 0.0, 0.5), 'max_depth': hp.quniform('max_depth', 2, 8, 1), 'min_child_weight': hp.quniform('min_child_weight', 1, 5, 1), 'subsample': hp.uniform('subsample', 0.5, 1.0), 'colsample_bytree': hp.uniform('colsample_bytree', 0.5, 1.0), 'colsample_bylevel': hp.uniform('colsample_bylevel', 0.5, 1.0), 'colsample_bynode': hp.uniform('colsample_bynode', 0.5, 1.0), 'lambda': hp.uniform('lambda', 0.0, 1.0), 'alpha': hp.uniform('alpha', 0.0, 1.0), 'scale_pos_weight': 1.0, 'silent': 1, 'objective': 'binary:logitraw', 'nthread': 1, 'eval_metric': 'auc'}
 
     if not apply_weights:
         PyProphetLearner(infile, outfile, classifier, xgb_hyperparams, xgb_params, xgb_params_space, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, ss_main_score, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, level, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn, tric_chromprob, threads, test).run()

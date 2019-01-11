@@ -88,7 +88,9 @@ class XGBLearner(AbstractLearner):
         self.xgb_hyperparams = xgb_hyperparams
         self.xgb_params = xgb_params
         self.xgb_params_space = xgb_params_space
+        self.xgb_params_tuned = xgb_params
         self.threads = threads
+        self.xgb_params['nthread'] = self.threads
 
     def tune(self, decoy_peaks, target_peaks, use_main_score=True):
         def objective(params):
@@ -106,11 +108,9 @@ class XGBLearner(AbstractLearner):
                 'scale_pos_weight': "{:.3f}".format(params['scale_pos_weight']),
             }
             
-            clf = xgb.XGBClassifier(silent=1, objective='binary:logitraw', eval_metric='auc', **params)
+            clf = xgb.XGBClassifier(n_jobs=self.threads, silent=1, objective='binary:logitraw', eval_metric='auc', **params)
 
-            X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0, random_state=42)
-
-            score = cross_val_score(clf, X_train, y_train, scoring='roc_auc', cv=KFold()).mean()
+            score = cross_val_score(clf, X, y, scoring='roc_auc', cv=KFold(n_splits=3, shuffle=True, random_state=42)).mean()
             # click.echo("Info: AUC: {:.3f} hyperparameters: {}".format(score, params))
             return score
 
@@ -125,16 +125,50 @@ class XGBLearner(AbstractLearner):
         y = np.zeros((X.shape[0],))
         y[X0.shape[0]:] = 1.0
 
-        best = fmin(fn=objective, space=self.xgb_params_space, algo=tpe.suggest, max_evals=self.xgb_hyperparams['autotune_num_rounds'])
-        best['max_depth'] = int(best['max_depth'])
-        best['min_child_weight'] = int(best['min_child_weight'])
+        # Tune complexity hyperparameters
+        xgb_params_complexity = self.xgb_params_tuned
+        xgb_params_complexity.update({k: self.xgb_params_space[k] for k in ('max_depth', 'min_child_weight')})
 
-        click.echo("Info: Optimal hyperparameters: {}".format(best))
+        best_complexity = fmin(fn=objective, space=xgb_params_complexity, algo=tpe.suggest, max_evals=self.xgb_hyperparams['autotune_num_rounds'])
+        best_complexity['max_depth'] = int(best_complexity['max_depth'])
+        best_complexity['min_child_weight'] = int(best_complexity['min_child_weight'])
 
-        self.xgb_params = best
-        self.xgb_params['silent'] = 1
-        self.xgb_params['objective'] = 'binary:logitraw'
-        self.xgb_params['eval_metric'] = 'auc'
+        self.xgb_params_tuned.update(best_complexity)
+
+        # Tune gamma hyperparameter
+        xgb_params_gamma = self.xgb_params_tuned
+        xgb_params_gamma['gamma'] = self.xgb_params_space['gamma']
+
+        best_gamma = fmin(fn=objective, space=xgb_params_gamma, algo=tpe.suggest, max_evals=self.xgb_hyperparams['autotune_num_rounds'])
+
+        self.xgb_params_tuned.update(best_gamma)
+
+        # Tune subsampling hyperparameters
+        xgb_params_subsampling = self.xgb_params_tuned
+        xgb_params_subsampling.update({k: self.xgb_params_space[k] for k in ('subsample', 'colsample_bytree', 'colsample_bylevel', 'colsample_bynode')})
+
+        best_subsampling = fmin(fn=objective, space=xgb_params_subsampling, algo=tpe.suggest, max_evals=self.xgb_hyperparams['autotune_num_rounds'])
+
+        self.xgb_params_tuned.update(best_subsampling)
+
+        # Tune regularization hyperparameters
+        xgb_params_regularization = self.xgb_params_tuned
+        xgb_params_regularization.update({k: self.xgb_params_space[k] for k in ('lambda', 'alpha')})
+
+        best_regularization = fmin(fn=objective, space=xgb_params_regularization, algo=tpe.suggest, max_evals=self.xgb_hyperparams['autotune_num_rounds'])
+
+        self.xgb_params_tuned.update(best_regularization)
+
+        # Tune learning rate
+        xgb_params_learning = self.xgb_params_tuned
+        xgb_params_learning['eta'] = self.xgb_params_space['eta']
+
+        best_learning = fmin(fn=objective, space=xgb_params_learning, algo=tpe.suggest, max_evals=self.xgb_hyperparams['autotune_num_rounds'])
+
+        self.xgb_params_tuned.update(best_learning)
+        click.echo("Info: Optimal hyperparameters: {}".format(self.xgb_params_tuned))
+
+        self.xgb_params = self.xgb_params_tuned
 
         return self
 
