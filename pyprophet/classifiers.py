@@ -108,9 +108,9 @@ class XGBLearner(AbstractLearner):
                 'scale_pos_weight': "{:.3f}".format(params['scale_pos_weight']),
             }
             
-            clf = xgb.XGBClassifier(n_jobs=self.threads, silent=1, objective='binary:logitraw', eval_metric='auc', **params)
+            clf = xgb.XGBClassifier(silent=1, objective='binary:logitraw', eval_metric='auc', **params)
 
-            score = cross_val_score(clf, X, y, scoring='roc_auc', cv=KFold(n_splits=3, shuffle=True, random_state=42)).mean()
+            score = cross_val_score(clf, X, y, scoring='roc_auc', n_jobs=self.threads, cv=KFold(n_splits=3, shuffle=True, random_state=np.random.RandomState(42))).mean()
             # click.echo("Info: AUC: {:.3f} hyperparameters: {}".format(score, params))
             return score
 
