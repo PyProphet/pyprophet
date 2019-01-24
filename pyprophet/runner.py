@@ -7,6 +7,7 @@ import warnings
 import pandas as pd
 import numpy as np
 import sqlite3
+import pickle
 
 from .pyprophet import PyProphet
 from .report import save_report
@@ -27,7 +28,7 @@ class PyProphetRunner(object):
     """Base class for workflow of command line tool
     """
 
-    def __init__(self, infile, outfile, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, ss_main_score, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, level, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn, tric_chromprob, threads, test):
+    def __init__(self, infile, outfile, classifier, xgb_hyperparams, xgb_params, xgb_params_space, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, ss_main_score, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, level, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn, tric_chromprob, threads, test):
         def read_tsv(infile):
             table = pd.read_csv(infile, "\t")
             return(table)
@@ -38,6 +39,14 @@ class PyProphetRunner(object):
             if level == "ms2" or level == "ms1ms2":
                 if not check_sqlite_table(con, "FEATURE_MS2"):
                     sys.exit("Error: MS2-level feature table not present in file.")
+
+                con.executescript('''
+CREATE INDEX IF NOT EXISTS idx_precursor_precursor_id ON PRECURSOR (ID);
+CREATE INDEX IF NOT EXISTS idx_feature_precursor_id ON FEATURE (PRECURSOR_ID);
+CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
+CREATE INDEX IF NOT EXISTS idx_feature_ms2_feature_id ON FEATURE_MS2 (FEATURE_ID);
+''')
+
                 table = pd.read_sql_query('''
 SELECT *,
        RUN_ID || '_' || PRECURSOR_ID AS GROUP_ID
@@ -59,6 +68,14 @@ ORDER BY RUN_ID,
             elif level == "ms1":
                 if not check_sqlite_table(con, "FEATURE_MS1"):
                     sys.exit("Error: MS1-level feature table not present in file.")
+
+                con.executescript('''
+CREATE INDEX IF NOT EXISTS idx_precursor_precursor_id ON PRECURSOR (ID);
+CREATE INDEX IF NOT EXISTS idx_feature_precursor_id ON FEATURE (PRECURSOR_ID);
+CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
+CREATE INDEX IF NOT EXISTS idx_feature_ms1_feature_id ON FEATURE_MS1 (FEATURE_ID);
+''')
+
                 table = pd.read_sql_query('''
 SELECT *,
        RUN_ID || '_' || PRECURSOR_ID AS GROUP_ID
@@ -80,6 +97,17 @@ ORDER BY RUN_ID,
             elif level == "transition":
                 if not check_sqlite_table(con, "FEATURE_TRANSITION"):
                     sys.exit("Error: Transition-level feature table not present in file.")
+
+                con.executescript('''
+CREATE INDEX IF NOT EXISTS idx_transition_id ON TRANSITION (ID);
+CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);
+CREATE INDEX IF NOT EXISTS idx_precursor_precursor_id ON PRECURSOR (ID);
+CREATE INDEX IF NOT EXISTS idx_feature_precursor_id ON FEATURE (PRECURSOR_ID);
+CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
+CREATE INDEX IF NOT EXISTS idx_feature_transition_feature_id ON FEATURE_TRANSITION (FEATURE_ID);
+CREATE INDEX IF NOT EXISTS idx_feature_transition_transition_id ON FEATURE_TRANSITION (TRANSITION_ID);
+''')
+
                 table = pd.read_sql_query('''
 SELECT TRANSITION.DECOY AS DECOY,
        FEATURE_TRANSITION.*,
@@ -144,6 +172,10 @@ ORDER BY RUN_ID,
 
         self.infile = infile
         self.outfile = outfile
+        self.classifier = classifier
+        self.xgb_hyperparams = xgb_hyperparams
+        self.xgb_params = xgb_params
+        self.xgb_params_space = xgb_params_space
         self.xeval_fraction = xeval_fraction
         self.xeval_num_iter = xeval_num_iter
         self.ss_initial_fdr = ss_initial_fdr
@@ -194,7 +226,11 @@ ORDER BY RUN_ID,
 
         if self.mode == 'tsv':
             self.save_tsv_results(result, extra_writes, scorer.pi0)
-            self.save_tsv_weights(weights, extra_writes)
+            if self.classifier == 'LDA':
+                self.save_tsv_weights(weights, extra_writes)
+            elif self.classifier == 'XGBoost':
+                self.save_bin_weights(weights, extra_writes)
+
         elif self.mode == 'osw':
             self.save_osw_results(result, extra_writes, scorer.pi0)
             self.save_osw_weights(weights)
@@ -308,22 +344,43 @@ ORDER BY RUN_ID,
             click.echo("Info: %s written." %  os.path.join(self.prefix + "_" + self.level + "_report.pdf"))
 
     def save_osw_weights(self, weights):
-        weights['level'] = self.level
-        con = sqlite3.connect(self.outfile)
+        if self.classifier == "LDA":
+            weights['level'] = self.level
+            con = sqlite3.connect(self.outfile)
 
-        c = con.cursor()
-        c.execute('SELECT count(name) FROM sqlite_master WHERE type="table" AND name="PYPROPHET_WEIGHTS";')
-        if c.fetchone()[0] == 1:
-            c.execute('DELETE FROM PYPROPHET_WEIGHTS WHERE LEVEL =="%s"' % self.level)
-        c.fetchall()
+            c = con.cursor()
+            c.execute('SELECT count(name) FROM sqlite_master WHERE type="table" AND name="PYPROPHET_WEIGHTS";')
+            if c.fetchone()[0] == 1:
+                c.execute('DELETE FROM PYPROPHET_WEIGHTS WHERE LEVEL =="%s"' % self.level)
+            c.close()
 
-        weights.to_sql("PYPROPHET_WEIGHTS", con, index=False, if_exists='append')
+            weights.to_sql("PYPROPHET_WEIGHTS", con, index=False, if_exists='append')
 
+        elif self.classifier == "XGBoost":
+            con = sqlite3.connect(self.outfile)
+
+            c = con.cursor()
+            c.execute('SELECT count(name) FROM sqlite_master WHERE type="table" AND name="PYPROPHET_XGB";')
+            if c.fetchone()[0] == 1:
+                c.execute('DELETE FROM PYPROPHET_XGB WHERE LEVEL =="%s"' % self.level)
+            else:
+                c.execute('CREATE TABLE PYPROPHET_XGB (level TEXT, xgb BLOB)')
+
+            c.execute('INSERT INTO PYPROPHET_XGB VALUES(?, ?)', [self.level, pickle.dumps(weights)])
+            con.commit()
+            c.close()
+
+    def save_bin_weights(self, weights, extra_writes):
+        trained_weights_path = extra_writes.get("trained_model_path_" + self.level)
+        if trained_weights_path is not None:
+            with open(trained_weights_path, 'wb') as file:
+                self.persisted_weights = pickle.dump(weights, file)
+            click.echo("Info: %s written." % trained_weights_path)
 
 class PyProphetLearner(PyProphetRunner):
 
     def run_algo(self):
-        (result, scorer, weights) = PyProphet(self.xeval_fraction, self.xeval_num_iter, self.ss_initial_fdr, self.ss_iteration_fdr, self.ss_num_iter, self.group_id, self.parametric, self.pfdr, self.pi0_lambda, self.pi0_method, self.pi0_smooth_df, self.pi0_smooth_log_pi0, self.lfdr_truncate, self.lfdr_monotone, self.lfdr_transformation, self.lfdr_adj, self.lfdr_eps, self.tric_chromprob, self.threads, self.test).learn_and_apply(self.table)
+        (result, scorer, weights) = PyProphet(self.classifier, self.xgb_hyperparams, self.xgb_params, self.xgb_params_space, self.xeval_fraction, self.xeval_num_iter, self.ss_initial_fdr, self.ss_iteration_fdr, self.ss_num_iter, self.group_id, self.parametric, self.pfdr, self.pi0_lambda, self.pi0_method, self.pi0_smooth_df, self.pi0_smooth_log_pi0, self.lfdr_truncate, self.lfdr_monotone, self.lfdr_transformation, self.lfdr_adj, self.lfdr_eps, self.tric_chromprob, self.threads, self.test).learn_and_apply(self.table)
         return (result, scorer, weights)
 
     def extra_writes(self):
@@ -331,41 +388,61 @@ class PyProphetLearner(PyProphetRunner):
         yield "summ_stat_path", os.path.join(self.prefix + "_summary_stat.csv")
         yield "full_stat_path", os.path.join(self.prefix + "_full_stat.csv")
         yield "trained_weights_path", os.path.join(self.prefix + "_weights.csv")
+        yield "trained_model_path_ms1", os.path.join(self.prefix + "_ms1_model.bin")
+        yield "trained_model_path_ms1ms2", os.path.join(self.prefix + "_ms1ms2_model.bin")
+        yield "trained_model_path_ms2", os.path.join(self.prefix + "_ms2_model.bin")
+        yield "trained_model_path_transition", os.path.join(self.prefix + "_transition_model.bin")
         yield "report_path", os.path.join(self.prefix + "_report.pdf")
 
 
 class PyProphetWeightApplier(PyProphetRunner):
 
-    def __init__(self, infile, outfile, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, ss_main_score, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, level, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn, tric_chromprob, threads, test, apply_weights):
-        super(PyProphetWeightApplier, self).__init__(infile, outfile, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, ss_main_score, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, level, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn, tric_chromprob, threads, test)
+    def __init__(self, infile, outfile, classifier, xgb_hyperparams, xgb_params, xgb_params_space, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, ss_main_score, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, level, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn, tric_chromprob, threads, test, apply_weights):
+        super(PyProphetWeightApplier, self).__init__(infile, outfile, classifier, xgb_hyperparams, xgb_params, xgb_params_space, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, ss_main_score, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, level, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn, tric_chromprob, threads, test)
         if not os.path.exists(apply_weights):
             sys.exit("Error: Weights file %s does not exist." % apply_weights)
         if self.mode == "tsv":
-            try:
-                self.persisted_weights = pd.read_csv(apply_weights, sep=",")
-                if self.level != self.persisted_weights['level'].unique()[0]:
-                    sys.exit("Error: Weights file has wrong level.")
-            except Exception:
-                import traceback
-                traceback.print_exc()
-                raise
+            if self.classifier == "LDA":
+                try:
+                    self.persisted_weights = pd.read_csv(apply_weights, sep=",")
+                    if self.level != self.persisted_weights['level'].unique()[0]:
+                        sys.exit("Error: Weights file has wrong level.")
+                except Exception:
+                    import traceback
+                    traceback.print_exc()
+                    raise
+            elif self.classifier == "XGBoost":
+                with open(apply_weights, 'rb') as file:
+                    self.persisted_weights = pickle.load(file)
         elif self.mode == "osw":
-            try:
-                con = sqlite3.connect(apply_weights)
+            if self.classifier == "LDA":
+                try:
+                    con = sqlite3.connect(apply_weights)
 
-                data = pd.read_sql_query("SELECT * FROM PYPROPHET_WEIGHTS WHERE LEVEL=='%s'" % self.level, con)
-                data.columns = [col.lower() for col in data.columns]
-                con.close()
-                self.persisted_weights = data
-                if self.level != self.persisted_weights['level'].unique()[0]:
-                    sys.exit("Error: Weights file has wrong level.")
-            except Exception:
-                import traceback
-                traceback.print_exc()
-                raise
+                    data = pd.read_sql_query("SELECT * FROM PYPROPHET_WEIGHTS WHERE LEVEL=='%s'" % self.level, con)
+                    data.columns = [col.lower() for col in data.columns]
+                    con.close()
+                    self.persisted_weights = data
+                    if self.level != self.persisted_weights['level'].unique()[0]:
+                        sys.exit("Error: Weights file has wrong level.")
+                except Exception:
+                    import traceback
+                    traceback.print_exc()
+                    raise
+            elif self.classifier == "XGBoost":
+                try:
+                    con = sqlite3.connect(apply_weights)
 
+                    data = con.execute("SELECT xgb FROM PYPROPHET_XGB WHERE LEVEL=='%s'" % self.level).fetchone()
+                    con.close()
+                    self.persisted_weights = pickle.loads(data[0])
+                except Exception:
+                    import traceback
+                    traceback.print_exc()
+                    raise
+                
     def run_algo(self):
-        (result, scorer, weights) = PyProphet(self.xeval_fraction, self.xeval_num_iter, self.ss_initial_fdr, self.ss_iteration_fdr, self.ss_num_iter, self.group_id, self.parametric, self.pfdr, self.pi0_lambda, self.pi0_method, self.pi0_smooth_df, self.pi0_smooth_log_pi0, self.lfdr_truncate, self.lfdr_monotone, self.lfdr_transformation, self.lfdr_adj, self.lfdr_eps, self.tric_chromprob, self.threads, self.test).apply_weights(self.table, self.persisted_weights)
+        (result, scorer, weights) = PyProphet(self.classifier, self.xgb_hyperparams, self.xgb_params, self.xgb_params_space, self.xeval_fraction, self.xeval_num_iter, self.ss_initial_fdr, self.ss_iteration_fdr, self.ss_num_iter, self.group_id, self.parametric, self.pfdr, self.pi0_lambda, self.pi0_method, self.pi0_smooth_df, self.pi0_smooth_log_pi0, self.lfdr_truncate, self.lfdr_monotone, self.lfdr_transformation, self.lfdr_adj, self.lfdr_eps, self.tric_chromprob, self.threads, self.test).apply_weights(self.table, self.persisted_weights)
         return (result, scorer, weights)
 
     def extra_writes(self):

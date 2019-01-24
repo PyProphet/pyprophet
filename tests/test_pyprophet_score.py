@@ -48,7 +48,7 @@ def _run_pyprophet_tsv_to_learn_model(regtest, temp_folder, dump_result_files=Fa
     print(pd.read_csv("test_data_weights.csv", sep=",", nrows=100).sort_index(axis=1),file=regtest)
 
 
-def _run_pyprophet_osw_to_learn_model(regtest, temp_folder, dump_result_files=False, parametric=False, pfdr=False, pi0_lambda=False, ms1ms2=False):
+def _run_pyprophet_osw_to_learn_model(regtest, temp_folder, dump_result_files=False, parametric=False, pfdr=False, pi0_lambda=False, ms1ms2=False, xgboost=False, xgboost_tune=False):
     os.chdir(temp_folder)
     data_path = os.path.join(DATA_FOLDER, "test_data.osw")
     shutil.copy(data_path, temp_folder)
@@ -60,6 +60,10 @@ def _run_pyprophet_osw_to_learn_model(regtest, temp_folder, dump_result_files=Fa
         cmdline += " --pfdr"
     if pi0_lambda is not False:
         cmdline += " --pi0_lambda=" + pi0_lambda
+    if xgboost:
+        cmdline += " --classifier=XGBoost"
+    if xgboost_tune:
+        cmdline += " --xgb_autotune"
 
     # MS2-level
     if ms1ms2:
@@ -72,6 +76,10 @@ def _run_pyprophet_osw_to_learn_model(regtest, temp_folder, dump_result_files=Fa
         cmdline += " --pfdr"
     if pi0_lambda is not False:
         cmdline += " --pi0_lambda=" + pi0_lambda
+    if xgboost:
+        cmdline += " --classifier=XGBoost"
+    if xgboost_tune:
+        cmdline += " --xgb_autotune"
 
     # transition-level
     cmdline += " score --in=test_data.osw --level=transition --test --ss_iteration_fdr=0.02"
@@ -81,6 +89,10 @@ def _run_pyprophet_osw_to_learn_model(regtest, temp_folder, dump_result_files=Fa
         cmdline += " --pfdr"
     if pi0_lambda is not False:
         cmdline += " --pi0_lambda=" + pi0_lambda
+    if xgboost:
+        cmdline += " --classifier=XGBoost"
+    if xgboost_tune:
+        cmdline += " --xgb_autotune"
 
     stdout = _run_cmdline(cmdline)
 
@@ -119,6 +131,12 @@ def test_osw_2(tmpdir, regtest):
 
 def test_osw_3(tmpdir, regtest):
     _run_pyprophet_osw_to_learn_model(regtest, tmpdir.strpath, True, False, True, pi0_lambda="0 0 0", ms1ms2=True)
+
+def test_osw_4(tmpdir, regtest):
+    _run_pyprophet_osw_to_learn_model(regtest, tmpdir.strpath, True, False, True, pi0_lambda="0 0 0", ms1ms2=True, xgboost=True)
+
+def test_osw_5(tmpdir, regtest):
+    _run_pyprophet_osw_to_learn_model(regtest, tmpdir.strpath, True, False, True, pi0_lambda="0 0 0", ms1ms2=True, xgboost=True, xgboost_tune=True)
 
 def test_not_unique_tg_id_blocks(tmpdir):
 

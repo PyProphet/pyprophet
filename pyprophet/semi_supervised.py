@@ -2,7 +2,7 @@ import numpy as np
 import click
 
 from .data_handling import Experiment
-from .classifiers import AbstractLearner
+from .classifiers import AbstractLearner, XGBLearner
 from .stats import mean_and_std_dev, find_cutoff
 
 try:
@@ -47,6 +47,10 @@ class AbstractSemiSupervisedLearner(object):
 
         # semi supervised iteration:
         for inner in range(self.xeval_num_iter):
+            # # tune first iteration of semi-supervised learning
+            # if inner == 0:
+            #     params, clf_scores = self.tune_semi_supervised_learning(train)
+            # else:
             params, clf_scores = self.iter_semi_supervised_learning(train)
             train.set_and_rerank("classifier_score", clf_scores)
 
@@ -67,6 +71,29 @@ class AbstractSemiSupervisedLearner(object):
         top_test_decoy_scores = top_test_peaks.get_decoy_peaks()["classifier_score"]
 
         return top_test_target_scores, top_test_decoy_scores, params
+
+    def learn_final(self, experiment):
+        assert isinstance(experiment, Experiment)
+
+        click.echo("Info: Learning on cross-validated scores.")
+
+        experiment.rank_by("classifier_score")
+
+        params, clf_scores = self.tune_semi_supervised_learning(experiment)
+        experiment.set_and_rerank("classifier_score", clf_scores)
+
+        # after semi supervised iteration: classify full dataset
+        clf_scores = self.score(experiment, params)
+        mu, nu = mean_and_std_dev(clf_scores)
+        experiment.set_and_rerank("classifier_score", clf_scores)
+
+        td_scores = experiment.get_top_decoy_peaks()["classifier_score"]
+
+        mu, nu = mean_and_std_dev(td_scores)
+        experiment["classifier_score"] = (experiment["classifier_score"] - mu) / nu
+        experiment.rank_by("classifier_score")
+
+        return params
 
 
 class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
@@ -118,8 +145,22 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
         clf_scores = model.score(train, True)
         return w, clf_scores
 
+    def tune_semi_supervised_learning(self, train):
+        td_peaks, bt_peaks = self.select_train_peaks(train, "classifier_score", self.ss_iteration_fdr, self.parametric, self.pfdr, self.pi0_lambda, self.pi0_method, self.pi0_smooth_df, self.pi0_smooth_log_pi0)
+
+        if isinstance(self.inner_learner, XGBLearner) and self.inner_learner.xgb_hyperparams['autotune']:
+            self.inner_learner.tune(td_peaks, bt_peaks, True)
+
+        model = self.inner_learner.learn(td_peaks, bt_peaks, True)
+        w = model.get_parameters()
+        clf_scores = model.score(train, True)
+        return w, clf_scores
+
     def averaged_learner(self, params):
         return self.inner_learner.averaged_learner(params)
+
+    def set_learner(self, model):
+        return self.inner_learner.set_parameters(model)
 
     def score(self, df, params):
         self.inner_learner.set_parameters(params)

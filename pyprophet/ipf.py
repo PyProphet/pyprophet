@@ -36,6 +36,17 @@ def read_pyp_peakgroup_precursor(path, ipf_max_peakgroup_pep, ipf_ms1_scoring, i
     if not ipf_ms1_scoring and ipf_ms2_scoring:
         if not check_sqlite_table(con, "SCORE_MS2") or not check_sqlite_table(con, "SCORE_TRANSITION"):
             sys.exit("Error: Apply scoring to MS2 and transition-level data before running IPF.")
+
+        con.executescript('''
+CREATE INDEX IF NOT EXISTS idx_transition_id ON TRANSITION (ID);
+CREATE INDEX IF NOT EXISTS idx_precursor_precursor_id ON PRECURSOR (ID);
+CREATE INDEX IF NOT EXISTS idx_feature_precursor_id ON FEATURE (PRECURSOR_ID);
+CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
+CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);
+CREATE INDEX IF NOT EXISTS idx_score_transition_feature_id ON SCORE_TRANSITION (FEATURE_ID);
+CREATE INDEX IF NOT EXISTS idx_score_transition_transition_id ON SCORE_TRANSITION (TRANSITION_ID);
+''')
+
         data = pd.read_sql_query('''
 SELECT FEATURE.ID AS FEATURE_ID,
        SCORE_MS2.PEP AS MS2_PEAKGROUP_PEP,
@@ -59,6 +70,15 @@ WHERE PRECURSOR.DECOY=0
     elif ipf_ms1_scoring and not ipf_ms2_scoring:
         if not check_sqlite_table(con, "SCORE_MS1") or not check_sqlite_table(con, "SCORE_MS2") or not check_sqlite_table(con, "SCORE_TRANSITION"):
             sys.exit("Error: Apply scoring to MS1, MS2 and transition-level data before running IPF.")
+
+        con.executescript('''
+CREATE INDEX IF NOT EXISTS idx_precursor_precursor_id ON PRECURSOR (ID);
+CREATE INDEX IF NOT EXISTS idx_feature_precursor_id ON FEATURE (PRECURSOR_ID);
+CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
+CREATE INDEX IF NOT EXISTS idx_score_ms1_feature_id ON SCORE_MS1 (FEATURE_ID);
+CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);
+''')
+
         data = pd.read_sql_query('''
 SELECT FEATURE.ID AS FEATURE_ID,
        SCORE_MS2.PEP AS MS2_PEAKGROUP_PEP,
@@ -76,6 +96,18 @@ WHERE PRECURSOR.DECOY=0
     elif ipf_ms1_scoring and ipf_ms2_scoring:
         if not check_sqlite_table(con, "SCORE_MS1") or not check_sqlite_table(con, "SCORE_MS2") or not check_sqlite_table(con, "SCORE_TRANSITION"):
             sys.exit("Error: Apply scoring to MS1, MS2 and transition-level data before running IPF.")
+
+        con.executescript('''
+CREATE INDEX IF NOT EXISTS idx_transition_id ON TRANSITION (ID);
+CREATE INDEX IF NOT EXISTS idx_precursor_precursor_id ON PRECURSOR (ID);
+CREATE INDEX IF NOT EXISTS idx_feature_precursor_id ON FEATURE (PRECURSOR_ID);
+CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
+CREATE INDEX IF NOT EXISTS idx_score_ms1_feature_id ON SCORE_MS1 (FEATURE_ID);
+CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);
+CREATE INDEX IF NOT EXISTS idx_score_transition_feature_id ON SCORE_TRANSITION (FEATURE_ID);
+CREATE INDEX IF NOT EXISTS idx_score_transition_transition_id ON SCORE_TRANSITION (TRANSITION_ID);
+''')
+
         data = pd.read_sql_query('''
 SELECT FEATURE.ID AS FEATURE_ID,
        SCORE_MS2.PEP AS MS2_PEAKGROUP_PEP,
@@ -100,6 +132,14 @@ WHERE PRECURSOR.DECOY=0
     else:
         if not check_sqlite_table(con, "SCORE_MS2") or not check_sqlite_table(con, "SCORE_TRANSITION"):
             sys.exit("Error: Apply scoring to MS2  and transition-level data before running IPF.")
+
+        con.executescript('''
+CREATE INDEX IF NOT EXISTS idx_precursor_precursor_id ON PRECURSOR (ID);
+CREATE INDEX IF NOT EXISTS idx_feature_precursor_id ON FEATURE (PRECURSOR_ID);
+CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
+CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);
+''')
+
         data = pd.read_sql_query('''
 SELECT FEATURE.ID AS FEATURE_ID,
        SCORE_MS2.PEP AS MS2_PEAKGROUP_PEP,
@@ -122,6 +162,13 @@ def read_pyp_transition(path, ipf_max_transition_pep, ipf_h0):
     click.echo("Info: Reading peptidoform-level data.")
     # only the evidence is restricted to ipf_max_transition_pep, the peptidoform-space is complete
     con = sqlite3.connect(path)
+
+    con.executescript('''
+CREATE INDEX IF NOT EXISTS idx_transition_peptide_mapping_transition_id ON TRANSITION_PEPTIDE_MAPPING (TRANSITION_ID);
+CREATE INDEX IF NOT EXISTS idx_transition_id ON TRANSITION (ID);
+CREATE INDEX IF NOT EXISTS idx_score_transition_feature_id ON SCORE_TRANSITION (FEATURE_ID);
+CREATE INDEX IF NOT EXISTS idx_score_transition_transition_id ON SCORE_TRANSITION (TRANSITION_ID);
+''')
 
     # transition-level evidence
     evidence = pd.read_sql_query('''
