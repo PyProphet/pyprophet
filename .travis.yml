@@ -6,6 +6,7 @@ python:
   - "3.4"
   - "3.5"
   - "3.6"
+  - "3.7"
 before_install:
  - sudo apt-get update
 install:
@@ -26,4 +27,5 @@ script:
   - if [[ $TRAVIS_PYTHON_VERSION == 3.4* ]]; then py.test tests/; fi
   - if [[ $TRAVIS_PYTHON_VERSION == 3.5* ]]; then py.test tests/; fi
   - if [[ $TRAVIS_PYTHON_VERSION == 3.6* ]]; then py.test tests/; fi
+  - if [[ $TRAVIS_PYTHON_VERSION == 3.7* ]]; then py.test tests/; fi
 cache: pip
