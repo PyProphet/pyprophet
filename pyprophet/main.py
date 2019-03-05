@@ -225,16 +225,17 @@ def reduce(infile, outfile):
 @cli.command()
 @click.argument('infiles', nargs=-1, type=click.Path(exists=True))
 @click.option('--out','outfile', required=True, type=click.Path(exists=False), help='Merged OSW output file.')
+@click.option('--same_run/--no-same_run', default=False, help='Assume input files are from same run (deletes run information).')
 @click.option('--template','templatefile', required=True, type=click.Path(exists=False), help='Template OSW file.')
-def merge(infiles, outfile, templatefile):
+def merge(infiles, outfile, same_run, templatefile):
     """
-    Merge multiple OSW files and optionally subsample the data for faster learning.
+    Merge multiple OSW files and (for large experiments, it is recommended to subsample first).
     """
 
     if len(infiles) < 1:
-        sys.exit("Error: At least one PyProphet input file needs to be defined.")
+        sys.exit("Error: At least one PyProphet input file needs to be provided.")
 
-    merge_osw(infiles, outfile, templatefile)
+    merge_osw(infiles, outfile, templatefile, same_run)
 
 
 # Backpropagate multi-run peptide and protein scores to single files

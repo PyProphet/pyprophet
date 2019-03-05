@@ -400,22 +400,29 @@ WHERE ID IN
     click.echo("Info: OSW file was reduced for multi-run scoring.")
 
 
-def merge_osw(infiles, outfile, templatefile):
+def merge_osw(infiles, outfile, templatefile, same_run):
     conn = sqlite3.connect(infiles[0])
     reduced = check_sqlite_table(conn, "SCORE_MS2")
     conn.close()
 
     if reduced:
-        merge_oswr(infiles, outfile, templatefile)
+        merge_oswr(infiles, outfile, templatefile, same_run)
     else:
-        merge_osws(infiles, outfile, templatefile)
+        merge_osws(infiles, outfile, templatefile, same_run)
 
 
-def merge_osws(infiles, outfile, templatefile):
+def merge_osws(infiles, outfile, templatefile, same_run):
     # Copy the first file to have a template
     copyfile(templatefile, outfile)
     conn = sqlite3.connect(outfile)
     c = conn.cursor()
+    if same_run:
+        c.execute("SELECT ID, FILENAME FROM RUN")
+        result = c.fetchall()
+        if len(result) != 1:
+            sys.exit("Error: Input for same-run merge contains more than one run.")
+        runid, rname = result[0]
+
     c.executescript('''
 PRAGMA synchronous = OFF;
 
@@ -457,15 +464,23 @@ DETACH DATABASE sdb;
 ''' % (infiles[0]))
 
     for infile in infiles:
-        c.executescript('''
+        # Only create a single run entry (all files are presumably from the same run)
+        if same_run:
+            c.executescript('''INSERT INTO RUN (ID, FILENAME) VALUES (%s, '%s')''' % (runid, rname) )
+            break;
+        else:
+            c.executescript('''
 ATTACH DATABASE "%s" AS sdb;
 
 INSERT INTO RUN SELECT * FROM sdb.RUN;
 
 DETACH DATABASE sdb;
 ''' % infile)
+
         click.echo("Info: Merged runs of file %s to %s." % (infile, outfile))
 
+    # Now merge the run-specific data into the output file:
+    #   Note: only tables FEATURE, FEATURE_MS1, FEATURE_MS2 and FEATURE_TRANSITION are run-specific
     for infile in infiles:
         c.executescript('''
 ATTACH DATABASE "%s" AS sdb; 
@@ -475,6 +490,9 @@ INSERT INTO FEATURE SELECT * FROM sdb.FEATURE;
 DETACH DATABASE sdb;
 ''' % infile)
         click.echo("Info: Merged generic features of file %s to %s." % (infile, outfile))
+    if same_run:
+        # Fix run id assuming we only have a single run
+        c.executescript('''UPDATE FEATURE SET RUN_ID = %s''' % runid)
 
     for infile in infiles:
         c.executescript('''
@@ -518,11 +536,18 @@ DETACH DATABASE sdb;
     click.echo("Info: All OSWS files were merged.")
 
 
-def merge_oswr(infiles, outfile, templatefile):
+def merge_oswr(infiles, outfile, templatefile, same_run):
     # Copy the template to the output file
     copyfile(templatefile, outfile)
     conn = sqlite3.connect(outfile)
     c = conn.cursor()
+    if same_run:
+        c.execute("SELECT ID, FILENAME FROM RUN")
+        result = c.fetchall()
+        if len(result) != 1:
+            sys.exit("Error: Input for same-run merge contains more than one run.")
+        runid, rname = result[0]
+
     c.executescript('''
 PRAGMA synchronous = OFF;
 
@@ -559,12 +584,21 @@ CREATE TABLE FEATURE(ID INT PRIMARY KEY NOT NULL,
 ''')
 
     for infile in infiles:
-        c.executescript('ATTACH DATABASE "%s" AS sdb; INSERT INTO RUN SELECT * FROM sdb.RUN; DETACH DATABASE sdb;' % infile)
+        # Only create a single run entry (all files are presumably from the same run)
+        if same_run:
+            c.executescript('''INSERT INTO RUN (ID, FILENAME) VALUES (%s, '%s')''' % (runid, rname) )
+            break;
+        else:
+            c.executescript('ATTACH DATABASE "%s" AS sdb; INSERT INTO RUN SELECT * FROM sdb.RUN; DETACH DATABASE sdb;' % infile)
         click.echo("Info: Merged runs of file %s to %s." % (infile, outfile))
 
     for infile in infiles:
         c.executescript('ATTACH DATABASE "%s" AS sdb; INSERT INTO FEATURE SELECT * FROM sdb.FEATURE; DETACH DATABASE sdb;' % infile)
         click.echo("Info: Merged generic features of file %s to %s." % (infile, outfile))
+
+    if same_run:
+        # Fix run id assuming we only have a single run
+        c.executescript('''UPDATE FEATURE SET RUN_ID = %s''' % runid)
 
     for infile in infiles:
         c.executescript('ATTACH DATABASE "%s" AS sdb; INSERT INTO SCORE_MS2 SELECT * FROM sdb.SCORE_MS2; DETACH DATABASE sdb;' % infile)
