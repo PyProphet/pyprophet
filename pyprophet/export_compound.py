@@ -1,9 +1,8 @@
-import sqlite3
 import pandas as pd
+import sqlite3
 
-from .data_handling improt check_sqlite_table
+from .data_handling import check_sqlite_table
 from .report import plot_scores
-
 
 def export_compound_tsv(infile, outfile, format, outcsv, max_rs_peakgroup_qvalue):
     con = sqlite3.connect(infile)
