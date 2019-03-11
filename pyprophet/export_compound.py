@@ -54,7 +54,7 @@ def export_compound_tsv(infile, outfile, format, outcsv, max_rs_peakgroup_qvalue
     
     # select top ranking peak group
     if format == "legacy_merged":
-        data.drop(['id_run','id_compound'], axis=1).to_csv(outfile, sep=sep, index=FALSE)
+        data.drop(['id_run','id_compound'], axis=1).to_csv(outfile, sep=sep, index=False)
     elif format == "matrix":
         # select top ranking peak group only
         data = data.iloc[data.groupby(['run_id','transition_group_id']).apply(lambda x: x['m_score'].idxmin())]
