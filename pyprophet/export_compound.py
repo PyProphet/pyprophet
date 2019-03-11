@@ -91,7 +91,7 @@ def export_score_plots(infile):
                                              PRECURSOR.ID ASC,
                                              FEATURE.EXP_RT ASC;
                                       ''', con)
-                                            plot_scores(table_ms2, outfile)
+        plot_scores(table_ms2, outfile)
 
     if check_sqlite_table(con, "SCORE_MS1"):
         outfile = infile.split(".osw")[0] + "_ms1_score_plots.pdf"
@@ -115,7 +115,7 @@ def export_score_plots(infile):
                                                PRECURSOR.ID ASC,
                                                FEATURE.EXP_RT ASC;
                                       ''', con)
-                                              plot_scores(table_ms1, outfile)
+        plot_scores(table_ms1, outfile)
          
     con.close()
 
