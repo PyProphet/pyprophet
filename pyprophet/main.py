@@ -7,6 +7,7 @@ from .runner import PyProphetLearner, PyProphetWeightApplier
 from .ipf import infer_peptidoforms
 from .levels_contexts import infer_peptides, infer_proteins, subsample_osw, reduce_osw, merge_osw, backpropagate_oswr
 from .export import export_tsv, export_score_plots
+from .export_compound import export_compound_tsv, export_score_plots 
 from .filter import filter_sqmass
 from .data_handling import (transform_pi0_lambda, transform_threads, transform_subsample_ratio)
 from functools import update_wrapper
@@ -290,6 +291,32 @@ def export(infile, outfile, format, outcsv, transition_quantification, max_trans
 
         export_tsv(infile, outfile, format, outcsv, transition_quantification, max_transition_pep, ipf, ipf_max_peptidoform_pep, max_rs_peakgroup_qvalue, peptide, max_global_peptide_qvalue, protein, max_global_protein_qvalue)
 
+
+# Export Compound TSV
+@cli.command()
+#File handling
+@click.option('--in', 'infile', required=True, type=click.Path(exists=True), help='PyProphet input file.')
+@click.option('--out', 'outfile', type=click.Path(exists=False), help='Output TSV/CSV (matrix, legacy_merged) file.')
+@click.option('--format', default='legacy_merged', show_default=True, type=click.Choice(['matrix', 'legacy_merged','score_plots']), help='Export format, either matrix, legacy_merged (PyProphet) or score_plots format.')
+@click.option('--csv/--no-csv', 'outcsv', default=False, show_default=True, help='Export CSV instead of TSV file.')
+# Context
+@click.option('--max_rs_peakgroup_qvalue', default=0.05, show_default=True, type=float, help='[format: matrix/legacy] Filter results to maximum run-specific peak group-level q-value.')
+def export_compound(infile, outfile, format, outcsv, max_rs_peakgroup_qvalue):
+    """
+    Export Compound TSV/CSV tables
+    """
+    if format == "score_plots":
+        export_score_plots(infile)
+    else:
+        if outfile is None:
+            if outcsv:
+                outfile = infile.split(".osw")[0] + ".csv"
+            else:
+                outfile = infile.split(".osw")[0] + ".tsv"
+        else:
+            outfile = outfile
+
+        export_compound_tsv(infile, outfile, format, outcsv, max_rs_peakgroup_qvalue)
 
 # Filter sqMass files
 @cli.command()

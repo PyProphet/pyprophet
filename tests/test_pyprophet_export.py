@@ -90,6 +90,22 @@ def _run_ipf(regtest, temp_folder, transition_quantification=False, ipf="disable
     print(pd.read_csv("test_data.tsv", sep="\t", nrows=100).sort_index(axis=1),file=regtest)
 
 
+def _run_compound(regtest, temp_folder):
+    os.chdir(temp_folder)
+    data_path= os.path.join(DATA_FOLDER, "test_data_compound.osw")
+    shutil.copy(data_path, temp_folder)
+
+    # MS2-level
+    cmdline = "pyprophet score --in=test_data_compound.osw --level=ms2 --test"
+
+    # export
+    cmdline += " export-compound --in=test_data_compound.osw --max_rs_peakgroup_qvalue=0.05 --format=legacy_merged"
+
+    stdout = _run_cmdline(cmdline)
+
+    print(pd.read_csv("test_data_compound.tsv", sep="\t", nrows=100).sort_index(axis=1),file=regtest)
+
+
 def test_osw_0(tmpdir, regtest):
     _run_osw(regtest, tmpdir.strpath, False, False, False)
 
@@ -113,3 +129,6 @@ def test_ipf_2(tmpdir, regtest):
 
 def test_ipf_3(tmpdir, regtest):
     _run_ipf(regtest, tmpdir.strpath, False, "augmented")
+
+def test_compound_0(tmpdir, regtest):
+    _run_compound(regtest, tmpdir.strpath)
