@@ -22,6 +22,7 @@ def export_compound_tsv(infile, outfile, format, outcsv, max_rs_peakgroup_qvalue
                                FEATURE.ID AS id,
                                COMPOUND.SUM_FORMULA AS sum_formula,
                                COMPOUND.COMPOUND_NAME AS compound_name,
+                               COMPOUND.ADDUCTS AS Adducts, 
                                PRECURSOR.CHARGE AS Charge,
                                PRECURSOR.PRECURSOR_MZ AS mz,
                                FEATURE_MS2.AREA_INTENSITY AS Intensity,
@@ -59,8 +60,8 @@ def export_compound_tsv(infile, outfile, format, outcsv, max_rs_peakgroup_qvalue
         # select top ranking peak group only
         data = data.iloc[data.groupby(['run_id','transition_group_id']).apply(lambda x: x['m_score'].idxmin())]
         # restructure dataframe to matrix
-        data = data[['transition_group_id','sum_formula','compound_name','filename','Intensity']]
-        data = data.pivot_table(index=['transition_group_id','sum_formula','compound_name'], columns='filename', values='Intensity')
+        data = data[['transition_group_id','sum_formula','compound_name', 'Adducts','filename','Intensity']]
+        data = data.pivot_table(index=['transition_group_id','sum_formula','compound_name','Adducts'], columns='filename', values='Intensity')
         data.to_csv(outfile, sep=sep, index=True)
 
 
@@ -92,30 +93,6 @@ def export_score_plots(infile):
                                              FEATURE.EXP_RT ASC;
                                       ''', con)
         plot_scores(table_ms2, outfile)
-
-    if check_sqlite_table(con, "SCORE_MS1"):
-        outfile = infile.split(".osw")[0] + "_ms1_score_plots.pdf"
-        table_ms1 = pd.read_sql_query('''
-                                      SELECT *,
-                                             RUN_ID || '_' || PRECURSOR_ID AS GROUP_ID
-                                      FROM FEATURE_MS1
-                                      INNER JOIN
-                                        (SELECT RUN_ID,
-                                                ID,
-                                                PRECURSOR_ID,
-                                                EXP_RT
-                                         FROM FEATURE) AS FEATURE ON FEATURE_MS1.FEATURE_ID = FEATURE.ID
-                                      INNER JOIN
-                                        (SELECT ID,
-                                                DECOY
-                                         FROM PRECURSOR) AS PRECURSOR ON FEATURE.PRECURSOR_ID = PRECURSOR.ID
-                                      INNER JOIN SCORE_MS1 ON FEATURE.ID = SCORE_MS1.FEATURE_ID
-                                      WHERE RANK == 1
-                                      ORDER BY RUN_ID,
-                                               PRECURSOR.ID ASC,
-                                               FEATURE.EXP_RT ASC;
-                                      ''', con)
-        plot_scores(table_ms1, outfile)
          
     con.close()
 
