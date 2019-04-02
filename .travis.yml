@@ -20,6 +20,7 @@ install:
   - pip install -U numexpr
   - pip install -U statsmodels
   - pip install -U matplotlib
+  - pip install -U networkx==2.2
   - travis_retry python setup.py develop
 script: 
   - if [[ $TRAVIS_PYTHON_VERSION == 2* ]]; then py.test tests/; fi

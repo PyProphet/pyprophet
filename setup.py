@@ -5,11 +5,19 @@ from distutils.extension import Extension
 
 ext_modules = [Extension("pyprophet._optimized", ["pyprophet/_optimized.c"])]
 
+# read the contents of README for PyPI
+from os import path
+this_directory = path.abspath(path.dirname(__file__))
+with open(path.join(this_directory, 'README.md')) as f:
+    long_description = f.read()
+
 setup(name='pyprophet',
-      version="2.1.dev1",
+      version="2.1.0.post1",
       author="Uwe Schmitt",
       author_email="rocksportrocker@gmail.com",
       description="PyProphet: Semi-supervised learning and scoring of OpenSWATH results.",
+      long_description=long_description,
+      long_description_content_type='text/markdown',
       license="BSD",
       url="https://github.com/PyProphet/pyprophet",
       packages=find_packages(exclude=['ez_setup', 'examples', 'tests']),
