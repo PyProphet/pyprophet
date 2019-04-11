@@ -25,7 +25,7 @@ SRM experiments.* **Nat Methods.** 2011 May;8(5):430-5. [doi:
 Installation
 ============
 
-We strongly advice to install PyProphet in a Python [*virtualenv*](https://virtualenv.pypa.io/en/stable/). PyProphet is compatible with Python 2.7 and provides experimental support for Python 3.
+We strongly advice to install PyProphet in a Python [*virtualenv*](https://virtualenv.pypa.io/en/stable/). PyProphet is compatible with Python 3.
 
 Install the development version of *pyprophet* from GitHub:
 
@@ -54,6 +54,22 @@ or:
    $ pyprophet score --in=tests/test_data.txt
 ````
 
+Docker
+=================
+
+PyProphet is also available from Docker (automated builds:
+
+Pull the development version of *pyprophet* from DockerHub (synced with GitHub):
+
+````
+    $ docker pull pyprophet/master:latest
+````
+
+Pull the stable version (e.g. 2.1.2) of *pyprophet* from DockerHub (synced with releases):
+
+````
+    $ docker pull pyprophet/pyprophet:2.1.2
+````
 
 Running tests
 =============

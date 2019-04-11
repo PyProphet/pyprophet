@@ -95,6 +95,8 @@ ORDER BY RUN_ID,
          FEATURE.EXP_RT ASC;
 ''', con)
             elif level == "transition":
+                if not check_sqlite_table(con, "SCORE_MS2"):
+                    raise click.ClickException("Transition-level scoring for IPF requires prior MS2 or MS1MS2-level scoring. Please run 'pyprophet score --level=ms2' or 'pyprophet score --level=ms1ms2' on this file first.")
                 if not check_sqlite_table(con, "FEATURE_TRANSITION"):
                     raise click.ClickException("Transition-level feature table not present in file.")
 
