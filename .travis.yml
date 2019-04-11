@@ -2,7 +2,7 @@ sudo: required
 dist: xenial
 language: python
 python:
-  - "2.7"
+  - "3.4"
   - "3.5"
   - "3.6"
   - "3.7"
@@ -20,10 +20,9 @@ install:
   - pip install -U numexpr
   - pip install -U statsmodels
   - pip install -U matplotlib
-  - pip install -U networkx==2.2
+  - pip install -U networkx
   - travis_retry python setup.py develop
 script: 
-  - if [[ $TRAVIS_PYTHON_VERSION == 2* ]]; then py.test tests/; fi
   - if [[ $TRAVIS_PYTHON_VERSION == 3.4* ]]; then py.test tests/; fi
   - if [[ $TRAVIS_PYTHON_VERSION == 3.5* ]]; then py.test tests/; fi
   - if [[ $TRAVIS_PYTHON_VERSION == 3.6* ]]; then py.test tests/; fi
