@@ -156,6 +156,19 @@ ORDER BY RUN_ID,
             # Mark main score column
             if ss_main_score.lower() in table.columns:
                 table = table.rename(index=str, columns={ss_main_score.lower(): "main_"+ss_main_score.lower()})
+            elif ss_main_score.lower() == "swath_pretrained":
+                # Add a pretrained main score corresponding to the original implementation in OpenSWATH
+                # This is optimized for 32-windows SCIEX TripleTOF 5600 data
+                table['main_var_pretrained'] = -( -0.19011762 * table['var_library_corr']
+                                                +  2.47298914 * table['var_library_rmsd']
+                                                +  5.63906731 * table['var_norm_rt_score']
+                                                + -0.62640133 * table['var_isotope_correlation_score']
+                                                +  0.36006925 * table['var_isotope_overlap_score']
+                                                +  0.08814003 * table['var_massdev_score']
+                                                +  0.13978311 * table['var_xcorr_coelution']
+                                                + -1.16475032 * table['var_xcorr_shape']
+                                                + -0.19267813 * table['var_yseries_score']
+                                                + -0.61712054 * table['var_log_sn_score'])
             else:
                 raise click.ClickException("Main score column not present in data.")
 
