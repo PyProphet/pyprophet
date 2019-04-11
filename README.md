@@ -54,6 +54,22 @@ or:
    $ pyprophet score --in=tests/test_data.txt
 ````
 
+Docker
+=================
+
+PyProphet is also available from Docker (automated builds:
+
+Pull the development version of *pyprophet* from DockerHub (synced with GitHub):
+
+````
+    $ docker pull pyprophet/master:latest
+````
+
+Pull the stable version (e.g. 2.1.2) of *pyprophet* from DockerHub (synced with releases):
+
+````
+    $ docker pull pyprophet/pyprophet:2.1.2
+````
 
 Running tests
 =============
