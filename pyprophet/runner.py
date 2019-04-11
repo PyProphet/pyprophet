@@ -95,6 +95,8 @@ ORDER BY RUN_ID,
          FEATURE.EXP_RT ASC;
 ''', con)
             elif level == "transition":
+                if not check_sqlite_table(con, "SCORE_MS2"):
+                    raise click.ClickException("Transition-level scoring requires prior MS2 or MS1MS2-level scoring.")
                 if not check_sqlite_table(con, "FEATURE_TRANSITION"):
                     raise click.ClickException("Transition-level feature table not present in file.")
 
