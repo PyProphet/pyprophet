@@ -43,7 +43,7 @@ def infer_proteins(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_m
     con = sqlite3.connect(infile)
 
     if not check_sqlite_table(con, "SCORE_MS2"):
-        sys.exit("Error: Apply scoring to MS2-level data before running protein-level scoring.")
+        raise click.ClickException("Apply scoring to MS2-level data before running protein-level scoring.")
 
     if context in ['global','experiment-wide','run-specific']:
         if context == 'global':
@@ -93,7 +93,7 @@ HAVING MAX(SCORE)
 ORDER BY SCORE DESC
 ''' % (run_id, group_id, context), con)
     else:
-        sys.exit("Error: Unspecified context selected.")
+        raise click.ClickException("Unspecified context selected.")
 
     data.columns = [col.lower() for col in data.columns]
     con.close()
@@ -129,7 +129,7 @@ def infer_peptides(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_m
     con = sqlite3.connect(infile)
 
     if not check_sqlite_table(con, "SCORE_MS2"):
-        sys.exit("Error: Apply scoring to MS2-level data before running peptide-level scoring.")
+        raise click.ClickException("Apply scoring to MS2-level data before running peptide-level scoring.")
 
     if context in ['global','experiment-wide','run-specific']:
         if context == 'global':
@@ -166,7 +166,7 @@ HAVING MAX(SCORE)
 ORDER BY SCORE DESC
 ''' % (run_id, group_id, context), con)
     else:
-        sys.exit("Error: Unspecified context selected.")
+        raise click.ClickException("Unspecified context selected.")
 
     data.columns = [col.lower() for col in data.columns]
     con.close()
@@ -349,7 +349,7 @@ DETACH DATABASE sdb;
 def reduce_osw(infile, outfile):
     conn = sqlite3.connect(infile)
     if not check_sqlite_table(conn, "SCORE_MS2"):
-        sys.exit("Error: Apply scoring to MS2 data before reducing file for multi-run scoring.")
+        raise click.ClickException("Apply scoring to MS2 data before reducing file for multi-run scoring.")
     conn.close()
 
     try:
@@ -420,7 +420,7 @@ def merge_osws(infiles, outfile, templatefile, same_run):
         c.execute("SELECT ID, FILENAME FROM RUN")
         result = c.fetchall()
         if len(result) != 1:
-            sys.exit("Error: Input for same-run merge contains more than one run.")
+            raise click.ClickException("Input for same-run merge contains more than one run.")
         runid, rname = result[0]
 
     c.executescript('''
@@ -545,7 +545,7 @@ def merge_oswr(infiles, outfile, templatefile, same_run):
         c.execute("SELECT ID, FILENAME FROM RUN")
         result = c.fetchall()
         if len(result) != 1:
-            sys.exit("Error: Input for same-run merge contains more than one run.")
+            raise click.ClickException("Input for same-run merge contains more than one run.")
         runid, rname = result[0]
 
     c.executescript('''
@@ -621,7 +621,7 @@ def backpropagate_oswr(infile, outfile, apply_scores):
     protein_present = check_sqlite_table(score_con, "SCORE_PROTEIN")
     score_con.close()
     if not (peptide_present or protein_present):
-        sys.exit('Error: Backpropagation requires peptide or protein-level contexts.')
+        raise click.ClickException('Backpropagation requires peptide or protein-level contexts.')
 
     # build up the list
     script = list()

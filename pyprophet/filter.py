@@ -125,7 +125,7 @@ WHERE SCORE_MS2.PEP <= {0}
 '''.format(max_peakgroup_pep, sqm_in.split(".sqMass")[0]), con)['transition_id'].values
             
         else:
-            sys.exit("Error: Conduct scoring on MS1, MS2 and/or transition-level before filtering.")
+            raise click.ClickException("Conduct scoring on MS1, MS2 and/or transition-level before filtering.")
 
         filter_chrom_by_labels(sqm_in, sqm_out, transitions)
 

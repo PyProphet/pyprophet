@@ -35,7 +35,7 @@ def read_pyp_peakgroup_precursor(path, ipf_max_peakgroup_pep, ipf_ms1_scoring, i
     # only use MS2 precursors
     if not ipf_ms1_scoring and ipf_ms2_scoring:
         if not check_sqlite_table(con, "SCORE_MS2") or not check_sqlite_table(con, "SCORE_TRANSITION"):
-            sys.exit("Error: Apply scoring to MS2 and transition-level data before running IPF.")
+            raise click.ClickException("Apply scoring to MS2 and transition-level data before running IPF.")
 
         con.executescript('''
 CREATE INDEX IF NOT EXISTS idx_transition_id ON TRANSITION (ID);
@@ -69,7 +69,7 @@ WHERE PRECURSOR.DECOY=0
     # only use MS1 precursors
     elif ipf_ms1_scoring and not ipf_ms2_scoring:
         if not check_sqlite_table(con, "SCORE_MS1") or not check_sqlite_table(con, "SCORE_MS2") or not check_sqlite_table(con, "SCORE_TRANSITION"):
-            sys.exit("Error: Apply scoring to MS1, MS2 and transition-level data before running IPF.")
+            raise click.ClickException("Apply scoring to MS1, MS2 and transition-level data before running IPF.")
 
         con.executescript('''
 CREATE INDEX IF NOT EXISTS idx_precursor_precursor_id ON PRECURSOR (ID);
@@ -95,7 +95,7 @@ WHERE PRECURSOR.DECOY=0
     # use both MS1 and MS2 precursors
     elif ipf_ms1_scoring and ipf_ms2_scoring:
         if not check_sqlite_table(con, "SCORE_MS1") or not check_sqlite_table(con, "SCORE_MS2") or not check_sqlite_table(con, "SCORE_TRANSITION"):
-            sys.exit("Error: Apply scoring to MS1, MS2 and transition-level data before running IPF.")
+            raise click.ClickException("Apply scoring to MS1, MS2 and transition-level data before running IPF.")
 
         con.executescript('''
 CREATE INDEX IF NOT EXISTS idx_transition_id ON TRANSITION (ID);
@@ -131,7 +131,7 @@ WHERE PRECURSOR.DECOY=0
     # do not use any precursor information
     else:
         if not check_sqlite_table(con, "SCORE_MS2") or not check_sqlite_table(con, "SCORE_TRANSITION"):
-            sys.exit("Error: Apply scoring to MS2  and transition-level data before running IPF.")
+            raise click.ClickException("Apply scoring to MS2  and transition-level data before running IPF.")
 
         con.executescript('''
 CREATE INDEX IF NOT EXISTS idx_precursor_precursor_id ON PRECURSOR (ID);

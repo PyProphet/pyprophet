@@ -221,7 +221,7 @@ class HolyGostQuery(object):
             if np.all(score_columns == loaded_weights['score'].values):
                 weights = loaded_weights['weight'].values
             else:
-                sys.exit("Error: Scores in weights file do not match data.")
+                raise click.ClickException("Scores in weights file do not match data.")
         elif self.classifier == "XGBoost":
             weights = loaded_weights
 
@@ -349,4 +349,4 @@ def PyProphet(classifier, xgb_hyperparams, xgb_params, xgb_params_space, xeval_f
     elif classifier == "XGBoost":
         return HolyGostQuery(StandardSemiSupervisedLearner(XGBLearner(xgb_hyperparams, xgb_params, xgb_params_space, threads), xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, test), classifier, ss_num_iter, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, tric_chromprob, threads, test)
     else:
-        sys.exit("Error: Classifier not supported.")
+        raise click.ClickException("Classifier not supported.")

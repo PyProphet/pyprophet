@@ -6,8 +6,8 @@ import pandas as pd
 import math
 import scipy.stats
 import scipy.special
-import sys
 import multiprocessing
+import click
 
 from .optimized import (find_nearest_matches as _find_nearest_matches,
                        count_num_positives, single_chromatogram_hypothesis_fast)
@@ -183,11 +183,11 @@ def pi0est(p_values, lambda_ = np.arange(0.05,1.0,0.05), pi0_method = "smoother"
         lambda_ = np.sort(lambda_)
 
     if (min(p) < 0 or max(p) > 1):
-        sys.exit("Error: p-values not in valid range [0,1].")
+        raise click.ClickException("p-values not in valid range [0,1].")
     elif (ll > 1 and ll < 4):
-        sys.exit("Error: If lambda_ is not predefined (one value), at least four data points are required.")
+        raise click.ClickException("If lambda_ is not predefined (one value), at least four data points are required.")
     elif (np.min(lambda_) < 0 or np.max(lambda_) >= 1):
-        sys.exit("Error: Lambda must be within [0,1)")
+        raise click.ClickException("Lambda must be within [0,1)")
 
     if (ll == 1):
         pi0 = np.mean(p >= lambda_)/(1 - lambda_)
@@ -222,9 +222,9 @@ def pi0est(p_values, lambda_ = np.arange(0.05,1.0,0.05), pi0_method = "smoother"
             pi0 = np.minimum(pi0[np.argmin(mse)],1)
             pi0Smooth = False
         else:
-            sys.exit("Error: pi0_method must be one of 'smoother' or 'bootstrap'.")
+            raise click.ClickException("pi0_method must be one of 'smoother' or 'bootstrap'.")
     if (pi0<=0):
-        sys.exit("Error: The estimated pi0 <= 0. Check that you have valid p-values or use a different range of lambda.")
+        raise click.ClickException("The estimated pi0 <= 0. Check that you have valid p-values or use a different range of lambda.")
 
     return {'pi0': pi0, 'pi0_lambda': pi0_lambda, 'lambda_': lambda_, 'pi0_smooth': pi0Smooth}
 
@@ -237,9 +237,9 @@ def qvalue(p_values, pi0, pfdr = False):
     p = p[rm_na]
 
     if (min(p) < 0 or max(p) > 1):
-        sys.exit("Error: p-values not in valid range [0,1].")
+        raise click.ClickException("p-values not in valid range [0,1].")
     elif (pi0 < 0 or pi0 > 1):
-        sys.exit("Error: pi0 not in valid range [0,1].")
+        raise click.ClickException("pi0 not in valid range [0,1].")
 
     m = len(p)
     u = np.argsort(p)
@@ -260,7 +260,7 @@ def qvalue(p_values, pi0, pfdr = False):
 
 def bw_nrd0(x):
     if len(x) < 2:
-        sys.exit("Error: bandwidth estimation requires at least two data points.")
+        raise click.ClickException("bandwidth estimation requires at least two data points.")
 
     hi = np.std(x, ddof=1)
     q75, q25 = np.percentile(x, [75 ,25])
@@ -292,9 +292,9 @@ def lfdr(p_values, pi0, trunc = True, monotone = True, transf = "probit", adj = 
     p = p[rm_na]
 
     if (min(p) < 0 or max(p) > 1):
-        sys.exit("Error: p-values not in valid range [0,1].")
+        raise click.ClickException("p-values not in valid range [0,1].")
     elif (pi0 < 0 or pi0 > 1):
-        sys.exit("Error: pi0 not in valid range [0,1].")
+        raise click.ClickException("pi0 not in valid range [0,1].")
 
     # Local FDR method for both probit and logit transformations
     if (transf == "probit"):
@@ -330,7 +330,7 @@ def lfdr(p_values, pi0, trunc = True, monotone = True, transf = "probit", adj = 
         dx = np.exp(x) / np.power((1 + np.exp(x)),2)
         lfdr = (pi0 * dx) / y
     else:
-        sys.exit("Error: Invalid local FDR method.")
+        raise click.ClickException("Invalid local FDR method.")
 
     if (trunc):
         lfdr[lfdr > 1] = 1
@@ -475,7 +475,7 @@ def find_cutoff(tt_scores, td_scores, cutoff_fdr, parametric, pfdr, pi0_lambda, 
 
     error_stat, pi0 = error_statistics(tt_scores, td_scores, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, False)
     if not len(error_stat):
-        sys.exit("Error: Too little data for calculating error statistcs.")
+        raise click.ClickException("Too little data for calculating error statistcs.")
     i0 = (error_stat.qvalue - cutoff_fdr).abs().idxmin()
     cutoff = error_stat.iloc[i0]["cutoff"]
     return cutoff

@@ -22,7 +22,7 @@ def transform_pi0_lambda(ctx, param, value):
     elif 0 <= value[0] < 1 and value[0] <= value[1] <= 1 and 0 < value[2] < 1:
         pi0_lambda = np.arange(value[0], value[1], value[2])
     else:
-        sys.exit('Error: Wrong input values for pi0_lambda. pi0_lambda must be within [0,1).')
+        raise click.ClickException('Wrong input values for pi0_lambda. pi0_lambda must be within [0,1).')
     return(pi0_lambda)
 
 
@@ -34,7 +34,7 @@ def transform_threads(ctx, param, value):
 
 def transform_subsample_ratio(ctx, param, value):
     if value < 0 or value > 1:
-      sys.exit('Error: Wrong input values for subsample_ratio. subsample_ratio must be within [0,1].')
+      raise click.ClickException('Wrong input values for subsample_ratio. subsample_ratio must be within [0,1].')
     return(value)
 
 
@@ -105,7 +105,7 @@ def cleanup_and_check(df):
 
     click.echo("Info: Data set contains %d decoy and %d target groups." % (n_decoy, n_target))
     if n_decoy < 10 or n_target < 10:
-        sys.exit("Error: At least 10 decoy groups and 10 target groups are required.")
+        raise click.ClickException("At least 10 decoy groups and 10 target groups are required.")
 
     return df_cleaned
 
@@ -117,16 +117,16 @@ def prepare_data_table(table, tg_id_name="transition_group_id",
                        ):
     N = len(table)
     if not N:
-        sys.exit("Error: Empty input file supplied.")
+        raise click.ClickException("Empty input file supplied.")
     header = table.columns.values
     if score_columns is not None:
         missing = set(score_columns) - set(header)
         if missing:
             missing_txt = ", ".join(["'%s'" % m for m in missing])
-            sys.exit("Error: Column(s) %s missing in input file to apply scorer." % missing_txt)
+            raise click.ClickException("Column(s) %s missing in input file to apply scorer." % missing_txt)
 
-    assert tg_id_name in header, "Error: Column %s is not in input file(s)." % tg_id_name
-    assert decoy_name in header, "Error: Column %s is not in input file(s)." % decoy_name
+    assert tg_id_name in header, "Column %s is not in input file(s)." % tg_id_name
+    assert decoy_name in header, "Column %s is not in input file(s)." % decoy_name
 
     if score_columns is not None:
         # we assume there is exactly one main_score in score_columns as we checked that in
@@ -135,23 +135,23 @@ def prepare_data_table(table, tg_id_name="transition_group_id",
         main_score_name = [c for c in score_columns if c.startswith("main_")][0]
     else:
         if main_score_name is not None:
-            assert main_score_name in header, "Error: Column %s is not in input file(s)." % main_score_name
+            assert main_score_name in header, "Column %s is not in input file(s)." % main_score_name
 
         # if no main_score_name provided, look for unique column with name
         # starting with "main_":
         else:
             main_columns = set(c for c in header if c.startswith("main_"))
             if not main_columns:
-                sys.exit("Error: No column \"main_*\" is in input file(s).")
+                raise click.ClickException("No column \"main_*\" is in input file(s).")
             if len(main_columns) > 1:
-                sys.exit("Error: Multiple columns with name \"main_*\" are in input file(s).")
+                raise click.ClickException("Multiple columns with name \"main_*\" are in input file(s).")
             main_score_name = main_columns.pop()
 
         # get all other score columns, name beginning with "var_"
         var_column_names = tuple(h for h in header if h.startswith("var_"))
 
         if not var_column_names:
-            raise Exception("Error: No column \"var_*\" is in input file(s).")
+            raise Exception("No column \"var_*\" is in input file(s).")
 
     # collect needed data:
     empty_col = [0] * N
@@ -160,7 +160,7 @@ def prepare_data_table(table, tg_id_name="transition_group_id",
     tg_ids = table[tg_id_name]
 
     if not check_for_unique_blocks(tg_ids):
-        sys.exit("Error: " + tg_id_name + " values do not form unique blocks in input file(s).")
+        raise click.ClickException("" + tg_id_name + " values do not form unique blocks in input file(s).")
 
     tg_map = dict()
     for i, tg_id in enumerate(tg_ids.unique()):
@@ -220,7 +220,7 @@ class Experiment(object):
 
     def __setattr__(self, name, value):
         if name not in ["df", ]:
-            sys.exit("Error: Use '[...]' syntax to set input file columns.")
+            raise click.ClickException("Use '[...]' syntax to set input file columns.")
         object.__setattr__(self, name, value)
 
     def set_and_rerank(self, col_name, scores):

@@ -38,7 +38,7 @@ class PyProphetRunner(object):
 
             if level == "ms2" or level == "ms1ms2":
                 if not check_sqlite_table(con, "FEATURE_MS2"):
-                    sys.exit("Error: MS2-level feature table not present in file.")
+                    raise click.ClickException("MS2-level feature table not present in file.")
 
                 con.executescript('''
 CREATE INDEX IF NOT EXISTS idx_precursor_precursor_id ON PRECURSOR (ID);
@@ -67,7 +67,7 @@ ORDER BY RUN_ID,
 ''', con)
             elif level == "ms1":
                 if not check_sqlite_table(con, "FEATURE_MS1"):
-                    sys.exit("Error: MS1-level feature table not present in file.")
+                    raise click.ClickException("MS1-level feature table not present in file.")
 
                 con.executescript('''
 CREATE INDEX IF NOT EXISTS idx_precursor_precursor_id ON PRECURSOR (ID);
@@ -96,7 +96,7 @@ ORDER BY RUN_ID,
 ''', con)
             elif level == "transition":
                 if not check_sqlite_table(con, "FEATURE_TRANSITION"):
-                    sys.exit("Error: Transition-level feature table not present in file.")
+                    raise click.ClickException("Transition-level feature table not present in file.")
 
                 con.executescript('''
 CREATE INDEX IF NOT EXISTS idx_transition_id ON TRANSITION (ID);
@@ -136,12 +136,12 @@ ORDER BY RUN_ID,
          TRANSITION.ID;
 ''' % (ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn), con)
             else:
-                sys.exit("Error: Unspecified data level selected.")
+                raise click.ClickException("Unspecified data level selected.")
 
             # Append MS1 scores to MS2 table if selected
             if level == "ms1ms2":
                 if not check_sqlite_table(con, "FEATURE_MS1"):
-                    sys.exit("Error: MS1-level feature table not present in file.")
+                    raise click.ClickException("MS1-level feature table not present in file.")
                 ms1_table = pd.read_sql_query('SELECT * FROM FEATURE_MS1;', con)
 
                 ms1_scores = [c for c in ms1_table.columns if c.startswith("VAR_")]
@@ -157,7 +157,7 @@ ORDER BY RUN_ID,
             if ss_main_score.lower() in table.columns:
                 table = table.rename(index=str, columns={ss_main_score.lower(): "main_"+ss_main_score.lower()})
             else:
-                sys.exit("Error: Main score column not present in data.")
+                raise click.ClickException("Main score column not present in data.")
 
             con.close()
             return(table)
@@ -400,13 +400,13 @@ class PyProphetWeightApplier(PyProphetRunner):
     def __init__(self, infile, outfile, classifier, xgb_hyperparams, xgb_params, xgb_params_space, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, ss_main_score, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, level, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn, tric_chromprob, threads, test, apply_weights):
         super(PyProphetWeightApplier, self).__init__(infile, outfile, classifier, xgb_hyperparams, xgb_params, xgb_params_space, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, ss_main_score, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, level, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn, tric_chromprob, threads, test)
         if not os.path.exists(apply_weights):
-            sys.exit("Error: Weights file %s does not exist." % apply_weights)
+            raise click.ClickException("Weights file %s does not exist." % apply_weights)
         if self.mode == "tsv":
             if self.classifier == "LDA":
                 try:
                     self.persisted_weights = pd.read_csv(apply_weights, sep=",")
                     if self.level != self.persisted_weights['level'].unique()[0]:
-                        sys.exit("Error: Weights file has wrong level.")
+                        raise click.ClickException("Weights file has wrong level.")
                 except Exception:
                     import traceback
                     traceback.print_exc()
@@ -424,7 +424,7 @@ class PyProphetWeightApplier(PyProphetRunner):
                     con.close()
                     self.persisted_weights = data
                     if self.level != self.persisted_weights['level'].unique()[0]:
-                        sys.exit("Error: Weights file has wrong level.")
+                        raise click.ClickException("Weights file has wrong level.")
                 except Exception:
                     import traceback
                     traceback.print_exc()
