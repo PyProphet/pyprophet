@@ -57,7 +57,7 @@ or:
 Docker
 =================
 
-PyProphet is also available from Docker (automated builds:
+PyProphet is also available from Docker (automated builds):
 
 Pull the development version of *pyprophet* from DockerHub (synced with GitHub):
 
