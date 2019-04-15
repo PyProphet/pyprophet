@@ -37,6 +37,11 @@ CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
           idx_query += "CREATE INDEX IF NOT EXISTS idx_feature_ms2_feature_id ON FEATURE_MS2 (FEATURE_ID);"
         if check_sqlite_table(con, "SCORE_MS1"):
           idx_query += "CREATE INDEX IF NOT EXISTS idx_score_ms1_feature_id ON SCORE_MS1 (FEATURE_ID);"
+          score_ms1_pep = "SCORE_MS1.PEP"
+          link_ms1 = "LEFT JOIN SCORE_MS1 ON SCORE_MS1.FEATURE_ID = FEATURE.ID"
+        else:
+          score_ms1_pep = "NULL"
+          link_ms1 = ""
         if check_sqlite_table(con, "SCORE_MS2"):
           idx_query += "CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);"
         if check_sqlite_table(con, "SCORE_IPF"):
@@ -66,7 +71,7 @@ SELECT RUN.ID AS id_run,
        FEATURE_MS1.APEX_INTENSITY AS aggr_prec_Peak_Apex,
        FEATURE.LEFT_WIDTH AS leftWidth,
        FEATURE.RIGHT_WIDTH AS rightWidth,
-       SCORE_MS1.PEP AS ms1_pep,
+       %s AS ms1_pep,
        SCORE_MS2.PEP AS ms2_pep,
        SCORE_IPF.PRECURSOR_PEAKGROUP_PEP AS precursor_pep,
        SCORE_IPF.PEP AS ipf_pep,
@@ -81,14 +86,14 @@ INNER JOIN FEATURE ON FEATURE.PRECURSOR_ID = PRECURSOR.ID
 INNER JOIN RUN ON RUN.ID = FEATURE.RUN_ID
 LEFT JOIN FEATURE_MS1 ON FEATURE_MS1.FEATURE_ID = FEATURE.ID
 LEFT JOIN FEATURE_MS2 ON FEATURE_MS2.FEATURE_ID = FEATURE.ID
-LEFT JOIN SCORE_MS1 ON SCORE_MS1.FEATURE_ID = FEATURE.ID
+%s
 LEFT JOIN SCORE_MS2 ON SCORE_MS2.FEATURE_ID = FEATURE.ID
 LEFT JOIN SCORE_IPF ON SCORE_IPF.FEATURE_ID = FEATURE.ID
 INNER JOIN PEPTIDE AS PEPTIDE_IPF ON SCORE_IPF.PEPTIDE_ID = PEPTIDE_IPF.ID
 WHERE SCORE_MS2.QVALUE < %s AND SCORE_IPF.PEP < %s
 ORDER BY transition_group_id,
          peak_group_rank;
-''' % (max_rs_peakgroup_qvalue, ipf_max_peptidoform_pep)
+''' % (score_ms1_pep, link_ms1, max_rs_peakgroup_qvalue, ipf_max_peptidoform_pep)
     # Main query for augmented IPF
     elif ipf_present and ipf=='augmented':
         idx_query = '''
@@ -110,6 +115,11 @@ CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
           idx_query += "CREATE INDEX IF NOT EXISTS idx_feature_ms2_feature_id ON FEATURE_MS2 (FEATURE_ID);"
         if check_sqlite_table(con, "SCORE_MS1"):
           idx_query += "CREATE INDEX IF NOT EXISTS idx_score_ms1_feature_id ON SCORE_MS1 (FEATURE_ID);"
+          score_ms1_pep = "SCORE_MS1.PEP"
+          link_ms1 = "LEFT JOIN SCORE_MS1 ON SCORE_MS1.FEATURE_ID = FEATURE.ID"
+        else:
+          score_ms1_pep = "NULL"
+          link_ms1 = ""
         if check_sqlite_table(con, "SCORE_MS2"):
           idx_query += "CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);"
         if check_sqlite_table(con, "SCORE_IPF"):
@@ -142,7 +152,7 @@ SELECT RUN.ID AS id_run,
        SCORE_MS2.RANK AS peak_group_rank,
        SCORE_MS2.SCORE AS d_score,
        SCORE_MS2.QVALUE AS m_score,
-       SCORE_MS1.PEP AS ms1_pep,
+       %s AS ms1_pep,
        SCORE_MS2.PEP AS ms2_pep
 FROM PRECURSOR
 INNER JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
@@ -151,12 +161,12 @@ INNER JOIN FEATURE ON FEATURE.PRECURSOR_ID = PRECURSOR.ID
 INNER JOIN RUN ON RUN.ID = FEATURE.RUN_ID
 LEFT JOIN FEATURE_MS1 ON FEATURE_MS1.FEATURE_ID = FEATURE.ID
 LEFT JOIN FEATURE_MS2 ON FEATURE_MS2.FEATURE_ID = FEATURE.ID
-LEFT JOIN SCORE_MS1 ON SCORE_MS1.FEATURE_ID = FEATURE.ID
+%s
 LEFT JOIN SCORE_MS2 ON SCORE_MS2.FEATURE_ID = FEATURE.ID
 WHERE SCORE_MS2.QVALUE < %s
 ORDER BY transition_group_id,
          peak_group_rank;
-''' % max_rs_peakgroup_qvalue
+''' % (score_ms1_pep, link_ms1, max_rs_peakgroup_qvalue)
         query_augmented = '''
 SELECT FEATURE_ID AS id,
        MODIFIED_SEQUENCE AS ipf_FullUniModPeptideName,
