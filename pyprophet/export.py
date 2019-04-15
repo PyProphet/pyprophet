@@ -30,14 +30,19 @@ CREATE INDEX IF NOT EXISTS idx_run_run_id ON RUN (ID);
 CREATE INDEX IF NOT EXISTS idx_feature_run_id ON FEATURE (RUN_ID);
 
 CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
-CREATE INDEX IF NOT EXISTS idx_feature_ms1_feature_id ON FEATURE_MS1 (FEATURE_ID);
-CREATE INDEX IF NOT EXISTS idx_feature_ms2_feature_id ON FEATURE_MS2 (FEATURE_ID);
-CREATE INDEX IF NOT EXISTS idx_score_ms1_feature_id ON SCORE_MS1 (FEATURE_ID);
-CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);
-CREATE INDEX IF NOT EXISTS idx_score_ipf_feature_id ON SCORE_IPF (FEATURE_ID);
-
-CREATE INDEX IF NOT EXISTS idx_score_ipf_peptide_id ON SCORE_IPF (PEPTIDE_ID);
 '''
+        if check_sqlite_table(con, "FEATURE_MS1"):
+          idx_query += "CREATE INDEX IF NOT EXISTS idx_feature_ms1_feature_id ON FEATURE_MS1 (FEATURE_ID);"
+        if check_sqlite_table(con, "FEATURE_MS2"):
+          idx_query += "CREATE INDEX IF NOT EXISTS idx_feature_ms2_feature_id ON FEATURE_MS2 (FEATURE_ID);"
+        if check_sqlite_table(con, "SCORE_MS1"):
+          idx_query += "CREATE INDEX IF NOT EXISTS idx_score_ms1_feature_id ON SCORE_MS1 (FEATURE_ID);"
+        if check_sqlite_table(con, "SCORE_MS2"):
+          idx_query += "CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);"
+        if check_sqlite_table(con, "SCORE_IPF"):
+          idx_query += "CREATE INDEX IF NOT EXISTS idx_score_ipf_feature_id ON SCORE_IPF (FEATURE_ID);"
+          idx_query += "CREATE INDEX IF NOT EXISTS idx_score_ipf_peptide_id ON SCORE_IPF (PEPTIDE_ID);"
+
         query = '''
 SELECT RUN.ID AS id_run,
        PEPTIDE.ID AS id_peptide,
@@ -98,14 +103,19 @@ CREATE INDEX IF NOT EXISTS idx_run_run_id ON RUN (ID);
 CREATE INDEX IF NOT EXISTS idx_feature_run_id ON FEATURE (RUN_ID);
 
 CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
-CREATE INDEX IF NOT EXISTS idx_feature_ms1_feature_id ON FEATURE_MS1 (FEATURE_ID);
-CREATE INDEX IF NOT EXISTS idx_feature_ms2_feature_id ON FEATURE_MS2 (FEATURE_ID);
-CREATE INDEX IF NOT EXISTS idx_score_ms1_feature_id ON SCORE_MS1 (FEATURE_ID);
-CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);
-CREATE INDEX IF NOT EXISTS idx_score_ipf_feature_id ON SCORE_IPF (FEATURE_ID);
-
-CREATE INDEX IF NOT EXISTS idx_score_ipf_peptide_id ON SCORE_IPF (PEPTIDE_ID);
 '''
+        if check_sqlite_table(con, "FEATURE_MS1"):
+          idx_query += "CREATE INDEX IF NOT EXISTS idx_feature_ms1_feature_id ON FEATURE_MS1 (FEATURE_ID);"
+        if check_sqlite_table(con, "FEATURE_MS2"):
+          idx_query += "CREATE INDEX IF NOT EXISTS idx_feature_ms2_feature_id ON FEATURE_MS2 (FEATURE_ID);"
+        if check_sqlite_table(con, "SCORE_MS1"):
+          idx_query += "CREATE INDEX IF NOT EXISTS idx_score_ms1_feature_id ON SCORE_MS1 (FEATURE_ID);"
+        if check_sqlite_table(con, "SCORE_MS2"):
+          idx_query += "CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);"
+        if check_sqlite_table(con, "SCORE_IPF"):
+          idx_query += "CREATE INDEX IF NOT EXISTS idx_score_ipf_feature_id ON SCORE_IPF (FEATURE_ID);"
+          idx_query += "CREATE INDEX IF NOT EXISTS idx_score_ipf_peptide_id ON SCORE_IPF (PEPTIDE_ID);"
+
         query = '''
 SELECT RUN.ID AS id_run,
        PEPTIDE.ID AS id_peptide,
@@ -171,10 +181,14 @@ CREATE INDEX IF NOT EXISTS idx_run_run_id ON RUN (ID);
 CREATE INDEX IF NOT EXISTS idx_feature_run_id ON FEATURE (RUN_ID);
 
 CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
-CREATE INDEX IF NOT EXISTS idx_feature_ms1_feature_id ON FEATURE_MS1 (FEATURE_ID);
-CREATE INDEX IF NOT EXISTS idx_feature_ms2_feature_id ON FEATURE_MS2 (FEATURE_ID);
-CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);
 '''
+        if check_sqlite_table(con, "FEATURE_MS1"):
+          idx_query += "CREATE INDEX IF NOT EXISTS idx_feature_ms1_feature_id ON FEATURE_MS1 (FEATURE_ID);"
+        if check_sqlite_table(con, "FEATURE_MS2"):
+          idx_query += "CREATE INDEX IF NOT EXISTS idx_feature_ms2_feature_id ON FEATURE_MS2 (FEATURE_ID);"
+        if check_sqlite_table(con, "SCORE_MS2"):
+          idx_query += "CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);"
+
         query = '''
 SELECT RUN.ID AS id_run,
        PEPTIDE.ID AS id_peptide,
