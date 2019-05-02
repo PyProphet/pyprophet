@@ -66,7 +66,7 @@ def export_compound_tsv(infile, outfile, format, outcsv, max_rs_peakgroup_qvalue
 
 
 # ms1 and ms2 level 
-def export_score_plots(infile):
+def export_compound_score_plots(infile):
 
     con = sqlite3.connect(infile)
 

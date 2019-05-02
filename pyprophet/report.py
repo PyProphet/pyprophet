@@ -93,15 +93,6 @@ def plot_scores(df, out):
             top_decoys = df[df["DECOY"] == 1][idx]
 
             if not (top_targets.isnull().values.any() or top_targets.isnull().values.any()):
-                tdensity = gaussian_kde(top_targets)
-                tdensity.covariance_factor = lambda: .25
-                tdensity._compute_covariance()
-                ddensity = gaussian_kde(top_decoys)
-                ddensity.covariance_factor = lambda: .25
-                ddensity._compute_covariance()
-                xs = linspace(min(concatenate((top_targets, top_decoys))), max(
-                    concatenate((top_targets, top_decoys))), 200)
-
                 plt.figure(figsize=(10, 10))
                 plt.subplots_adjust(hspace=.5)
 
@@ -113,12 +104,23 @@ def plot_scores(df, out):
                     [top_targets, top_decoys], 20, color=['g', 'r'], label=['target', 'decoy'], histtype='bar')
                 plt.legend(loc=2)
 
-                plt.subplot(212)
-                plt.xlabel(idx)
-                plt.ylabel("density")
-                plt.plot(xs, tdensity(xs), color='g', label='target')
-                plt.plot(xs, ddensity(xs), color='r', label='decoy')
-                plt.legend(loc=2)
+                try:
+                    tdensity = gaussian_kde(top_targets)
+                    tdensity.covariance_factor = lambda: .25
+                    tdensity._compute_covariance()
+                    ddensity = gaussian_kde(top_decoys)
+                    ddensity.covariance_factor = lambda: .25
+                    ddensity._compute_covariance()
+                    xs = linspace(min(concatenate((top_targets, top_decoys))), max(
+                        concatenate((top_targets, top_decoys))), 200)
+                    plt.subplot(212)
+                    plt.xlabel(idx)
+                    plt.ylabel("density")
+                    plt.plot(xs, tdensity(xs), color='g', label='target')
+                    plt.plot(xs, ddensity(xs), color='r', label='decoy')
+                    plt.legend(loc=2)
+                except:
+                    plt.subplot(212)
 
                 pdf.savefig()
                 plt.close()
