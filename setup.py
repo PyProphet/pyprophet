@@ -36,7 +36,7 @@ setup(name='pyprophet',
       install_requires=[
           "Click",
           "numpy >= 1.9.0",
-          "scipy >= 0.9.0",
+          "scipy == 1.2.1",
           "pandas >= 0.17",
           "cython",
           "numexpr >= 2.1",
