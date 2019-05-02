@@ -59,12 +59,12 @@ INNER JOIN
    FROM FEATURE) AS FEATURE ON FEATURE_ID = FEATURE.ID
 INNER JOIN
   (SELECT ID,
-          CHARGE AS VAR_PRECURSOR_CHARGE,
+          CHARGE AS PRECURSOR_CHARGE,
           DECOY
    FROM PRECURSOR) AS PRECURSOR ON FEATURE.PRECURSOR_ID = PRECURSOR.ID
 INNER JOIN
   (SELECT PRECURSOR_ID AS ID,
-          COUNT(*) AS VAR_TRANSITION_NUM_SCORE
+          COUNT(*) AS TRANSITION_COUNT
    FROM TRANSITION_PRECURSOR_MAPPING
    INNER JOIN TRANSITION ON TRANSITION_PRECURSOR_MAPPING.TRANSITION_ID = TRANSITION.ID
    WHERE DETECTING==1
@@ -96,7 +96,7 @@ INNER JOIN
    FROM FEATURE) AS FEATURE ON FEATURE_ID = FEATURE.ID
 INNER JOIN
   (SELECT ID,
-          CHARGE AS VAR_PRECURSOR_CHARGE,
+          CHARGE AS PRECURSOR_CHARGE,
           DECOY
    FROM PRECURSOR) AS PRECURSOR ON FEATURE.PRECURSOR_ID = PRECURSOR.ID
 ORDER BY RUN_ID,
@@ -122,8 +122,8 @@ CREATE INDEX IF NOT EXISTS idx_feature_transition_transition_id ON FEATURE_TRANS
                 table = pd.read_sql_query('''
 SELECT TRANSITION.DECOY AS DECOY,
        FEATURE_TRANSITION.*,
-       PRECURSOR.CHARGE AS VAR_PRECURSOR_CHARGE,
-       TRANSITION.VAR_PRODUCT_CHARGE AS VAR_PRODUCT_CHARGE,
+       PRECURSOR.CHARGE AS PRECURSOR_CHARGE,
+       TRANSITION.PRODUCT_CHARGE AS PRODUCT_CHARGE,
        RUN_ID || '_' || FEATURE_TRANSITION.FEATURE_ID || '_' || PRECURSOR_ID || '_' || TRANSITION_ID AS GROUP_ID
 FROM FEATURE_TRANSITION
 INNER JOIN
@@ -136,7 +136,7 @@ INNER JOIN PRECURSOR ON FEATURE.PRECURSOR_ID = PRECURSOR.ID
 INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
 INNER JOIN
   (SELECT ID,
-          CHARGE AS VAR_PRODUCT_CHARGE,
+          CHARGE AS PRODUCT_CHARGE,
           DECOY
    FROM TRANSITION) AS TRANSITION ON FEATURE_TRANSITION.TRANSITION_ID = TRANSITION.ID
 WHERE RANK <= %s
@@ -172,6 +172,11 @@ ORDER BY RUN_ID,
                 table = table.rename(index=str, columns={ss_main_score.lower(): "main_"+ss_main_score.lower()})
             else:
                 raise click.ClickException("Main score column not present in data.")
+
+            # Enable transition count & precursor / product charge scores for XGBoost-based classifier
+            if classifier == 'XGBoost':
+                click.echo("Info: Enable number of transitions & precursor / product charge scores for XGBoost-based classifier")
+                table = table.rename(index=str, columns={'precursor_charge': 'var_precursor_charge', 'product_charge': 'var_product_charge', 'transition_count': 'var_transition_count'})
 
             con.close()
             return(table)
