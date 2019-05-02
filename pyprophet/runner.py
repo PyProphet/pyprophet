@@ -152,9 +152,6 @@ ORDER BY RUN_ID,
             else:
                 raise click.ClickException("Unspecified data level selected.")
 
-            # print(table.columns)
-            # sys.exit()
-
             # Append MS1 scores to MS2 table if selected
             if level == "ms1ms2":
                 if not check_sqlite_table(con, "FEATURE_MS1"):
