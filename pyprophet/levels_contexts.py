@@ -37,6 +37,91 @@ def statistics_report(data, outfile, context, analyte, parametric, pfdr, pi0_lam
 
     return(data)
 
+def infer_genes(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps):
+
+    con = sqlite3.connect(infile)
+
+    if not check_sqlite_table(con, "SCORE_MS2"):
+        raise click.ClickException("Apply scoring to MS2-level data before running gene-level scoring.")
+
+    if context in ['global','experiment-wide','run-specific']:
+        if context == 'global':
+            run_id = 'NULL'
+            group_id = 'GENE.ID'
+        else:
+            run_id = 'RUN_ID'
+            group_id = 'RUN_ID || "_" || GENE.ID'
+
+        con.executescript('''
+CREATE INDEX IF NOT EXISTS idx_peptide_gene_mapping_gene_id ON PEPTIDE_GENE_MAPPING (GENE_ID);
+CREATE INDEX IF NOT EXISTS idx_peptide_gene_mapping_peptide_id ON PEPTIDE_GENE_MAPPING (PEPTIDE_ID);
+CREATE INDEX IF NOT EXISTS idx_peptide_peptide_id ON PEPTIDE (ID);
+CREATE INDEX IF NOT EXISTS idx_precursor_peptide_mapping_peptide_id ON PRECURSOR_PEPTIDE_MAPPING (PEPTIDE_ID);
+CREATE INDEX IF NOT EXISTS idx_precursor_peptide_mapping_precursor_id ON PRECURSOR_PEPTIDE_MAPPING (PRECURSOR_ID);
+CREATE INDEX IF NOT EXISTS idx_precursor_precursor_id ON PRECURSOR (ID);
+CREATE INDEX IF NOT EXISTS idx_feature_precursor_id ON FEATURE (PRECURSOR_ID);
+CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
+CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);
+''')
+
+        data = pd.read_sql_query('''
+SELECT %s AS RUN_ID,
+       %s AS GROUP_ID,
+       GENE.ID AS GENE_ID,
+       PRECURSOR.DECOY AS DECOY,
+       SCORE,
+       "%s" AS CONTEXT
+FROM GENE
+INNER JOIN
+  (SELECT PEPTIDE_GENE_MAPPING.PEPTIDE_ID AS PEPTIDE_ID,
+          GENE_ID
+   FROM
+     (SELECT PEPTIDE_ID,
+             COUNT(*) AS NUM_GENES
+      FROM PEPTIDE_GENE_MAPPING
+      GROUP BY PEPTIDE_ID) AS GENES_PER_PEPTIDE
+   INNER JOIN PEPTIDE_GENE_MAPPING ON GENES_PER_PEPTIDE.PEPTIDE_ID = PEPTIDE_GENE_MAPPING.PEPTIDE_ID
+   WHERE NUM_GENES == 1) AS PEPTIDE_GENE_MAPPING ON GENE.ID = PEPTIDE_GENE_MAPPING.GENE_ID
+INNER JOIN PEPTIDE ON PEPTIDE_GENE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
+INNER JOIN PRECURSOR_PEPTIDE_MAPPING ON PEPTIDE.ID = PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID
+INNER JOIN PRECURSOR ON PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID = PRECURSOR.ID
+INNER JOIN FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID
+INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
+GROUP BY GROUP_ID
+HAVING MAX(SCORE)
+ORDER BY SCORE DESC
+''' % (run_id, group_id, context), con)
+    else:
+        raise click.ClickException("Unspecified context selected.")
+
+    data.columns = [col.lower() for col in data.columns]
+    con.close()
+
+    if context == 'run-specific':
+        data = data.groupby('run_id').apply(statistics_report, outfile, context, "gene", parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps).reset_index()
+
+    elif context in ['global', 'experiment-wide']:
+        data = statistics_report(data, outfile, context, "gene", parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps)
+
+    # store data in table
+    if infile != outfile:
+        copyfile(infile, outfile)
+
+    con = sqlite3.connect(outfile)
+
+    c = con.cursor()
+    c.execute('SELECT count(name) FROM sqlite_master WHERE type="table" AND name="SCORE_GENE"')
+    if c.fetchone()[0] == 1:
+        c.execute('DELETE FROM SCORE_GENE WHERE CONTEXT =="%s"' % context)
+    c.fetchall()
+
+    df = data[['context','run_id','gene_id','score','p_value','q_value','pep']]
+    df.columns = ['CONTEXT','RUN_ID','GENE_ID','SCORE','PVALUE','QVALUE','PEP']
+    table = "SCORE_GENE"
+    df.to_sql(table, con, index=False, dtype={"RUN_ID": "INTEGER"}, if_exists='append')
+
+    con.close()
+
 
 def infer_proteins(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps):
 
