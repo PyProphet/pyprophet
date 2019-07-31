@@ -665,7 +665,12 @@ CREATE TABLE SCORE_MS2(FEATURE_ID INTEGER, SCORE REAL);
 
 CREATE TABLE FEATURE(ID INT PRIMARY KEY NOT NULL,
                      RUN_ID INT NOT NULL,
-                     PRECURSOR_ID INT NOT NULL);
+                     PRECURSOR_ID INT NOT NULL,
+                     EXP_RT REAL NULL,
+                     NORM_RT REAL NULL,
+                     DELTA_RT REAL NULL,
+                     LEFT_WIDTH REAL NULL,
+                     RIGHT_WIDTH REAL NULL);
 ''')
 
     for infile in infiles:
