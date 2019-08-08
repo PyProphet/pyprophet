@@ -12,7 +12,7 @@ with open(path.join(this_directory, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
 setup(name='pyprophet',
-      version="2.1.4dev1",
+      version="2.1.4dev2",
       author="The PyProphet Developers",
       author_email="rocksportrocker@gmail.com",
       description="PyProphet: Semi-supervised learning and scoring of OpenSWATH results.",
@@ -36,7 +36,7 @@ setup(name='pyprophet',
       install_requires=[
           "Click",
           "numpy >= 1.9.0",
-          "scipy == 1.2.1",
+          "scipy",
           "pandas >= 0.17",
           "cython",
           "numexpr >= 2.1",
