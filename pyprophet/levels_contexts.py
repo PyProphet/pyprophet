@@ -548,7 +548,13 @@ CREATE TABLE FEATURE_TRANSITION AS SELECT * FROM sdb.FEATURE_TRANSITION LIMIT 0;
 DETACH DATABASE sdb;
 ''' % (infiles[0]))
 
+    conn.commit()
+    conn.close()
+
     for infile in infiles:
+        conn = sqlite3.connect(outfile)
+        c = conn.cursor()
+
         # Only create a single run entry (all files are presumably from the same run)
         if same_run:
             c.executescript('''INSERT INTO RUN (ID, FILENAME) VALUES (%s, '%s')''' % (runid, rname) )
@@ -562,11 +568,17 @@ INSERT INTO RUN SELECT * FROM sdb.RUN;
 DETACH DATABASE sdb;
 ''' % infile)
 
+        conn.commit()
+        conn.close()
+
         click.echo("Info: Merged runs of file %s to %s." % (infile, outfile))
 
     # Now merge the run-specific data into the output file:
     #   Note: only tables FEATURE, FEATURE_MS1, FEATURE_MS2 and FEATURE_TRANSITION are run-specific
     for infile in infiles:
+        conn = sqlite3.connect(outfile)
+        c = conn.cursor()
+
         c.executescript('''
 ATTACH DATABASE "%s" AS sdb; 
 
@@ -574,12 +586,26 @@ INSERT INTO FEATURE SELECT * FROM sdb.FEATURE;
 
 DETACH DATABASE sdb;
 ''' % infile)
+
+        conn.commit()
+        conn.close()
+
         click.echo("Info: Merged generic features of file %s to %s." % (infile, outfile))
+        
     if same_run:
+        conn = sqlite3.connect(outfile)
+        c = conn.cursor()
+
         # Fix run id assuming we only have a single run
         c.executescript('''UPDATE FEATURE SET RUN_ID = %s''' % runid)
 
+        conn.commit()
+        conn.close()
+
     for infile in infiles:
+        conn = sqlite3.connect(outfile)
+        c = conn.cursor()
+
         c.executescript('''
 ATTACH DATABASE "%s" AS sdb;
 
@@ -589,9 +615,16 @@ FROM sdb.FEATURE_MS1;
 
 DETACH DATABASE sdb;
 ''' % infile)
+
+        conn.commit()
+        conn.close()
+
         click.echo("Info: Merged MS1 features of file %s to %s." % (infile, outfile))
 
     for infile in infiles:
+        conn = sqlite3.connect(outfile)
+        c = conn.cursor()
+
         c.executescript('''
 ATTACH DATABASE "%s" AS sdb;
 
@@ -601,9 +634,16 @@ FROM sdb.FEATURE_MS2;
 
 DETACH DATABASE sdb;
 ''' % infile)
+
+        conn.commit()
+        conn.close()
+
         click.echo("Info: Merged MS2 features of file %s to %s." % (infile, outfile))
 
     for infile in infiles:
+        conn = sqlite3.connect(outfile)
+        c = conn.cursor()
+
         c.executescript('''
 ATTACH DATABASE "%s" AS sdb;
 
@@ -613,10 +653,11 @@ FROM sdb.FEATURE_TRANSITION;
 
 DETACH DATABASE sdb;
 ''' % infile)
-        click.echo("Info: Merged transition features of file %s to %s." % (infile, outfile))
 
-    conn.commit()
-    conn.close()
+        conn.commit()
+        conn.close()
+
+        click.echo("Info: Merged transition features of file %s to %s." % (infile, outfile))
 
     click.echo("Info: All OSWS files were merged.")
 
@@ -673,29 +714,56 @@ CREATE TABLE FEATURE(ID INT PRIMARY KEY NOT NULL,
                      RIGHT_WIDTH REAL NULL);
 ''')
 
+    conn.commit()
+    conn.close()
+
     for infile in infiles:
+        conn = sqlite3.connect(outfile)
+        c = conn.cursor()
+
         # Only create a single run entry (all files are presumably from the same run)
         if same_run:
             c.executescript('''INSERT INTO RUN (ID, FILENAME) VALUES (%s, '%s')''' % (runid, rname) )
             break;
         else:
             c.executescript('ATTACH DATABASE "%s" AS sdb; INSERT INTO RUN SELECT * FROM sdb.RUN; DETACH DATABASE sdb;' % infile)
+
+        conn.commit()
+        conn.close()
+
         click.echo("Info: Merged runs of file %s to %s." % (infile, outfile))
 
     for infile in infiles:
+        conn = sqlite3.connect(outfile)
+        c = conn.cursor()
+
         c.executescript('ATTACH DATABASE "%s" AS sdb; INSERT INTO FEATURE SELECT * FROM sdb.FEATURE; DETACH DATABASE sdb;' % infile)
+
+        conn.commit()
+        conn.close()
+
         click.echo("Info: Merged generic features of file %s to %s." % (infile, outfile))
 
     if same_run:
+        conn = sqlite3.connect(outfile)
+        c = conn.cursor()
+
         # Fix run id assuming we only have a single run
         c.executescript('''UPDATE FEATURE SET RUN_ID = %s''' % runid)
 
-    for infile in infiles:
-        c.executescript('ATTACH DATABASE "%s" AS sdb; INSERT INTO SCORE_MS2 SELECT * FROM sdb.SCORE_MS2; DETACH DATABASE sdb;' % infile)
-        click.echo("Info: Merged MS2 scores of file %s to %s." % (infile, outfile))
+        conn.commit()
+        conn.close()
 
-    conn.commit()
-    conn.close()
+    for infile in infiles:
+        conn = sqlite3.connect(outfile)
+        c = conn.cursor()
+
+        c.executescript('ATTACH DATABASE "%s" AS sdb; INSERT INTO SCORE_MS2 SELECT * FROM sdb.SCORE_MS2; DETACH DATABASE sdb;' % infile)
+
+        conn.commit()
+        conn.close()
+
+        click.echo("Info: Merged MS2 scores of file %s to %s." % (infile, outfile))
 
     click.echo("Info: All reduced OSWR files were merged.")
 
