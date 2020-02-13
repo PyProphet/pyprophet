@@ -7,7 +7,7 @@ from .runner import PyProphetLearner, PyProphetWeightApplier
 from .ipf import infer_peptidoforms
 from .levels_contexts import infer_peptides, infer_proteins, infer_genes, subsample_osw, reduce_osw, merge_osw, backpropagate_oswr
 from .export import export_tsv, export_score_plots
-from .export_compound import export_compound_tsv
+from .export_compound import export_compound_tsv, export_compound_score_plots 
 from .filter import filter_sqmass
 from .data_handling import (transform_pi0_lambda, transform_threads, transform_subsample_ratio)
 from functools import update_wrapper
