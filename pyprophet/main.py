@@ -9,9 +9,10 @@ from .levels_contexts import infer_peptides, infer_proteins, infer_genes, subsam
 from .export import export_tsv, export_score_plots
 from .export_compound import export_compound_tsv
 from .filter import filter_sqmass
-from .data_handling import (transform_pi0_lambda, transform_threads, transform_subsample_ratio)
+from .data_handling import (transform_pi0_lambda, transform_threads, transform_subsample_ratio, check_sqlite_table)
 from functools import update_wrapper
 import sqlite3
+from tabulate import tabulate
 
 from hyperopt import hp
 
@@ -363,3 +364,40 @@ def filter(sqmassfiles, infile, max_precursor_pep, max_peakgroup_pep, max_transi
     """
 
     filter_sqmass(sqmassfiles, infile, max_precursor_pep, max_peakgroup_pep, max_transition_pep)
+
+# Print statistics
+@cli.command()
+@click.option('--in', 'infile', required=True, type=click.Path(exists=True), help='PyProphet input file.')
+def statistics(infile):
+    """
+    Print PyProphet statistics
+    """
+
+    con = sqlite3.connect(infile)
+
+    qts = [0.01, 0.05, 0.10]
+
+    for qt in qts:
+        if check_sqlite_table(con, 'SCORE_MS2'):
+            peakgroups = pd.read_sql('SELECT * FROM SCORE_MS2 INNER JOIN FEATURE ON SCORE_MS2.feature_id = FEATURE.id INNER JOIN RUN ON FEATURE.RUN_ID = RUN.ID WHERE RANK==1;' , con)
+
+            click.echo("Total peakgroups (q-value<%s): %s" % (qt, len(peakgroups[peakgroups['QVALUE']<qt][['FEATURE_ID']].drop_duplicates())))
+            click.echo("Total peakgroups per run (q-value<%s):" % qt)
+            click.echo(tabulate(peakgroups[peakgroups['QVALUE']<qt].groupby(['FILENAME'])['FEATURE_ID'].nunique().reset_index(), showindex=False))
+            click.echo(10*"=")
+
+        if check_sqlite_table(con, 'SCORE_PEPTIDE'):
+            peptides_global = pd.read_sql('SELECT * FROM SCORE_PEPTIDE WHERE CONTEXT=="global";' , con)
+            peptides = pd.read_sql('SELECT * FROM SCORE_PEPTIDE INNER JOIN RUN ON SCORE_PEPTIDE.RUN_ID = RUN.ID;' , con)
+
+            click.echo("Total peptides (global context) (q-value<%s): %s" % (qt, len(peptides_global[peptides_global['QVALUE']<qt][['PEPTIDE_ID']].drop_duplicates())))
+            click.echo(tabulate(peptides[peptides['QVALUE']<qt].groupby(['FILENAME'])['PEPTIDE_ID'].nunique().reset_index(), showindex=False))
+            click.echo(10*"=")
+
+        if check_sqlite_table(con, 'SCORE_PROTEIN'):
+            proteins_global = pd.read_sql('SELECT * FROM SCORE_PROTEIN WHERE CONTEXT=="global";' , con)
+            proteins = pd.read_sql('SELECT * FROM SCORE_PROTEIN INNER JOIN RUN ON SCORE_PROTEIN.RUN_ID = RUN.ID;' , con)
+
+            click.echo("Total proteins (global context) (q-value<%s): %s" % (qt, len(proteins_global[proteins_global['QVALUE']<qt][['PROTEIN_ID']].drop_duplicates())))
+            click.echo(tabulate(proteins[proteins['QVALUE']<qt].groupby(['FILENAME'])['PROTEIN_ID'].nunique().reset_index(), showindex=False))
+            click.echo(10*"=")

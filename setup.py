@@ -44,7 +44,8 @@ setup(name='pyprophet',
           "xgboost",
           "hyperopt",
           "statsmodels >= 0.8.0",
-          "matplotlib"
+          "matplotlib",
+          "tabulate"
       ],
       entry_points={
           'console_scripts': [
