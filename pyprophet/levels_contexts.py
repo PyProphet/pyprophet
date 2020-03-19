@@ -492,7 +492,7 @@ def merge_osw(infiles, outfile, templatefile, same_run, merge_post_scored_runs):
 
     if reduced:
         merge_oswr(infiles, outfile, templatefile, same_run)
-    if else merge_post_scored_runs:
+    elif merge_post_scored_runs:
 	merge_oswps(infiles, outfile, templatefile, same_run)
     else:
         merge_osws(infiles, outfile, templatefile, same_run)
