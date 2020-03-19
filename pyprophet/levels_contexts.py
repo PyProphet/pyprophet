@@ -490,7 +490,7 @@ def merge_osw(infiles, outfile, templatefile, same_run, merge_post_scored_runs):
     reduced = check_sqlite_table(conn, "SCORE_MS2")
     conn.close()
     print( "merge_post_scored_runs: " + str(merge_post_scored_runs) ) 
-    if reduced and not merge_post_score_runs:
+    if reduced and not merge_post_scored_runs:
         click.echo("Calling reduced osws merge function")
         merge_oswr(infiles, outfile, templatefile, same_run)
     elif merge_post_scored_runs:
