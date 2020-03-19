@@ -260,7 +260,7 @@ def reduce(infile, outfile):
 @click.option('--out','outfile', required=True, type=click.Path(exists=False), help='Merged OSW output file.')
 @click.option('--same_run/--no-same_run', default=False, help='Assume input files are from same run (deletes run information).')
 @click.option('--template','templatefile', required=True, type=click.Path(exists=False), help='Template OSW file.')
-@click.option('--merged_post_scored_runs', 'merged_post_scored_runs', default=False, help='Merge OSW output files that have already been scored.')
+@click.option('--merged_post_scored_runs', is_flag=True, help='Merge OSW output files that have already been scored.')
 def merge(infiles, outfile, same_run, templatefile, merged_post_scored_runs):
     """
     Merge multiple OSW files and (for large experiments, it is recommended to subsample first).
