@@ -485,13 +485,15 @@ WHERE ID IN
     click.echo("Info: OSW file was reduced for multi-run scoring.")
 
 
-def merge_osw(infiles, outfile, templatefile, same_run):
+def merge_osw(infiles, outfile, templatefile, same_run, merge_post_scored_runs):
     conn = sqlite3.connect(infiles[0])
     reduced = check_sqlite_table(conn, "SCORE_MS2")
     conn.close()
 
     if reduced:
         merge_oswr(infiles, outfile, templatefile, same_run)
+    if else merge_post_scored_runs:
+	merge_oswps(infiles, outfile, templatefile, same_run)
     else:
         merge_osws(infiles, outfile, templatefile, same_run)
 
@@ -762,6 +764,175 @@ CREATE TABLE FEATURE(ID INT PRIMARY KEY NOT NULL,
 
     click.echo("Info: All reduced OSWR files were merged.")
 
+def merge_oswps(infiles, outfile, templatefile, same_run):
+    click.echo("Info: Merging all Scored Runs.")
+    # Copy the first file to have a template
+    copyfile(templatefile, outfile)
+    conn = sqlite3.connect(outfile)
+    c = conn.cursor()
+    if same_run:
+        c.execute("SELECT ID, FILENAME FROM RUN")
+        result = c.fetchall()
+        if len(result) != 1:
+            raise click.ClickException("Input for same-run merge contains more than one run.")
+        runid, rname = result[0]
+
+    original_tables = c.execute(''' SELECT name FROM sqlite_master WHERE type='table'; ''')
+    original_tables = [name[0] for name in original_tables]
+    ## Get Score tables table_present
+    score_tables = [name for name in original_tables if "SCORE" in name]
+    if len(score_tables) > 0:
+        create_scores_query = '\n'.join( ['CREATE TABLE ' + score_tbl + ' AS SELECT * FROM sdb.' + score_tbl + ' LIMIT 0;' for score_tbl in score_tables] )
+    else:
+        create_scores_query = ""
+
+    click.echo( '''First File input: %s''' %( infiles[0] ) )
+
+    c.executescript('''
+PRAGMA synchronous = OFF;
+DROP TABLE IF EXISTS RUN;
+DROP TABLE IF EXISTS FEATURE;
+DROP TABLE IF EXISTS FEATURE_MS1;
+DROP TABLE IF EXISTS FEATURE_MS2;
+DROP TABLE IF EXISTS FEATURE_TRANSITION;
+DROP TABLE IF EXISTS SCORE_MS1;
+DROP TABLE IF EXISTS SCORE_MS2;
+DROP TABLE IF EXISTS SCORE_TRANSITION;
+DROP TABLE IF EXISTS SCORE_PEPTIDE;
+DROP TABLE IF EXISTS SCORE_PROTEIN;
+DROP TABLE IF EXISTS SCORE_IPF;
+ATTACH DATABASE "%s" AS sdb;
+CREATE TABLE RUN AS SELECT * FROM sdb.RUN LIMIT 0;
+CREATE TABLE FEATURE AS SELECT * FROM sdb.FEATURE LIMIT 0;
+CREATE TABLE FEATURE_MS1 AS SELECT * FROM sdb.FEATURE_MS1 LIMIT 0;
+CREATE TABLE FEATURE_MS2 AS SELECT * FROM sdb.FEATURE_MS2 LIMIT 0;
+CREATE TABLE FEATURE_TRANSITION AS SELECT * FROM sdb.FEATURE_TRANSITION LIMIT 0;
+%s
+DETACH DATABASE sdb;
+''' % (infiles[0], create_scores_query) )
+
+    conn.commit()
+    conn.close()
+
+    for infile in infiles:
+        conn = sqlite3.connect(outfile)
+        c = conn.cursor()
+
+        # Only create a single run entry (all files are presumably from the same run)
+        if same_run:
+            c.executescript('''INSERT INTO RUN (ID, FILENAME) VALUES (%s, '%s')''' % (runid, rname) )
+            break;
+        else:
+            c.executescript('''
+ATTACH DATABASE "%s" AS sdb;
+INSERT INTO RUN SELECT * FROM sdb.RUN;
+DETACH DATABASE sdb;
+''' % infile)
+
+        conn.commit()
+        conn.close()
+
+        click.echo("Info: Merged runs of file %s to %s." % (infile, outfile))
+
+    # Now merge the run-specific data into the output file:
+    #   Note: only tables FEATURE, FEATURE_MS1, FEATURE_MS2 and FEATURE_TRANSITION are run-specific
+    for infile in infiles:
+        conn = sqlite3.connect(outfile)
+        c = conn.cursor()
+
+        c.executescript('''
+ATTACH DATABASE "%s" AS sdb; 
+INSERT INTO FEATURE SELECT * FROM sdb.FEATURE; 
+DETACH DATABASE sdb;
+''' % infile)
+
+        conn.commit()
+        conn.close()
+
+        click.echo("Info: Merged generic features of file %s to %s." % (infile, outfile))
+
+    if same_run:
+        conn = sqlite3.connect(outfile)
+        c = conn.cursor()
+
+        # Fix run id assuming we only have a single run
+        c.executescript('''UPDATE FEATURE SET RUN_ID = %s''' % runid)
+
+        conn.commit()
+        conn.close()
+
+    for infile in infiles:
+        conn = sqlite3.connect(outfile)
+        c = conn.cursor()
+
+        c.executescript('''
+ATTACH DATABASE "%s" AS sdb;
+INSERT INTO FEATURE_MS1
+SELECT *
+FROM sdb.FEATURE_MS1;
+DETACH DATABASE sdb;
+''' % infile)
+
+        conn.commit()
+        conn.close()
+
+        click.echo("Info: Merged MS1 features of file %s to %s." % (infile, outfile))
+
+    for infile in infiles:
+        conn = sqlite3.connect(outfile)
+        c = conn.cursor()
+
+        c.executescript('''
+ATTACH DATABASE "%s" AS sdb;
+INSERT INTO FEATURE_MS2
+SELECT *
+FROM sdb.FEATURE_MS2;
+DETACH DATABASE sdb;
+''' % infile)
+
+        conn.commit()
+        conn.close()
+
+        click.echo("Info: Merged MS2 features of file %s to %s." % (infile, outfile))
+
+    for infile in infiles:
+        conn = sqlite3.connect(outfile)
+        c = conn.cursor()
+
+        c.executescript('''
+ATTACH DATABASE "%s" AS sdb;
+INSERT INTO FEATURE_TRANSITION
+SELECT *
+FROM sdb.FEATURE_TRANSITION;
+DETACH DATABASE sdb;
+''' % infile)
+
+        conn.commit()
+        conn.close()
+
+        click.echo("Info: Merged transition features of file %s to %s." % (infile, outfile))
+
+
+    for infile in infiles:
+        for score_tbl in score_tables:
+            conn = sqlite3.connect(outfile)
+            c = conn.cursor()
+
+            c.executescript('''
+    ATTACH DATABASE "%s" AS sdb;
+    INSERT INTO %s
+    SELECT *
+    FROM sdb.%s;
+    DETACH DATABASE sdb;
+    ''' % (infile, score_tbl, score_tbl) )
+
+            conn.commit()
+            conn.close()
+
+            click.echo("Info: Merged %s table of file %s to %s." % (score_tbl, infile, outfile))
+
+
+    click.echo("Info: All OSWS files were merged.")
 
 def backpropagate_oswr(infile, outfile, apply_scores):
     # store data in table
