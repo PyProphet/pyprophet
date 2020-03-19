@@ -789,27 +789,27 @@ def merge_oswps(infiles, outfile, templatefile, same_run):
     click.echo( '''First File input: %s''' %( infiles[0] ) )
 
     c.executescript('''
-PRAGMA synchronous = OFF;
-DROP TABLE IF EXISTS RUN;
-DROP TABLE IF EXISTS FEATURE;
-DROP TABLE IF EXISTS FEATURE_MS1;
-DROP TABLE IF EXISTS FEATURE_MS2;
-DROP TABLE IF EXISTS FEATURE_TRANSITION;
-DROP TABLE IF EXISTS SCORE_MS1;
-DROP TABLE IF EXISTS SCORE_MS2;
-DROP TABLE IF EXISTS SCORE_TRANSITION;
-DROP TABLE IF EXISTS SCORE_PEPTIDE;
-DROP TABLE IF EXISTS SCORE_PROTEIN;
-DROP TABLE IF EXISTS SCORE_IPF;
-ATTACH DATABASE "%s" AS sdb;
-CREATE TABLE RUN AS SELECT * FROM sdb.RUN LIMIT 0;
-CREATE TABLE FEATURE AS SELECT * FROM sdb.FEATURE LIMIT 0;
-CREATE TABLE FEATURE_MS1 AS SELECT * FROM sdb.FEATURE_MS1 LIMIT 0;
-CREATE TABLE FEATURE_MS2 AS SELECT * FROM sdb.FEATURE_MS2 LIMIT 0;
-CREATE TABLE FEATURE_TRANSITION AS SELECT * FROM sdb.FEATURE_TRANSITION LIMIT 0;
-%s
-DETACH DATABASE sdb;
-''' % (infiles[0], create_scores_query) )
+    PRAGMA synchronous = OFF;
+    DROP TABLE IF EXISTS RUN;
+    DROP TABLE IF EXISTS FEATURE;
+    DROP TABLE IF EXISTS FEATURE_MS1;
+    DROP TABLE IF EXISTS FEATURE_MS2;
+    DROP TABLE IF EXISTS FEATURE_TRANSITION;
+    DROP TABLE IF EXISTS SCORE_MS1;
+    DROP TABLE IF EXISTS SCORE_MS2;
+    DROP TABLE IF EXISTS SCORE_TRANSITION;
+    DROP TABLE IF EXISTS SCORE_PEPTIDE;
+    DROP TABLE IF EXISTS SCORE_PROTEIN;
+    DROP TABLE IF EXISTS SCORE_IPF;
+    ATTACH DATABASE "%s" AS sdb;
+    CREATE TABLE RUN AS SELECT * FROM sdb.RUN LIMIT 0;
+    CREATE TABLE FEATURE AS SELECT * FROM sdb.FEATURE LIMIT 0;
+    CREATE TABLE FEATURE_MS1 AS SELECT * FROM sdb.FEATURE_MS1 LIMIT 0;
+    CREATE TABLE FEATURE_MS2 AS SELECT * FROM sdb.FEATURE_MS2 LIMIT 0;
+    CREATE TABLE FEATURE_TRANSITION AS SELECT * FROM sdb.FEATURE_TRANSITION LIMIT 0;
+    %s
+    DETACH DATABASE sdb;
+    ''' % (infiles[0], create_scores_query) )
 
     conn.commit()
     conn.close()
@@ -824,10 +824,10 @@ DETACH DATABASE sdb;
             break;
         else:
             c.executescript('''
-ATTACH DATABASE "%s" AS sdb;
-INSERT INTO RUN SELECT * FROM sdb.RUN;
-DETACH DATABASE sdb;
-''' % infile)
+    ATTACH DATABASE "%s" AS sdb;
+    INSERT INTO RUN SELECT * FROM sdb.RUN;
+    DETACH DATABASE sdb;
+    ''' % infile)
 
         conn.commit()
         conn.close()
@@ -841,10 +841,10 @@ DETACH DATABASE sdb;
         c = conn.cursor()
 
         c.executescript('''
-ATTACH DATABASE "%s" AS sdb; 
-INSERT INTO FEATURE SELECT * FROM sdb.FEATURE; 
-DETACH DATABASE sdb;
-''' % infile)
+    ATTACH DATABASE "%s" AS sdb; 
+    INSERT INTO FEATURE SELECT * FROM sdb.FEATURE; 
+    DETACH DATABASE sdb;
+    ''' % infile)
 
         conn.commit()
         conn.close()
@@ -866,12 +866,12 @@ DETACH DATABASE sdb;
         c = conn.cursor()
 
         c.executescript('''
-ATTACH DATABASE "%s" AS sdb;
-INSERT INTO FEATURE_MS1
-SELECT *
-FROM sdb.FEATURE_MS1;
-DETACH DATABASE sdb;
-''' % infile)
+    ATTACH DATABASE "%s" AS sdb;
+    INSERT INTO FEATURE_MS1
+    SELECT *
+    FROM sdb.FEATURE_MS1;
+    DETACH DATABASE sdb;
+    ''' % infile)
 
         conn.commit()
         conn.close()
@@ -883,12 +883,12 @@ DETACH DATABASE sdb;
         c = conn.cursor()
 
         c.executescript('''
-ATTACH DATABASE "%s" AS sdb;
-INSERT INTO FEATURE_MS2
-SELECT *
-FROM sdb.FEATURE_MS2;
-DETACH DATABASE sdb;
-''' % infile)
+    ATTACH DATABASE "%s" AS sdb;
+    INSERT INTO FEATURE_MS2
+    SELECT *
+    FROM sdb.FEATURE_MS2;
+    DETACH DATABASE sdb;
+    ''' % infile)
 
         conn.commit()
         conn.close()
@@ -900,12 +900,12 @@ DETACH DATABASE sdb;
         c = conn.cursor()
 
         c.executescript('''
-ATTACH DATABASE "%s" AS sdb;
-INSERT INTO FEATURE_TRANSITION
-SELECT *
-FROM sdb.FEATURE_TRANSITION;
-DETACH DATABASE sdb;
-''' % infile)
+    ATTACH DATABASE "%s" AS sdb;
+    INSERT INTO FEATURE_TRANSITION
+    SELECT *
+    FROM sdb.FEATURE_TRANSITION;
+    DETACH DATABASE sdb;
+    ''' % infile)
 
         conn.commit()
         conn.close()
