@@ -445,7 +445,23 @@ WHERE sdb.PRECURSOR.ID IN
 
 DETACH DATABASE sdb;
 ''' % infile)
-    click.echo("Info: Subsampled precursor table of file %s to %s. For scoring merged subsampled file." % (infile, outfile))
+        click.echo("Info: Subsampled precursor table of file %s to %s. For scoring merged subsampled file." % (infile, outfile))
+
+       c.executescript('''
+PRAGMA synchronous = OFF;
+
+ATTACH DATABASE "%s" AS sdb;
+
+CREATE TABLE TRANSITION_PRECURSOR_MAPPING AS 
+SELECT * 
+FROM sdb.TRANSITION_PRECURSOR_MAPPING
+WHERE sdb.TRANSITION_PRECURSOR_MAPPING.TRANSITION_ID IN
+    (SELECT ID
+     FROM TRANSITION);
+
+DETACH DATABASE sdb;
+''' % infile)
+        click.echo("Info: Subsampled transition_precursor_mapping table of file %s to %s. For scoring merged subsampled file." % (infile, outfile)) 
 
     conn.commit()
     conn.close()
