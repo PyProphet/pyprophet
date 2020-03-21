@@ -291,7 +291,7 @@ def subsample_osw(infile, outfile, subsample_ratio, test):
     n_runs = conn.cursor().execute("SELECT COUNT(*) AS NUMBER_OF_RUNS FROM RUN").fetchall()[0][0]
     multiple_runs = True if n_runs > 1 else False
     print( multiple_runs )
-    click.echo("Warn: There are %s runs in %s" %(n_runs, multiple_runs)
+    click.echo("Warn: There are %s runs in %s" %(n_runs, multiple_runs))
     conn.close()
     
     conn = sqlite3.connect(outfile)
