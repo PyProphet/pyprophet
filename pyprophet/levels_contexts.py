@@ -287,6 +287,8 @@ def subsample_osw(infile, outfile, subsample_ratio, test):
     ms1_present = check_sqlite_table(conn, "FEATURE_MS1")
     ms2_present = check_sqlite_table(conn, "FEATURE_MS2")
     transition_present = check_sqlite_table(conn, "FEATURE_TRANSITION")
+    ## Check if infile contains multiple entries for run table, if only 1 entry, then infile is a single run, else infile is multiples run
+    multiple_runs = True if conn.cursor().execute("SELECT COUNT(*) AS NUMBER_OF_RUNS FROM RUN").fetchall()[0][0] > 1 else False
     conn.close()
 
     conn = sqlite3.connect(outfile)
@@ -424,6 +426,23 @@ WHERE sdb.FEATURE_TRANSITION.FEATURE_ID IN
 DETACH DATABASE sdb;
 ''' % infile)
         click.echo("Info: Subsampled transition features of file %s to %s." % (infile, outfile))
+
+    if multiple_runs:
+        c.executescript('''
+PRAGMA synchronous = OFF;
+
+ATTACH DATABASE "%s" AS sdb;
+
+CREATE TABLE PRECURSOR AS 
+SELECT * 
+FROM sdb.PRECURSOR
+WHERE sdb.PRECURSOR.ID IN
+    (SELECT PRECURSOR_ID
+     FROM FEATURE);
+
+DETACH DATABASE sdb;
+''' % infile)
+    click.echo("Info: Subsampled precursor table of file %s to %s. For scoring merged subsampled file." % (infile, outfile))
 
     conn.commit()
     conn.close()
