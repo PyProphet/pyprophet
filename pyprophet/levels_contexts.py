@@ -290,6 +290,7 @@ def subsample_osw(infile, outfile, subsample_ratio, test):
     ## Check if infile contains multiple entries for run table, if only 1 entry, then infile is a single run, else infile is multiples run
     n_runs = conn.cursor().execute("SELECT COUNT(*) AS NUMBER_OF_RUNS FROM RUN").fetchall()[0][0]
     multiple_runs = True if n_runs > 1 else False
+    print( multiple_runs )
     click.echo("Warn: There are %s runs in %s" %(n_runs, multiple_runs)
     conn.close()
     
