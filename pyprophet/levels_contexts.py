@@ -447,7 +447,7 @@ DETACH DATABASE sdb;
 ''' % infile)
         click.echo("Info: Subsampled precursor table of file %s to %s. For scoring merged subsampled file." % (infile, outfile))
 
-       c.executescript('''
+        c.executescript('''
 PRAGMA synchronous = OFF;
 
 ATTACH DATABASE "%s" AS sdb;
