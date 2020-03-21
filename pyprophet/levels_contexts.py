@@ -288,9 +288,11 @@ def subsample_osw(infile, outfile, subsample_ratio, test):
     ms2_present = check_sqlite_table(conn, "FEATURE_MS2")
     transition_present = check_sqlite_table(conn, "FEATURE_TRANSITION")
     ## Check if infile contains multiple entries for run table, if only 1 entry, then infile is a single run, else infile is multiples run
-    multiple_runs = True if conn.cursor().execute("SELECT COUNT(*) AS NUMBER_OF_RUNS FROM RUN").fetchall()[0][0] > 1 else False
+    n_runs = conn.cursor().execute("SELECT COUNT(*) AS NUMBER_OF_RUNS FROM RUN").fetchall()[0][0]
+    multiple_runs = True if n_runs > 1 else False
+    click.echo("Warn: There are %s runs in %s" %(n_runs, multiple_runs)
     conn.close()
-
+    
     conn = sqlite3.connect(outfile)
     c = conn.cursor()
 
