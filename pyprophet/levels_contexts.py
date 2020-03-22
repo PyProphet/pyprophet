@@ -478,7 +478,7 @@ WHERE sdb.TRANSITION.ID IN
 
 DETACH DATABASE sdb;
 ''' % infile)
-        click.echo("Info: Subsampled transition_precursor_mapping table of file %s to %s. For scoring merged subsampled file." % (infile, outfile)) 
+        click.echo("Info: Subsampled transition table of file %s to %s. For scoring merged subsampled file." % (infile, outfile)) 
 
     conn.commit()
     conn.close()
