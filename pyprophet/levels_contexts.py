@@ -287,7 +287,7 @@ def subsample_osw(infile, outfile, subsample_ratio, test):
     ms1_present = check_sqlite_table(conn, "FEATURE_MS1")
     ms2_present = check_sqlite_table(conn, "FEATURE_MS2")
     transition_present = check_sqlite_table(conn, "FEATURE_TRANSITION")
-    ## Check if infile contains multiple entries for run table, if only 1 entry, then infile is a single run, else infile is multiples run
+    ## Check if infile contains multiple entries for run table, if only 1 entry, then infile is a single run, else infile contains multiples run
     n_runs = conn.cursor().execute("SELECT COUNT(*) AS NUMBER_OF_RUNS FROM RUN").fetchall()[0][0]
     multiple_runs = True if n_runs > 1 else False
     if multiple_runs: 
@@ -544,7 +544,6 @@ def merge_osw(infiles, outfile, templatefile, same_run, merge_post_scored_runs):
     conn = sqlite3.connect(infiles[0])
     reduced = check_sqlite_table(conn, "SCORE_MS2")
     conn.close()
-    print( "merge_post_scored_runs: " + str(merge_post_scored_runs) ) 
     if reduced and not merge_post_scored_runs:
         click.echo("Calling reduced osws merge function")
         merge_oswr(infiles, outfile, templatefile, same_run)
@@ -989,8 +988,18 @@ def merge_oswps(infiles, outfile, templatefile, same_run):
 
             click.echo("Info: Merged %s table of file %s to %s." % (score_tbl, infile, outfile))
 
+    ## Vacuum to clean and re-write rootpage indexes
+    conn =  sqlite3.connect(outfile)
+    c = conn.cursor()
 
-    click.echo("Info: All OSWS files were merged.")
+    c.executescript('VACUUM')
+
+    conn.commit()
+    conn.close()
+    
+    click.echo("Info: Cleaned and re-wrote indexing meta-data for %s.: " % (outfile))
+
+    click.echo("Info: All Post-Scored OSWS files were merged.")
 
 def backpropagate_oswr(infile, outfile, apply_scores):
     # store data in table
