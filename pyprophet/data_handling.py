@@ -172,7 +172,6 @@ def prepare_data_table(table,
     # filter columns based on input score names (unless default is set)
     var_column_names = []
     if ss_score_filter != '':
-
         input_scores = ss_score_filter.split(sep=',')
 
         # use metabolomics scores and allows to add scores in addition specified by ss_score_filter
@@ -194,7 +193,6 @@ def prepare_data_table(table,
                 var_column_names.append(score)
             else:
                 score_not_found.append(score)
-
         if score_not_found:
             not_found = ", ".join(["'%s'" % m for m in score_not_found])
             raise click.ClickException("Column(s) %s not found in input file. Please check your score filter (--ss_score_filter)" % not_found)
