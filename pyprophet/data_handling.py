@@ -14,6 +14,20 @@ except NameError:
     def profile(fun):
         return fun
 
+def use_metabolomics_scores():
+    return [
+            "var_ms1_isotope_overlap_score",
+            "var_ms1_xcorr_coelution_contrast",
+            "var_ms1_massdev_score",
+            "var_ms1_xcorr_coelution",  
+            "var_ms1_isotope_correlation_score",
+            "var_isotope_overlap_score",
+            "var_isotope_correlation_score",
+            "var_intensity_score",
+            "var_massdev_score",
+            "var_library_corr",
+            "var_norm_rt_score"
+            ]
 
 # Parameter transformation functions
 def transform_pi0_lambda(ctx, param, value):
@@ -110,7 +124,9 @@ def cleanup_and_check(df):
     return df_cleaned
 
 
-def prepare_data_table(table, tg_id_name="transition_group_id",
+def prepare_data_table(table,
+                       ss_score_filter,
+                       tg_id_name="transition_group_id",
                        decoy_name="decoy",
                        main_score_name=None,
                        score_columns=None,
@@ -131,7 +147,7 @@ def prepare_data_table(table, tg_id_name="transition_group_id",
     if score_columns is not None:
         # we assume there is exactly one main_score in score_columns as we checked that in
         # the run which persisted the classifier:
-        var_column_names = [c for c in score_columns if c.startswith("var_")]
+        var_columns_available = [c for c in score_columns if c.startswith("var_")]
         main_score_name = [c for c in score_columns if c.startswith("main_")][0]
     else:
         if main_score_name is not None:
@@ -148,10 +164,41 @@ def prepare_data_table(table, tg_id_name="transition_group_id",
             main_score_name = main_columns.pop()
 
         # get all other score columns, name beginning with "var_"
-        var_column_names = tuple(h for h in header if h.startswith("var_"))
+        var_columns_available = tuple(h for h in header if h.startswith("var_"))
 
-        if not var_column_names:
+        if not var_columns_available:
             raise Exception("No column \"var_*\" is in input file(s).")
+
+    # filter columns based on input score names (unless default is set)
+    var_column_names = []
+    if ss_score_filter != '':
+        input_scores = ss_score_filter.split(sep=',')
+
+        # use metabolomics scores and allows to add scores in addition specified by ss_score_filter
+        if 'metabolomics' in ss_score_filter:
+            input_scores.remove('metabolomics')
+            metabolomics_scores = use_metabolomics_scores()
+            input_scores += metabolomics_scores
+            input_scores = list(set(input_scores))
+
+        # remove main score from filter list if it was specified twice (main, var)
+        if main_score_name.strip("main_") in input_scores:
+            input_scores.remove(main_score_name.strip("main_"))
+
+        var_columns_available_s = set(var_columns_available)
+        score_not_found = []
+
+        for score in input_scores:
+            if score in var_columns_available_s:
+                var_column_names.append(score)
+            else:
+                score_not_found.append(score)
+        if score_not_found:
+            not_found = ", ".join(["'%s'" % m for m in score_not_found])
+            raise click.ClickException("Column(s) %s not found in input file. Please check your score filter (--ss_score_filter)" % not_found)
+
+    else:
+        var_column_names = var_columns_available
 
     # collect needed data:
     empty_col = [0] * N
