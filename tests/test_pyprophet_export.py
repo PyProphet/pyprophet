@@ -60,6 +60,17 @@ def _run_osw(regtest, temp_folder, transition_quantification=False, peptide=Fals
 
     print(pd.read_csv("test_data.tsv", sep="\t", nrows=100).sort_index(axis=1),file=regtest)
 
+def _run_osw_unscored(regtest, temp_folder, transition_quantification=False, peptide=False, protein=False):
+    os.chdir(temp_folder)
+    data_path = os.path.join(DATA_FOLDER, "test_data.osw")
+    shutil.copy(data_path, temp_folder)
+
+    # export
+    cmdline = "pyprophet export --in=test_data.osw --out=test_data.tsv --format=legacy_merged"
+
+    stdout = _run_cmdline(cmdline)
+
+    print(pd.read_csv("test_data.tsv", sep="\t", nrows=100).sort_index(axis=1),file=regtest)
 
 def _run_ipf(regtest, temp_folder, transition_quantification=False, ipf="disable"):
     os.chdir(temp_folder)
@@ -88,14 +99,24 @@ def _run_ipf(regtest, temp_folder, transition_quantification=False, ipf="disable
     stdout = _run_cmdline(cmdline)
 
     print(pd.read_csv("test_data.tsv", sep="\t", nrows=100).sort_index(axis=1),file=regtest)
+    
+def _run_compound_unscored(regtest, temp_folder):
+    os.chdir(temp_folder)
+    data_path= os.path.join(DATA_FOLDER, "test_data_compound.osw")
+    shutil.copy(data_path, temp_folder)
+    
+    # export
+    cmdline = "pyprophet export-compound --in=test_data_compound.osw --out=test_data_compound_unscored.tsv --format=legacy_merged"
+    stdout = _run_cmdline(cmdline)
 
+    print(pd.read_csv("test_data_compound_unscored.tsv", sep="\t", nrows=100).sort_index(axis=1),file=regtest)
 
 def _run_compound_ms1(regtest, temp_folder):
     os.chdir(temp_folder)
     data_path= os.path.join(DATA_FOLDER, "test_data_compound.osw")
     shutil.copy(data_path, temp_folder)
     
-    # MS2-level
+    # MS1-level
     cmdline = "pyprophet score --in=test_data_compound.osw --level=ms1 --test"
 
     # export
@@ -109,7 +130,7 @@ def _run_compound_ms2(regtest, temp_folder):
     data_path= os.path.join(DATA_FOLDER, "test_data_compound.osw")
     shutil.copy(data_path, temp_folder)
     
-    # MS1-level
+    # MS2-level
     cmdline = "pyprophet score --in=test_data_compound.osw --level=ms2 --test"
 
     # export
@@ -149,3 +170,9 @@ def test_compound_0(tmpdir, regtest):
     
 def test_compound_1(tmpdir, regtest):
     _run_compound_ms2(regtest, tmpdir.strpath)
+
+def test_compound_unscored(tmpdir, regtest):
+	_run_compound_unscored(regtest, tmpdir.strpath)
+	
+def test_osw_unscored(tmpdir, regtest):
+	_run_osw_unscored(regtest, tmpdir.strpath)
