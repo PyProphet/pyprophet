@@ -2,10 +2,10 @@ sudo: required
 dist: xenial
 language: python
 python:
-  - "3.5"
   - "3.6"
   - "3.7"
   - "3.8"
+  - "3.9"
 before_install:
  - sudo apt-get update
 install:
@@ -23,8 +23,8 @@ install:
   - pip install -U networkx
   - travis_retry python setup.py develop
 script: 
-  - if [[ $TRAVIS_PYTHON_VERSION == 3.5* ]]; then py.test tests/; fi
   - if [[ $TRAVIS_PYTHON_VERSION == 3.6* ]]; then py.test tests/; fi
   - if [[ $TRAVIS_PYTHON_VERSION == 3.7* ]]; then py.test tests/; fi
   - if [[ $TRAVIS_PYTHON_VERSION == 3.8* ]]; then py.test tests/; fi
+  - if [[ $TRAVIS_PYTHON_VERSION == 3.9* ]]; then py.test tests/; fi
 cache: pip
