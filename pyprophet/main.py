@@ -381,7 +381,7 @@ def statistics(infile):
 
     for qt in qts:
         if check_sqlite_table(con, 'SCORE_MS2'):
-            peakgroups = pd.read_sql('SELECT * FROM SCORE_MS2 INNER JOIN FEATURE ON SCORE_MS2.feature_id = FEATURE.id INNER JOIN RUN ON FEATURE.RUN_ID = RUN.ID WHERE RANK==1;' , con)
+            peakgroups = pd.read_sql('SELECT * FROM SCORE_MS2 INNER JOIN FEATURE ON SCORE_MS2.feature_id = FEATURE.id INNER JOIN PRECURSOR ON FEATURE.precursor_id = PRECURSOR.id INNER JOIN RUN ON FEATURE.RUN_ID = RUN.ID WHERE RANK==1 AND DECOY==0;' , con)
 
             click.echo("Total peakgroups (q-value<%s): %s" % (qt, len(peakgroups[peakgroups['QVALUE']<qt][['FEATURE_ID']].drop_duplicates())))
             click.echo("Total peakgroups per run (q-value<%s):" % qt)
@@ -389,16 +389,16 @@ def statistics(infile):
             click.echo(10*"=")
 
         if check_sqlite_table(con, 'SCORE_PEPTIDE'):
-            peptides_global = pd.read_sql('SELECT * FROM SCORE_PEPTIDE WHERE CONTEXT=="global";' , con)
-            peptides = pd.read_sql('SELECT * FROM SCORE_PEPTIDE INNER JOIN RUN ON SCORE_PEPTIDE.RUN_ID = RUN.ID;' , con)
+            peptides_global = pd.read_sql('SELECT * FROM SCORE_PEPTIDE INNER JOIN PEPTIDE ON SCORE_PEPTIDE.peptide_id = PEPTIDE.id WHERE CONTEXT=="global" AND DECOY==0;' , con)
+            peptides = pd.read_sql('SELECT * FROM SCORE_PEPTIDE INNER JOIN PEPTIDE ON SCORE_PEPTIDE.peptide_id = PEPTIDE.id INNER JOIN RUN ON SCORE_PEPTIDE.RUN_ID = RUN.ID WHERE DECOY==0;' , con)
 
             click.echo("Total peptides (global context) (q-value<%s): %s" % (qt, len(peptides_global[peptides_global['QVALUE']<qt][['PEPTIDE_ID']].drop_duplicates())))
             click.echo(tabulate(peptides[peptides['QVALUE']<qt].groupby(['FILENAME'])['PEPTIDE_ID'].nunique().reset_index(), showindex=False))
             click.echo(10*"=")
 
         if check_sqlite_table(con, 'SCORE_PROTEIN'):
-            proteins_global = pd.read_sql('SELECT * FROM SCORE_PROTEIN WHERE CONTEXT=="global";' , con)
-            proteins = pd.read_sql('SELECT * FROM SCORE_PROTEIN INNER JOIN RUN ON SCORE_PROTEIN.RUN_ID = RUN.ID;' , con)
+            proteins_global = pd.read_sql('SELECT * FROM SCORE_PROTEIN INNER JOIN PROTEIN ON SCORE_PROTEIN.protein_id = PROTEIN.id WHERE CONTEXT=="global" AND DECOY==0;' , con)
+            proteins = pd.read_sql('SELECT * FROM SCORE_PROTEIN INNER JOIN PROTEIN ON SCORE_PROTEIN.protein_id = PROTEIN.id INNER JOIN RUN ON SCORE_PROTEIN.RUN_ID = RUN.ID WHERE DECOY==0;' , con)
 
             click.echo("Total proteins (global context) (q-value<%s): %s" % (qt, len(proteins_global[proteins_global['QVALUE']<qt][['PROTEIN_ID']].drop_duplicates())))
             click.echo(tabulate(proteins[proteins['QVALUE']<qt].groupby(['FILENAME'])['PROTEIN_ID'].nunique().reset_index(), showindex=False))
