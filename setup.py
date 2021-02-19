@@ -2,8 +2,9 @@ import sys
 import numpy
 from setuptools import setup, find_packages
 from distutils.extension import Extension
+from Cython.Build import cythonize
 
-ext_modules = [Extension("pyprophet._optimized", ["pyprophet/_optimized.c"])]
+ext_modules = [Extension("pyprophet._optimized", ["pyprophet/_optimized.pyx"])]
 
 # read the contents of README for PyPI
 from os import path
@@ -52,5 +53,5 @@ setup(name='pyprophet',
               "pyprophet=pyprophet.main:cli",
               ]
       },
-      ext_modules=ext_modules,
+      ext_modules=cythonize(ext_modules, compiler_directives={'language_level' : "3"}),
       )
