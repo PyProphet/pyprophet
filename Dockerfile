@@ -1,5 +1,5 @@
 # PyProphet Dockerfile
-FROM python:3.7.3
+FROM python:3.9.1
 
 # install numpy & cython
 RUN pip install numpy cython
