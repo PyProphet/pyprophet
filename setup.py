@@ -53,5 +53,5 @@ setup(name='pyprophet',
               "pyprophet=pyprophet.main:cli",
               ]
       },
-      ext_modules=cythonize(ext_modules, compiler_directives={'language_level' : "3"}),
+      ext_modules=cythonize(ext_modules, compiler_directives={'language_level' : "2"}),
       )
