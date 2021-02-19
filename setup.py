@@ -13,7 +13,7 @@ with open(path.join(this_directory, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
 setup(name='pyprophet',
-      version="2.1.6",
+      version="2.1.7",
       author="The PyProphet Developers",
       author_email="rocksportrocker@gmail.com",
       description="PyProphet: Semi-supervised learning and scoring of OpenSWATH results.",

@@ -1,8 +1,8 @@
 # PyProphet Dockerfile
 FROM python:3.7.3
 
-# install numpy
-RUN pip install numpy
+# install numpy & cython
+RUN pip install numpy cython
 
 # install PyProphet and dependencies
 ADD . /pyprophet
