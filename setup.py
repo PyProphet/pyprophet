@@ -15,7 +15,7 @@ ext_modules = []
 
 if use_cython:
     ext_modules += [Extension("pyprophet._optimized", ["pyprophet/_optimized.pyx"])]
-    cmdclass.update({'build_ext': build_ext})
+    cmdclass.update({'build_ext': build_ext })
 else:
     ext_modules += [Extension("pyprophet._optimized", ["pyprophet/_optimized.c"])]
 
