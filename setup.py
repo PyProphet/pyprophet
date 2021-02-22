@@ -4,7 +4,7 @@ from setuptools import setup, find_packages
 from distutils.extension import Extension
 
 try:
-    from Cython.Distutils import build_ext
+    from Cython.Build import cythonize
 except ImportError:
     use_cython = False
 else:
@@ -15,7 +15,7 @@ ext_modules = []
 
 if use_cython:
     ext_modules += [Extension("pyprophet._optimized", ["pyprophet/_optimized.pyx"])]
-    cmdclass.update({'build_ext': build_ext})
+    ext_modules = cythonize(ext_modules)
 else:
     ext_modules += [Extension("pyprophet._optimized", ["pyprophet/_optimized.c"])]
 
