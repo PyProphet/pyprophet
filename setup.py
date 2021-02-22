@@ -3,20 +3,7 @@ import numpy
 from setuptools import setup, find_packages
 from distutils.extension import Extension
 
-try:
-    from Cython.Build import cythonize
-except ImportError:
-    use_cython = False
-else:
-    use_cython = True
-
-cmdclass = {}
-ext_modules = [Extension("pyprophet._optimized", ["pyprophet/_optimized.pyx"])]
-
-if use_cython:
-    ext_modules += cythonize(ext_modules)
-else:
-    ext_modules += [Extension("pyprophet._optimized", ["pyprophet/_optimized.c"])]
+ext_modules = [Extension("pyprophet._optimized", ["pyprophet/_optimized.c"])]
 
 # read the contents of README for PyPI
 from os import path
