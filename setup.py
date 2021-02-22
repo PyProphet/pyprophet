@@ -11,11 +11,10 @@ else:
     use_cython = True
 
 cmdclass = {}
-ext_modules = []
+ext_modules = [Extension("pyprophet._optimized", ["pyprophet/_optimized.pyx"])]
 
 if use_cython:
-    ext_modules += [Extension("pyprophet._optimized", ["pyprophet/_optimized.pyx"])]
-    ext_modules = cythonize(ext_modules)
+    ext_modules += cythonize(ext_modules)
 else:
     ext_modules += [Extension("pyprophet._optimized", ["pyprophet/_optimized.c"])]
 
