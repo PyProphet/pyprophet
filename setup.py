@@ -2,9 +2,22 @@ import sys
 import numpy
 from setuptools import setup, find_packages
 from distutils.extension import Extension
-from Cython.Build import cythonize
 
-ext_modules = [Extension("pyprophet._optimized", ["pyprophet/_optimized.pyx"])]
+try:
+    from Cython.Build import cythonize
+except ImportError:
+    use_cython = False
+else:
+    use_cython = True
+
+cmdclass = {}
+ext_modules = []
+
+if use_cython:
+    ext_modules += [Extension("pyprophet._optimized", ["pyprophet/_optimized.pyx"])]
+    ext_modules = cythonize(ext_modules)
+else:
+    ext_modules += [Extension("pyprophet._optimized", ["pyprophet/_optimized.c"])]
 
 # read the contents of README for PyPI
 from os import path
@@ -13,7 +26,7 @@ with open(path.join(this_directory, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
 setup(name='pyprophet',
-      version="2.1.7",
+      version="2.1.8",
       author="The PyProphet Developers",
       author_email="rocksportrocker@gmail.com",
       description="PyProphet: Semi-supervised learning and scoring of OpenSWATH results.",
@@ -53,5 +66,5 @@ setup(name='pyprophet',
               "pyprophet=pyprophet.main:cli",
               ]
       },
-      ext_modules=cythonize(ext_modules, compiler_directives={'language_level' : "2"}),
+      ext_modules=ext_modules,
       )
