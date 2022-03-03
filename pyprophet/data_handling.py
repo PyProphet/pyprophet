@@ -8,6 +8,11 @@ import multiprocessing
 
 from .optimized import find_top_ranked, rank
 
+# For Editing/Adding Tables to OSW file
+import sqlite3
+import re
+from shutil import copyfile
+
 try:
     profile
 except NameError:
@@ -93,6 +98,149 @@ def check_for_unique_blocks(tg_ids):
                 return False
             seen.add(tg_id)
     return True
+
+# For Editing/Adding Tables in OSW Sqlite file
+def unimod_to_codename_map(_data):
+    # print(_data["MODIFIED_SEQUENCE"])
+    _data["ID_TYPE"] = np.where(_data["MODIFIED_SEQUENCE"].str.contains("UniMod"), "UNIMOD_ID", "CODENAME_ID")
+    _data = _data[["ID", "ID_TYPE"]]
+    if (_data.shape[0] == 1):
+        if (np.all(_data[["ID_TYPE"]] == "CODENAME_ID")):
+            _data = pd.concat([_data, pd.DataFrame(
+                [{"ID": -1, "ID_TYPE": "UNIMOD_ID"}])])
+        else:
+            _data = pd.concat(
+                [pd.DataFrame([{"ID": -1, "ID_TYPE": "CODENAME_ID"}]), _data])
+    _data["index"] = 0
+    _data = _data.pivot(index="index", columns="ID_TYPE", values="ID")
+    # print(_data)
+    return _data
+
+def get_sequence_all_mods(modified_sequence_string):
+    # Import AASequence from pyopenms for handling modification names
+    try:
+        from pyopenms import AASequence
+    except ModuleNotFoundError:
+        raise ModuleNotFoundError("Could not import AASequence from pyopenms.")
+        
+    seq = AASequence.fromString(modified_sequence_string)
+    term_mods = [seq.getNTerminalModificationName(), seq.getCTerminalModificationName()]
+    mods = [aa.getModificationName() for aa in seq if aa.isModified()]
+    all_mods = term_mods + mods
+    # Remove empty strings ''
+    all_mods = list(filter(None, all_mods))
+    all_mods.sort()
+    seq_all_mods = "_".join([seq.toUnmodifiedString()] + all_mods)
+    return seq_all_mods
+
+def set_peptidoform_group(sequence_group):
+    sequence_group["PEPTIDOFORM_GROUP"] = sequence_group.groupby(["UNMODIFIED_SEQUENCE", "tmp"]).ngroup()
+    return sequence_group[["ID", "PEPTIDOFORM_GROUP"]]
+
+def create_unimod_codename_mapping(infile, outfile, threads=1):
+
+    # Import dask dataframe for parallelism with partioned dataframes
+    have_dask = True
+    try: 
+        import dask.dataframe as dd
+        from tqdm.dask import TqdmCallback
+    except ModuleNotFoundError:
+        print("Could not import dask dataframe, will perform computations serially.")
+        have_dask = False
+        pass
+
+    click.echo("Info: Reading Peptide Table.")
+
+    con = sqlite3.connect(infile)
+    peptide_df = pd.read_sql_query('''SELECT * FROM PEPTIDE''', con)
+    con.close()
+
+    unimod_peptides = peptide_df["MODIFIED_SEQUENCE"][peptide_df["MODIFIED_SEQUENCE"].str.contains("UniMod")]
+    codename_peptides = peptide_df["MODIFIED_SEQUENCE"][np.logical_not(peptide_df["MODIFIED_SEQUENCE"].str.contains("UniMod"))]
+
+    # Create tmp col replacing UniMod ID or Codename ID with @ symbol to group the same peptidoform id
+    # TODO: Make the regex more flexible, or use pyopenms?
+    peptide_df["tmp"] = peptide_df["MODIFIED_SEQUENCE"].apply(lambda x: re.sub("\\(Label:\\d+\\w+\\(\\d+\\)\\d+\\w+\\(\\d+\\)\\)|\\(\\w+\\)|\\(\\w+[:]\\d+\\)", "(@)", x))
+    # peptide_df.groupby(["tmp"])[["ID", "MODIFIED_SEQUENCE"]].apply(unimod_to_codename_map)
+
+    if have_dask:
+        click.echo("Info: Partioning Dask Dataframe Parallelism.")
+        peptide_df = dd.from_pandas(peptide_df, npartitions=threads)
+        peptide_df["tmp_index"] = peptide_df["tmp"]
+        peptide_df = peptide_df.set_index('tmp_index')
+        with TqdmCallback(desc=f"INFO: Creating UniMod to Codename mapping for {len(peptide_df['tmp'].unique())} peptidoforms with {threads} processes"):
+            unimod_codename_mapping = peptide_df.groupby(["tmp"])[["ID", "MODIFIED_SEQUENCE"]] \
+                .apply(unimod_to_codename_map, meta={'CODENAME_ID': 'int64', 'UNIMOD_ID': 'int64'}) \
+                .compute(scheduler='processes')
+    else:
+        click.echo(
+            f"INFO: Creating UniMod to Codename mapping for {len(peptide_df['tmp'].unique())} peptidoforms")
+        unimod_codename_mapping = peptide_df.groupby(
+            ["tmp"])[["ID", "MODIFIED_SEQUENCE"]].apply(unimod_to_codename_map)
+
+    unimod_codename_mapping = unimod_codename_mapping.reset_index(drop=True)
+
+    if infile != outfile:
+        copyfile(infile, outfile)
+
+    click.echo("INFO: Writing UNIMOD_CODENAME_MAPPING Table to file.")
+    con = sqlite3.connect(outfile)
+    unimod_codename_mapping.to_sql("UNIMOD_CODENAME_MAPPING", con, index=False, if_exists='replace')
+
+    con.close()
+
+def create_peptidoform_group_mapping(infile, outfile, threads=1):
+    # Import dask dataframe for parallelism with partioned dataframes
+    have_dask = True
+    try: 
+        import dask.dataframe as dd
+        from tqdm.dask import TqdmCallback
+    except ModuleNotFoundError:
+        print("Could not import dask dataframe, will perform computations serially.")
+        have_dask = False
+        pass
+    
+    # Import AASequence from pyopenms for handling modification names
+    try:
+        from pyopenms import AASequence
+    except ModuleNotFoundError:
+        raise ModuleNotFoundError("Could not import AASequence from pyopenms.")
+
+    click.echo("Info: Reading Peptide Table.")
+
+    con = sqlite3.connect(infile)
+    peptide_df = pd.read_sql_query('''SELECT * FROM PEPTIDE''', con)
+    con.close()
+
+    peptide_df["tmp"] = peptide_df["MODIFIED_SEQUENCE"].apply(get_sequence_all_mods)
+
+    if have_dask and threads!=1:
+        peptide_df = dd.from_pandas(peptide_df, npartitions=threads)
+        peptide_df["UNMODIFIED_SEQUENCE_INDEX"] = peptide_df["UNMODIFIED_SEQUENCE"]
+        peptide_df = peptide_df.set_index('UNMODIFIED_SEQUENCE_INDEX')
+        with TqdmCallback(desc=f"INFO: Getting Sequence Peptidoform groups for {len(peptide_df['tmp'].unique())} peptidoform groups with {threads} processes"):
+            peptidoform_grouping = peptide_df[["ID", "UNMODIFIED_SEQUENCE", "tmp"]].groupby(["UNMODIFIED_SEQUENCE"]).apply(set_peptidoform_group, meta={"ID":"int64", "PEPTIDOFORM_GROUP":"int64"}).compute(scheduler='processes')
+            peptidoform_grouping.reset_index(drop=True, inplace=True)
+        peptide_df = peptide_df.compute()
+        peptide_df.reset_index(drop=True, inplace=True)
+    else:
+        peptidoform_grouping = peptide_df[["UNMODIFIED_SEQUENCE", "tmp"]].groupby(["UNMODIFIED_SEQUENCE"]).apply(set_peptidoform_group)
+        peptidoform_grouping.reset_index(drop=True, inplace=True)
+    
+    click.echo("INFO: Adding PEPTIDOFORM_GROUP column to PEPTIDE Table")
+    peptide_df = peptide_df.merge(peptidoform_grouping, on="ID")
+    peptide_df.drop(columns=["tmp"], inplace=True)
+    peptide_df = peptide_df.reindex(['ID', 'UNMODIFIED_SEQUENCE', 'MODIFIED_SEQUENCE', 'PEPTIDOFORM_GROUP', 'DECOY'], axis=1)
+    
+    if infile != outfile:
+        copyfile(infile, outfile)
+
+    con = sqlite3.connect(outfile)
+
+    peptide_df.to_sql("PEPTIDE", con, index=False, if_exists='replace')
+
+    con.close()
+    
 
 
 @profile

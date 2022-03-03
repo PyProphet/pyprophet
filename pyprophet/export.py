@@ -47,6 +47,11 @@ CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
         if check_sqlite_table(con, "SCORE_IPF"):
           idx_query += "CREATE INDEX IF NOT EXISTS idx_score_ipf_feature_id ON SCORE_IPF (FEATURE_ID);"
           idx_query += "CREATE INDEX IF NOT EXISTS idx_score_ipf_peptide_id ON SCORE_IPF (PEPTIDE_ID);"
+        if check_sqlite_table(con, "UNIMOD_CODENAME_MAPPING"):
+          idx_query += "CREATE INDEX IF NOT EXISTS idx_unimod_codename_mapping_unimod_id_id ON UNIMOD_CODENAME_MAPPING (UNIMOD_ID);"
+          idx_query += "CREATE INDEX IF NOT EXISTS idx_unimod_codename_mapping_codename_id_id ON UNIMOD_CODENAME_MAPPING (CODENAME_ID);"
+        else:
+          raise ValueError("Input file does not have UNIMOD_CODENAME_MAPPING required for exportating data for IPF results. See edit-osw module to add UNIMOD_CODENAME_MAPPING to your OSW file.")
 
         query = '''
 SELECT RUN.ID AS id_run,
@@ -88,7 +93,15 @@ LEFT JOIN FEATURE_MS1 ON FEATURE_MS1.FEATURE_ID = FEATURE.ID
 LEFT JOIN FEATURE_MS2 ON FEATURE_MS2.FEATURE_ID = FEATURE.ID
 %s
 LEFT JOIN SCORE_MS2 ON SCORE_MS2.FEATURE_ID = FEATURE.ID
-LEFT JOIN SCORE_IPF ON SCORE_IPF.FEATURE_ID = FEATURE.ID
+LEFT JOIN (SELECT 
+FEATURE_ID,
+UNIMOD_CODENAME_MAPPING.UNIMOD_ID AS PEPTIDE_ID,
+UNIMOD_CODENAME_MAPPING.CODENAME_ID AS IPF_PEPTIDE_ID,
+PRECURSOR_PEAKGROUP_PEP,
+PEP,
+QVALUE
+FROM UNIMOD_CODENAME_MAPPING
+INNER JOIN SCORE_IPF ON SCORE_IPF.PEPTIDE_ID = UNIMOD_CODENAME_MAPPING.CODENAME_ID) AS SCORE_IPF ON SCORE_IPF.FEATURE_ID = FEATURE.ID
 INNER JOIN PEPTIDE AS PEPTIDE_IPF ON SCORE_IPF.PEPTIDE_ID = PEPTIDE_IPF.ID
 WHERE SCORE_MS2.QVALUE < %s AND SCORE_IPF.PEP < %s
 ORDER BY transition_group_id,
@@ -125,6 +138,11 @@ CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
         if check_sqlite_table(con, "SCORE_IPF"):
           idx_query += "CREATE INDEX IF NOT EXISTS idx_score_ipf_feature_id ON SCORE_IPF (FEATURE_ID);"
           idx_query += "CREATE INDEX IF NOT EXISTS idx_score_ipf_peptide_id ON SCORE_IPF (PEPTIDE_ID);"
+        if check_sqlite_table(con, "UNIMOD_CODENAME_MAPPING"):
+          idx_query += "CREATE INDEX IF NOT EXISTS idx_unimod_codename_mapping_unimod_id_id ON UNIMOD_CODENAME_MAPPING (UNIMOD_ID);"
+          idx_query += "CREATE INDEX IF NOT EXISTS idx_unimod_codename_mapping_codename_id_id ON UNIMOD_CODENAME_MAPPING (CODENAME_ID);"
+        else:
+          raise ValueError("Input file does not have UNIMOD_CODENAME_MAPPING required for exportating data for IPF results. See edit-osw module to add UNIMOD_CODENAME_MAPPING to your OSW file.")
 
         query = '''
 SELECT RUN.ID AS id_run,
@@ -173,7 +191,15 @@ SELECT FEATURE_ID AS id,
        PRECURSOR_PEAKGROUP_PEP AS ipf_precursor_peakgroup_pep,
        PEP AS ipf_peptidoform_pep,
        QVALUE AS ipf_peptidoform_m_score
-FROM SCORE_IPF
+FROM (SELECT 
+FEATURE_ID,
+UNIMOD_CODENAME_MAPPING.UNIMOD_ID AS PEPTIDE_ID,
+UNIMOD_CODENAME_MAPPING.CODENAME_ID AS IPF_PEPTIDE_ID,
+PRECURSOR_PEAKGROUP_PEP,
+PEP,
+QVALUE
+FROM UNIMOD_CODENAME_MAPPING
+INNER JOIN SCORE_IPF ON SCORE_IPF.PEPTIDE_ID = UNIMOD_CODENAME_MAPPING.CODENAME_ID) AS SCORE_IPF
 INNER JOIN PEPTIDE ON SCORE_IPF.PEPTIDE_ID = PEPTIDE.ID
 WHERE SCORE_IPF.PEP < %s;
 ''' % ipf_max_peptidoform_pep

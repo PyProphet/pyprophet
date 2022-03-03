@@ -9,7 +9,7 @@ from .levels_contexts import infer_peptides, infer_proteins, infer_genes, subsam
 from .export import export_tsv, export_score_plots
 from .export_compound import export_compound_tsv
 from .filter import filter_sqmass
-from .data_handling import (transform_pi0_lambda, transform_threads, transform_subsample_ratio, check_sqlite_table)
+from .data_handling import (transform_pi0_lambda, transform_threads, transform_subsample_ratio, check_sqlite_table, create_unimod_codename_mapping, create_peptidoform_group_mapping)
 from functools import update_wrapper
 import sqlite3
 from tabulate import tabulate
@@ -71,10 +71,12 @@ def cli():
 @click.option('--ipf_min_transition_sn', default=0, show_default=True, type=float, help='Minimum log signal-to-noise level to consider transitions in IPF. Set -1 to disable this filter.')
 # TRIC
 @click.option('--tric_chromprob/--no-tric_chromprob', default=False, show_default=True, help='Whether chromatogram probabilities for TRIC should be computed.')
+# Visualization
+@click.option('--color_palette', default='normal', show_default=True, type=click.Choice(['normal', 'protan', 'deutran', 'tritan']), help='Color palette to use in reports.')
 # Processing
 @click.option('--threads', default=1, show_default=True, type=int, help='Number of threads used for semi-supervised learning. -1 means all available CPUs.', callback=transform_threads)
 @click.option('--test/--no-test', default=False, show_default=True, help='Run in test mode with fixed seed.')
-def score(infile, outfile, classifier, xgb_autotune, apply_weights, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, ss_main_score, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, level, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn, tric_chromprob, threads, test, ss_score_filter):
+def score(infile, outfile, classifier, xgb_autotune, apply_weights, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, ss_main_score, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, level, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn, tric_chromprob, threads, test, ss_score_filter, color_palette):
     """
     Conduct semi-supervised learning and error-rate estimation for MS1, MS2 and transition-level data. 
     """
@@ -92,9 +94,9 @@ def score(infile, outfile, classifier, xgb_autotune, apply_weights, xeval_fracti
     xgb_params_space = {'eta': hp.uniform('eta', 0.0, 0.3), 'gamma': hp.uniform('gamma', 0.0, 0.5), 'max_depth': hp.quniform('max_depth', 2, 8, 1), 'min_child_weight': hp.quniform('min_child_weight', 1, 5, 1), 'subsample': 1, 'colsample_bytree': 1, 'colsample_bylevel': 1, 'colsample_bynode': 1, 'lambda': hp.uniform('lambda', 0.0, 1.0), 'alpha': hp.uniform('alpha', 0.0, 1.0), 'scale_pos_weight': 1.0, 'silent': 1, 'objective': 'binary:logitraw', 'nthread': 1, 'eval_metric': 'auc'}
 
     if not apply_weights:
-        PyProphetLearner(infile, outfile, classifier, xgb_hyperparams, xgb_params, xgb_params_space, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, ss_main_score, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, level, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn, tric_chromprob, threads, test, ss_score_filter).run()
+        PyProphetLearner(infile, outfile, classifier, xgb_hyperparams, xgb_params, xgb_params_space, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, ss_main_score, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, level, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn, tric_chromprob, threads, test, ss_score_filter, color_palette).run()
     else:
-        PyProphetWeightApplier(infile, outfile, classifier, xgb_hyperparams, xgb_params, xgb_params_space, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, ss_main_score, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, level, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn, tric_chromprob, threads, test, apply_weights, ss_score_filter).run()
+        PyProphetWeightApplier(infile, outfile, classifier, xgb_hyperparams, xgb_params, xgb_params_space, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, ss_main_score, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, level, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn, tric_chromprob, threads, test, apply_weights, ss_score_filter, color_palette).run()
 
 
 # IPF
@@ -143,7 +145,9 @@ def ipf(infile, outfile, ipf_ms1_scoring, ipf_ms2_scoring, ipf_h0, ipf_grouped_f
 @click.option('--lfdr_transformation', default='probit', show_default=True, type=click.Choice(['probit', 'logit']), help='Either a "probit" or "logit" transformation is applied to the p-values so that a local FDR estimate can be formed that does not involve edge effects of the [0,1] interval in which the p-values lie.')
 @click.option('--lfdr_adj', default=1.5, show_default=True, type=float, help='Numeric value that is applied as a multiple of the smoothing bandwidth used in the density estimation.')
 @click.option('--lfdr_eps', default=np.power(10.0,-8), show_default=True, type=float, help='Numeric value that is threshold for the tails of the empirical p-value distribution.')
-def peptide(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps):
+# Visualization
+@click.option('--color_palette', default='normal', show_default=True, type=click.Choice(['normal', 'protan', 'deutran', 'tritan']), help='Color palette to use in reports.')
+def peptide(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, color_palette):
     """
     Infer peptides and conduct error-rate estimation in different contexts.
     """
@@ -153,7 +157,7 @@ def peptide(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_method, 
     else:
         outfile = outfile
 
-    infer_peptides(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps)
+    infer_peptides(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, color_palette)
 
 
 # Gene-level inference
@@ -175,7 +179,9 @@ def peptide(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_method, 
 @click.option('--lfdr_transformation', default='probit', show_default=True, type=click.Choice(['probit', 'logit']), help='Either a "probit" or "logit" transformation is applied to the p-values so that a local FDR estimate can be formed that does not involve edge effects of the [0,1] interval in which the p-values lie.')
 @click.option('--lfdr_adj', default=1.5, show_default=True, type=float, help='Numeric value that is applied as a multiple of the smoothing bandwidth used in the density estimation.')
 @click.option('--lfdr_eps', default=np.power(10.0,-8), show_default=True, type=float, help='Numeric value that is threshold for the tails of the empirical p-value distribution.')
-def gene(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps):
+# Visualization
+@click.option('--color_palette', default='normal', show_default=True, type=click.Choice(['normal', 'protan', 'deutran', 'tritan']), help='Color palette to use in reports.')
+def gene(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, color_palette):
     """
     Infer genes and conduct error-rate estimation in different contexts.
     """
@@ -185,7 +191,7 @@ def gene(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_method, pi0
     else:
         outfile = outfile
 
-    infer_genes(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps)
+    infer_genes(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, color_palette)
 
 # Protein-level inference
 @cli.command()
@@ -206,7 +212,9 @@ def gene(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_method, pi0
 @click.option('--lfdr_transformation', default='probit', show_default=True, type=click.Choice(['probit', 'logit']), help='Either a "probit" or "logit" transformation is applied to the p-values so that a local FDR estimate can be formed that does not involve edge effects of the [0,1] interval in which the p-values lie.')
 @click.option('--lfdr_adj', default=1.5, show_default=True, type=float, help='Numeric value that is applied as a multiple of the smoothing bandwidth used in the density estimation.')
 @click.option('--lfdr_eps', default=np.power(10.0,-8), show_default=True, type=float, help='Numeric value that is threshold for the tails of the empirical p-value distribution.')
-def protein(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps):
+# Visualization
+@click.option('--color_palette', default='normal', show_default=True, type=click.Choice(['normal', 'protan', 'deutran', 'tritan']), help='Color palette to use in reports.')
+def protein(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, color_palette):
     """
     Infer proteins and conduct error-rate estimation in different contexts.
     """
@@ -216,7 +224,7 @@ def protein(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_method, 
     else:
         outfile = outfile
 
-    infer_proteins(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps)
+    infer_proteins(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, color_palette)
 
 
 # Subsample OpenSWATH file to minimum for integrated scoring
@@ -276,7 +284,7 @@ def merge(infiles, outfile, same_run, templatefile, merged_post_scored_runs):
 # Backpropagate multi-run peptide and protein scores to single files
 @cli.command()
 @click.option('--in', 'infile', required=True, type=click.Path(exists=True), help='Single run PyProphet input file.')
-@click.option('--out','outfile', type=click.Path(exists=False), help='Single run (with multi-run scores) PyProphet output file.')
+@click.option('--out', 'outfile', type=click.Path(exists=False), help='PyProphet output file.')
 @click.option('--apply_scores', required=True, type=click.Path(exists=True), help='PyProphet multi-run scores file to apply.')
 def backpropagate(infile, outfile, apply_scores):
     """
@@ -289,6 +297,34 @@ def backpropagate(infile, outfile, apply_scores):
         outfile = outfile
 
     backpropagate_oswr(infile, outfile, apply_scores)
+
+
+
+# Append UNIMOD to CODENAME Mapping Table and add Peptidoform group to PEPTIDE Table
+@cli.command()
+# File handling
+@click.option('--in', 'infile', required=True, type=click.Path(exists=True), help='PyProphet input file.')
+@click.option('--out', 'outfile', type=click.Path(exists=False), help='PyProphet output file.')
+@click.option('--unimod_codename_table/--no-unimod_codename_table', default=True, show_default=True, help='Add a UNIMOD_TO_CODENAME Mapping table.')
+@click.option('--peptidoform_grouping/--no-peptidoform_grouping', default=False, show_default=True, help='Add a PEPTIDOFORM_GROUP Column to PEPTIDE Table.')
+@click.option('--threads', default=1, show_default=True, type=int, help='Number of threads used for generating mappings, using dask partioned dataframes. -1 means all available CPUs.', callback=transform_threads)
+def edit_osw(infile,outfile, unimod_codename_table, peptidoform_grouping, threads):
+    """
+    Edit/Add Tables OSW sqlite database file
+    """
+
+    if outfile is None:
+        outfile = infile
+    else:
+        outfile = outfile
+
+    con = sqlite3.connect(infile)
+
+    if check_sqlite_table(con, 'PEPTIDE'):
+        if unimod_codename_table:
+            create_unimod_codename_mapping(infile, outfile, threads)
+        if peptidoform_grouping:
+            create_peptidoform_group_mapping(infile, outfile, threads)
 
 
 # Export TSV

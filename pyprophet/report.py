@@ -6,13 +6,25 @@ try:
 except ImportError:
     plt = None
 
+import click
 from scipy.stats import gaussian_kde
 from numpy import linspace, concatenate, around
 
-def save_report(pdf_path, title, top_decoys, top_targets, cutoffs, svalues, qvalues, pvalues, pi0):
+def color_blind_friendly(color_palette):
+
+    color_dict = {"normal":["#F5793A", "#0F2080"], "protan":["#AE9C45", "#052955"], "deutran":["#C59434", "#092C48"], "tritan":["#1ECBE1", "#E1341E"]}
+
+    if color_palette not in color_dict:
+        click.echo(f"WARN: {color_palette} is not a valid color_palette, must be one of 'normal'. 'protan', 'deutran', or 'tritan'. Using default 'normal'.")
+        color_palette = "normal"
+    return color_dict[color_palette][0], color_dict[color_palette][1]
+
+def save_report(pdf_path, title, top_decoys, top_targets, cutoffs, svalues, qvalues, pvalues, pi0, color_palette="normal"):
 
     if plt is None:
         raise ImportError("Error: The matplotlib package is required to create a report.")
+
+    t_col, d_col = color_blind_friendly(color_palette)
 
     plt.figure(figsize=(10, 15))
     plt.subplots_adjust(hspace=.5)
@@ -30,17 +42,17 @@ def save_report(pdf_path, title, top_decoys, top_targets, cutoffs, svalues, qval
     plt.xlabel('d-score cutoff')
     plt.ylabel('rates')
 
-    plt.scatter(cutoffs, svalues, color='g', s=3)
-    plt.plot(cutoffs, svalues, color='g', label="TPR (s-value)")
-    plt.scatter(cutoffs, qvalues, color='r', s=3)
-    plt.plot(cutoffs, qvalues, color='r', label="FPR (q-value)")
+    plt.scatter(cutoffs, svalues, color=t_col, s=3)
+    plt.plot(cutoffs, svalues, color=t_col, label="TPR (s-value)")
+    plt.scatter(cutoffs, qvalues, color=d_col, s=3)
+    plt.plot(cutoffs, qvalues, color=d_col, label="FPR (q-value)")
 
     plt.subplot(323)
     plt.title("group d-score distributions")
     plt.xlabel("d-score")
     plt.ylabel("# of groups")
     plt.hist(
-        [top_targets, top_decoys], 20, color=['g', 'r'], label=['target', 'decoy'], histtype='bar')
+        [top_targets, top_decoys], 20, color=[t_col, d_col], label=['target', 'decoy'], histtype='bar')
     plt.legend(loc=2)
 
     plt.subplot(324)
@@ -55,8 +67,8 @@ def save_report(pdf_path, title, top_decoys, top_targets, cutoffs, svalues, qval
     plt.title("group d-score densities")
     plt.xlabel("d-score")
     plt.ylabel("density")
-    plt.plot(xs, tdensity(xs), color='g', label='target')
-    plt.plot(xs, ddensity(xs), color='r', label='decoy')
+    plt.plot(xs, tdensity(xs), color=t_col, label='target')
+    plt.plot(xs, ddensity(xs), color=d_col, label='decoy')
     plt.legend(loc=2)
 
     plt.subplot(325)
@@ -80,12 +92,14 @@ def save_report(pdf_path, title, top_decoys, top_targets, cutoffs, svalues, qval
     plt.suptitle(title)
     plt.savefig(pdf_path)
 
-def plot_scores(df, out):
+def plot_scores(df, out, color_palette="normal"):
 
     if plt is None:
         raise ImportError("Error: The matplotlib package is required to create a report.")
 
     score_columns = ["SCORE"] + [c for c in df.columns if c.startswith("MAIN_VAR_")] + [c for c in df.columns if c.startswith("VAR_")]
+
+    t_col, d_col = color_blind_friendly(color_palette)
 
     with PdfPages(out) as pdf:
         for idx in score_columns:
@@ -101,7 +115,7 @@ def plot_scores(df, out):
                 plt.xlabel(idx)
                 plt.ylabel("# of groups")
                 plt.hist(
-                    [top_targets, top_decoys], 20, color=['g', 'r'], label=['target', 'decoy'], histtype='bar')
+                    [top_targets, top_decoys], 20, color=[t_col, d_col], label=['target', 'decoy'], histtype='bar')
                 plt.legend(loc=2)
 
                 try:
@@ -116,11 +130,20 @@ def plot_scores(df, out):
                     plt.subplot(212)
                     plt.xlabel(idx)
                     plt.ylabel("density")
-                    plt.plot(xs, tdensity(xs), color='g', label='target')
-                    plt.plot(xs, ddensity(xs), color='r', label='decoy')
+                    plt.plot(xs, tdensity(xs), color=t_col, label='target')
+                    plt.plot(xs, ddensity(xs), color=d_col, label='decoy')
                     plt.legend(loc=2)
                 except:
                     plt.subplot(212)
 
                 pdf.savefig()
                 plt.close()
+
+def plot_hist(x, title, xlabel, ylabel, pdf_path="histogram_plot.png"):
+
+    if plt is not None:
+        counts, __, __ = plt.hist(x, bins=20, density=True)
+        plt.title(title, wrap=True)
+        plt.xlabel(xlabel)
+        plt.ylabel(ylabel)
+        plt.savefig(pdf_path)
