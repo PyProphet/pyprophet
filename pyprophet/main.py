@@ -10,6 +10,7 @@ from .export import export_tsv, export_score_plots
 from .export_compound import export_compound_tsv
 from .filter import filter_sqmass
 from .data_handling import (transform_pi0_lambda, transform_threads, transform_subsample_ratio, check_sqlite_table)
+from .export_parquet import export_to_parquet
 from functools import update_wrapper
 import sqlite3
 from tabulate import tabulate
@@ -325,6 +326,19 @@ def export(infile, outfile, format, outcsv, transition_quantification, max_trans
 
         export_tsv(infile, outfile, format, outcsv, transition_quantification, max_transition_pep, ipf, ipf_max_peptidoform_pep, max_rs_peakgroup_qvalue, peptide, max_global_peptide_qvalue, protein, max_global_protein_qvalue)
 
+
+# Export to Paruqet
+@cli.command()
+@click.option('--in', 'infile', required=True, type=click.Path(exists=True), help='PyProphet input file.')
+@click.option('--out', 'outfile', type=click.Path(exists=False), help='Output parquet file.')
+def export_parquet(infile, outfile=None):
+    """
+    Export all transition data to parquet file
+    """
+    if outfile is None:
+        outfile = infile.split(".osw")[0] + ".parquet"
+
+    export_to_parquet(infile, outfile)
 
 # Export Compound TSV
 @cli.command()

@@ -1,6 +1,7 @@
 import pandas as pd
 import sqlite3
 import argparse
+from .data_handling import check_sqlite_table
 from datetime import datetime
 
 def main():
@@ -11,22 +12,9 @@ def main():
 
     export_parquet(args.infile, args.outfile, 1)
 
-# from data_handling include so that not dependent on any other scripts in the package
-def check_sqlite_table(con, table):
-    table_present = False
-    c = con.cursor()
-    c.execute('SELECT count(name) FROM sqlite_master WHERE type="table" AND name="%s"' % table)
-    if c.fetchone()[0] == 1:
-        table_present = True
-    else:
-        table_present = False
-    c.fetchall()
-
-    return(table_present)
-
 
 # this method is only currently supported for combined output and not with ipf
-def export_parquet(infile, outfile, max_q): 
+def export_to_parquet(infile, outfile): 
 
     con = sqlite3.connect(infile)
 
@@ -154,7 +142,6 @@ CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
     LEFT JOIN SCORE_PROTEIN ON PROTEIN.ID = SCORE_PROTEIN.PROTEIN_ID
     '''.format(columnsToSelect)
 
-    print(query)
 
 
     now = datetime.now()
