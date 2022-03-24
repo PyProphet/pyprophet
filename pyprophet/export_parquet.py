@@ -1,4 +1,6 @@
 import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
 import sqlite3
 import argparse
 from .data_handling import check_sqlite_table
@@ -95,31 +97,8 @@ CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
     #get rid of trailing comma
     columnsToSelect = columnsToSelect[0:-2]
 
-    ## query
-    #query = '''
-    #SELECT {} 
-    #FROM PRECURSOR
-
-    #INNER JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
-    #INNER JOIN PEPTIDE ON PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
-    #INNER JOIN PEPTIDE_PROTEIN_MAPPING ON PEPTIDE.ID = PEPTIDE_PROTEIN_MAPPING.PEPTIDE_ID
-    #INNER JOIN PROTEIN ON PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID = PROTEIN.ID
-    #INNER JOIN TRANSITION_PRECURSOR_MAPPING ON PRECURSOR.ID = TRANSITION_PRECURSOR_MAPPING.PRECURSOR_ID
-    #INNER JOIN TRANSITION ON TRANSITION_PRECURSOR_MAPPING.TRANSITION_ID = TRANSITION.ID
-
-    #LEFT JOIN FEATURE_TRANSITION ON TRANSITION.ID = FEATURE_TRANSITION.TRANSITION_ID
-    #LEFT JOIN FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID
-    #LEFT JOIN FEATURE_MS1 ON FEATURE.ID = FEATURE_MS1.FEATURE_ID
-    #LEFT JOIN FEATURE_MS2 ON FEATURE.ID = FEATURE_MS2.FEATURE_ID
-
-    #INNER JOIN RUN ON FEATURE.RUN_ID = RUN.ID
-
-    #LEFT JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
-    #LEFT JOIN SCORE_PEPTIDE ON PEPTIDE.ID = SCORE_PEPTIDE.PEPTIDE_ID
-    #LEFT JOIN SCORE_PROTEIN ON PROTEIN.ID = SCORE_PROTEIN.PROTEIN_ID
-    #WHERE SCORE_MS2.QVALUE < {} '''.format(columnsToSelect, max_q)
-
-    # query, start with the largest table and work way outwords. Start with feature_transition but then to include the rows of those precursors not found join with precursor_transition rows should not exceed total rows in feature_transition if joins executed correctly.
+    # query, start with the largest table and work way outwards 
+    # Start with feature_transition but then to include the rows of those precursors not found (no associated feature) join with precursor_transition
     query = '''
     SELECT {0}
     FROM FEATURE_TRANSITION
@@ -180,7 +159,6 @@ CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
     current_time = now.strftime("%H:%M:%S")
     print("Done Executing (Current Time = {})".format(current_time))
 
-    con.close()
 
     print("Creating bitwise maps ...")
 
@@ -189,16 +167,41 @@ CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
 
     # for the precursor mask should be a superset of feature mask. If precursor mask is true and feature mask is false then feature should be NA.
     # Thus df[(~df['FEATURE_MASK']) & df['PRECURSOR_MASK'] & df['FEATURE_ID'].notna()] should return no entries
-    # do not think that this is directly looked for however because all of the transitions are organized together in the array (all in one block) it works out.
+    # in current implementation this is not directly looked for however because all of the transitions for a given precursor/feature are groupped together in the array it works out.
     df['PRECURSOR_MASK'] = (~ df['PRECURSOR_ID'].duplicated())
 
 
     df['PEPTIDE_MASK'] = ~ df['PEPTIDE_ID'].duplicated()
 
+    print("Saving metaData ...")
+
+    table = pa.Table.from_pandas(df)
     
+    # array to store metadata 
+    custom_metadata = {}
+    existing_metadata = table.schema.metadata
+
+
+    # fetch the OSW version as metadata
+    custom_metadata['version'] = str(con.execute("select id from version").fetchone()[0])
+
+    # fetch the pyprophet weights if avaliable
+    if check_sqlite_table(con, "PYPROPHET_WEIGHTS"):
+        custom_metadata['scoreLevel'] = str(con.execute("select level from PYPROPHET_WEIGHTS").fetchone()[0])
+        custom_metadata['pyprophetWeights'] = pd.read_sql("select * from pyprophet_weights", con).to_json()
+
+
+    fixed_table = table.replace_schema_metadata({**custom_metadata, **existing_metadata})
+
+    merged_metadata = { **custom_metadata, **existing_metadata }
+    fixed_table = table.replace_schema_metadata(merged_metadata)
+    
+    con.close()
     print("Saving to Parquet .... ")
+
     ## export to parquet 
-    df.to_parquet(outfile)
+    pq.write_table(fixed_table, outfile) 
+
 
     now = datetime.now()
     current_time = now.strftime("%H:%M:%S")
