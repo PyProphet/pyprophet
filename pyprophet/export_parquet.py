@@ -119,9 +119,9 @@ CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
     #LEFT JOIN SCORE_PROTEIN ON PROTEIN.ID = SCORE_PROTEIN.PROTEIN_ID
     #WHERE SCORE_MS2.QVALUE < {} '''.format(columnsToSelect, max_q)
 
-    # query, start with the largest table and work way outwords. Total rows should not exceed total rows in feature_transition if joins executed correctly.
+    # query, start with the largest table and work way outwords. Start with feature_transition but then to include the rows of those precursors not found join with precursor_transition rows should not exceed total rows in feature_transition if joins executed correctly.
     query = '''
-    SELECT {}
+    SELECT {0}
     FROM FEATURE_TRANSITION
 
     LEFT JOIN FEATURE ON FEATURE_TRANSITION.FEATURE_ID = FEATURE.ID
@@ -140,9 +140,35 @@ CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
     LEFT JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
     LEFT JOIN SCORE_PEPTIDE ON PEPTIDE.ID = SCORE_PEPTIDE.PEPTIDE_ID
     LEFT JOIN SCORE_PROTEIN ON PROTEIN.ID = SCORE_PROTEIN.PROTEIN_ID
+
+
+    UNION
+
+    SELECT DISTINCT {0} FROM TRANSITION_PRECURSOR_MAPPING 
+
+    LEFT JOIN PRECURSOR ON TRANSITION_PRECURSOR_MAPPING.PRECURSOR_ID = PRECURSOR.ID
+    LEFT JOIN TRANSITION ON TRANSITION_PRECURSOR_MAPPING.TRANSITION_ID = TRANSITION.ID
+
+    LEFT JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
+    LEFT JOIN PEPTIDE ON PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
+    LEFT JOIN PEPTIDE_PROTEIN_MAPPING ON PEPTIDE.ID = PEPTIDE_PROTEIN_MAPPING.PEPTIDE_ID
+    LEFT JOIN PROTEIN ON PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID = PROTEIN.ID
+
+    LEFT JOIN FEATURE_TRANSITION ON TRANSITION_PRECURSOR_MAPPING.TRANSITION_ID = FEATURE_TRANSITION.TRANSITION_ID
+
+    LEFT JOIN FEATURE ON FEATURE_TRANSITION.FEATURE_ID = FEATURE.ID
+    LEFT JOIN FEATURE_MS1 ON FEATURE_TRANSITION.FEATURE_ID = FEATURE_MS1.FEATURE_ID
+    LEFT JOIN FEATURE_MS2 ON FEATURE_TRANSITION.FEATURE_ID = FEATURE_MS2.FEATURE_ID
+
+    LEFT JOIN RUN ON FEATURE.RUN_ID = RUN.ID
+
+    LEFT JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
+    LEFT JOIN SCORE_PEPTIDE ON PEPTIDE.ID = SCORE_PEPTIDE.PEPTIDE_ID
+    LEFT JOIN SCORE_PROTEIN ON PROTEIN.ID = SCORE_PROTEIN.PROTEIN_ID
+
+    WHERE FEATURE.ID IS NULL
+
     '''.format(columnsToSelect)
-
-
 
     now = datetime.now()
     current_time = now.strftime("%H:%M:%S")
@@ -153,11 +179,23 @@ CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
     now = datetime.now()
     current_time = now.strftime("%H:%M:%S")
     print("Done Executing (Current Time = {})".format(current_time))
-    print(df.info())
 
     con.close()
 
+    print("Creating bitwise maps ...")
 
+    # create masks for easier indexing 
+    df['FEATURE_MASK'] = (~ df['FEATURE_ID'].duplicated()) & (df['FEATURE_ID'].notna())
+
+    # for the precursor mask should be a superset of feature mask. If precursor mask is true and feature mask is false then feature should be NA.
+    # Thus df[(~df['FEATURE_MASK']) & df['PRECURSOR_MASK'] & df['FEATURE_ID'].notna()] should return no entries
+    # do not think that this is directly looked for however because all of the transitions are organized together in the array (all in one block) it works out.
+    df['PRECURSOR_MASK'] = (~ df['PRECURSOR_ID'].duplicated())
+
+
+    df['PEPTIDE_MASK'] = ~ df['PEPTIDE_ID'].duplicated()
+
+    
     print("Saving to Parquet .... ")
     ## export to parquet 
     df.to_parquet(outfile)
