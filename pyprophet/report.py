@@ -138,3 +138,12 @@ def plot_scores(df, out, color_palette="normal"):
 
                 pdf.savefig()
                 plt.close()
+
+def plot_hist(x, title, xlabel, ylabel, pdf_path="histogram_plot.png"):
+
+    if plt is not None:
+        counts, __, __ = plt.hist(x, bins=20, density=True)
+        plt.title(title, wrap=True)
+        plt.xlabel(xlabel)
+        plt.ylabel(ylabel)
+        plt.savefig(pdf_path)
