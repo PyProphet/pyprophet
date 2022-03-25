@@ -11,6 +11,7 @@ import click
 
 from .optimized import (find_nearest_matches as _find_nearest_matches,
                        count_num_positives, single_chromatogram_hypothesis_fast)
+from .report import plot_hist
 from statsmodels.nonparametric.kde import KDEUnivariate
 from collections import namedtuple
 # from .config import CONFIG
@@ -224,7 +225,8 @@ def pi0est(p_values, lambda_ = np.arange(0.05,1.0,0.05), pi0_method = "smoother"
         else:
             raise click.ClickException("pi0_method must be one of 'smoother' or 'bootstrap'.")
     if (pi0<=0):
-        raise click.ClickException("The estimated pi0 <= 0. Check that you have valid p-values or use a different range of lambda.")
+        plot_hist(p, f"p-value density histogram used during pi0 estimation", "p-value", "density histogram", "pi0_estimation_error_pvalue_histogram_plot.pdf")
+        raise click.ClickException(f"The estimated pi0 <= 0. Check that you have valid p-values or use a different range of lambda. Current lambda range: {lambda_}")
 
     return {'pi0': pi0, 'pi0_lambda': pi0_lambda, 'lambda_': lambda_, 'pi0_smooth': pi0Smooth}
 
