@@ -330,15 +330,19 @@ def export(infile, outfile, format, outcsv, transition_quantification, max_trans
 # Export to Paruqet
 @cli.command()
 @click.option('--in', 'infile', required=True, type=click.Path(exists=True), help='PyProphet input file.')
-@click.option('--out', 'outfile', type=click.Path(exists=False), help='Output parquet file.')
-def export_parquet(infile, outfile=None):
+@click.option('--out', 'outfile', required=False, type=click.Path(exists=False), help='Output parquet file.')
+@click.option('--transitionLevel', 'transitionLevel', is_flag=True, help='Whether to export transition level data as well')
+def export_parquet(infile, outfile, transitionLevel):
+    print("outfile is {}".format(outfile))
     """
     Export all transition data to parquet file
     """
+    if transitionLevel:
+        print("[INFO] Will export transition level data")
     if outfile is None:
         outfile = infile.split(".osw")[0] + ".parquet"
 
-    export_to_parquet(infile, outfile)
+    export_to_parquet(infile, outfile, transitionLevel)
 
 # Export Compound TSV
 @cli.command()
