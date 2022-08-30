@@ -59,7 +59,8 @@ setup(name='pyprophet',
           "hyperopt",
           "statsmodels >= 0.8.0",
           "matplotlib",
-          "tabulate"
+          "tabulate",
+          "pyarrow"
       ],
       entry_points={
           'console_scripts': [
