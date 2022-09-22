@@ -6,14 +6,12 @@ import argparse
 from .data_handling import check_sqlite_table
 from datetime import datetime
 
-def main():
+def main(): 
     parser = argparse.ArgumentParser()
     parser.add_argument('infile')
     parser.add_argument('outfile')
     args = parser.parse_args()
-
     export_parquet(args.infile, args.outfile, 1)
-
 
 # this method is only currently supported for combined output and not with ipf
 def export_to_parquet(infile, outfile, transitionLevel):
@@ -34,7 +32,18 @@ CREATE INDEX IF NOT EXISTS idx_run_run_id ON RUN (ID);
 CREATE INDEX IF NOT EXISTS idx_feature_run_id ON FEATURE (RUN_ID);
 
 CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
+
+CREATE INDEX IF NOT EXISTS idx_peptide_protein_mapping_protein_id ON PEPTIDE_PROTEIN_MAPPING (PROTEIN_ID);
+CREATE INDEX IF NOT EXISTS idx_protein_protein_id ON PROTEIN (ID);
+CREATE INDEX IF NOT EXISTS idx_peptide_protein_mapping_peptide_id ON PEPTIDE_PROTEIN_MAPPING (PEPTIDE_ID);
+
+CREATE INDEX IF NOT EXISTS idx_score_protein_protein_id ON SCORE_PROTEIN (PROTEIN_ID);
+CREATE INDEX IF NOT EXISTS idx_score_protein_run_id ON SCORE_PROTEIN (RUN_ID);
+
+CREATE INDEX IF NOT EXISTS idx_score_peptide_peptide_id ON SCORE_PEPTIDE (PEPTIDE_ID);
+CREATE INDEX IF NOT EXISTS idx_score_peptide_run_id ON SCORE_PEPTIDE (RUN_ID);
 '''
+
     if check_sqlite_table(con, "FEATURE_MS1"):
       idx_query += "CREATE INDEX IF NOT EXISTS idx_feature_ms1_feature_id ON FEATURE_MS1 (FEATURE_ID);"
     if check_sqlite_table(con, "FEATURE_MS2"):
@@ -45,6 +54,18 @@ CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
     print("Creating Index ....")
 
     con.executescript(idx_query) # Add indices
+
+    # create transition indicies (if needed)
+    if transitionLevel:
+        idx_transition_query = '''
+        CREATE INDEX IF NOT EXISTS idx_feature_transition_transition_id ON FEATURE_TRANSITION (TRANSITION_ID);
+        CREATE INDEX IF NOT EXISTS idx_transition_transition_id ON TRANSITION (ID);
+        CREATE INDEX IF NOT EXISTS idx_feature_transition_transition_id_feature_id ON FEATURE_TRANSITION (TRANSITION_ID, FEATURE_ID);
+        CREATE INDEX IF NOT EXISTS idx_feature_transition_feature_id ON FEATURE_TRANSITION (FEATURE_ID); '''
+
+        print("Creating transition level index ...")
+        con.executescript(idx_transition_query)
+
     
     print("Creating Main Query ....")
     # since do not want all of the columns (some columns are twice per table) manually select the columns want in a list, (note do not want decoy)
