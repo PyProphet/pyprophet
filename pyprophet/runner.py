@@ -453,6 +453,8 @@ class PyProphetWeightApplier(PyProphetRunner):
                 try:
                     con = sqlite3.connect(apply_weights)
 
+                    if not check_sqlite_table(con, "PYPROPHET_WEIGHTS"):
+                        raise click.ClickException("PYPROPHET_WEIGHTS table is not present in file, cannot apply weights for LDA classifier! Make sure you have run the scoring on a subset of the data first, or that you supplied the right `--classifier` parameter.")
                     data = pd.read_sql_query("SELECT * FROM PYPROPHET_WEIGHTS WHERE LEVEL=='%s'" % self.level, con)
                     data.columns = [col.lower() for col in data.columns]
                     con.close()
@@ -467,6 +469,8 @@ class PyProphetWeightApplier(PyProphetRunner):
                 try:
                     con = sqlite3.connect(apply_weights)
 
+                    if not check_sqlite_table(con, "PYPROPHET_XGB"):
+                        raise click.ClickException("PYPROPHET_XGB table is not present in file, cannot apply weights for XGBoost classifier! Make sure you have run the scoring on a subset of the data first, or that you supplied the right `--classifier` parameter.")
                     data = con.execute("SELECT xgb FROM PYPROPHET_XGB WHERE LEVEL=='%s'" % self.level).fetchone()
                     con.close()
                     self.persisted_weights = pickle.loads(data[0])
