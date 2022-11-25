@@ -364,7 +364,7 @@ def export_compound(infile, outfile, format, outcsv, max_rs_peakgroup_qvalue):
 # Filter sqMass or OSW files
 @cli.command()
 # SqMass Filter File handling
-@click.argument('sqldbfiles', nargs=-1, type=click.Path(exists=True), help='List of sqMass or OSW Sqlite DB structured files.')
+@click.argument('sqldbfiles', nargs=-1, type=click.Path(exists=True))
 @click.option('--in', 'infile', required=False, default=None, show_default=True, type=click.Path(exists=True), help='PyProphet input file.')
 @click.option('--max_precursor_pep', default=0.7, show_default=True, type=float, help='Maximum PEP to retain scored precursors in sqMass.')
 @click.option('--max_peakgroup_pep', default=0.7, show_default=True, type=float, help='Maximum PEP to retain scored peak groups in sqMass.')
