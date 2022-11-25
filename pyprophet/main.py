@@ -375,7 +375,7 @@ def export_compound(infile, outfile, format, outcsv, max_rs_peakgroup_qvalue):
 @click.option('--max_protein_fdr', default=None, show_default=True, type=float, help='Maximum QVALUE to retain scored proteins in OSW.')
 @click.option('--max_peptide_fdr', default=None, show_default=True, type=float, help='Maximum QVALUE to retain scored peptides in OSW.')
 @click.option('--max_ms2_fdr', default=None, show_default=True, type=float, help='Maximum QVALUE to retain scored MS2 Features in OSW.')
-def filter(sqldbfiles, infile, max_precursor_pep, max_peakgroup_pep, max_transition_pep, remove_decoys):
+def filter(sqldbfiles, infile, max_precursor_pep, max_peakgroup_pep, max_transition_pep, remove_decoys, max_gene_fdr, max_protein_fdr, max_peptide_fdr, max_ms2_fdr):
     """
     Filter sqMass files or osw files
     """
@@ -386,7 +386,7 @@ def filter(sqldbfiles, infile, max_precursor_pep, max_peakgroup_pep, max_transit
             click.ClickException("If you are filtering sqMass files, you need to provide a PyProphet file via `--in` flag.")
         filter_sqmass(sqldbfiles, infile, max_precursor_pep, max_peakgroup_pep, max_transition_pep)
     elif all([pathlib.PurePosixPath(file).suffix.lower()=='.osw' for file in sqldbfiles]):
-        filter_osw(sqldbfiles, remove_decoys=True, max_gene_fdr=None, max_protein_fdr=None, max_peptide_fdr=None, max_ms2_fdr=None)
+        filter_osw(sqldbfiles, remove_decoys, max_gene_fdr, max_protein_fdr, max_peptide_fdr, max_ms2_fdr)
     else:
         click.ClickException(f"There seems to be something wrong with the input sqlite db files. Make sure they are all either sqMass files or all OSW files, these are mutually exclusive.\nYour input files: {sqldbfiles}")
 
