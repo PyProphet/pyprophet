@@ -371,16 +371,15 @@ def export_compound(infile, outfile, format, outcsv, max_rs_peakgroup_qvalue):
 @click.option('--max_transition_pep', default=0.7, show_default=True, type=float, help='Maximum PEP to retain scored transitions in sqMass.')
 # OSW Filter File Handling
 @click.option('--remove_decoys/--no-remove_decoys', 'remove_decoys', default=True, show_default=True, help='Remove Decoys from OSW file.')
-@click.option('--max_gene_fdr', default=None, show_default=True, type=float, help='Maximum QVALUE to retain scored genes in OSW.')
-@click.option('--max_protein_fdr', default=None, show_default=True, type=float, help='Maximum QVALUE to retain scored proteins in OSW.')
-@click.option('--max_peptide_fdr', default=None, show_default=True, type=float, help='Maximum QVALUE to retain scored peptides in OSW.')
-@click.option('--max_ms2_fdr', default=None, show_default=True, type=float, help='Maximum QVALUE to retain scored MS2 Features in OSW.')
+@click.option('--max_gene_fdr', default=None, show_default=True, type=float, help='Maximum QVALUE to retain scored genes in OSW.  [default: None]')
+@click.option('--max_protein_fdr', default=None, show_default=True, type=float, help='Maximum QVALUE to retain scored proteins in OSW.  [default: None]')
+@click.option('--max_peptide_fdr', default=None, show_default=True, type=float, help='Maximum QVALUE to retain scored peptides in OSW.  [default: None]')
+@click.option('--max_ms2_fdr', default=None, show_default=True, type=float, help='Maximum QVALUE to retain scored MS2 Features in OSW.  [default: None]')
 def filter(sqldbfiles, infile, max_precursor_pep, max_peakgroup_pep, max_transition_pep, remove_decoys, max_gene_fdr, max_protein_fdr, max_peptide_fdr, max_ms2_fdr):
     """
     Filter sqMass files or osw files
     """
-    
-    
+        
     if all([pathlib.PurePosixPath(file).suffix.lower()=='.sqmass' for file in sqldbfiles]):
         if infile is None:
             click.ClickException("If you are filtering sqMass files, you need to provide a PyProphet file via `--in` flag.")

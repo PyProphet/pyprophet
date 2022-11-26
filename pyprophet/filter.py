@@ -133,9 +133,6 @@ WHERE SCORE_MS2.PEP <= {0}
 
 def filter_osw(oswfiles, remove_decoys=True, max_gene_fdr=None, max_protein_fdr=None, max_peptide_fdr=None, max_ms2_fdr=None):
 
-    if False:
-        oswfiles = ["./merged.osw"]
-
     # process each oswfile independently
     for osw_in in oswfiles:
         osw_out = osw_in.split(".osw")[0] + "_filtered.osw"
@@ -236,7 +233,9 @@ def filter_osw(oswfiles, remove_decoys=True, max_gene_fdr=None, max_protein_fdr=
                 copy_table(c, conn, feature_ids, "SCORE_MS2", "FEATURE_ID")
         
         # Table(s) - TRANSITION, TRANSITION_PRECURSOR_MAPPING, TRANSITION_PEPTIDE_MAPPING
-        transition_ids = np.unique(list(c.execute(f"SELECT ID FROM TRANSITION INNER JOIN (SELECT * FROM TRANSITION_PRECURSOR_MAPPING WHERE PRECURSOR_ID IN {tuple(precursor_ids)}) AS TRANSITION_PRECURSOR_MAPPING ON TRANSITION.ID = TRANSITION_PRECURSOR_MAPPING.TRANSITION_ID INNER JOIN (SELECT * FROM TRANSITION_PEPTIDE_MAPPING WHERE PEPTIDE_ID IN {tuple(peptide_ids)}) AS TRANSITION_PEPTIDE_MAPPING ON TRANSITION.ID = TRANSITION_PEPTIDE_MAPPING.TRANSITION_ID")))
+        transition_ids = np.unique(list(c.execute(f"SELECT ID FROM TRANSITION LEFT JOIN (SELECT * FROM TRANSITION_PRECURSOR_MAPPING WHERE PRECURSOR_ID IN {tuple(precursor_ids)}) AS TRANSITION_PRECURSOR_MAPPING ON TRANSITION.ID = TRANSITION_PRECURSOR_MAPPING.TRANSITION_ID LEFT JOIN (SELECT * FROM TRANSITION_PEPTIDE_MAPPING WHERE PEPTIDE_ID IN {tuple(peptide_ids)}) AS TRANSITION_PEPTIDE_MAPPING ON TRANSITION.ID = TRANSITION_PEPTIDE_MAPPING.TRANSITION_ID")))
+        # Ensure there are ids to filter for
+        assert (len(transition_ids) >0), "There seems to be no transition ids to retain after filtering..."
         click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Filtering for  {len(transition_ids)} transition ids for {len(peptide_ids)} peptides ids and {len(precursor_ids)} precursor ids...")
         # Copy filtered tables
         copy_table(c, conn, transition_ids, "TRANSITION", "ID")
