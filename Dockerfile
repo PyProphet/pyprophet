@@ -10,3 +10,6 @@ WORKDIR /pyprophet
 RUN python setup.py install
 WORKDIR /
 RUN rm -rf /pyprophet
+
+# Set final working directory, useful for when binding to a local mount
+WORKDIR /data/
