@@ -384,7 +384,7 @@ def export_compound(infile, outfile, format, outcsv, max_rs_peakgroup_qvalue):
 @click.option('--max_transition_pep', default=0.7, show_default=True, type=float, help='Maximum PEP to retain scored transitions in sqMass.')
 # OSW Filter File Handling
 @click.option('--remove_decoys/--no-remove_decoys', 'remove_decoys', default=True, show_default=True, help='Remove Decoys from OSW file.')
-@click.option('--omit_tables', default="[]", show_default=True, cls=PythonLiteralOption, help='Tables in the database you do not want to copy over to filtered file.')
+@click.option('--omit_tables', default="[]", show_default=True, cls=PythonLiteralOption, help="""Tables in the database you do not want to copy over to filtered file. i.e. `--omit_tables '["FEATURE_TRANSITION", "SCORE_TRANSITION"]'`""")
 @click.option('--max_gene_fdr', default=None, show_default=True, type=float, help='Maximum QVALUE to retain scored genes in OSW.  [default: None]')
 @click.option('--max_protein_fdr', default=None, show_default=True, type=float, help='Maximum QVALUE to retain scored proteins in OSW.  [default: None]')
 @click.option('--max_peptide_fdr', default=None, show_default=True, type=float, help='Maximum QVALUE to retain scored peptides in OSW.  [default: None]')
