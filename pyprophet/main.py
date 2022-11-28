@@ -3,6 +3,7 @@ import numpy as np
 import click
 import sys
 import pathlib
+import ast
 
 from .runner import PyProphetLearner, PyProphetWeightApplier
 from .ipf import infer_peptidoforms
@@ -32,6 +33,18 @@ def cli():
 
     Visit http://openswath.org for usage instructions and help.
     """
+
+
+
+# https://stackoverflow.com/a/47730333
+class PythonLiteralOption(click.Option):
+    def type_cast_value(self, ctx, value):
+        if not isinstance(value, str):  # required for Click>=8.0.0
+            return value
+        try:
+            return ast.literal_eval(value)
+        except Exception:
+            raise click.BadParameter(value)
 
 # PyProphet semi-supervised learning and scoring
 @cli.command()
@@ -371,11 +384,12 @@ def export_compound(infile, outfile, format, outcsv, max_rs_peakgroup_qvalue):
 @click.option('--max_transition_pep', default=0.7, show_default=True, type=float, help='Maximum PEP to retain scored transitions in sqMass.')
 # OSW Filter File Handling
 @click.option('--remove_decoys/--no-remove_decoys', 'remove_decoys', default=True, show_default=True, help='Remove Decoys from OSW file.')
+@click.option('--omit_tables', default="[]", show_default=True, cls=PythonLiteralOption, help='Tables in the database you do not want to copy over to filtered file.')
 @click.option('--max_gene_fdr', default=None, show_default=True, type=float, help='Maximum QVALUE to retain scored genes in OSW.  [default: None]')
 @click.option('--max_protein_fdr', default=None, show_default=True, type=float, help='Maximum QVALUE to retain scored proteins in OSW.  [default: None]')
 @click.option('--max_peptide_fdr', default=None, show_default=True, type=float, help='Maximum QVALUE to retain scored peptides in OSW.  [default: None]')
 @click.option('--max_ms2_fdr', default=None, show_default=True, type=float, help='Maximum QVALUE to retain scored MS2 Features in OSW.  [default: None]')
-def filter(sqldbfiles, infile, max_precursor_pep, max_peakgroup_pep, max_transition_pep, remove_decoys, max_gene_fdr, max_protein_fdr, max_peptide_fdr, max_ms2_fdr):
+def filter(sqldbfiles, infile, max_precursor_pep, max_peakgroup_pep, max_transition_pep, remove_decoys, omit_tables, max_gene_fdr, max_protein_fdr, max_peptide_fdr, max_ms2_fdr):
     """
     Filter sqMass files or osw files
     """
@@ -385,7 +399,7 @@ def filter(sqldbfiles, infile, max_precursor_pep, max_peakgroup_pep, max_transit
             click.ClickException("If you are filtering sqMass files, you need to provide a PyProphet file via `--in` flag.")
         filter_sqmass(sqldbfiles, infile, max_precursor_pep, max_peakgroup_pep, max_transition_pep)
     elif all([pathlib.PurePosixPath(file).suffix.lower()=='.osw' for file in sqldbfiles]):
-        filter_osw(sqldbfiles, remove_decoys, max_gene_fdr, max_protein_fdr, max_peptide_fdr, max_ms2_fdr)
+        filter_osw(sqldbfiles, remove_decoys, omit_tables, max_gene_fdr, max_protein_fdr, max_peptide_fdr, max_ms2_fdr)
     else:
         click.ClickException(f"There seems to be something wrong with the input sqlite db files. Make sure they are all either sqMass files or all OSW files, these are mutually exclusive.\nYour input files: {sqldbfiles}")
 
