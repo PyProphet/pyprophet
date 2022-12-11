@@ -154,8 +154,12 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
         # Get tables aliased score variable name
         df_column_score_alias = [col for col in train.df.columns if col not in ['tg_id', 'tg_num_id', 'is_decoy', 'is_top_peak', 'is_train', 'classifier_score']]
 
-        # Use the min() function to find the column with the smallest delta value
-        use_as_main_col_alias = min(df_column_score_alias, key=lambda x: self.get_delta_td_bt_feature_size(train, x))
+        if isinstance(self.inner_learner, XGBLearner):
+            # dynamic selection of main score seems to only benefit the XBGLearner, the LDALearner performs worse when we apply this
+            # Use the min() function to find the column with the smallest delta value
+            use_as_main_col_alias = min(df_column_score_alias, key=lambda x: self.get_delta_td_bt_feature_size(train, x))
+        else:
+            use_as_main_col_alias = 'main_score'
 
         td_peaks, bt_peaks = self.select_train_peaks(train, use_as_main_col_alias, self.ss_initial_fdr, self.parametric, self.pfdr, self.pi0_lambda, self.pi0_method, self.pi0_smooth_df, self.pi0_smooth_log_pi0)
         model = self.inner_learner.learn(td_peaks, bt_peaks, False)
