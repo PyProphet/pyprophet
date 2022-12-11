@@ -264,11 +264,11 @@ class HolyGostQuery(object):
     def _learn_and_apply(self, table):
 
         experiment, score_columns = self._setup_experiment(table)
-        final_classifier = self._learn(experiment)
+        final_classifier = self._learn(experiment, score_columns)
 
         return self._build_result(table, final_classifier, score_columns, experiment)
 
-    def _learn(self, experiment):
+    def _learn(self, experiment, score_columns):
         if self.test:  # for reliable results
             experiment.df.sort_values("tg_id", ascending=True, inplace=True)
 
@@ -285,7 +285,7 @@ class HolyGostQuery(object):
 
         if self.threads == 1:
             for k in range(neval):
-                (ttt_scores, ttd_scores, w) = learner.learn_randomized(experiment)
+                (ttt_scores, ttd_scores, w) = learner.learn_randomized(experiment, score_columns)
                 ttt.append(ttt_scores)
                 ttd.append(ttd_scores)
                 ws.append(w)
@@ -295,7 +295,7 @@ class HolyGostQuery(object):
                 remaining = max(0, neval - self.threads)
                 todo = neval - remaining
                 neval -= todo
-                args = ((learner, "learn_randomized", (experiment, )), ) * todo
+                args = ((learner, "learn_randomized", (experiment, score_columns, )), ) * todo
                 res = pool.map(unwrap_self_for_multiprocessing, args)
                 ttt_scores = [r[0] for r in res]
                 ttd_scores = [r[1] for r in res]
