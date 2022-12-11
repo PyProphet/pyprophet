@@ -1,7 +1,7 @@
 import numpy as np
 import click
 
-from .data_handling import Experiment
+from .data_handling import Experiment, update_chosen_main_score_in_table
 from .classifiers import AbstractLearner, XGBLearner
 from .stats import mean_and_std_dev, find_cutoff
 
@@ -18,7 +18,7 @@ class AbstractSemiSupervisedLearner(object):
         self.xeval_num_iter = xeval_num_iter
         self.test = test
 
-    def start_semi_supervised_learning(self, train):
+    def start_semi_supervised_learning(self, train, score_columns):
         raise NotImplementedError()
 
     def iter_semi_supervised_learning(self, train):
@@ -31,7 +31,7 @@ class AbstractSemiSupervisedLearner(object):
         raise NotImplementedError()
 
     @profile
-    def learn_randomized(self, experiment):
+    def learn_randomized(self, experiment, score_columns):
         assert isinstance(experiment, Experiment)
 
         click.echo("Info: Learning on cross-validation fold.")
@@ -41,7 +41,15 @@ class AbstractSemiSupervisedLearner(object):
 
         train.rank_by("main_score")
 
-        params, clf_scores = self.start_semi_supervised_learning(train)
+        params, clf_scores, use_as_main_score = self.start_semi_supervised_learning(train, score_columns)
+        
+        # Get current main score column name
+        old_main_score_column = [col for col in score_columns if  'main' in col][0]
+        # Only Update if chosen main score column has changed
+        if use_as_main_score != old_main_score_column:
+            train, _ = update_chosen_main_score_in_table(train, score_columns, use_as_main_score)
+            train.rank_by("main_score")
+            experiment, score_columns = update_chosen_main_score_in_table(experiment, score_columns, use_as_main_score)
 
         train.set_and_rerank("classifier_score", clf_scores)
 
@@ -128,13 +136,36 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
         best_target_peaks = tt_peaks.filter_(tt_scores >= cutoff)
         return td_peaks, best_target_peaks
 
-    def start_semi_supervised_learning(self, train):
-        td_peaks, bt_peaks = self.select_train_peaks(train, "main_score", self.ss_initial_fdr, self.parametric, self.pfdr, self.pi0_lambda, self.pi0_method, self.pi0_smooth_df, self.pi0_smooth_log_pi0)
+    def get_delta_td_bt_feature_size(self, train, col):
+        '''
+        Get the the difference in feature size based on which column is used in select_train_peaks for top decoy features and best target features
+        '''
+        assert isinstance(train, Experiment)
+        assert isinstance(col, str)
+        # Try catch exception when using a feature column that cannot generate a valid pi0 estimation due to imbalance of number of top decoys to best targets
+        try:
+            td_peaks, bt_peaks = self.select_train_peaks(train, col, self.ss_initial_fdr, self.parametric, self.pfdr, self.pi0_lambda, self.pi0_method, self.pi0_smooth_df, self.pi0_smooth_log_pi0)
+            return abs(td_peaks.df.shape[0] - bt_peaks.df.shape[0])
+        except:
+            # Return highest possible value if select_train_peaks fails to run due to not being able to compute pi0 estimation
+            return float('inf')
+
+    def start_semi_supervised_learning(self, train, score_columns):
+        # Get tables aliased score variable name
+        df_column_score_alias = [col for col in train.df.columns if col not in ['tg_id', 'tg_num_id', 'is_decoy', 'is_top_peak', 'is_train', 'classifier_score']]
+
+        # Use the min() function to find the column with the smallest delta value
+        use_as_main_col_alias = min(df_column_score_alias, key=lambda x: self.get_delta_td_bt_feature_size(train, x))
+
+        td_peaks, bt_peaks = self.select_train_peaks(train, use_as_main_col_alias, self.ss_initial_fdr, self.parametric, self.pfdr, self.pi0_lambda, self.pi0_method, self.pi0_smooth_df, self.pi0_smooth_log_pi0)
         model = self.inner_learner.learn(td_peaks, bt_peaks, False)
         w = model.get_parameters()
         clf_scores = model.score(train, False)
         clf_scores -= np.mean(clf_scores)
-        return w, clf_scores
+
+        mapper = {alias_col : col for alias_col, col in zip(df_column_score_alias, score_columns)}
+
+        return w, clf_scores, mapper[use_as_main_col_alias]
 
     @profile
     def iter_semi_supervised_learning(self, train):
