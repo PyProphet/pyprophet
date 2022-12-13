@@ -270,7 +270,7 @@ def update_chosen_main_score_in_table(train, score_columns, use_as_main_score):
     # Re-order main_score column index
     temp_col = train.df.pop('main_score')
     train.df.insert(5, temp_col.name, temp_col)
-    click.echo(f"INFO: Updated main score column from {old_main_score_column} to {use_as_main_score}...")
+    click.echo(f"Info: Updated main score column from {old_main_score_column} to {use_as_main_score}...")
     return train, tuple(updated_score_columns)
 class Experiment(object):
 
