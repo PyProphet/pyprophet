@@ -175,8 +175,12 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
         return w, clf_scores, mapper[use_as_main_col_alias]
 
     @profile
-    def iter_semi_supervised_learning(self, train):
-        td_peaks, bt_peaks = self.select_train_peaks(train, "classifier_score", self.ss_iteration_fdr, self.parametric, self.pfdr, self.pi0_lambda, self.pi0_method, self.pi0_smooth_df, self.pi0_smooth_log_pi0)
+    def iter_semi_supervised_learning(self, train, score_columns, working_thread_number):
+        # Get tables aliased score variable name
+        df_column_score_alias = [col for col in train.df.columns if col not in ['tg_id', 'tg_num_id', 'is_decoy', 'is_top_peak', 'is_train']]
+        # Generate column alias name to score feature name
+        mapper = {alias_col : col for alias_col, col in zip(df_column_score_alias, score_columns + ('classifier_score',))}
+        td_peaks, bt_peaks = self.select_train_peaks(train, "classifier_score", self.ss_iteration_fdr, self.parametric, self.pfdr, self.pi0_lambda, self.pi0_method, self.pi0_smooth_df, self.pi0_smooth_log_pi0, mapper, self.main_score_selection_report, self.outfile, self.level, working_thread_number)
 
         model = self.inner_learner.learn(td_peaks, bt_peaks, True)
         w = model.get_parameters()
