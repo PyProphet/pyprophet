@@ -459,10 +459,13 @@ def error_statistics(target_scores, decoy_scores, parametric, pfdr, pi0_lambda, 
         try:
             # estimate pi0
             pi0 = pi0est(target_pvalues, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0)
-        except:
+        except Exception as e:
             pi0 = None
+            pi0_error_msg = e
         # generate main score selection report
-        main_score_selection_report(title, sel_column, mapper, decoy_scores, target_scores, target_pvalues, pi0, pdf_path=os.path.join(os.path.dirname(title), f"main_score_selection_{level}_report_thread_{working_thread_number}.pdf"), worker_num=working_thread_number)
+        main_score_selection_report(os.path.basename(title), sel_column, mapper, decoy_scores, target_scores, target_pvalues, pi0, pdf_path=os.path.join(os.path.dirname(title), os.path.splitext(os.path.basename(title))[0] + f"_main_score_selection_{level}_report_thread_{working_thread_number}.pdf"), worker_num=working_thread_number)
+        if pi0 is None:
+            raise click.ClickException(f"{pi0_error_msg}")
     else:
         # estimate pi0
         pi0 = pi0est(target_pvalues, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0)
