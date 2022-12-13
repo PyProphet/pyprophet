@@ -483,7 +483,7 @@ def error_statistics(target_scores, decoy_scores, parametric, pfdr, pi0_lambda, 
     return error_stat, pi0
 
 
-def find_cutoff(tt_scores, td_scores, cutoff_fdr, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, sel_column=None, mapper=None, main_score_selection_report=none, outfile=None, level=None, working_thread_number=None):
+def find_cutoff(tt_scores, td_scores, cutoff_fdr, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, sel_column=None, mapper=None, main_score_selection_report=False, outfile=None, level=None, working_thread_number=None):
     """ Finds cut off target score for specified false discovery rate fdr """
 
     error_stat, pi0 = error_statistics(tt_scores, td_scores, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, False, sel_column=sel_column, mapper=mapper, save_report=main_score_selection_report, title=outfile, level=level, working_thread_number=working_thread_number)

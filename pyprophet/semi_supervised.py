@@ -124,7 +124,7 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
         self.outfile = outfile
         self.level = level
 
-    def select_train_peaks(self, train, sel_column, cutoff_fdr, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, mapper=None, main_score_selection_report=None, outfile=None, level=None, working_thread_number=None):
+    def select_train_peaks(self, train, sel_column, cutoff_fdr, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, mapper=None, main_score_selection_report=False, outfile=None, level=None, working_thread_number=None):
         assert isinstance(train, Experiment)
         assert isinstance(sel_column, str)
         assert isinstance(cutoff_fdr, float)
