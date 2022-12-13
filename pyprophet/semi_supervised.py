@@ -59,7 +59,7 @@ class AbstractSemiSupervisedLearner(object):
             # if inner == 0:
             #     params, clf_scores = self.tune_semi_supervised_learning(train)
             # else:
-            params, clf_scores = self.iter_semi_supervised_learning(train)
+            params, clf_scores = self.iter_semi_supervised_learning(train, score_columns, working_thread_number)
             train.set_and_rerank("classifier_score", clf_scores)
 
         # after semi supervised iteration: classify full dataset
@@ -166,7 +166,7 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
         else:
             use_as_main_col_alias = 'main_score'
 
-        td_peaks, bt_peaks = self.select_train_peaks(train, use_as_main_col_alias, self.ss_initial_fdr, self.parametric, self.pfdr, self.pi0_lambda, self.pi0_method, self.pi0_smooth_df, self.pi0_smooth_log_pi0)
+        td_peaks, bt_peaks = self.select_train_peaks(train, use_as_main_col_alias, self.ss_initial_fdr, self.parametric, self.pfdr, self.pi0_lambda, self.pi0_method, self.pi0_smooth_df, self.pi0_smooth_log_pi0, mapper, self.main_score_selection_report, self.outfile, self.level, working_thread_number)
         model = self.inner_learner.learn(td_peaks, bt_peaks, False)
         w = model.get_parameters()
         clf_scores = model.score(train, False)
