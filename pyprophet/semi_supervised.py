@@ -4,7 +4,7 @@ import click
 from .data_handling import Experiment, update_chosen_main_score_in_table
 from .classifiers import AbstractLearner, XGBLearner
 from .stats import mean_and_std_dev, find_cutoff
-
+import code
 try:
     profile
 except NameError:
@@ -18,7 +18,7 @@ class AbstractSemiSupervisedLearner(object):
         self.xeval_num_iter = xeval_num_iter
         self.test = test
 
-    def start_semi_supervised_learning(self, train, score_columns):
+    def start_semi_supervised_learning(self, train, score_columns, working_thread_number):
         raise NotImplementedError()
 
     def iter_semi_supervised_learning(self, train):
@@ -31,7 +31,7 @@ class AbstractSemiSupervisedLearner(object):
         raise NotImplementedError()
 
     @profile
-    def learn_randomized(self, experiment, score_columns):
+    def learn_randomized(self, experiment, score_columns, working_thread_number):
         assert isinstance(experiment, Experiment)
 
         click.echo("Info: Learning on cross-validation fold.")
@@ -41,7 +41,7 @@ class AbstractSemiSupervisedLearner(object):
 
         train.rank_by("main_score")
 
-        params, clf_scores, use_as_main_score = self.start_semi_supervised_learning(train, score_columns)
+        params, clf_scores, use_as_main_score = self.start_semi_supervised_learning(train, score_columns, working_thread_number)
         
         # Get current main score column name
         old_main_score_column = [col for col in score_columns if  'main' in col][0]
@@ -106,7 +106,7 @@ class AbstractSemiSupervisedLearner(object):
 
 class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
 
-    def __init__(self, inner_learner, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, test):
+    def __init__(self, inner_learner, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, test, main_score_selection_report, outfile, level):
         assert isinstance(inner_learner, AbstractLearner)
         AbstractSemiSupervisedLearner.__init__(self, xeval_fraction, xeval_num_iter, test)
         self.inner_learner = inner_learner
@@ -120,8 +120,11 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
         self.pi0_method = pi0_method
         self.pi0_smooth_df = pi0_smooth_df
         self.pi0_smooth_log_pi0 = pi0_smooth_log_pi0
+        self.main_score_selection_report = main_score_selection_report
+        self.outfile = outfile
+        self.level = level
 
-    def select_train_peaks(self, train, sel_column, cutoff_fdr, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0):
+    def select_train_peaks(self, train, sel_column, cutoff_fdr, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, mapper=None, main_score_selection_report=None, outfile=None, level=None, working_thread_number=None):
         assert isinstance(train, Experiment)
         assert isinstance(sel_column, str)
         assert isinstance(cutoff_fdr, float)
@@ -132,32 +135,34 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
         td_scores = td_peaks[sel_column]
 
         # find cutoff fdr from scores and only use best target peaks:
-        cutoff = find_cutoff(tt_scores, td_scores, cutoff_fdr, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0)
+        cutoff = find_cutoff(tt_scores, td_scores, cutoff_fdr, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, sel_column, mapper, main_score_selection_report, outfile, level, working_thread_number)
         best_target_peaks = tt_peaks.filter_(tt_scores >= cutoff)
         return td_peaks, best_target_peaks
 
-    def get_delta_td_bt_feature_size(self, train, col):
+    def get_delta_td_bt_feature_size(self, train, col, mapper, working_thread_number):
         '''
         Get the the difference in feature size based on which column is used in select_train_peaks for top decoy features and best target features
         '''
         assert isinstance(train, Experiment)
         assert isinstance(col, str)
+        
         # Try catch exception when using a feature column that cannot generate a valid pi0 estimation due to imbalance of number of top decoys to best targets
         try:
-            td_peaks, bt_peaks = self.select_train_peaks(train, col, self.ss_initial_fdr, self.parametric, self.pfdr, self.pi0_lambda, self.pi0_method, self.pi0_smooth_df, self.pi0_smooth_log_pi0)
+            td_peaks, bt_peaks = self.select_train_peaks(train, col, self.ss_initial_fdr, self.parametric, self.pfdr, self.pi0_lambda, self.pi0_method, self.pi0_smooth_df, self.pi0_smooth_log_pi0, mapper, self.main_score_selection_report, self.outfile, self.level, working_thread_number)
             return abs(td_peaks.df.shape[0] - bt_peaks.df.shape[0])
         except:
             # Return highest possible value if select_train_peaks fails to run due to not being able to compute pi0 estimation
             return float('inf')
 
-    def start_semi_supervised_learning(self, train, score_columns):
+    def start_semi_supervised_learning(self, train, score_columns, working_thread_number):
         # Get tables aliased score variable name
         df_column_score_alias = [col for col in train.df.columns if col not in ['tg_id', 'tg_num_id', 'is_decoy', 'is_top_peak', 'is_train', 'classifier_score']]
-
+        # Generate column alias name to score feature name
+        mapper = {alias_col : col for alias_col, col in zip(df_column_score_alias, score_columns)}
         if isinstance(self.inner_learner, XGBLearner):
             # dynamic selection of main score seems to only benefit the XBGLearner, the LDALearner performs worse when we apply this
             # Use the min() function to find the column with the smallest delta value
-            use_as_main_col_alias = min(df_column_score_alias, key=lambda x: self.get_delta_td_bt_feature_size(train, x))
+            use_as_main_col_alias = min(df_column_score_alias, key=lambda x: self.get_delta_td_bt_feature_size(train, x, mapper, working_thread_number))
         else:
             use_as_main_col_alias = 'main_score'
 
@@ -166,8 +171,6 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
         w = model.get_parameters()
         clf_scores = model.score(train, False)
         clf_scores -= np.mean(clf_scores)
-
-        mapper = {alias_col : col for alias_col, col in zip(df_column_score_alias, score_columns)}
 
         return w, clf_scores, mapper[use_as_main_col_alias]
 
