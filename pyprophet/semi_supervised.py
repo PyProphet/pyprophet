@@ -4,7 +4,7 @@ import click
 from .data_handling import Experiment, update_chosen_main_score_in_table
 from .classifiers import AbstractLearner, XGBLearner
 from .stats import mean_and_std_dev, find_cutoff
-import code
+
 try:
     profile
 except NameError:
