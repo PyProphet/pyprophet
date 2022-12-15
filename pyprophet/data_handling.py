@@ -14,6 +14,7 @@ except NameError:
     def profile(fun):
         return fun
 
+# selection of scores with low cross-correlation for metabolomics scoring
 def use_metabolomics_scores():
     return [
             "var_ms1_isotope_overlap_score",
@@ -28,6 +29,17 @@ def use_metabolomics_scores():
             "var_library_corr",
             "var_norm_rt_score"
             ]
+
+# extracts the scores and writes it into an SQL command 
+# in some cases some post processing has to be performed depending on which 
+# position the statement should be inserted (e.g. export_compounds.py)
+def write_scores_sql_command(con, score_sql, feature_name, var_replacement):
+  feature = pd.read_sql_query("""PRAGMA table_info(%s)""" % feature_name, con)
+  score_names_sql = [name for name in feature["name"].tolist() if name.startswith("VAR")]
+  score_names_lower = [name.lower().replace("var_", var_replacement) for name in score_names_sql]
+  for i in range(0,len(score_names_sql)):
+      score_sql = score_sql + str(feature_name + "." + score_names_sql[i] + " AS " + score_names_lower[i] + ", ")
+  return score_sql
 
 # Parameter transformation functions
 def transform_pi0_lambda(ctx, param, value):
