@@ -246,7 +246,32 @@ def prepare_data_table(table,
     df = cleanup_and_check(df)
     return df, all_score_columns
 
-
+def update_chosen_main_score_in_table(train, score_columns, use_as_main_score):
+    """
+    Update feature tables main_score
+    """
+    # Get current main score column name
+    old_main_score_column = [col for col in score_columns if  'main' in col][0]
+    # Get tables aliased score variable name
+    df_column_score_alias = [col for col in train.df.columns if col not in ['tg_id', 'tg_num_id', 'is_decoy', 'is_top_peak', 'is_train', 'classifier_score']]
+    # Generate mapping to rename columns in table
+    mapper = {alias_col : col for alias_col, col in zip(df_column_score_alias, score_columns)}
+    # Rename columns with actual feature score names
+    train.df.rename(columns=mapper, inplace=True)
+    # Update coulmns to set new main score column based on most important feature column
+    updated_score_columns = [col.replace("main_", "") if col==old_main_score_column else col for col in score_columns]
+    updated_score_columns = [col.replace("var", "main_var") if col==use_as_main_score else col for col in updated_score_columns]
+    updated_score_columns = sorted(updated_score_columns, key=lambda x:(x!=use_as_main_score.replace("var", "main_var"), x))
+    updated_score_columns = [old_main_score_column if old_main_score_column.replace("main_", "")==col else col for col in updated_score_columns]
+    # Rename columns with feature aliases
+    mapper = {v : 'var_{0}'.format(i) for i, v in enumerate(updated_score_columns[1:len(updated_score_columns)])}
+    mapper[updated_score_columns[0].replace("main_", "")] = 'main_score' 
+    train.df.rename(columns=mapper, inplace=True)
+    # Re-order main_score column index
+    temp_col = train.df.pop('main_score')
+    train.df.insert(5, temp_col.name, temp_col)
+    click.echo(f"Info: Updated main score column from {old_main_score_column} to {use_as_main_score}...")
+    return train, tuple(updated_score_columns)
 class Experiment(object):
 
     @profile

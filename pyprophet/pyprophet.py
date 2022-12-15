@@ -264,11 +264,11 @@ class HolyGostQuery(object):
     def _learn_and_apply(self, table):
 
         experiment, score_columns = self._setup_experiment(table)
-        final_classifier = self._learn(experiment)
+        final_classifier = self._learn(experiment, score_columns)
 
         return self._build_result(table, final_classifier, score_columns, experiment)
 
-    def _learn(self, experiment):
+    def _learn(self, experiment, score_columns):
         if self.test:  # for reliable results
             experiment.df.sort_values("tg_id", ascending=True, inplace=True)
 
@@ -285,7 +285,7 @@ class HolyGostQuery(object):
 
         if self.threads == 1:
             for k in range(neval):
-                (ttt_scores, ttd_scores, w) = learner.learn_randomized(experiment)
+                (ttt_scores, ttd_scores, w) = learner.learn_randomized(experiment, score_columns, 1)
                 ttt.append(ttt_scores)
                 ttd.append(ttd_scores)
                 ws.append(w)
@@ -295,7 +295,12 @@ class HolyGostQuery(object):
                 remaining = max(0, neval - self.threads)
                 todo = neval - remaining
                 neval -= todo
-                args = ((learner, "learn_randomized", (experiment, )), ) * todo
+                # args = ((learner, "learn_randomized", (experiment, score_columns, )), ) * todo
+                # Add individual worker ids
+                args = []
+                for thread_num in range(1, todo+1):
+                    args.append((learner, "learn_randomized", (experiment, score_columns, thread_num, )))
+                args = tuple(args)
                 res = pool.map(unwrap_self_for_multiprocessing, args)
                 ttt_scores = [r[0] for r in res]
                 ttd_scores = [r[1] for r in res]
@@ -347,10 +352,10 @@ class HolyGostQuery(object):
 
 
 @profile
-def PyProphet(classifier, xgb_hyperparams, xgb_params, xgb_params_space, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, tric_chromprob, threads, test, ss_score_filter, color_palette):
+def PyProphet(classifier, xgb_hyperparams, xgb_params, xgb_params_space, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, tric_chromprob, threads, test, ss_score_filter, color_palette, main_score_selection_report, outfile, level):
     if classifier == "LDA":
-        return HolyGostQuery(StandardSemiSupervisedLearner(LDALearner(), xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, test), classifier, ss_num_iter, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, tric_chromprob, threads, test, ss_score_filter, color_palette)
+        return HolyGostQuery(StandardSemiSupervisedLearner(LDALearner(), xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, test, main_score_selection_report, outfile, level), classifier, ss_num_iter, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, tric_chromprob, threads, test, ss_score_filter, color_palette)
     elif classifier == "XGBoost":
-        return HolyGostQuery(StandardSemiSupervisedLearner(XGBLearner(xgb_hyperparams, xgb_params, xgb_params_space, threads), xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, test), classifier, ss_num_iter, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, tric_chromprob, threads, test, ss_score_filter, color_palette)
+        return HolyGostQuery(StandardSemiSupervisedLearner(XGBLearner(xgb_hyperparams, xgb_params, xgb_params_space, threads), xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, test, main_score_selection_report, outfile, level), classifier, ss_num_iter, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, tric_chromprob, threads, test, ss_score_filter, color_palette)
     else:
         raise click.ClickException("Classifier not supported.")

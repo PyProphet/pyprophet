@@ -6,14 +6,18 @@ try:
 except ImportError:
     plt = None
 
+from PyPDF2 import PdfFileMerger, PdfFileReader
+
+import os
+
 import click
 from scipy.stats import gaussian_kde
 from numpy import linspace, concatenate, around
 
 def color_blind_friendly(color_palette):
-
+    
     color_dict = {"normal":["#F5793A", "#0F2080"], "protan":["#AE9C45", "#052955"], "deutran":["#C59434", "#092C48"], "tritan":["#1ECBE1", "#E1341E"]}
-
+    
     if color_palette not in color_dict:
         click.echo(f"WARN: {color_palette} is not a valid color_palette, must be one of 'normal'. 'protan', 'deutran', or 'tritan'. Using default 'normal'.")
         color_palette = "normal"
@@ -142,8 +146,68 @@ def plot_scores(df, out, color_palette="normal"):
 def plot_hist(x, title, xlabel, ylabel, pdf_path="histogram_plot.png"):
 
     if plt is not None:
+        # Clear figures
+        plt.close('all')
         counts, __, __ = plt.hist(x, bins=20, density=True)
         plt.title(title, wrap=True)
         plt.xlabel(xlabel)
         plt.ylabel(ylabel)
         plt.savefig(pdf_path)
+
+        # Clear figures
+        plt.close('all')
+
+def main_score_selection_report(title, sel_column, mapper, decoy_scores, target_scores, target_pvalues, pi0, color_palette="normal", pdf_path="main_score_selection_report.pdf", worker_num=1):
+    
+    if plt is None:
+        raise ImportError("Error: The matplotlib package is required to create a report.")
+    
+    # Create output to merge pdges
+    output = PdfFileMerger() 
+    # Generate colors
+    t_col, d_col = color_blind_friendly(color_palette)
+
+    # Clear figures
+    plt.close('all')
+
+    plt.figure(figsize=(10, 11))
+    plt.subplots_adjust(hspace=.5)
+
+    # Plot Score Distribution
+    plt.subplot(121)
+    plt.hist([target_scores, decoy_scores], 20, color=[t_col, d_col], label=['target', 'decoy'], histtype='bar')
+    plt.title(f"histogram of scores")
+    plt.xlabel("score")
+    plt.ylabel("density histogram")
+    plt.legend(loc=1)
+    # Plot P-value Distribution
+    plt.subplot(122)
+    if target_pvalues is not None:
+        counts, __, __ = plt.hist(target_pvalues, bins=20, density=True)
+        if pi0 is not None:
+            plt.plot([0, 1], [pi0['pi0'], pi0['pi0']], "r")
+            plt.title("p-value density histogram: $\pi_0$ = " + str(around(pi0['pi0'], decimals=3)))
+        else:
+            plt.title("p-value density histogram: $\pi_0$ estimation failed.")
+        plt.xlabel("target p-values")
+        plt.ylabel("density histogram")
+    # Finalize figure
+    plt.suptitle(f"{title}: {mapper[sel_column]}")
+    plt.tight_layout()
+    # Append to existing master report if exists, otherwise write to a new master report pdf.
+    if os.path.isfile(pdf_path):
+        temp_pdf_path = f"temp_main_score_selection_report_thread__{worker_num}.pdf"
+        # Save current plot in temporary pdf
+        plt.savefig(temp_pdf_path)
+        # Append master pdf and temp pdf to output merger
+        output.append(PdfFileReader(open(pdf_path, "rb")))
+        output.append(PdfFileReader(open(temp_pdf_path, "rb")))
+        # Write to master pdf
+        output.write(pdf_path)
+        # Remove temporary pdf
+        os.remove(temp_pdf_path)
+    else:
+        # Save as master pdf
+        plt.savefig(pdf_path)
+    # Clear figures
+    plt.close('all')
