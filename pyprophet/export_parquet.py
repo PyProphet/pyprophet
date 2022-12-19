@@ -131,9 +131,8 @@ CREATE INDEX IF NOT EXISTS idx_score_peptide_run_id ON SCORE_PEPTIDE (RUN_ID);
     #get rid of trailing comma
     columnsToSelect = columnsToSelect[0:-2]
 
-    # query, start with the largest table and work way outwards 
     # Start with feature_transition but then to include the rows of those precursors not found (no associated feature) join with precursor_transition
-    if transitionLevel:
+    if transitionLevel: # each row will be a transition 
         query = '''
         SELECT {0}
         FROM FEATURE_TRANSITION
@@ -184,7 +183,7 @@ CREATE INDEX IF NOT EXISTS idx_score_peptide_run_id ON SCORE_PEPTIDE (RUN_ID);
 
         '''.format(columnsToSelect)
 
-    else:
+    else: # each row will be a precursor/feature
         query = '''
         SELECT {0}
         FROM FEATURE
@@ -239,23 +238,28 @@ CREATE INDEX IF NOT EXISTS idx_score_peptide_run_id ON SCORE_PEPTIDE (RUN_ID);
     except Exception as e:
         print("read_sql_query failed: "+ str(e))
 
-
     now = datetime.now()
     current_time = now.strftime("%H:%M:%S")
     print("Done Executing (Current Time = {})".format(current_time))
 
     print("Creating bitwise maps ...")
 
-    # create masks for easier indexing 
-    df['FEATURE_MASK'] = (~ df['FEATURE_ID'].duplicated()) & (df['FEATURE_ID'].notna())
-
-    # for the precursor mask should be a superset of feature mask. If precursor mask is true and feature mask is false then feature should be NA.
-    # Thus df[(~df['FEATURE_MASK']) & df['PRECURSOR_MASK'] & df['FEATURE_ID'].notna()] should return no entries
-    # in current implementation this is not directly looked for however because all of the transitions for a given precursor/feature are groupped together in the array it works out.
-    df['PRECURSOR_MASK'] = (~ df['PRECURSOR_ID'].duplicated())
+    # create masks for easier data exploration
 
 
-    df['PEPTIDE_MASK'] = ~ df['PEPTIDE_ID'].duplicated()
+    ### FEATURE_MASK such that each row is a feature. For feature level this will remove rows of precursors that do not map to any feature. For transition level a random transition is chosen
+    df['FEATURE_MASK'] = (~df['FEATURE_ID'].duplicated(keep='first')) & (df['FEATURE_ID'].notna())
+    #### TOP_FEATURE_MASK = all FEATURES that have a RANK == 1. One row per feature
+    df['TOP_FEATURE_MASK'] = (df['FEATURE_MASK']) & (df['SCORE_MS2.RANK'] == 1)  # just take a random transitionLevel
+
+    #### PRECURSOR_MASK = one row per precursor, includes precursors that do not map to any feature. If precursor maps to a feature than take the feature with rank == 1. If no rank values exist mask includes a random feature.
+
+    df = df.sort_values(by='SCORE_MS2.RANK')
+    df['PRECURSOR_MASK'] = (df['TOP_FEATURE_MASK'] | df['FEATURE_ID'].isna() | df['SCORE_MS2.RANK'].isna() ) 
+
+    dfPrec = df[df['PRECURSOR_MASK']]
+    df['PRECURSOR_MASK'] = ~dfPrec['PRECURSOR_ID'].duplicated(keep='first')
+    df['PRECURSOR_MASK'] = df['PRECURSOR_MASK'].fillna(False) ## since df and dfPrec are diferent sizes have some NA values, fill those that with False 
 
     print("Saving metaData ...")
 
@@ -274,6 +278,9 @@ CREATE INDEX IF NOT EXISTS idx_score_peptide_run_id ON SCORE_PEPTIDE (RUN_ID);
         custom_metadata['scoreLevel'] = str(con.execute("select level from PYPROPHET_WEIGHTS").fetchone()[0])
         custom_metadata['pyprophetWeights'] = pd.read_sql("select * from pyprophet_weights", con).to_json()
 
+    # fetch the pyprophet weights if avaliable
+    if check_sqlite_table(con, "PYPROPHET_XGB"):
+        custom_metadata['xgbModel'] = con.execute(("select * from PYPROPHET_XGB").fetchone()[0])
 
     fixed_table = table.replace_schema_metadata({**custom_metadata, **existing_metadata})
 
@@ -286,11 +293,9 @@ CREATE INDEX IF NOT EXISTS idx_score_peptide_run_id ON SCORE_PEPTIDE (RUN_ID);
     ## export to parquet 
     pq.write_table(fixed_table, outfile) 
 
-
     now = datetime.now()
     current_time = now.strftime("%H:%M:%S")
     print("Done Saving (Current Time = {})".format(current_time))
-
 
 if __name__ == "__main__":
     main()
