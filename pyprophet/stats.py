@@ -8,9 +8,11 @@ import scipy.stats
 import scipy.special
 import multiprocessing
 import click
+import os
 
 from .optimized import (find_nearest_matches as _find_nearest_matches,
                        count_num_positives, single_chromatogram_hypothesis_fast)
+from .report import plot_hist, main_score_selection_report
 from statsmodels.nonparametric.kde import KDEUnivariate
 from collections import namedtuple
 # from .config import CONFIG
@@ -40,7 +42,7 @@ def find_nearest_matches(x, y):
 
 def to_one_dim_array(values, as_type=None):
     """ Converts list or flattens n-dim array to 1-dim array if possible """
-
+    
     if isinstance(values, (list, tuple)):
         values = np.array(values, dtype=np.float32)
     elif isinstance(values, pd.Series):
@@ -132,48 +134,48 @@ def pnorm(stat, stat0):
 
 def pemp(stat, stat0):
     """ Computes empirical values identically to bioconductor/qvalue empPvals """
-
+    
     assert len(stat0) > 0
     assert len(stat) > 0
-
+    
     stat = np.array(stat)
     stat0 = np.array(stat0)
-
+    
     m = len(stat)
     m0 = len(stat0)
-
+    
     statc = np.concatenate((stat, stat0))
     v = np.array([True] * m + [False] * m0)
     perm = np.argsort(-statc, kind="mergesort")  # reversed sort, mergesort is stable
     v = v[perm]
-
+    
     u = np.where(v)[0]
     p = (u - np.arange(m)) / float(m0)
-
+    
     # ranks can be fractional, we round down to the next integer, ranking returns values starting
     # with 1, not 0:
     ranks = np.floor(scipy.stats.rankdata(-stat)).astype(int) - 1
     p = p[ranks]
     p[p <= 1.0 / m0] = 1.0 / m0
-
+    
     return p
 
 
 @profile
 def pi0est(p_values, lambda_ = np.arange(0.05,1.0,0.05), pi0_method = "smoother", smooth_df = 3, smooth_log_pi0 = False):
     """ Estimate pi0 according to bioconductor/qvalue """
-
+    
     # Compare to bioconductor/qvalue reference implementation
     # import rpy2
     # import rpy2.robjects as robjects
     # from rpy2.robjects import pandas2ri
     # pandas2ri.activate()
-
+    
     # smoothspline=robjects.r('smooth.spline')
     # predict=robjects.r('predict')
-
+    
     p = np.array(p_values)
-
+    
     rm_na = np.isfinite(p)
     p = p[rm_na]
     m = len(p)
@@ -181,14 +183,14 @@ def pi0est(p_values, lambda_ = np.arange(0.05,1.0,0.05), pi0_method = "smoother"
     if isinstance(lambda_, np.ndarray ):
         ll = len(lambda_)
         lambda_ = np.sort(lambda_)
-
+    
     if (min(p) < 0 or max(p) > 1):
         raise click.ClickException("p-values not in valid range [0,1].")
     elif (ll > 1 and ll < 4):
         raise click.ClickException("If lambda_ is not predefined (one value), at least four data points are required.")
     elif (np.min(lambda_) < 0 or np.max(lambda_) >= 1):
         raise click.ClickException("Lambda must be within [0,1)")
-
+    
     if (ll == 1):
         pi0 = np.mean(p >= lambda_)/(1 - lambda_)
         pi0_lambda = pi0
@@ -199,7 +201,7 @@ def pi0est(p_values, lambda_ = np.arange(0.05,1.0,0.05), pi0_method = "smoother"
         for l in lambda_:
             pi0.append(np.mean(p >= l)/(1 - l))
         pi0_lambda = pi0
-
+    
         if (pi0_method == "smoother"):
             if smooth_log_pi0:
                 pi0 = np.log(pi0)
@@ -224,8 +226,9 @@ def pi0est(p_values, lambda_ = np.arange(0.05,1.0,0.05), pi0_method = "smoother"
         else:
             raise click.ClickException("pi0_method must be one of 'smoother' or 'bootstrap'.")
     if (pi0<=0):
-        raise click.ClickException("The estimated pi0 <= 0. Check that you have valid p-values or use a different range of lambda.")
-
+        plot_hist(p, f"p-value density histogram used during pi0 estimation", "p-value", "density histogram", "pi0_estimation_error_pvalue_histogram_plot.pdf")
+        raise click.ClickException(f"The estimated pi0 <= 0. Check that you have valid p-values or use a different range of lambda. Current lambda range: {lambda_}")
+    
     return {'pi0': pi0, 'pi0_lambda': pi0_lambda, 'lambda_': lambda_, 'pi0_smooth': pi0Smooth}
 
 @profile
@@ -434,12 +437,12 @@ def summary_err_table(df, qvalues=[0, 0.01, 0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5]
 
 
 @profile
-def error_statistics(target_scores, decoy_scores, parametric, pfdr, pi0_lambda, pi0_method = "smoother", pi0_smooth_df = 3, pi0_smooth_log_pi0 = False, compute_lfdr = False, lfdr_trunc = True, lfdr_monotone = True, lfdr_transf = "probit", lfdr_adj = 1.5, lfdr_eps = np.power(10.0,-8)):
+def error_statistics(target_scores, decoy_scores, parametric, pfdr, pi0_lambda, pi0_method = "smoother", pi0_smooth_df = 3, pi0_smooth_log_pi0 = False, compute_lfdr = False, lfdr_trunc = True, lfdr_monotone = True, lfdr_transf = "probit", lfdr_adj = 1.5, lfdr_eps = np.power(10.0,-8), sel_column=None, mapper=None, save_report=False, title=None, level=None, working_thread_number=None):
     """ Takes list of decoy and target scores and creates error statistics for target values """
 
     target_scores = to_one_dim_array(target_scores)
     target_scores = np.sort(target_scores[~np.isnan(target_scores)])
-
+    
     decoy_scores = to_one_dim_array(decoy_scores)
     decoy_scores = np.sort(decoy_scores[~np.isnan(decoy_scores)])
 
@@ -450,9 +453,22 @@ def error_statistics(target_scores, decoy_scores, parametric, pfdr, pi0_lambda, 
     else:
         # non-parametric
         target_pvalues = pemp(target_scores, decoy_scores)
-
-    # estimate pi0
-    pi0 = pi0est(target_pvalues, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0)
+    
+    if save_report and title is not None and sel_column is not None:
+        # Place pi0 estimation in a try-except block for plot generation only
+        try:
+            # estimate pi0
+            pi0 = pi0est(target_pvalues, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0)
+        except Exception as e:
+            pi0 = None
+            pi0_error_msg = e
+        # generate main score selection report
+        main_score_selection_report(os.path.basename(title), sel_column, mapper, decoy_scores, target_scores, target_pvalues, pi0, pdf_path=os.path.join(os.path.dirname(title), os.path.splitext(os.path.basename(title))[0] + f"_main_score_selection_{level}_report_thread_{working_thread_number}.pdf"), worker_num=working_thread_number)
+        if pi0 is None:
+            raise click.ClickException(f"{pi0_error_msg}")
+    else:
+        # estimate pi0
+        pi0 = pi0est(target_pvalues, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0)
 
     # compute q-value
     target_qvalues = qvalue(target_pvalues, pi0['pi0'], pfdr)
@@ -470,10 +486,10 @@ def error_statistics(target_scores, decoy_scores, parametric, pfdr, pi0_lambda, 
     return error_stat, pi0
 
 
-def find_cutoff(tt_scores, td_scores, cutoff_fdr, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0):
+def find_cutoff(tt_scores, td_scores, cutoff_fdr, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, sel_column=None, mapper=None, main_score_selection_report=False, outfile=None, level=None, working_thread_number=None):
     """ Finds cut off target score for specified false discovery rate fdr """
 
-    error_stat, pi0 = error_statistics(tt_scores, td_scores, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, False)
+    error_stat, pi0 = error_statistics(tt_scores, td_scores, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, False, sel_column=sel_column, mapper=mapper, save_report=main_score_selection_report, title=outfile, level=level, working_thread_number=working_thread_number)
     if not len(error_stat):
         raise click.ClickException("Too little data for calculating error statistcs.")
     i0 = (error_stat.qvalue - cutoff_fdr).abs().idxmin()
