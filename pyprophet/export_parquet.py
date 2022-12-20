@@ -2,17 +2,9 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 import sqlite3
-import argparse
 import click
 from .data_handling import check_sqlite_table
 from datetime import datetime
-
-def main(): 
-    parser = argparse.ArgumentParser()
-    parser.add_argument('infile')
-    parser.add_argument('outfile')
-    args = parser.parse_args()
-    export_parquet(args.infile, args.outfile, 1)
 
 # this method is only currently supported for combined output and not with ipf
 def export_to_parquet(infile, outfile, transitionLevel):
@@ -232,12 +224,9 @@ CREATE INDEX IF NOT EXISTS idx_score_peptide_run_id ON SCORE_PEPTIDE (RUN_ID);
     current_time = now.strftime("%H:%M:%S")
     click.echo("Info: Executing Query (Current Time = {})".format(current_time))
     
-    try:
-        click.echo("Info: Attempting Execution")
-        df = pd.read_sql(query, con)
-        click.echo("Info: read_sql_query went well")
-    except Exception as e:
-        click.echo("Info: read_sql_query failed: "+ str(e))
+    click.echo("Info: Attempting Execution")
+    df = pd.read_sql(query, con)
+    click.echo("Info: read_sql_query finished")
 
     now = datetime.now()
     current_time = now.strftime("%H:%M:%S")
@@ -297,6 +286,3 @@ CREATE INDEX IF NOT EXISTS idx_score_peptide_run_id ON SCORE_PEPTIDE (RUN_ID);
     now = datetime.now()
     current_time = now.strftime("%H:%M:%S")
     click.echo("Info: Done Saving (Current Time = {})".format(current_time))
-
-if __name__ == "__main__":
-    main()
