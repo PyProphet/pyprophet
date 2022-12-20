@@ -3,6 +3,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import sqlite3
 import argparse
+import click
 from .data_handling import check_sqlite_table
 from datetime import datetime
 
@@ -18,7 +19,7 @@ def export_to_parquet(infile, outfile, transitionLevel):
 
     con = sqlite3.connect(infile)
 
-    print("Creating Index Query ...")
+    click.echo("Info: Creating Index Query ...")
     # Main query for standard OpenSWATH
     idx_query = '''
 CREATE INDEX IF NOT EXISTS idx_precursor_precursor_id ON PRECURSOR (ID);
@@ -51,7 +52,7 @@ CREATE INDEX IF NOT EXISTS idx_score_peptide_run_id ON SCORE_PEPTIDE (RUN_ID);
     if check_sqlite_table(con, "SCORE_MS2"):
       idx_query += "CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);"
 
-    print("Creating Index ....")
+    click.echo("Info: Creating Index ....")
 
     con.executescript(idx_query) # Add indices
 
@@ -63,11 +64,11 @@ CREATE INDEX IF NOT EXISTS idx_score_peptide_run_id ON SCORE_PEPTIDE (RUN_ID);
         CREATE INDEX IF NOT EXISTS idx_feature_transition_transition_id_feature_id ON FEATURE_TRANSITION (TRANSITION_ID, FEATURE_ID);
         CREATE INDEX IF NOT EXISTS idx_feature_transition_feature_id ON FEATURE_TRANSITION (FEATURE_ID); '''
 
-        print("Creating transition level index ...")
+        click.echo("Info: Creating transition level index ...")
         con.executescript(idx_transition_query)
 
     
-    print("Creating Main Query ....")
+    click.echo("Info: Creating Main Query ....")
     # since do not want all of the columns (some columns are twice per table) manually select the columns want in a list, (note do not want decoy)
     # note TRAML_ID for precursor and transition are not the same
     columns = {}
@@ -85,7 +86,7 @@ CREATE INDEX IF NOT EXISTS idx_score_peptide_run_id ON SCORE_PEPTIDE (RUN_ID);
     query = con.execute("select count(*) as cntrec from pragma_table_info('feature_MS2') where name='EXP_IM'")
     hasIm = query.fetchone()[0] > 0
     if hasIm:
-        print("[INFO] Ion Mobility Columns Found")
+        click.echo("Info: Ion Mobility Columns Found")
         imColumns = ['EXP_IM', 'DELTA_IM']
         columns['FEATURE_MS2'] = columns['FEATURE_MS2'] + imColumns
         columns['FEATURE_MS1'] = columns['FEATURE_MS1'] + imColumns
@@ -229,20 +230,20 @@ CREATE INDEX IF NOT EXISTS idx_score_peptide_run_id ON SCORE_PEPTIDE (RUN_ID);
 
     now = datetime.now()
     current_time = now.strftime("%H:%M:%S")
-    print("Executing Query (Current Time = {})".format(current_time))
+    click.echo("Info: Executing Query (Current Time = {})".format(current_time))
     
     try:
-        print("Attempting Execution")
+        click.echo("Info: Attempting Execution")
         df = pd.read_sql(query, con)
-        print("read_sql_query went well")
+        click.echo("Info: read_sql_query went well")
     except Exception as e:
-        print("read_sql_query failed: "+ str(e))
+        click.echo("Info: read_sql_query failed: "+ str(e))
 
     now = datetime.now()
     current_time = now.strftime("%H:%M:%S")
-    print("Done Executing (Current Time = {})".format(current_time))
+    click.echo("Info: Done Executing (Current Time = {})".format(current_time))
 
-    print("Creating bitwise maps ...")
+    click.echo("Info: Creating bitwise maps ...")
 
     # create masks for easier data exploration
 
@@ -261,7 +262,7 @@ CREATE INDEX IF NOT EXISTS idx_score_peptide_run_id ON SCORE_PEPTIDE (RUN_ID);
     df['PRECURSOR_MASK'] = ~dfPrec['PRECURSOR_ID'].duplicated(keep='first')
     df['PRECURSOR_MASK'] = df['PRECURSOR_MASK'].fillna(False) ## since df and dfPrec are diferent sizes have some NA values, fill those that with False 
 
-    print("Saving metaData ...")
+    click.echo("Info: Saving metaData ...")
 
     table = pa.Table.from_pandas(df)
     
@@ -288,14 +289,14 @@ CREATE INDEX IF NOT EXISTS idx_score_peptide_run_id ON SCORE_PEPTIDE (RUN_ID);
     fixed_table = table.replace_schema_metadata(merged_metadata)
     
     con.close()
-    print("Saving to Parquet .... ")
+    click.echo("Info: Saving to Parquet .... ")
 
     ## export to parquet 
     pq.write_table(fixed_table, outfile) 
 
     now = datetime.now()
     current_time = now.strftime("%H:%M:%S")
-    print("Done Saving (Current Time = {})".format(current_time))
+    click.echo("Info: Done Saving (Current Time = {})".format(current_time))
 
 if __name__ == "__main__":
     main()

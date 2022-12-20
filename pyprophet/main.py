@@ -360,12 +360,11 @@ def export_parquet(infile, outfile, transitionLevel):
     """
     Export all transition data to parquet file
     """
-    print("outfile is {}".format(outfile))
     if transitionLevel:
-        print("[INFO] Will export transition level data")
+        click.echo("Info: Will export transition level data")
     if outfile is None:
         outfile = infile.split(".osw")[0] + ".parquet"
-
+    click.echo("Info: parquet file will be written to {}".format(outfile))
     export_to_parquet(infile, outfile, transitionLevel)
 
 # Export Compound TSV
