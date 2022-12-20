@@ -357,10 +357,10 @@ def export(infile, outfile, format, outcsv, transition_quantification, max_trans
 @click.option('--out', 'outfile', required=False, type=click.Path(exists=False), help='Output parquet file.')
 @click.option('--transitionLevel', 'transitionLevel', is_flag=True, help='Whether to export transition level data as well')
 def export_parquet(infile, outfile, transitionLevel):
-    print("outfile is {}".format(outfile))
     """
     Export all transition data to parquet file
     """
+    print("outfile is {}".format(outfile))
     if transitionLevel:
         print("[INFO] Will export transition level data")
     if outfile is None:
