@@ -9,22 +9,30 @@ from datetime import datetime
 from tqdm import tqdm
 import os
 import multiprocessing
+from functools import wraps
 import contextlib
 from time import time
 
-infile = "/media/justincsing/ExtraDrive1/Documents2/Roest_Lab/Github/testing/pyprophet/merged_5ng.osw"
-outfile = '/media/justincsing/ExtraDrive1/Documents2/Roest_Lab/Github/testing/pyprophet/merged_5ng.parquet'
-expectfile = '/media/justincsing/ExtraDrive1/Documents2/Roest_Lab/Github/testing/pyprophet/expected_merged_5ng.parquet'
-df_expect = pd.read_parquet(expectfile, engine='pyarrow')
-df_expect.sort_values(by='PRECURSOR_ID', inplace=True)
-transitionLevel = False
-chunksize=1000
-threads=3
-df = pd.read_parquet(outfile, engine="pyarrow")
-df.sort_values(by='PRECURSOR_ID', inplace=True)
+def method_timer(f):
+    """
+    Method for timing functions
+    """
+    @wraps(f)
+    def wrap(*args, **kw):
+        ts = time()
+        result = f(*args, **kw)
+        te = time()
+        click.echo('Info: method:%r args:[%r, %r] took: %2.4f sec' % (
+            f.__name__, args, kw, te-ts))
+        return result
+    return wrap
+
 
 @contextlib.contextmanager
 def code_block_timer(ident, log_type=click.echo):
+    """
+    Time a block of code
+    """
     tstart = time()
     yield
     elapsed = time() - tstart
@@ -159,7 +167,8 @@ def osw_to_parquet_writer(con, columnsToSelect, precursor_id_batches, outfile, o
         writer.close()
 
 # this method is only currently supported for combined output and not with ipf
-def export_to_parquet(infile, outfile, transitionLevel, chunksize=100):
+@method_timer
+def export_to_parquet(infile, outfile, transitionLevel, chunksize=1000, threads=1):
     '''
     Convert an OSW sqlite file to Parquet format
 
