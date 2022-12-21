@@ -1,14 +1,177 @@
 import pandas as pd
+import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
 import sqlite3
 import click
 from .data_handling import check_sqlite_table
 from datetime import datetime
+from tqdm import tqdm
+import os
+import multiprocessing
+import contextlib
+from time import time
+
+infile = "/media/justincsing/ExtraDrive1/Documents2/Roest_Lab/Github/testing/pyprophet/merged_5ng.osw"
+outfile = '/media/justincsing/ExtraDrive1/Documents2/Roest_Lab/Github/testing/pyprophet/merged_5ng.parquet'
+expectfile = '/media/justincsing/ExtraDrive1/Documents2/Roest_Lab/Github/testing/pyprophet/expected_merged_5ng.parquet'
+df_expect = pd.read_parquet(expectfile, engine='pyarrow')
+df_expect.sort_values(by='PRECURSOR_ID', inplace=True)
+transitionLevel = False
+chunksize=1000
+threads=3
+df = pd.read_parquet(outfile, engine="pyarrow")
+df.sort_values(by='PRECURSOR_ID', inplace=True)
+
+@contextlib.contextmanager
+def code_block_timer(ident, log_type=click.echo):
+    tstart = time()
+    yield
+    elapsed = time() - tstart
+    log_type("{0}: Elapsed {1} ms".format(ident, elapsed))
+
+# See: https://stackoverflow.com/questions/47113813/using-pyarrow-how-do-you-append-to-parquet-file
+def append_to_parquet_table(dataframe, filepath=None, writer=None):
+    """Method writes/append dataframes in parquet format.
+
+    This method is used to write pandas DataFrame as pyarrow Table in parquet format. If the methods is invoked
+    with writer, it appends dataframe to the already written pyarrow table.
+
+    :param dataframe: pd.DataFrame to be written in parquet format.
+    :param filepath: target file location for parquet file.
+    :param writer: ParquetWriter object to write pyarrow tables in parquet format.
+    :return: ParquetWriter object. This can be passed in the subsequenct method calls to append DataFrame
+        in the pyarrow Table
+    """
+    table = pa.Table.from_pandas(dataframe)
+    if writer is None:
+        writer = pq.ParquetWriter(filepath, table.schema)
+    writer.write_table(table=table)
+    return writer
+
+def read_precursor_feature_data(con, columnsToSelect, prec_ids):
+            query = f'''
+        SELECT DISTINCT {columnsToSelect} 
+        FROM (SELECT * FROM PRECURSOR WHERE ID in ({','.join(prec_ids)})) AS PRECURSOR
+
+            LEFT JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
+            LEFT JOIN PEPTIDE ON PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
+            LEFT JOIN PEPTIDE_PROTEIN_MAPPING ON PEPTIDE.ID = PEPTIDE_PROTEIN_MAPPING.PEPTIDE_ID
+            LEFT JOIN PROTEIN ON PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID = PROTEIN.ID
+
+            LEFT JOIN FEATURE ON FEATURE.PRECURSOR_ID = PRECURSOR.ID
+            LEFT JOIN FEATURE_MS1 ON FEATURE.ID = FEATURE_MS1.FEATURE_ID
+            LEFT JOIN FEATURE_MS2 ON FEATURE.ID = FEATURE_MS2.FEATURE_ID
+
+            LEFT JOIN RUN ON FEATURE.RUN_ID = RUN.ID
+
+            LEFT JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
+            LEFT JOIN SCORE_PEPTIDE ON PEPTIDE.ID = SCORE_PEPTIDE.PEPTIDE_ID
+            LEFT JOIN SCORE_PROTEIN ON PROTEIN.ID = SCORE_PROTEIN.PROTEIN_ID
+
+            WHERE FEATURE.ID IS NULL
+        
+        UNION
+
+        SELECT {columnsToSelect}
+        FROM (SELECT * FROM FEATURE WHERE PRECURSOR_ID in ({','.join(prec_ids)})) AS FEATURE
+
+            LEFT JOIN PRECURSOR ON FEATURE.PRECURSOR_ID = PRECURSOR.ID
+            LEFT JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
+            LEFT JOIN PEPTIDE ON PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
+            LEFT JOIN PEPTIDE_PROTEIN_MAPPING ON PEPTIDE.ID = PEPTIDE_PROTEIN_MAPPING.PEPTIDE_ID
+            LEFT JOIN PROTEIN ON PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID = PROTEIN.ID
+
+            LEFT JOIN RUN ON FEATURE.RUN_ID = RUN.ID
+            LEFT JOIN FEATURE_MS1 ON FEATURE.ID = FEATURE_MS1.FEATURE_ID
+            LEFT JOIN FEATURE_MS2 ON FEATURE.ID = FEATURE_MS2.FEATURE_ID
+
+
+            LEFT JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
+            LEFT JOIN SCORE_PEPTIDE ON PEPTIDE.ID = SCORE_PEPTIDE.PEPTIDE_ID
+            LEFT JOIN SCORE_PROTEIN ON PROTEIN.ID = SCORE_PROTEIN.PROTEIN_ID
+        '''
+            df = pd.read_sql(query, con)
+            return df
+
+def read_feature_transition_data(con, columnsToSelect, prec_ids):
+    query = f'''
+        SELECT {columnsToSelect}
+        FROM FEATURE_TRANSITION
+
+        LEFT JOIN FEATURE ON FEATURE_TRANSITION.FEATURE_ID = FEATURE.ID
+        LEFT JOIN FEATURE_MS1 ON FEATURE_TRANSITION.FEATURE_ID = FEATURE_MS1.FEATURE_ID
+        LEFT JOIN FEATURE_MS2 ON FEATURE_TRANSITION.FEATURE_ID = FEATURE_MS2.FEATURE_ID
+
+        LEFT JOIN (SELECT * FROM PRECURSOR WHERE ID in ({','.join(prec_ids)})) AS PRECURSOR ON FEATURE.PRECURSOR_ID = PRECURSOR.ID
+        LEFT JOIN TRANSITION ON FEATURE_TRANSITION.TRANSITION_ID = TRANSITION.ID
+        LEFT JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
+        LEFT JOIN PEPTIDE ON PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
+        LEFT JOIN PEPTIDE_PROTEIN_MAPPING ON PEPTIDE.ID = PEPTIDE_PROTEIN_MAPPING.PEPTIDE_ID
+        LEFT JOIN PROTEIN ON PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID = PROTEIN.ID
+
+        LEFT JOIN RUN ON FEATURE.RUN_ID = RUN.ID
+
+        LEFT JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
+        LEFT JOIN SCORE_PEPTIDE ON PEPTIDE.ID = SCORE_PEPTIDE.PEPTIDE_ID
+        LEFT JOIN SCORE_PROTEIN ON PROTEIN.ID = SCORE_PROTEIN.PROTEIN_ID
+
+
+        UNION
+
+        SELECT DISTINCT {columnsToSelect} FROM TRANSITION_PRECURSOR_MAPPING
+
+        LEFT JOIN (SELECT * FROM PRECURSOR WHERE ID in ({','.join(prec_ids)})) AS PRECURSOR ON TRANSITION_PRECURSOR_MAPPING.PRECURSOR_ID = PRECURSOR.ID
+        LEFT JOIN TRANSITION ON TRANSITION_PRECURSOR_MAPPING.TRANSITION_ID = TRANSITION.ID
+
+        LEFT JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
+        LEFT JOIN PEPTIDE ON PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
+        LEFT JOIN PEPTIDE_PROTEIN_MAPPING ON PEPTIDE.ID = PEPTIDE_PROTEIN_MAPPING.PEPTIDE_ID
+        LEFT JOIN PROTEIN ON PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID = PROTEIN.ID
+
+        LEFT JOIN FEATURE_TRANSITION ON TRANSITION_PRECURSOR_MAPPING.TRANSITION_ID = FEATURE_TRANSITION.TRANSITION_ID
+
+        LEFT JOIN FEATURE ON FEATURE_TRANSITION.FEATURE_ID = FEATURE.ID
+        LEFT JOIN FEATURE_MS1 ON FEATURE_TRANSITION.FEATURE_ID = FEATURE_MS1.FEATURE_ID
+        LEFT JOIN FEATURE_MS2 ON FEATURE_TRANSITION.FEATURE_ID = FEATURE_MS2.FEATURE_ID
+
+        LEFT JOIN RUN ON FEATURE.RUN_ID = RUN.ID
+
+        LEFT JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
+        LEFT JOIN SCORE_PEPTIDE ON PEPTIDE.ID = SCORE_PEPTIDE.PEPTIDE_ID
+        LEFT JOIN SCORE_PROTEIN ON PROTEIN.ID = SCORE_PROTEIN.PROTEIN_ID
+
+        WHERE FEATURE.ID IS NULL
+
+        '''
+    df = pd.read_sql(query, con)
+    return df
+
+def osw_to_parquet_writer(con, columnsToSelect, precursor_id_batches, outfile, osw_data_reader=read_precursor_feature_data):
+    # If an input file is passed instead of a sqlite3 connection, establish a connection
+    if os.path.exists(con) and not isinstance(con, sqlite3.Connection):
+        con = sqlite3.connect(infile)
+    writer = None
+    for prec_id in tqdm(precursor_id_batches, desc="INFO: Reading data from OSW...", total=len(precursor_id_batches)):
+        df = osw_data_reader(con, columnsToSelect, prec_id['ID'].astype(str).values)
+        writer = append_to_parquet_table(df, outfile, writer)
+    if writer:
+        writer.close()
 
 # this method is only currently supported for combined output and not with ipf
-def export_to_parquet(infile, outfile, transitionLevel):
+def export_to_parquet(infile, outfile, transitionLevel, chunksize=100):
+    '''
+    Convert an OSW sqlite file to Parquet format
 
+    Parameters:
+        infile: (str) path to osw sqlite file
+        outfile: (str) path to write out parquet file
+        transitionLevel: (bool) append transition level data
+        chunksize: (int) read in the data into chunks for low-memory requirements
+    
+    Return:
+        None
+    '''
     con = sqlite3.connect(infile)
 
     click.echo("Info: Creating Index Query ...")
@@ -124,118 +287,39 @@ CREATE INDEX IF NOT EXISTS idx_score_peptide_run_id ON SCORE_PEPTIDE (RUN_ID);
     #get rid of trailing comma
     columnsToSelect = columnsToSelect[0:-2]
 
+    # Get list of precursor ids
+    precursor_ids = pd.read_sql("SELECT ID FROM PRECURSOR", con)
+    precursor_id_batches = [precursor_ids[i:i+chunksize].copy() for i in range(0,precursor_ids.shape[0],chunksize)]
+
     # Start with feature_transition but then to include the rows of those precursors not found (no associated feature) join with precursor_transition
     if transitionLevel: # each row will be a transition 
-        query = '''
-        SELECT {0}
-        FROM FEATURE_TRANSITION
-
-        LEFT JOIN FEATURE ON FEATURE_TRANSITION.FEATURE_ID = FEATURE.ID
-        LEFT JOIN FEATURE_MS1 ON FEATURE_TRANSITION.FEATURE_ID = FEATURE_MS1.FEATURE_ID
-        LEFT JOIN FEATURE_MS2 ON FEATURE_TRANSITION.FEATURE_ID = FEATURE_MS2.FEATURE_ID
-
-        LEFT JOIN PRECURSOR ON FEATURE.PRECURSOR_ID = PRECURSOR.ID
-        LEFT JOIN TRANSITION ON FEATURE_TRANSITION.TRANSITION_ID = TRANSITION.ID
-        LEFT JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
-        LEFT JOIN PEPTIDE ON PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
-        LEFT JOIN PEPTIDE_PROTEIN_MAPPING ON PEPTIDE.ID = PEPTIDE_PROTEIN_MAPPING.PEPTIDE_ID
-        LEFT JOIN PROTEIN ON PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID = PROTEIN.ID
-
-        LEFT JOIN RUN ON FEATURE.RUN_ID = RUN.ID
-
-        LEFT JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
-        LEFT JOIN SCORE_PEPTIDE ON PEPTIDE.ID = SCORE_PEPTIDE.PEPTIDE_ID
-        LEFT JOIN SCORE_PROTEIN ON PROTEIN.ID = SCORE_PROTEIN.PROTEIN_ID
-
-
-        UNION
-
-        SELECT DISTINCT {0} FROM TRANSITION_PRECURSOR_MAPPING
-
-        LEFT JOIN PRECURSOR ON TRANSITION_PRECURSOR_MAPPING.PRECURSOR_ID = PRECURSOR.ID
-        LEFT JOIN TRANSITION ON TRANSITION_PRECURSOR_MAPPING.TRANSITION_ID = TRANSITION.ID
-
-        LEFT JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
-        LEFT JOIN PEPTIDE ON PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
-        LEFT JOIN PEPTIDE_PROTEIN_MAPPING ON PEPTIDE.ID = PEPTIDE_PROTEIN_MAPPING.PEPTIDE_ID
-        LEFT JOIN PROTEIN ON PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID = PROTEIN.ID
-
-        LEFT JOIN FEATURE_TRANSITION ON TRANSITION_PRECURSOR_MAPPING.TRANSITION_ID = FEATURE_TRANSITION.TRANSITION_ID
-
-        LEFT JOIN FEATURE ON FEATURE_TRANSITION.FEATURE_ID = FEATURE.ID
-        LEFT JOIN FEATURE_MS1 ON FEATURE_TRANSITION.FEATURE_ID = FEATURE_MS1.FEATURE_ID
-        LEFT JOIN FEATURE_MS2 ON FEATURE_TRANSITION.FEATURE_ID = FEATURE_MS2.FEATURE_ID
-
-        LEFT JOIN RUN ON FEATURE.RUN_ID = RUN.ID
-
-        LEFT JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
-        LEFT JOIN SCORE_PEPTIDE ON PEPTIDE.ID = SCORE_PEPTIDE.PEPTIDE_ID
-        LEFT JOIN SCORE_PROTEIN ON PROTEIN.ID = SCORE_PROTEIN.PROTEIN_ID
-
-        WHERE FEATURE.ID IS NULL
-
-        '''.format(columnsToSelect)
-
+        osw_data_reader = read_feature_transition_data
     else: # each row will be a precursor/feature
-        query = '''
-        SELECT {0}
-        FROM FEATURE
+        osw_data_reader = read_precursor_feature_data
 
-        LEFT JOIN PRECURSOR ON FEATURE.PRECURSOR_ID = PRECURSOR.ID
-        LEFT JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
-        LEFT JOIN PEPTIDE ON PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
-        LEFT JOIN PEPTIDE_PROTEIN_MAPPING ON PEPTIDE.ID = PEPTIDE_PROTEIN_MAPPING.PEPTIDE_ID
-        LEFT JOIN PROTEIN ON PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID = PROTEIN.ID
-
-        LEFT JOIN RUN ON FEATURE.RUN_ID = RUN.ID
-        LEFT JOIN FEATURE_MS1 ON FEATURE.ID = FEATURE_MS1.FEATURE_ID
-        LEFT JOIN FEATURE_MS2 ON FEATURE.ID = FEATURE_MS2.FEATURE_ID
-
-
-        LEFT JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
-        LEFT JOIN SCORE_PEPTIDE ON PEPTIDE.ID = SCORE_PEPTIDE.PEPTIDE_ID
-        LEFT JOIN SCORE_PROTEIN ON PROTEIN.ID = SCORE_PROTEIN.PROTEIN_ID
-
-
-        UNION
-
-        SELECT DISTINCT {0} FROM PRECURSOR
-
-        LEFT JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
-        LEFT JOIN PEPTIDE ON PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
-        LEFT JOIN PEPTIDE_PROTEIN_MAPPING ON PEPTIDE.ID = PEPTIDE_PROTEIN_MAPPING.PEPTIDE_ID
-        LEFT JOIN PROTEIN ON PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID = PROTEIN.ID
-
-        LEFT JOIN FEATURE ON FEATURE.PRECURSOR_ID = PRECURSOR.ID
-        LEFT JOIN FEATURE_MS1 ON FEATURE.ID = FEATURE_MS1.FEATURE_ID
-        LEFT JOIN FEATURE_MS2 ON FEATURE.ID = FEATURE_MS2.FEATURE_ID
-
-        LEFT JOIN RUN ON FEATURE.RUN_ID = RUN.ID
-
-        LEFT JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
-        LEFT JOIN SCORE_PEPTIDE ON PEPTIDE.ID = SCORE_PEPTIDE.PEPTIDE_ID
-        LEFT JOIN SCORE_PROTEIN ON PROTEIN.ID = SCORE_PROTEIN.PROTEIN_ID
-
-        WHERE FEATURE.ID IS NULL
-
-        '''.format(columnsToSelect)
-
-    now = datetime.now()
-    current_time = now.strftime("%H:%M:%S")
-    click.echo("Info: Executing Query (Current Time = {})".format(current_time))
-    
-    click.echo("Info: Attempting Execution")
-    df = pd.read_sql(query, con)
-    click.echo("Info: read_sql_query finished")
-
-    now = datetime.now()
-    current_time = now.strftime("%H:%M:%S")
-    click.echo("Info: Done Executing (Current Time = {})".format(current_time))
-
-    click.echo("Info: Creating bitwise maps ...")
+    with code_block_timer(f"Info: Extracting data from OSW file..."):
+        if threads == 1:
+            osw_to_parquet_writer(con, columnsToSelect, precursor_id_batches, outfile, osw_data_reader=osw_data_reader)
+            df = pd.read_parquet(outfile, engine='pyarrow')
+            # Remove parquet, as this is not the final saved parquet
+            os.remove(outfile) 
+        else:
+            # Silience VisibleDeprecationWarning
+            # VisibleDeprecationWarning: Creating an ndarray from ragged nested sequences (which is a list-or-tuple of lists-or-tuples-or ndarrays with different lengths or shapes) is deprecated. If you meant to do this, you must specify 'dtype=object' when creating the ndarray.
+            np.warnings.filterwarnings('ignore', category=np.VisibleDeprecationWarning)
+            tmp_outfiles = [f"{os.path.dirname(outfile)}{os.sep}tmp_{thread}_{os.path.basename(outfile)}" for thread in range(0, threads)]
+            # Initiate a pool with nthreads for parallel processing
+            pool = multiprocessing.Pool( threads )
+            _ = pool.starmap( osw_to_parquet_writer, zip([infile] * threads, [columnsToSelect] * threads, np.array_split(precursor_id_batches, threads), tmp_outfiles, [osw_data_reader] * threads) )
+            pool.close()
+            pool.join()
+            # Merge tmp parquets
+            df = pd.concat(map(pd.read_parquet, tmp_outfiles))
+            # Remove tmp parquets
+            _ = list(map(os.remove, tmp_outfiles))
 
     # create masks for easier data exploration
-
+    click.echo("Info: Creating bitwise maps ...")
 
     ### FEATURE_MASK such that each row is a feature. For feature level this will remove rows of precursors that do not map to any feature. For transition level a random transition is chosen
     df['FEATURE_MASK'] = (~df['FEATURE_ID'].duplicated(keep='first')) & (df['FEATURE_ID'].notna())
@@ -244,11 +328,13 @@ CREATE INDEX IF NOT EXISTS idx_score_peptide_run_id ON SCORE_PEPTIDE (RUN_ID);
 
     #### PRECURSOR_MASK = one row per precursor, includes precursors that do not map to any feature. If precursor maps to a feature than take the feature with rank == 1. If no rank values exist mask includes a random feature.
 
-    df = df.sort_values(by='SCORE_MS2.RANK')
+    df.sort_values(by='SCORE_MS2.RANK', inplace=True)
     df['PRECURSOR_MASK'] = (df['TOP_FEATURE_MASK'] | df['FEATURE_ID'].isna() | df['SCORE_MS2.RANK'].isna() ) 
 
     dfPrec = df[df['PRECURSOR_MASK']]
-    df['PRECURSOR_MASK'] = ~dfPrec['PRECURSOR_ID'].duplicated(keep='first')
+    # df['PRECURSOR_MASK'] = ~dfPrec['PRECURSOR_ID'].duplicated(keep='first') ## TODO: This seems to be slow as well
+    tmp = ~dfPrec['PRECURSOR_ID'].duplicated(keep='first')
+    df.iloc[tmp.index, np.where(df.columns=='PRECURSOR_MASK')[0]] = tmp.values
     df['PRECURSOR_MASK'] = df['PRECURSOR_MASK'].fillna(False) ## since df and dfPrec are diferent sizes have some NA values, fill those that with False 
 
     click.echo("Info: Saving metaData ...")
