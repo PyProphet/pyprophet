@@ -365,6 +365,8 @@ def export_parquet(infile, outfile, transitionLevel, chunksize, threads):
         click.echo("Info: Will export transition level data")
     if outfile is None:
         outfile = infile.split(".osw")[0] + ".parquet"
+    if os.path.exists(outfile):
+        raise click.ClickException(f"Error: {outfile} already exists!")
     click.echo("Info: Parquet file will be written to {}".format(outfile))
     export_to_parquet(os.path.abspath(infile), os.path.abspath(outfile), transitionLevel, chunksize, threads)
 
