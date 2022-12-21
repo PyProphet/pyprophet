@@ -157,7 +157,7 @@ def read_feature_transition_data(con, columnsToSelect, prec_ids):
 
 def osw_to_parquet_writer(con, columnsToSelect, precursor_id_batches, outfile, osw_data_reader=read_precursor_feature_data):
     # If an input file is passed instead of a sqlite3 connection, establish a connection
-    if isinstance(con, sqlite3.Connection):
+    if not isinstance(con, sqlite3.Connection):
         con = sqlite3.connect(con)
     writer = None
     for prec_id in tqdm(precursor_id_batches, desc="INFO: Reading data from OSW...", total=len(precursor_id_batches)):
