@@ -12,6 +12,7 @@ import multiprocessing
 from functools import wraps
 import contextlib
 from time import time
+import warnings
 
 def method_timer(f):
     """
@@ -317,7 +318,7 @@ CREATE INDEX IF NOT EXISTS idx_score_peptide_run_id ON SCORE_PEPTIDE (RUN_ID);
             con.close()
             # Silience VisibleDeprecationWarning
             # VisibleDeprecationWarning: Creating an ndarray from ragged nested sequences (which is a list-or-tuple of lists-or-tuples-or ndarrays with different lengths or shapes) is deprecated. If you meant to do this, you must specify 'dtype=object' when creating the ndarray.
-            np.warnings.filterwarnings('ignore', category=np.VisibleDeprecationWarning)
+            warnings.filterwarnings('ignore', category=np.VisibleDeprecationWarning)
             tmp_outfiles = [f"{os.path.dirname(outfile)}{os.sep}tmp_{thread}_{os.path.basename(outfile)}" for thread in range(0, threads)]
             # Initiate a pool with nthreads for parallel processing
             pool = multiprocessing.Pool( threads )
