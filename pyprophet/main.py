@@ -35,8 +35,6 @@ def cli():
     Visit http://openswath.org for usage instructions and help.
     """
 
-
-
 # https://stackoverflow.com/a/47730333
 class PythonLiteralOption(click.Option):
     def type_cast_value(self, ctx, value):
@@ -356,7 +354,9 @@ def export(infile, outfile, format, outcsv, transition_quantification, max_trans
 @click.option('--in', 'infile', required=True, type=click.Path(exists=True), help='PyProphet input file.')
 @click.option('--out', 'outfile', required=False, type=click.Path(exists=False), help='Output parquet file.')
 @click.option('--transitionLevel', 'transitionLevel', is_flag=True, help='Whether to export transition level data as well')
-def export_parquet(infile, outfile, transitionLevel):
+@click.option('--chunksize', default=1000, show_default=True, type=int, help='Amount of precursor id batch sizes to process when querying OSW file. This helps reduce memory consumption during large sql calls.')
+@click.option('--threads', default=1, show_default=True, type=int, help='Number of threads used for semi-supervised learning. -1 means all available CPUs.', callback=transform_threads)
+def export_parquet(infile, outfile, transitionLevel, chunksize, threads):
     """
     Export all transition data to parquet file
     """
@@ -365,7 +365,7 @@ def export_parquet(infile, outfile, transitionLevel):
     if outfile is None:
         outfile = infile.split(".osw")[0] + ".parquet"
     click.echo("Info: parquet file will be written to {}".format(outfile))
-    export_to_parquet(infile, outfile, transitionLevel)
+    export_to_parquet(infile, outfile, transitionLevel, chunksize, threads)
 
 # Export Compound TSV
 @cli.command()
