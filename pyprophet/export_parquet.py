@@ -313,6 +313,8 @@ CREATE INDEX IF NOT EXISTS idx_score_peptide_run_id ON SCORE_PEPTIDE (RUN_ID);
             # Remove parquet, as this is not the final saved parquet
             os.remove(outfile) 
         else:
+            # Close connection to database, since each thread will establish it's own connection
+            con.close()
             # Silience VisibleDeprecationWarning
             # VisibleDeprecationWarning: Creating an ndarray from ragged nested sequences (which is a list-or-tuple of lists-or-tuples-or ndarrays with different lengths or shapes) is deprecated. If you meant to do this, you must specify 'dtype=object' when creating the ndarray.
             np.warnings.filterwarnings('ignore', category=np.VisibleDeprecationWarning)
@@ -326,6 +328,8 @@ CREATE INDEX IF NOT EXISTS idx_score_peptide_run_id ON SCORE_PEPTIDE (RUN_ID);
             df = pd.concat(map(pd.read_parquet, tmp_outfiles))
             # Remove tmp parquets
             _ = list(map(os.remove, tmp_outfiles))
+            # Restablish connection to database for downstream metadata
+            con = sqlite3.connect(infile)
 
     # create masks for easier data exploration
     click.echo("Info: Creating bitwise maps ...")
