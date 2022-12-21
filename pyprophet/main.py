@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import click
 import sys
+import os
 import pathlib
 import ast
 
@@ -364,8 +365,8 @@ def export_parquet(infile, outfile, transitionLevel, chunksize, threads):
         click.echo("Info: Will export transition level data")
     if outfile is None:
         outfile = infile.split(".osw")[0] + ".parquet"
-    click.echo("Info: parquet file will be written to {}".format(outfile))
-    export_to_parquet(infile, outfile, transitionLevel, chunksize, threads)
+    click.echo("Info: Parquet file will be written to {}".format(outfile))
+    export_to_parquet(os.path.abspath(infile), os.path.abspath(outfile), transitionLevel, chunksize, threads)
 
 # Export Compound TSV
 @cli.command()
