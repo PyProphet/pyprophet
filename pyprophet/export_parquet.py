@@ -12,7 +12,6 @@ import multiprocessing
 from functools import wraps
 import contextlib
 from time import time
-import warnings
 
 def method_timer(f):
     """
@@ -245,7 +244,7 @@ CREATE INDEX IF NOT EXISTS idx_score_peptide_run_id ON SCORE_PEPTIDE (RUN_ID);
     ## features
     columns['FEATURE'] = ['RUN_ID', 'EXP_RT', 'EXP_IM', 'NORM_RT', 'DELTA_RT', 'LEFT_WIDTH', 'RIGHT_WIDTH']
     columns['FEATURE_MS2'] = ['AREA_INTENSITY', 'TOTAL_AREA_INTENSITY', 'APEX_INTENSITY', 'TOTAL_MI', 'VAR_BSERIES_SCORE', 'VAR_DOTPROD_SCORE', 'VAR_INTENSITY_SCORE', 'VAR_ISOTOPE_CORRELATION_SCORE', 'VAR_ISOTOPE_OVERLAP_SCORE', 'VAR_LIBRARY_CORR', 'VAR_LIBRARY_DOTPROD', 'VAR_LIBRARY_MANHATTAN', 'VAR_LIBRARY_RMSD', 'VAR_LIBRARY_ROOTMEANSQUARE', 'VAR_LIBRARY_SANGLE', 'VAR_LOG_SN_SCORE', 'VAR_MANHATTAN_SCORE', 'VAR_MASSDEV_SCORE', 'VAR_MASSDEV_SCORE_WEIGHTED', 'VAR_MI_SCORE', 'VAR_MI_WEIGHTED_SCORE', 'VAR_MI_RATIO_SCORE', 'VAR_NORM_RT_SCORE', 'VAR_XCORR_COELUTION', 'VAR_XCORR_COELUTION_WEIGHTED', 'VAR_XCORR_SHAPE', 'VAR_XCORR_SHAPE_WEIGHTED', 'VAR_YSERIES_SCORE', 'VAR_ELUTION_MODEL_FIT_SCORE', 'VAR_IM_XCORR_SHAPE', 'VAR_IM_XCORR_COELUTION', 'VAR_IM_DELTA_SCORE', 'VAR_SONAR_LAG', 'VAR_SONAR_SHAPE', 'VAR_SONAR_LOG_SN', 'VAR_SONAR_LOG_DIFF', 'VAR_SONAR_LOG_TREND', 'VAR_SONAR_RSQ']
-    columns['FEATURE_MS1'] = ['AREA_INTENSITY', 'APEX_INTENSITY', 'VAR_MASSDEV_SCORE', 'VAR_MI_SCORE', 'VAR_MI_CONTRAST_SCORE', 'VAR_MI_COMBINED_SCORE', 'VAR_ISOTOPE_CORRELATION_SCORE', 'VAR_ISOTOPE_OVERLAP_SCORE', 'VAR_IM_MS1_DELTA_SCORE', 'VAR_XCORR_COELUTION', 'VAR_XCORR_COELUTION_CONTRAST', 'VAR_XCORR_COELUTION_COMBINED', 'VAR_XCORR_SHAPE', 'VAR_XCORR_SHAPE_CONTRAST', 'VAR_XCORR_SHAPE_COMBINED']
+    columns['FEATURE_MS1'] = ['APEX_INTENSITY', 'VAR_MASSDEV_SCORE', 'VAR_MI_SCORE', 'VAR_MI_CONTRAST_SCORE', 'VAR_MI_COMBINED_SCORE', 'VAR_ISOTOPE_CORRELATION_SCORE', 'VAR_ISOTOPE_OVERLAP_SCORE', 'VAR_IM_MS1_DELTA_SCORE', 'VAR_XCORR_COELUTION', 'VAR_XCORR_COELUTION_CONTRAST', 'VAR_XCORR_COELUTION_COMBINED', 'VAR_XCORR_SHAPE', 'VAR_XCORR_SHAPE_CONTRAST', 'VAR_XCORR_SHAPE_COMBINED']
 
     # check if IM columns exist
     query = con.execute("select count(*) as cntrec from pragma_table_info('feature_MS2') where name='EXP_IM'")
@@ -313,6 +312,9 @@ CREATE INDEX IF NOT EXISTS idx_score_peptide_run_id ON SCORE_PEPTIDE (RUN_ID);
             df = pd.read_parquet(outfile, engine='pyarrow')
             # Remove parquet, as this is not the final saved parquet
             os.remove(outfile) 
+            con.close()
+            # Restablish connection to database for downstream metadata
+            con = sqlite3.connect(infile)
         else:
             # Close connection to database, since each thread will establish it's own connection
             con.close()
@@ -359,8 +361,6 @@ CREATE INDEX IF NOT EXISTS idx_score_peptide_run_id ON SCORE_PEPTIDE (RUN_ID);
     custom_metadata = {}
     existing_metadata = table.schema.metadata
 
-
-    # fetch the OSW version as metadata
     custom_metadata['version'] = str(con.execute("select id from version").fetchone()[0])
 
     # fetch the pyprophet weights if avaliable
@@ -370,13 +370,10 @@ CREATE INDEX IF NOT EXISTS idx_score_peptide_run_id ON SCORE_PEPTIDE (RUN_ID);
 
     # fetch the pyprophet weights if avaliable
     if check_sqlite_table(con, "PYPROPHET_XGB"):
-        custom_metadata['xgbModel'] = con.execute(("select * from PYPROPHET_XGB").fetchone()[0])
+        custom_metadata['xgbModel'] = con.execute(("select * from PYPROPHET_XGB")).fetchone()[0]
 
     fixed_table = table.replace_schema_metadata({**custom_metadata, **existing_metadata})
 
-    merged_metadata = { **custom_metadata, **existing_metadata }
-    fixed_table = table.replace_schema_metadata(merged_metadata)
-    
     con.close()
     click.echo("Info: Saving to Parquet .... ")
 
