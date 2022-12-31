@@ -12,6 +12,7 @@ import multiprocessing
 from functools import wraps
 import contextlib
 from time import time
+import re
 
 def method_timer(f):
     """
@@ -57,50 +58,157 @@ def append_to_parquet_table(dataframe, filepath=None, writer=None):
     writer.write_table(table=table)
     return writer
 
-def read_precursor_feature_data(con, columnsToSelect, prec_ids):
-            query = f'''
-        SELECT DISTINCT {columnsToSelect} 
-        FROM (SELECT * FROM PRECURSOR WHERE ID in ({','.join(prec_ids)})) AS PRECURSOR
 
-            LEFT JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
-            LEFT JOIN PEPTIDE ON PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
-            LEFT JOIN PEPTIDE_PROTEIN_MAPPING ON PEPTIDE.ID = PEPTIDE_PROTEIN_MAPPING.PEPTIDE_ID
-            LEFT JOIN PROTEIN ON PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID = PROTEIN.ID
+def get_context_joins(columnsToSelect, run_id):
+    '''
+    Get join statements for peptide and protein scores and the contexts for building sql query
 
-            LEFT JOIN FEATURE ON FEATURE.PRECURSOR_ID = PRECURSOR.ID
-            LEFT JOIN FEATURE_MS1 ON FEATURE.ID = FEATURE_MS1.FEATURE_ID
-            LEFT JOIN FEATURE_MS2 ON FEATURE.ID = FEATURE_MS2.FEATURE_ID
+    Parameters:
+        columnsToSelect:    (str)   string of columns to select and return in main sql query
+        run_id: (int)   run_id from RUN table to filter query
+    
+    Return:
+        context_statements will contain a string of LEFT JOIN statements
+    '''
+    context_table_mapping = {
+        "SCORE_PEPTIDE-RUN_SPECIFIC": "SCORE_PEPTIDE",
+        "SCORE_PEPTIDE-EXPERIMENT_WIDE": "SCORE_PEPTIDE",
+            "SCORE_PEPTIDE-GLOBAL": "SCORE_PEPTIDE",
+            "SCORE_PROTEIN-RUN_SPECIFIC": "SCORE_PROTEIN",
+            "SCORE_PROTEIN-EXPERIMENT_WIDE": "SCORE_PROTEIN",
+            "SCORE_PROTEIN-GLOBAL": "SCORE_PROTEIN"
+    }
+    join_statements = []
+    for column, table_name in context_table_mapping.items():
+        if re.search(column.replace("-", "_"), columnsToSelect):
+            context = column.split("-")[-1].upper()
+            alias = f"{table_name}_{context}"
+            join_statements.append(
+                f"LEFT JOIN (SELECT * FROM {table_name} WHERE RUN_ID = {run_id} AND CONTEXT = '{context}') AS {alias} ON {table_name.replace('SCORE_', '')}.ID = {alias}.{table_name.replace('SCORE_', '')}_ID")
+    context_statements = "\n".join(join_statements)
+    return context_statements
 
-            LEFT JOIN RUN ON FEATURE.RUN_ID = RUN.ID
+def get_context_joins(columnsToSelect, run_id, pep_prot_dict):
+    '''
+    Get join statements for peptide and protein scores and the contexts for building sql query
 
-            LEFT JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
-            LEFT JOIN SCORE_PEPTIDE ON PEPTIDE.ID = SCORE_PEPTIDE.PEPTIDE_ID
-            LEFT JOIN SCORE_PROTEIN ON PROTEIN.ID = SCORE_PROTEIN.PROTEIN_ID
+    Parameters:
+        columnsToSelect:    (str)   string of columns to select and return in main sql query
+        run_id: (int)   run_id from RUN table to filter query
+    
+    Return:
+        context_statements will contain a string of LEFT JOIN statements
+    '''
+    context_table_mapping = {
+        "SCORE_PEPTIDE-RUN_SPECIFIC": "SCORE_PEPTIDE",
+        "SCORE_PEPTIDE-EXPERIMENT_WIDE": "SCORE_PEPTIDE",
+            "SCORE_PEPTIDE-GLOBAL": "SCORE_PEPTIDE",
+            "SCORE_PROTEIN-RUN_SPECIFIC": "SCORE_PROTEIN",
+            "SCORE_PROTEIN-EXPERIMENT_WIDE": "SCORE_PROTEIN",
+            "SCORE_PROTEIN-GLOBAL": "SCORE_PROTEIN"
+    }
+    join_statements = []
+    for column, table_name in context_table_mapping.items():
+        if re.search(column.replace("-", "_"), columnsToSelect):
+            context = column.split("-")[-1].upper()
+            alias = f"{table_name}_{context}"
+            context = column.split("-")[-1].replace('_', '-').lower()
+            join_statements.append(
+                f"LEFT JOIN (SELECT * FROM {table_name} WHERE RUN_ID = {run_id} AND CONTEXT = '{context}' AND {table_name.replace('SCORE_', '')}_ID IN ({pep_prot_dict[table_name.replace('SCORE_', '')+'_ID']})) AS {alias} ON RUN.ID = {alias}.RUN_ID")
+    context_statements = "\n".join(join_statements)
+    return context_statements
 
-            WHERE FEATURE.ID IS NULL
-        
-        UNION
+def get_context_joins(columnsToSelect, run_id, pep_prot_dict):
+    '''
+    Get join statements for peptide and protein scores and the contexts for building sql query
 
-        SELECT {columnsToSelect}
-        FROM (SELECT * FROM FEATURE WHERE PRECURSOR_ID in ({','.join(prec_ids)})) AS FEATURE
+    Parameters:
+        columnsToSelect:    (str)   string of columns to select and return in main sql query
+        run_id: (int)   run_id from RUN table to filter query
+    
+    Return:
+        context_statements will contain a string of LEFT JOIN statements
+    '''
+    context_tables = ['SCORE_PEPTIDE', 'SCORE_PROTEIN']
+    join_statements = []
+    for table_name in context_tables:
+        if re.search(table_name, columnsToSelect):
+            join_statements.append(
+                f"LEFT JOIN (SELECT * FROM {table_name} WHERE RUN_ID = {run_id} AND {table_name.replace('SCORE_', '')}_ID IN ({pep_prot_dict[table_name.replace('SCORE_', '')+'_ID']})) AS {table_name} ON RUN.ID = {table_name}.RUN_ID")
+    context_statements = "\n".join(join_statements)
+    return context_statements
 
-            LEFT JOIN PRECURSOR ON FEATURE.PRECURSOR_ID = PRECURSOR.ID
-            LEFT JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
-            LEFT JOIN PEPTIDE ON PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
-            LEFT JOIN PEPTIDE_PROTEIN_MAPPING ON PEPTIDE.ID = PEPTIDE_PROTEIN_MAPPING.PEPTIDE_ID
-            LEFT JOIN PROTEIN ON PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID = PROTEIN.ID
+def read_precursor_feature_data(con, columnsToSelect, prec_ids, run_id, outfile):
 
-            LEFT JOIN RUN ON FEATURE.RUN_ID = RUN.ID
-            LEFT JOIN FEATURE_MS1 ON FEATURE.ID = FEATURE_MS1.FEATURE_ID
-            LEFT JOIN FEATURE_MS2 ON FEATURE.ID = FEATURE_MS2.FEATURE_ID
-
-
-            LEFT JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
-            LEFT JOIN SCORE_PEPTIDE ON PEPTIDE.ID = SCORE_PEPTIDE.PEPTIDE_ID
-            LEFT JOIN SCORE_PROTEIN ON PROTEIN.ID = SCORE_PROTEIN.PROTEIN_ID
+        feature_query = f'''
+        SELECT {','.join([col.strip() for col in columnsToSelect.split(',') if re.search('^FEATURE|^RUN|^SCORE_MS2', col.strip())] + ['FEATURE.PRECURSOR_ID'])}
+        FROM (SELECT * FROM FEATURE WHERE PRECURSOR_ID IN ({','.join(prec_ids)}) AND RUN_ID = {run_id}) AS FEATURE
+        LEFT JOIN (SELECT * FROM RUN WHERE ID = {run_id}) AS RUN ON FEATURE.RUN_ID = RUN.ID
+        LEFT JOIN FEATURE_MS1 ON FEATURE.ID = FEATURE_MS1.FEATURE_ID
+        LEFT JOIN FEATURE_MS2 ON FEATURE.ID = FEATURE_MS2.FEATURE_ID
+        LEFT JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
         '''
-            df = pd.read_sql(query, con)
-            return df
+
+        precursor_query = f'''
+        SELECT {','.join([col.strip() for col in columnsToSelect.split(',') if re.search('^PRECURSOR|^PRECURSOR_PEPTIDE_MAPPING|^PEPTIDE|^PEPTIDE_PROTEIN_MAPPING|^PROTEIN', col.strip())])}
+        FROM (SELECT * FROM PRECURSOR WHERE ID in ({','.join(prec_ids)})) AS PRECURSOR
+        LEFT JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
+        LEFT JOIN PEPTIDE ON PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
+        LEFT JOIN PEPTIDE_PROTEIN_MAPPING ON PEPTIDE.ID = PEPTIDE_PROTEIN_MAPPING.PEPTIDE_ID
+        LEFT JOIN PROTEIN ON PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID = PROTEIN.ID
+        LEFT JOIN PEPTIDE_GENE_MAPPING ON PEPTIDE.ID = PEPTIDE_GENE_MAPPING.GENE_ID
+        LEFT JOIN GENE ON PEPTIDE_GENE_MAPPING.PROTEIN_ID = GENE.ID
+        '''
+
+        df_feature = pd.read_sql(feature_query, con)
+
+        df_prec = pd.read_sql(precursor_query, con)
+
+        df_tmp = pd.merge(df_feature, df_prec, on=['PRECURSOR_ID'])
+
+        if check_sqlite_table(con, "SCORE_PEPTIDE"):
+            df_peptide_scores = pd.read_sql(f'''
+            SELECT * 
+            FROM SCORE_PEPTIDE
+            WHERE RUN_ID = {run_id} 
+            AND PEPTIDE_ID in ({','.join(df_prec.PEPTIDE_ID.astype(str).values.tolist())})
+            ''', con)
+            df_peptide_scores_wide = df_peptide_scores.pivot(index=['RUN_ID', 'PEPTIDE_ID'], columns='CONTEXT')
+            df_peptide_scores_wide.columns = ['SCORE_PEPTIDE.' + col.upper() for col in df_peptide_scores_wide.columns.map('_'.join)]
+            df_peptide_scores_wide = df_peptide_scores_wide.reset_index()
+            df_tmp = pd.merge(df_tmp, df_peptide_scores_wide, left_on=['PEPTIDE_ID', 'FEATURE.RUN_ID'], right_on=['PEPTIDE_ID', 'RUN_ID'])
+        
+        if check_sqlite_table(con, "SCORE_PROTEIN"):
+            df_protein_scores = pd.read_sql(f'''
+            SELECT * 
+            FROM SCORE_PROTEIN
+            WHERE RUN_ID = {run_id} 
+            AND PROTEIN_ID in ({','.join(df_prec.PROTEIN_ID.astype(str).values.tolist())})
+            ''', con)
+            df_protein_scores_wide = df_protein_scores.pivot(index=['RUN_ID', 'PROTEIN_ID'], columns='CONTEXT')
+            df_protein_scores_wide.columns = ['SCORE_PROTEIN.' + col.upper() for col in df_protein_scores_wide.columns.map('_'.join)]
+            df_protein_scores_wide = df_protein_scores_wide.reset_index()
+            df_tmp = pd.merge(df_tmp, df_protein_scores_wide, left_on=['PROTEIN_ID', 'FEATURE.RUN_ID'], right_on=['PROTEIN_ID', 'RUN_ID'])
+
+        if check_sqlite_table(con, "SCORE_GENE"):
+            df_gene_scores = pd.read_sql(f'''
+            SELECT * 
+            FROM SCORE_GENE
+            WHERE RUN_ID = {run_id} 
+            AND GENE_ID in ({','.join(df_prec.GENE_ID.astype(str).values.tolist())})
+            ''', con)
+            df_gene_scores_wide = df_gene_scores.pivot(index=['RUN_ID', 'GENE_ID'], columns='CONTEXT')
+            df_gene_scores_wide.columns = ['SCORE_GENE.' + col.upper() for col in df_gene_scores_wide.columns.map('_'.join)]
+            df_gene_scores_wide = df_gene_scores_wide.reset_index()
+            df_tmp = pd.merge(df_tmp, df_gene_scores_wide, left_on=['GENE_ID', 'FEATURE.RUN_ID'], right_on=['GENE_ID', 'RUN_ID'])
+        
+
+        writer = None
+        writer = append_to_parquet_table(df_tmp, outfile, writer)
+        if writer:
+            writer.close()
+
+        return None
 
 def read_feature_transition_data(con, columnsToSelect, prec_ids):
     query = f'''
@@ -155,16 +263,14 @@ def read_feature_transition_data(con, columnsToSelect, prec_ids):
     df = pd.read_sql(query, con)
     return df
 
-def osw_to_parquet_writer(con, columnsToSelect, precursor_id_batches, outfile, osw_data_reader=read_precursor_feature_data):
+def osw_to_parquet_writer(con, columnsToSelect, precursor_id_batches, run_ids, outfile, osw_data_reader=read_precursor_feature_data):
     # If an input file is passed instead of a sqlite3 connection, establish a connection
-    if os.path.exists(con) and not isinstance(con, sqlite3.Connection):
+    if not isinstance(con, sqlalchemy.engine.base.Connection):
         con = sqlite3.connect(con)
-    writer = None
-    for prec_id in tqdm(precursor_id_batches, desc="INFO: Reading data from OSW...", total=len(precursor_id_batches)):
-        df = osw_data_reader(con, columnsToSelect, prec_id['ID'].astype(str).values)
-        writer = append_to_parquet_table(df, outfile, writer)
-    if writer:
-        writer.close()
+    for run_id in run_ids:
+        print(run_id)
+        for prec_id in tqdm(precursor_id_batches, desc=f"INFO: Reading data from OSW for run {run_id} with batch {len(precursor_id_batches)} precursor ids...", total=len(precursor_id_batches)):
+            osw_data_reader(con, columnsToSelect, prec_id['ID'].astype(str).values, run_id, outfile)
 
 # this method is only currently supported for combined output and not with ipf
 @method_timer
@@ -186,28 +292,28 @@ def export_to_parquet(infile, outfile, transitionLevel, chunksize=1000, threads=
     click.echo("Info: Creating Index Query ...")
     # Main query for standard OpenSWATH
     idx_query = '''
-CREATE INDEX IF NOT EXISTS idx_precursor_precursor_id ON PRECURSOR (ID);
-CREATE INDEX IF NOT EXISTS idx_precursor_peptide_mapping_precursor_id ON PRECURSOR_PEPTIDE_MAPPING (PRECURSOR_ID);
-CREATE INDEX IF NOT EXISTS idx_feature_precursor_id ON FEATURE (PRECURSOR_ID);
+    CREATE INDEX IF NOT EXISTS idx_precursor_precursor_id ON PRECURSOR (ID);
+    CREATE INDEX IF NOT EXISTS idx_precursor_peptide_mapping_precursor_id ON PRECURSOR_PEPTIDE_MAPPING (PRECURSOR_ID);
+    CREATE INDEX IF NOT EXISTS idx_feature_precursor_id ON FEATURE (PRECURSOR_ID);
 
-CREATE INDEX IF NOT EXISTS idx_precursor_peptide_mapping_peptide_id ON PRECURSOR_PEPTIDE_MAPPING (PEPTIDE_ID);
-CREATE INDEX IF NOT EXISTS idx_peptide_peptide_id ON PEPTIDE (ID);
+    CREATE INDEX IF NOT EXISTS idx_precursor_peptide_mapping_peptide_id ON PRECURSOR_PEPTIDE_MAPPING (PEPTIDE_ID);
+    CREATE INDEX IF NOT EXISTS idx_peptide_peptide_id ON PEPTIDE (ID);
 
-CREATE INDEX IF NOT EXISTS idx_run_run_id ON RUN (ID);
-CREATE INDEX IF NOT EXISTS idx_feature_run_id ON FEATURE (RUN_ID);
+    CREATE INDEX IF NOT EXISTS idx_run_run_id ON RUN (ID);
+    CREATE INDEX IF NOT EXISTS idx_feature_run_id ON FEATURE (RUN_ID);
 
-CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
+    CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
 
-CREATE INDEX IF NOT EXISTS idx_peptide_protein_mapping_protein_id ON PEPTIDE_PROTEIN_MAPPING (PROTEIN_ID);
-CREATE INDEX IF NOT EXISTS idx_protein_protein_id ON PROTEIN (ID);
-CREATE INDEX IF NOT EXISTS idx_peptide_protein_mapping_peptide_id ON PEPTIDE_PROTEIN_MAPPING (PEPTIDE_ID);
+    CREATE INDEX IF NOT EXISTS idx_peptide_protein_mapping_protein_id ON PEPTIDE_PROTEIN_MAPPING (PROTEIN_ID);
+    CREATE INDEX IF NOT EXISTS idx_protein_protein_id ON PROTEIN (ID);
+    CREATE INDEX IF NOT EXISTS idx_peptide_protein_mapping_peptide_id ON PEPTIDE_PROTEIN_MAPPING (PEPTIDE_ID);
 
-CREATE INDEX IF NOT EXISTS idx_score_protein_protein_id ON SCORE_PROTEIN (PROTEIN_ID);
-CREATE INDEX IF NOT EXISTS idx_score_protein_run_id ON SCORE_PROTEIN (RUN_ID);
+    CREATE INDEX IF NOT EXISTS idx_score_protein_protein_id ON SCORE_PROTEIN (PROTEIN_ID);
+    CREATE INDEX IF NOT EXISTS idx_score_protein_run_id ON SCORE_PROTEIN (RUN_ID);
 
-CREATE INDEX IF NOT EXISTS idx_score_peptide_peptide_id ON SCORE_PEPTIDE (PEPTIDE_ID);
-CREATE INDEX IF NOT EXISTS idx_score_peptide_run_id ON SCORE_PEPTIDE (RUN_ID);
-'''
+    CREATE INDEX IF NOT EXISTS idx_score_peptide_peptide_id ON SCORE_PEPTIDE (PEPTIDE_ID);
+    CREATE INDEX IF NOT EXISTS idx_score_peptide_run_id ON SCORE_PEPTIDE (RUN_ID);
+    '''
 
     if check_sqlite_table(con, "FEATURE_MS1"):
       idx_query += "CREATE INDEX IF NOT EXISTS idx_feature_ms1_feature_id ON FEATURE_MS1 (FEATURE_ID);"
@@ -257,8 +363,16 @@ CREATE INDEX IF NOT EXISTS idx_score_peptide_run_id ON SCORE_PEPTIDE (RUN_ID);
 
     ### pyprophet scores 
     columns['SCORE_MS2'] = ["SCORE", "RANK", "PVALUE", "QVALUE", "PEP"]
-    columns['SCORE_PEPTIDE'] = ['CONTEXT', 'SCORE', 'PVALUE', 'QVALUE', 'PEP']
-    columns['SCORE_PROTEIN'] = ['SCORE', 'PVALUE', 'QVALUE', 'PEP']
+    #### Handle Different levels of context
+    score_peptide_contexts = pd.read_sql("SELECT DISTINCT CONTEXT FROM SCORE_PEPTIDE", con)
+    score_protein_contexts = pd.read_sql("SELECT DISTINCT CONTEXT FROM SCORE_PROTEIN", con)
+    # columns['SCORE_PEPTIDE'] = ['CONTEXT', 'SCORE', 'PVALUE', 'QVALUE', 'PEP']
+    # columns['SCORE_PROTEIN'] = ['SCORE', 'PVALUE', 'QVALUE', 'PEP']
+    for context in score_peptide_contexts['CONTEXT']:
+        columns['SCORE_PEPTIDE'+"_"+context.replace('-', '_').upper()] = ['CONTEXT', 'SCORE', 'PVALUE', 'QVALUE', 'PEP']
+    for context in score_protein_contexts['CONTEXT']:
+        columns['SCORE_PROTEIN'+"_"+context.replace('-', '_').upper()] = ['CONTEXT', 'SCORE', 'PVALUE', 'QVALUE', 'PEP']
+
 
     ## other
     columns['RUN'] = ['FILENAME']
@@ -300,6 +414,10 @@ CREATE INDEX IF NOT EXISTS idx_score_peptide_run_id ON SCORE_PEPTIDE (RUN_ID);
     precursor_ids = pd.read_sql("SELECT ID FROM PRECURSOR", con)
     precursor_id_batches = [precursor_ids[i:i+chunksize].copy() for i in range(0,precursor_ids.shape[0],chunksize)]
 
+    run_ids = pd.read_sql("SELECT ID FROM RUN", con)
+
+    click.echo(f"Info: There are {precursor_ids.shape[0]} precursor ids split into {len(precursor_id_batches)} batches...")
+
     # Start with feature_transition but then to include the rows of those precursors not found (no associated feature) join with precursor_transition
     if transitionLevel: # each row will be a transition 
         osw_data_reader = read_feature_transition_data
@@ -308,7 +426,7 @@ CREATE INDEX IF NOT EXISTS idx_score_peptide_run_id ON SCORE_PEPTIDE (RUN_ID);
 
     with code_block_timer(f"Info: Extracting data from OSW file..."):
         if threads == 1:
-            osw_to_parquet_writer(con, columnsToSelect, precursor_id_batches, outfile, osw_data_reader=osw_data_reader)
+            osw_to_parquet_writer(con, columnsToSelect, precursor_id_batches, run_ids.to_numpy().flatten(), outfile, osw_data_reader=osw_data_reader)
             df = pd.read_parquet(outfile, engine='pyarrow')
             # Remove parquet, as this is not the final saved parquet
             os.remove(outfile) 
