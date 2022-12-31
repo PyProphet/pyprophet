@@ -265,7 +265,11 @@ def read_feature_transition_data(con, columnsToSelect, prec_ids):
 
 def osw_to_parquet_writer(con, columnsToSelect, precursor_id_batches, run_ids, outfile, osw_data_reader=read_precursor_feature_data):
     # If an input file is passed instead of a sqlite3 connection, establish a connection
+<<<<<<< HEAD
     if not isinstance(con, sqlalchemy.engine.base.Connection):
+=======
+    if not isinstance(con, sqlite3.Connection):
+>>>>>>> 95dd95cd103e6c23ca842759c06d5b09631698ef
         con = sqlite3.connect(con)
     for run_id in run_ids:
         print(run_id)
@@ -350,7 +354,7 @@ def export_to_parquet(infile, outfile, transitionLevel, chunksize=1000, threads=
     ## features
     columns['FEATURE'] = ['RUN_ID', 'EXP_RT', 'EXP_IM', 'NORM_RT', 'DELTA_RT', 'LEFT_WIDTH', 'RIGHT_WIDTH']
     columns['FEATURE_MS2'] = ['AREA_INTENSITY', 'TOTAL_AREA_INTENSITY', 'APEX_INTENSITY', 'TOTAL_MI', 'VAR_BSERIES_SCORE', 'VAR_DOTPROD_SCORE', 'VAR_INTENSITY_SCORE', 'VAR_ISOTOPE_CORRELATION_SCORE', 'VAR_ISOTOPE_OVERLAP_SCORE', 'VAR_LIBRARY_CORR', 'VAR_LIBRARY_DOTPROD', 'VAR_LIBRARY_MANHATTAN', 'VAR_LIBRARY_RMSD', 'VAR_LIBRARY_ROOTMEANSQUARE', 'VAR_LIBRARY_SANGLE', 'VAR_LOG_SN_SCORE', 'VAR_MANHATTAN_SCORE', 'VAR_MASSDEV_SCORE', 'VAR_MASSDEV_SCORE_WEIGHTED', 'VAR_MI_SCORE', 'VAR_MI_WEIGHTED_SCORE', 'VAR_MI_RATIO_SCORE', 'VAR_NORM_RT_SCORE', 'VAR_XCORR_COELUTION', 'VAR_XCORR_COELUTION_WEIGHTED', 'VAR_XCORR_SHAPE', 'VAR_XCORR_SHAPE_WEIGHTED', 'VAR_YSERIES_SCORE', 'VAR_ELUTION_MODEL_FIT_SCORE', 'VAR_IM_XCORR_SHAPE', 'VAR_IM_XCORR_COELUTION', 'VAR_IM_DELTA_SCORE', 'VAR_SONAR_LAG', 'VAR_SONAR_SHAPE', 'VAR_SONAR_LOG_SN', 'VAR_SONAR_LOG_DIFF', 'VAR_SONAR_LOG_TREND', 'VAR_SONAR_RSQ']
-    columns['FEATURE_MS1'] = ['AREA_INTENSITY', 'APEX_INTENSITY', 'VAR_MASSDEV_SCORE', 'VAR_MI_SCORE', 'VAR_MI_CONTRAST_SCORE', 'VAR_MI_COMBINED_SCORE', 'VAR_ISOTOPE_CORRELATION_SCORE', 'VAR_ISOTOPE_OVERLAP_SCORE', 'VAR_IM_MS1_DELTA_SCORE', 'VAR_XCORR_COELUTION', 'VAR_XCORR_COELUTION_CONTRAST', 'VAR_XCORR_COELUTION_COMBINED', 'VAR_XCORR_SHAPE', 'VAR_XCORR_SHAPE_CONTRAST', 'VAR_XCORR_SHAPE_COMBINED']
+    columns['FEATURE_MS1'] = ['APEX_INTENSITY', 'VAR_MASSDEV_SCORE', 'VAR_MI_SCORE', 'VAR_MI_CONTRAST_SCORE', 'VAR_MI_COMBINED_SCORE', 'VAR_ISOTOPE_CORRELATION_SCORE', 'VAR_ISOTOPE_OVERLAP_SCORE', 'VAR_IM_MS1_DELTA_SCORE', 'VAR_XCORR_COELUTION', 'VAR_XCORR_COELUTION_CONTRAST', 'VAR_XCORR_COELUTION_COMBINED', 'VAR_XCORR_SHAPE', 'VAR_XCORR_SHAPE_CONTRAST', 'VAR_XCORR_SHAPE_COMBINED']
 
     # check if IM columns exist
     query = con.execute("select count(*) as cntrec from pragma_table_info('feature_MS2') where name='EXP_IM'")
@@ -430,10 +434,15 @@ def export_to_parquet(infile, outfile, transitionLevel, chunksize=1000, threads=
             df = pd.read_parquet(outfile, engine='pyarrow')
             # Remove parquet, as this is not the final saved parquet
             os.remove(outfile) 
+            con.close()
+            # Restablish connection to database for downstream metadata
+            con = sqlite3.connect(infile)
         else:
+            # Close connection to database, since each thread will establish it's own connection
+            con.close()
             # Silience VisibleDeprecationWarning
             # VisibleDeprecationWarning: Creating an ndarray from ragged nested sequences (which is a list-or-tuple of lists-or-tuples-or ndarrays with different lengths or shapes) is deprecated. If you meant to do this, you must specify 'dtype=object' when creating the ndarray.
-            np.warnings.filterwarnings('ignore', category=np.VisibleDeprecationWarning)
+            warnings.filterwarnings('ignore', category=np.VisibleDeprecationWarning)
             tmp_outfiles = [f"{os.path.dirname(outfile)}{os.sep}tmp_{thread}_{os.path.basename(outfile)}" for thread in range(0, threads)]
             # Initiate a pool with nthreads for parallel processing
             pool = multiprocessing.Pool( threads )
@@ -444,6 +453,8 @@ def export_to_parquet(infile, outfile, transitionLevel, chunksize=1000, threads=
             df = pd.concat(map(pd.read_parquet, tmp_outfiles))
             # Remove tmp parquets
             _ = list(map(os.remove, tmp_outfiles))
+            # Restablish connection to database for downstream metadata
+            con = sqlite3.connect(infile)
 
     # create masks for easier data exploration
     click.echo("Info: Creating bitwise maps ...")
@@ -472,8 +483,6 @@ def export_to_parquet(infile, outfile, transitionLevel, chunksize=1000, threads=
     custom_metadata = {}
     existing_metadata = table.schema.metadata
 
-
-    # fetch the OSW version as metadata
     custom_metadata['version'] = str(con.execute("select id from version").fetchone()[0])
 
     # fetch the pyprophet weights if avaliable
@@ -483,13 +492,10 @@ def export_to_parquet(infile, outfile, transitionLevel, chunksize=1000, threads=
 
     # fetch the pyprophet weights if avaliable
     if check_sqlite_table(con, "PYPROPHET_XGB"):
-        custom_metadata['xgbModel'] = con.execute(("select * from PYPROPHET_XGB").fetchone()[0])
+        custom_metadata['xgbModel'] = con.execute(("select * from PYPROPHET_XGB")).fetchone()[0]
 
     fixed_table = table.replace_schema_metadata({**custom_metadata, **existing_metadata})
 
-    merged_metadata = { **custom_metadata, **existing_metadata }
-    fixed_table = table.replace_schema_metadata(merged_metadata)
-    
     con.close()
     click.echo("Info: Saving to Parquet .... ")
 
