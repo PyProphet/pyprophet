@@ -357,7 +357,7 @@ def export(infile, outfile, format, outcsv, transition_quantification, max_trans
 @click.option('--transitionLevel', 'transitionLevel', is_flag=True, help='Whether to export transition level data as well')
 @click.option('--separate_runs/--no-separate_runs', default=True, show_default=True, help='If the input file is a merged file, create separate parquet files per run')
 @click.option('--chunksize', default=1000, show_default=True, type=int, help='Amount of precursor id batch sizes to process when querying OSW file. This helps reduce memory consumption during large sql calls.')
-@click.option('--threads', default=1, show_default=True, type=int, help='Number of threads used for semi-supervised learning. -1 means all available CPUs.', callback=transform_threads)
+@click.option('--threads', default=1, show_default=True, type=int, help='Number of threads used for exporting. -1 means all available CPUs.', callback=transform_threads)
 def export_parquet(infile, outfile, transitionLevel, separate_runs, chunksize, threads):
     """
     Export all transition data to parquet file
