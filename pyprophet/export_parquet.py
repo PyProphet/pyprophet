@@ -65,85 +65,42 @@ def append_to_parquet_table(dataframe, filepath=None, writer=None):
     writer.write_table(table=table)
     return writer
 
+def validate_datatypes(df):
 
-def get_context_joins(columnsToSelect, run_id):
     '''
-    Get join statements for peptide and protein scores and the contexts for building sql query
+    Ensure specific columns in dataframe are of specific type
 
-    Parameters:
-        columnsToSelect:    (str)   string of columns to select and return in main sql query
-        run_id: (int)   run_id from RUN table to filter query
-    
-    Return:
-        context_statements will contain a string of LEFT JOIN statements
-    '''
-    context_table_mapping = {
-        "SCORE_PEPTIDE-RUN_SPECIFIC": "SCORE_PEPTIDE",
-        "SCORE_PEPTIDE-EXPERIMENT_WIDE": "SCORE_PEPTIDE",
-            "SCORE_PEPTIDE-GLOBAL": "SCORE_PEPTIDE",
-            "SCORE_PROTEIN-RUN_SPECIFIC": "SCORE_PROTEIN",
-            "SCORE_PROTEIN-EXPERIMENT_WIDE": "SCORE_PROTEIN",
-            "SCORE_PROTEIN-GLOBAL": "SCORE_PROTEIN"
-    }
-    join_statements = []
-    for column, table_name in context_table_mapping.items():
-        if re.search(column.replace("-", "_"), columnsToSelect):
-            context = column.split("-")[-1].upper()
-            alias = f"{table_name}_{context}"
-            join_statements.append(
-                f"LEFT JOIN (SELECT * FROM {table_name} WHERE RUN_ID = {run_id} AND CONTEXT = '{context}') AS {alias} ON {table_name.replace('SCORE_', '')}.ID = {alias}.{table_name.replace('SCORE_', '')}_ID")
-    context_statements = "\n".join(join_statements)
-    return context_statements
-
-def get_context_joins(columnsToSelect, run_id, pep_prot_dict):
-    '''
-    Get join statements for peptide and protein scores and the contexts for building sql query
+    ID columns should be int64
 
     Parameters:
-        columnsToSelect:    (str)   string of columns to select and return in main sql query
-        run_id: (int)   run_id from RUN table to filter query
+        df: (pandas.DataFrame) pandas dataframe with columns to validate data type
     
     Return:
-        context_statements will contain a string of LEFT JOIN statements
+        df with validated column datatypes
     '''
-    context_table_mapping = {
-        "SCORE_PEPTIDE-RUN_SPECIFIC": "SCORE_PEPTIDE",
-        "SCORE_PEPTIDE-EXPERIMENT_WIDE": "SCORE_PEPTIDE",
-            "SCORE_PEPTIDE-GLOBAL": "SCORE_PEPTIDE",
-            "SCORE_PROTEIN-RUN_SPECIFIC": "SCORE_PROTEIN",
-            "SCORE_PROTEIN-EXPERIMENT_WIDE": "SCORE_PROTEIN",
-            "SCORE_PROTEIN-GLOBAL": "SCORE_PROTEIN"
-    }
-    join_statements = []
-    for column, table_name in context_table_mapping.items():
-        if re.search(column.replace("-", "_"), columnsToSelect):
-            context = column.split("-")[-1].upper()
-            alias = f"{table_name}_{context}"
-            context = column.split("-")[-1].replace('_', '-').lower()
-            join_statements.append(
-                f"LEFT JOIN (SELECT * FROM {table_name} WHERE RUN_ID = {run_id} AND CONTEXT = '{context}' AND {table_name.replace('SCORE_', '')}_ID IN ({pep_prot_dict[table_name.replace('SCORE_', '')+'_ID']})) AS {alias} ON RUN.ID = {alias}.RUN_ID")
-    context_statements = "\n".join(join_statements)
-    return context_statements
+    ############################
+    ##  ID Col -> Int64
 
-def get_context_joins(columnsToSelect, run_id, pep_prot_dict):
-    '''
-    Get join statements for peptide and protein scores and the contexts for building sql query
+    # Get dict of cols with ID mappings to assert datatype
+    # Note, ignore TRAML_ID col here, because sometimes this col contains strings, which 
+    # we woule not want to convert to int64
+    id_cols_datatype = {col:'int64' for col in df.columns if re.search('ID$', col) and not re.search('TRAML_ID', col)}
+    # We need to fill na IDs with a -1 to force conversion to int64, because
+    # we cannot convert NAs to integers
+    df[list(id_cols_datatype.keys())] = df[list(id_cols_datatype.keys())].fillna(-1)
+    df = df.astype(id_cols_datatype)
 
-    Parameters:
-        columnsToSelect:    (str)   string of columns to select and return in main sql query
-        run_id: (int)   run_id from RUN table to filter query
-    
-    Return:
-        context_statements will contain a string of LEFT JOIN statements
-    '''
-    context_tables = ['SCORE_PEPTIDE', 'SCORE_PROTEIN']
-    join_statements = []
-    for table_name in context_tables:
-        if re.search(table_name, columnsToSelect):
-            join_statements.append(
-                f"LEFT JOIN (SELECT * FROM {table_name} WHERE RUN_ID = {run_id} AND {table_name.replace('SCORE_', '')}_ID IN ({pep_prot_dict[table_name.replace('SCORE_', '')+'_ID']})) AS {table_name} ON RUN.ID = {table_name}.RUN_ID")
-    context_statements = "\n".join(join_statements)
-    return context_statements
+    #############################
+    ## Other Int64 Cols
+
+    # Get dict of cols to assert datatype
+    id_cols_datatype = {col:'int64' for col in df.columns if re.search('RANK', col)}
+    # We need to fill na IDs with a -1 to force conversion to int64, because
+    # we cannot convert NAs to integers
+    df[list(id_cols_datatype.keys())] = df[list(id_cols_datatype.keys())].fillna(-1)
+    df = df.astype(id_cols_datatype)
+
+    return df
 
 def read_precursor_feature_data(con, columnsToSelect, prec_ids, run_id, outfile):
 
@@ -245,7 +202,9 @@ def read_precursor_feature_data(con, columnsToSelect, prec_ids, run_id, outfile)
             df_gene_scores_wide = df_gene_scores_wide.reset_index()
             df_tmp = pd.merge(df_tmp, df_gene_scores_wide, how='left', left_on=['GENE_ID', 'FEATURE.RUN_ID'], right_on=['GENE_ID', 'RUN_ID'])
             df_tmp.drop(columns='RUN_ID', inplace=True)
-
+        
+        # Ensure datatypes in df are correct
+        df_tmp = validate_datatypes(df_tmp)
         return df_tmp
 
 def read_feature_transition_data(con, columnsToSelect, prec_ids):
