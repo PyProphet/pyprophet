@@ -6,7 +6,7 @@ try:
 except ImportError:
     plt = None
 
-from PyPDF2 import PdfFileMerger, PdfFileReader
+from PyPDF2 import PdfMerger, PdfReader
 
 import os
 
@@ -163,7 +163,7 @@ def main_score_selection_report(title, sel_column, mapper, decoy_scores, target_
         raise ImportError("Error: The matplotlib package is required to create a report.")
     
     # Create output to merge pdges
-    output = PdfFileMerger() 
+    output = PdfMerger() 
     # Generate colors
     t_col, d_col = color_blind_friendly(color_palette)
 
@@ -200,8 +200,8 @@ def main_score_selection_report(title, sel_column, mapper, decoy_scores, target_
         # Save current plot in temporary pdf
         plt.savefig(temp_pdf_path)
         # Append master pdf and temp pdf to output merger
-        output.append(PdfFileReader(open(pdf_path, "rb")))
-        output.append(PdfFileReader(open(temp_pdf_path, "rb")))
+        output.append(PdfReader(open(pdf_path, "rb")))
+        output.append(PdfReader(open(temp_pdf_path, "rb")))
         # Write to master pdf
         output.write(pdf_path)
         # Remove temporary pdf
