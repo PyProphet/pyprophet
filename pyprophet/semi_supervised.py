@@ -42,7 +42,7 @@ class AbstractSemiSupervisedLearner(object):
         train.rank_by("main_score")
 
         params, clf_scores, use_as_main_score = self.start_semi_supervised_learning(train, score_columns, working_thread_number)
-        click.echo(f"Info: Using dynamic score set to {self.ss_use_dynamic_main_score}")
+        
         # Get current main score column name
         old_main_score_column = [col for col in score_columns if  'main' in col][0]
         # Only Update if chosen main score column has changed
