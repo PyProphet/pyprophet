@@ -46,7 +46,7 @@ class AbstractSemiSupervisedLearner(object):
         # Get current main score column name
         old_main_score_column = [col for col in score_columns if  'main' in col][0]
         # Only Update if chosen main score column has changed
-        if use_as_main_score != old_main_score_column:
+        if use_as_main_score != old_main_score_column and self.ss_use_dynamic_main_score:
             train, _ = update_chosen_main_score_in_table(train, score_columns, use_as_main_score)
             train.rank_by("main_score")
             experiment, score_columns = update_chosen_main_score_in_table(experiment, score_columns, use_as_main_score)
@@ -106,7 +106,7 @@ class AbstractSemiSupervisedLearner(object):
 
 class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
 
-    def __init__(self, inner_learner, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, test, main_score_selection_report, outfile, level):
+    def __init__(self, inner_learner, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, test, main_score_selection_report, outfile, level, ss_use_dynamic_main_score):
         assert isinstance(inner_learner, AbstractLearner)
         AbstractSemiSupervisedLearner.__init__(self, xeval_fraction, xeval_num_iter, test)
         self.inner_learner = inner_learner
@@ -123,6 +123,7 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
         self.main_score_selection_report = main_score_selection_report
         self.outfile = outfile
         self.level = level
+        self.ss_use_dynamic_main_score = ss_use_dynamic_main_score
 
     def select_train_peaks(self, train, sel_column, cutoff_fdr, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, mapper=None, main_score_selection_report=False, outfile=None, level=None, working_thread_number=None):
         assert isinstance(train, Experiment)
