@@ -15,7 +15,7 @@ def compute_model_fdr(data_in):
     # compute model based FDR estimates from posterior error probabilities
     order = np.argsort(data)
 
-    ranks = np.zeros(data.shape[0], dtype=np.int)
+    ranks = np.zeros(data.shape[0], dtype=int)
     fdr = np.zeros(data.shape[0])
 
     # rank data with with maximum ranks for ties
