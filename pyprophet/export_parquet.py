@@ -103,16 +103,17 @@ def validate_datatypes(df):
     return df
 
 def read_precursor_feature_data(con, columnsToSelect, prec_ids, run_id, outfile):
-
         # Feature Data
-        feature_query = f'''
-        SELECT {','.join([col.strip() for col in columnsToSelect.split(',') if re.search('^FEATURE|^RUN|^SCORE_MS2', col.strip())] + ['FEATURE.PRECURSOR_ID'])}
-        FROM (SELECT * FROM FEATURE WHERE PRECURSOR_ID IN ({','.join(prec_ids)}) AND RUN_ID = {run_id}) AS FEATURE
-        LEFT JOIN (SELECT * FROM RUN WHERE ID = {run_id}) AS RUN ON FEATURE.RUN_ID = RUN.ID
+
+        feature_query = '''
+        SELECT {0}
+        FROM (SELECT * FROM FEATURE WHERE PRECURSOR_ID IN ({1}) AND RUN_ID = {2}) AS FEATURE
+        LEFT JOIN (SELECT * FROM RUN WHERE ID = {2}) AS RUN ON FEATURE.RUN_ID = RUN.ID
         LEFT JOIN FEATURE_MS1 ON FEATURE.ID = FEATURE_MS1.FEATURE_ID
         LEFT JOIN FEATURE_MS2 ON FEATURE.ID = FEATURE_MS2.FEATURE_ID
         LEFT JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
-        '''
+        '''.format(','.join([col.strip() for col in columnsToSelect.split(',') if re.search('^FEATURE|^RUN|^SCORE_MS2', col.strip()) and not re.search('^FEATURE_TRANSITION', col.strip())] + ['FEATURE.PRECURSOR_ID']), ','.join(prec_ids), run_id)
+
         # Read into Pandas Dataframe
         df_feature = pd.read_sql(feature_query, con)
 
@@ -140,7 +141,7 @@ def read_precursor_feature_data(con, columnsToSelect, prec_ids, run_id, outfile)
 
         # Merge Feature and Precursor Tables
         df_tmp = pd.merge(df_feature, df_prec, how='outer', on=['PRECURSOR_ID'])
-        # Fill in run if for cases where precursors have no features identified
+        # Fill in run for cases where precursors have no features identified
         df_tmp['FEATURE.RUN_ID'] = df_tmp['FEATURE.RUN_ID'].dropna().unique()[0]
 
         # Check to see if GENE_ID is in table, and check to see if all values are NULL
@@ -207,58 +208,38 @@ def read_precursor_feature_data(con, columnsToSelect, prec_ids, run_id, outfile)
         df_tmp = validate_datatypes(df_tmp)
         return df_tmp
 
-def read_feature_transition_data(con, columnsToSelect, prec_ids):
-    query = f'''
-        SELECT {columnsToSelect}
-        FROM FEATURE_TRANSITION
+def read_transition_feature_data(con, columnsToSelect, prec_ids, run_id, outfile):
 
-        LEFT JOIN FEATURE ON FEATURE_TRANSITION.FEATURE_ID = FEATURE.ID
-        LEFT JOIN FEATURE_MS1 ON FEATURE_TRANSITION.FEATURE_ID = FEATURE_MS1.FEATURE_ID
-        LEFT JOIN FEATURE_MS2 ON FEATURE_TRANSITION.FEATURE_ID = FEATURE_MS2.FEATURE_ID
+        # First read feature data
+        precursor_df = read_precursor_feature_data(con, columnsToSelect, prec_ids, run_id, outfile)
 
-        LEFT JOIN (SELECT * FROM PRECURSOR WHERE ID in ({','.join(prec_ids)})) AS PRECURSOR ON FEATURE.PRECURSOR_ID = PRECURSOR.ID
-        LEFT JOIN TRANSITION ON FEATURE_TRANSITION.TRANSITION_ID = TRANSITION.ID
-        LEFT JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
-        LEFT JOIN PEPTIDE ON PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
-        LEFT JOIN PEPTIDE_PROTEIN_MAPPING ON PEPTIDE.ID = PEPTIDE_PROTEIN_MAPPING.PEPTIDE_ID
-        LEFT JOIN PROTEIN ON PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID = PROTEIN.ID
-
-        LEFT JOIN RUN ON FEATURE.RUN_ID = RUN.ID
-
-        LEFT JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
-        LEFT JOIN SCORE_PEPTIDE ON PEPTIDE.ID = SCORE_PEPTIDE.PEPTIDE_ID
-        LEFT JOIN SCORE_PROTEIN ON PROTEIN.ID = SCORE_PROTEIN.PROTEIN_ID
+        feat_ids = precursor_df['FEATURE_ID'].drop_duplicates().astype('str').values
 
 
-        UNION
+        # Append transition level data
 
-        SELECT DISTINCT {columnsToSelect} FROM TRANSITION_PRECURSOR_MAPPING
-
-        LEFT JOIN (SELECT * FROM PRECURSOR WHERE ID in ({','.join(prec_ids)})) AS PRECURSOR ON TRANSITION_PRECURSOR_MAPPING.PRECURSOR_ID = PRECURSOR.ID
-        LEFT JOIN TRANSITION ON TRANSITION_PRECURSOR_MAPPING.TRANSITION_ID = TRANSITION.ID
-
-        LEFT JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
-        LEFT JOIN PEPTIDE ON PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
-        LEFT JOIN PEPTIDE_PROTEIN_MAPPING ON PEPTIDE.ID = PEPTIDE_PROTEIN_MAPPING.PEPTIDE_ID
-        LEFT JOIN PROTEIN ON PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID = PROTEIN.ID
-
-        LEFT JOIN FEATURE_TRANSITION ON TRANSITION_PRECURSOR_MAPPING.TRANSITION_ID = FEATURE_TRANSITION.TRANSITION_ID
-
-        LEFT JOIN FEATURE ON FEATURE_TRANSITION.FEATURE_ID = FEATURE.ID
-        LEFT JOIN FEATURE_MS1 ON FEATURE_TRANSITION.FEATURE_ID = FEATURE_MS1.FEATURE_ID
-        LEFT JOIN FEATURE_MS2 ON FEATURE_TRANSITION.FEATURE_ID = FEATURE_MS2.FEATURE_ID
-
-        LEFT JOIN RUN ON FEATURE.RUN_ID = RUN.ID
-
-        LEFT JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
-        LEFT JOIN SCORE_PEPTIDE ON PEPTIDE.ID = SCORE_PEPTIDE.PEPTIDE_ID
-        LEFT JOIN SCORE_PROTEIN ON PROTEIN.ID = SCORE_PROTEIN.PROTEIN_ID
-
-        WHERE FEATURE.ID IS NULL
-
+        transition_feature_query = f'''SELECT {','.join([col.strip() for col in columnsToSelect.split(',') if re.search('^FEATURE_TRANSITION', col.strip())] + ['FEATURE_TRANSITION.FEATURE_ID as FEATURE_ID'])} FROM (SELECT ID AS FEATURE_ID FROM FEATURE WHERE ID IN ({','.join(feat_ids)}) AND RUN_ID = {run_id}) AS FEATURE
+        LEFT JOIN FEATURE_TRANSITION ON FEATURE_TRANSITION.FEATURE_ID = FEATURE.FEATURE_ID
         '''
-    df = pd.read_sql(query, con)
-    return df
+
+        # Read transition feature data into pandas dataframe
+
+        df_transition_feature = pd.read_sql(transition_feature_query, con)
+
+        transition_query = f'''
+        SELECT {','.join([col.strip() for col in columnsToSelect.split(',') if re.search('^TRANSITION', col.strip())] + ['TRANSITION.ID AS TRANSITION_ID'])}
+        FROM (SELECT * FROM TRANSITION_PRECURSOR_MAPPING WHERE PRECURSOR_ID in ({','.join(prec_ids)})) AS TRANSITION_PRECURSOR_MAPPING
+        LEFT JOIN TRANSITION ON TRANSITION_PRECURSOR_MAPPING.TRANSITION_ID = TRANSITION.ID
+        '''
+
+        # Reads tranasition data into pandas dataframe
+        df_transition = pd.read_sql(transition_query, con)
+
+        # merge transition with transition feature data
+        df_tmp = pd.merge(df_transition_feature, df_transition, how='outer', on=['TRANSITION_ID'])
+
+        # merge transition and precursor level data
+        return pd.merge(df_tmp, precursor_df, how='outer', on=['FEATURE_ID'])
 
 def append_bit_masks(outfile):
     # Read data from data written to parquet file
@@ -430,7 +411,7 @@ def export_to_parquet(infile, outfile, transitionLevel, separate_runs=True, chun
 
     ## features
     columns['FEATURE'] = ['RUN_ID', 'EXP_RT', 'EXP_IM', 'NORM_RT', 'DELTA_RT', 'LEFT_WIDTH', 'RIGHT_WIDTH']
-    columns['FEATURE_MS2'] = ['AREA_INTENSITY', 'TOTAL_AREA_INTENSITY', 'APEX_INTENSITY', 'TOTAL_MI', 'VAR_BSERIES_SCORE', 'VAR_DOTPROD_SCORE', 'VAR_INTENSITY_SCORE', 'VAR_ISOTOPE_CORRELATION_SCORE', 'VAR_ISOTOPE_OVERLAP_SCORE', 'VAR_LIBRARY_CORR', 'VAR_LIBRARY_DOTPROD', 'VAR_LIBRARY_MANHATTAN', 'VAR_LIBRARY_RMSD', 'VAR_LIBRARY_ROOTMEANSQUARE', 'VAR_LIBRARY_SANGLE', 'VAR_LOG_SN_SCORE', 'VAR_MANHATTAN_SCORE', 'VAR_MASSDEV_SCORE', 'VAR_MASSDEV_SCORE_WEIGHTED', 'VAR_MI_SCORE', 'VAR_MI_WEIGHTED_SCORE', 'VAR_MI_RATIO_SCORE', 'VAR_NORM_RT_SCORE', 'VAR_XCORR_COELUTION', 'VAR_XCORR_COELUTION_WEIGHTED', 'VAR_XCORR_SHAPE', 'VAR_XCORR_SHAPE_WEIGHTED', 'VAR_YSERIES_SCORE', 'VAR_ELUTION_MODEL_FIT_SCORE', 'VAR_IM_XCORR_SHAPE', 'VAR_IM_XCORR_COELUTION', 'VAR_IM_DELTA_SCORE', 'VAR_SONAR_LAG', 'VAR_SONAR_SHAPE', 'VAR_SONAR_LOG_SN', 'VAR_SONAR_LOG_DIFF', 'VAR_SONAR_LOG_TREND', 'VAR_SONAR_RSQ']
+    columns['FEATURE_MS2'] = ['FEATURE_ID', 'AREA_INTENSITY', 'TOTAL_AREA_INTENSITY', 'APEX_INTENSITY', 'TOTAL_MI', 'VAR_BSERIES_SCORE', 'VAR_DOTPROD_SCORE', 'VAR_INTENSITY_SCORE', 'VAR_ISOTOPE_CORRELATION_SCORE', 'VAR_ISOTOPE_OVERLAP_SCORE', 'VAR_LIBRARY_CORR', 'VAR_LIBRARY_DOTPROD', 'VAR_LIBRARY_MANHATTAN', 'VAR_LIBRARY_RMSD', 'VAR_LIBRARY_ROOTMEANSQUARE', 'VAR_LIBRARY_SANGLE', 'VAR_LOG_SN_SCORE', 'VAR_MANHATTAN_SCORE', 'VAR_MASSDEV_SCORE', 'VAR_MASSDEV_SCORE_WEIGHTED', 'VAR_MI_SCORE', 'VAR_MI_WEIGHTED_SCORE', 'VAR_MI_RATIO_SCORE', 'VAR_NORM_RT_SCORE', 'VAR_XCORR_COELUTION', 'VAR_XCORR_COELUTION_WEIGHTED', 'VAR_XCORR_SHAPE', 'VAR_XCORR_SHAPE_WEIGHTED', 'VAR_YSERIES_SCORE', 'VAR_ELUTION_MODEL_FIT_SCORE', 'VAR_IM_XCORR_SHAPE', 'VAR_IM_XCORR_COELUTION', 'VAR_IM_DELTA_SCORE', 'VAR_SONAR_LAG', 'VAR_SONAR_SHAPE', 'VAR_SONAR_LOG_SN', 'VAR_SONAR_LOG_DIFF', 'VAR_SONAR_LOG_TREND', 'VAR_SONAR_RSQ']
     columns['FEATURE_MS1'] = ['APEX_INTENSITY', 'VAR_MASSDEV_SCORE', 'VAR_MI_SCORE', 'VAR_MI_CONTRAST_SCORE', 'VAR_MI_COMBINED_SCORE', 'VAR_ISOTOPE_CORRELATION_SCORE', 'VAR_ISOTOPE_OVERLAP_SCORE', 'VAR_IM_MS1_DELTA_SCORE', 'VAR_XCORR_COELUTION', 'VAR_XCORR_COELUTION_CONTRAST', 'VAR_XCORR_COELUTION_COMBINED', 'VAR_XCORR_SHAPE', 'VAR_XCORR_SHAPE_CONTRAST', 'VAR_XCORR_SHAPE_COMBINED']
 
     # check if IM columns exist
@@ -448,6 +429,7 @@ def export_to_parquet(infile, outfile, transitionLevel, separate_runs=True, chun
     ## other
     columns['RUN'] = ['FILENAME']
 
+
     ## mappings
     columns['PRECURSOR_PEPTIDE_MAPPING'] = ['PEPTIDE_ID', 'PRECURSOR_ID']
     #columns['TRANSITION_PRECURSOR_MAPPING'] = ['PRECURSOR_ID']
@@ -457,11 +439,8 @@ def export_to_parquet(infile, outfile, transitionLevel, separate_runs=True, chun
 
     # transition level
     if transitionLevel:
-        columns['FEATURE_TRANSITION'] = ['FEATURE_ID', 'TRANSITION_ID', 'AREA_INTENSITY', 'TOTAL_AREA_INTENSITY', 'APEX_INTENSITY', 'TOTAL_MI', 'VAR_INTENSITY_SCORE', 'VAR_INTENSITY_RATIO_SCORE', 'VAR_LOG_INTENSITY', 'VAR_XCORR_COELUTION', 'VAR_XCORR_SHAPE', 'VAR_LOG_SN_SCORE', 'VAR_MASSDEV_SCORE', 'VAR_MI_SCORE', 'VAR_MI_RATIO_SCORE', 'VAR_ISOTOPE_CORRELATION_SCORE', 'VAR_ISOTOPE_OVERLAP_SCORE']
+        columns['FEATURE_TRANSITION'] = ['TRANSITION_ID', 'AREA_INTENSITY', 'TOTAL_AREA_INTENSITY', 'APEX_INTENSITY', 'TOTAL_MI', 'VAR_INTENSITY_SCORE', 'VAR_INTENSITY_RATIO_SCORE', 'VAR_LOG_INTENSITY', 'VAR_XCORR_COELUTION', 'VAR_XCORR_SHAPE', 'VAR_LOG_SN_SCORE', 'VAR_MASSDEV_SCORE', 'VAR_MI_SCORE', 'VAR_MI_RATIO_SCORE', 'VAR_ISOTOPE_CORRELATION_SCORE', 'VAR_ISOTOPE_OVERLAP_SCORE']
         columns['TRANSITION'] = ['TRAML_ID', 'PRODUCT_MZ', 'CHARGE', 'TYPE', 'ORDINAL', 'DETECTING', 'IDENTIFYING', 'QUANTIFYING', 'LIBRARY_INTENSITY']
-    else:
-        columns['FEATURE'].append('FEATURE.ID AS FEATURE_ID')
-    
 
     ### rename column names that are in common 
     whitelist = set(['PEPTIDE_ID', 'FEATURE_ID', 'TRANSITION_ID', 'PRECURSOR_ID', 'PROTEIN_ID', 'GENE_ID', 'DECOY'])  # these columns should not be renamed
@@ -493,7 +472,7 @@ def export_to_parquet(infile, outfile, transitionLevel, separate_runs=True, chun
 
     # Start with feature_transition but then to include the rows of those precursors not found (no associated feature) join with precursor_transition
     if transitionLevel: # each row will be a transition 
-        osw_data_reader = read_feature_transition_data
+        osw_data_reader = read_transition_feature_data
     else: # each row will be a precursor/feature
         osw_data_reader = read_precursor_feature_data
 
