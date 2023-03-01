@@ -367,7 +367,9 @@ def export_parquet(infile, outfile, transitionLevel, separate_runs, chunksize, t
     if outfile is None:
         outfile = infile.split(".osw")[0] + ".parquet"
     if os.path.exists(outfile):
-        raise click.ClickException(f"Error: {outfile} already exists!")
+        overwrite = click.confirm(f"{outfile} already exists, would you like to overwrite?")
+        if not overwrite:
+            raise click.ClickException(f"Aborting: {outfile} already exists!")
     click.echo("Info: Parquet file will be written to {}".format(outfile))
     export_to_parquet(os.path.abspath(infile), os.path.abspath(outfile), transitionLevel, separate_runs, chunksize, threads)
 
