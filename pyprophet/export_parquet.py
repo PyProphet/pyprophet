@@ -315,7 +315,7 @@ def osw_to_parquet_writer(con, columnsToSelect, precursor_id_batches, run_ids, o
     if isinstance(outfile, str):
         writer = None
         for run_id in run_ids:
-            for prec_id in tqdm(precursor_id_batches, desc=f"INFO: Reading data from OSW for run {run_id} with batch {len(precursor_id_batches)} precursor ids to file {outfile}...", total=len(precursor_id_batches), position=pbar_position):
+            for prec_id in tqdm(precursor_id_batches, desc=f"Info: Reading data for run {run_id} - Thread {pbar_position}...", total=len(precursor_id_batches), position=pbar_position):
                 df = osw_data_reader(con, columnsToSelect, prec_id['ID'].astype(str).values, run_id, outfile)
                 writer = append_to_parquet_table(df, outfile, writer)
         if writer:
@@ -331,7 +331,7 @@ def osw_to_parquet_writer(con, columnsToSelect, precursor_id_batches, run_ids, o
     else:
         for run_id, out_file in zip(run_ids, outfile):
             writer = None
-            for prec_id in tqdm(precursor_id_batches, desc=f"INFO: Reading data from OSW for run {run_id} with batch {len(precursor_id_batches)} precursor ids to file {out_file}...", total=len(precursor_id_batches), position=pbar_position):
+            for prec_id in tqdm(precursor_id_batches, desc=f"Info: Reading data for run {run_id} - Thread {pbar_position}...", total=len(precursor_id_batches), position=pbar_position):
                 df = osw_data_reader(con, columnsToSelect, prec_id['ID'].astype(str).values, run_id, out_file)
                 writer = append_to_parquet_table(df, out_file, writer)
             if writer:
