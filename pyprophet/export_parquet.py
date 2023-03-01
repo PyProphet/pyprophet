@@ -308,14 +308,14 @@ def append_metadata(con, outfile):
     ## export to parquet 
     pq.write_table(fixed_table, outfile) 
 
-def osw_to_parquet_writer(con, columnsToSelect, precursor_id_batches, run_ids, outfile, osw_data_reader=read_precursor_feature_data):
+def osw_to_parquet_writer(con, columnsToSelect, precursor_id_batches, run_ids, outfile, osw_data_reader=read_precursor_feature_data, pbar_position=0):
     # If an input file is passed instead of a sqlite3 connection, establish a connection
     if not isinstance(con, sqlite3.Connection):
         con = sqlite3.connect(con)
     if isinstance(outfile, str):
         writer = None
         for run_id in run_ids:
-            for prec_id in tqdm(precursor_id_batches, desc=f"INFO: Reading data from OSW for run {run_id} with batch {len(precursor_id_batches)} precursor ids to file {outfile}...", total=len(precursor_id_batches)):
+            for prec_id in tqdm(precursor_id_batches, desc=f"INFO: Reading data from OSW for run {run_id} with batch {len(precursor_id_batches)} precursor ids to file {outfile}...", total=len(precursor_id_batches), position=pbar_position):
                 df = osw_data_reader(con, columnsToSelect, prec_id['ID'].astype(str).values, run_id, outfile)
                 writer = append_to_parquet_table(df, outfile, writer)
         if writer:
@@ -331,7 +331,7 @@ def osw_to_parquet_writer(con, columnsToSelect, precursor_id_batches, run_ids, o
     else:
         for run_id, out_file in zip(run_ids, outfile):
             writer = None
-            for prec_id in tqdm(precursor_id_batches, desc=f"INFO: Reading data from OSW for run {run_id} with batch {len(precursor_id_batches)} precursor ids to file {out_file}...", total=len(precursor_id_batches)):
+            for prec_id in tqdm(precursor_id_batches, desc=f"INFO: Reading data from OSW for run {run_id} with batch {len(precursor_id_batches)} precursor ids to file {out_file}...", total=len(precursor_id_batches), position=pbar_position):
                 df = osw_data_reader(con, columnsToSelect, prec_id['ID'].astype(str).values, run_id, out_file)
                 writer = append_to_parquet_table(df, out_file, writer)
             if writer:
@@ -522,7 +522,8 @@ def export_to_parquet(infile, outfile, transitionLevel, separate_runs=True, chun
                 neval -= todo
                 todo_outfiles = outfile[start:end]
                 todo_run_ids = run_ids[start:end].tolist()
-                _ = pool.starmap( osw_to_parquet_writer, zip([infile] * todo, [columnsToSelect] * todo, [precursor_id_batches] * todo, [[id] for id in todo_run_ids], todo_outfiles, [osw_data_reader] * todo) )
+                pbar_positions = list(range(len(todo_outfiles)))
+                _ = pool.starmap( osw_to_parquet_writer, zip([infile] * todo, [columnsToSelect] * todo, [precursor_id_batches] * todo, [[id] for id in todo_run_ids], todo_outfiles, [osw_data_reader] * todo, pbar_positions) )
                 start+=todo
                 end+=todo
             pool.close()
@@ -545,7 +546,8 @@ def export_to_parquet(infile, outfile, transitionLevel, separate_runs=True, chun
                 neval -= todo
                 todo_outfiles = tmp_outfiles[start:end]
                 todo_run_ids = run_ids[start:end].tolist()
-                _ = pool.starmap( osw_to_parquet_writer, zip([infile] * todo, [columnsToSelect] * todo, [precursor_id_batches] * todo, [[id] for id in todo_run_ids], todo_outfiles, [osw_data_reader] * todo) )
+                pbar_positions = list(range(len(todo_outfiles)))
+                _ = pool.starmap( osw_to_parquet_writer, zip([infile] * todo, [columnsToSelect] * todo, [precursor_id_batches] * todo, [[id] for id in todo_run_ids], todo_outfiles, [osw_data_reader] * todo, pbar_positions) )
                 start+=todo
                 end+=todo
             pool.close()
@@ -563,9 +565,10 @@ def export_to_parquet(infile, outfile, transitionLevel, separate_runs=True, chun
             # VisibleDeprecationWarning: Creating an ndarray from ragged nested sequences (which is a list-or-tuple of lists-or-tuples-or ndarrays with different lengths or shapes) is deprecated. If you meant to do this, you must specify 'dtype=object' when creating the ndarray.
             warnings.filterwarnings('ignore', category=np.VisibleDeprecationWarning)
             tmp_outfiles = [f"{os.path.dirname(outfile)}{os.sep}tmp_{thread}_{os.path.basename(outfile)}" for thread in range(0, threads)]
+            pbar_positions = list(range(len(tmp_outfiles)))
             # Initiate a pool with nthreads for parallel processing
             pool = multiprocessing.Pool(processes=threads)
-            _ = pool.starmap( osw_to_parquet_writer, zip([infile] * threads, [columnsToSelect] * threads, list(chunks(precursor_id_batches, threads)), [[id] for id in run_ids.tolist() * threads], tmp_outfiles, [osw_data_reader] * threads) )
+            _ = pool.starmap( osw_to_parquet_writer, zip([infile] * threads, [columnsToSelect] * threads, list(chunks(precursor_id_batches, threads)), [[id] for id in run_ids.tolist() * threads], tmp_outfiles, [osw_data_reader] * threads, pbar_positions) )
             pool.close()
             pool.join()
             df = pd.concat(map(pd.read_parquet, tmp_outfiles))
