@@ -27,14 +27,14 @@ def _run_cmdline(cmdline):
     return stdout
 
 
-def _run_export_parquet_single_run(temp_folder, transitionLevel=False, pd_testing_kwargs=dict(check_dtype=False, check_names=False)):
+def _run_export_parquet_single_run(temp_folder, transitionLevel=False, threads=1, chunksize=1000, pd_testing_kwargs=dict(check_dtype=False, check_names=False)):
     os.chdir(temp_folder)
     DATA_NAME="dummyOSWScoredData.osw"
     data_path = os.path.join(DATA_FOLDER, DATA_NAME)
     conn = sqlite3.connect(DATA_NAME)
     shutil.copy(data_path, temp_folder)
 
-    cmdline = "pyprophet export-parquet --in={}".format(DATA_NAME)
+    cmdline = "pyprophet export-parquet --in={} --threads={} --chunksize={}".format(DATA_NAME, threads, chunksize)
 
     # if testing transition level add --transitionLevel flag
     if transitionLevel:
@@ -75,3 +75,10 @@ def test_export_parquet_single_run(tmpdir):
 	
 def test_export_parquet_single_run_transition_level(tmpdir):
 	_run_export_parquet_single_run(tmpdir, transitionLevel=True)
+
+
+def test_multithread_export_parquet_single_run(tmpdir):
+	_run_export_parquet_single_run(tmpdir, transitionLevel=False, threads=2, chunksize=1)
+
+def test_multithread_export_parquet_single_run_transition_level(tmpdir):
+	_run_export_parquet_single_run(tmpdir, transitionLevel=True, threads=2, chunksize=1)
