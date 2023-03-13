@@ -104,7 +104,6 @@ def validate_datatypes(df):
 
 def read_precursor_feature_data(con, columnsToSelect, prec_ids, run_id, outfile):
         # Feature Data
-
         feature_query = '''
         SELECT {0}
         FROM (SELECT * FROM FEATURE WHERE PRECURSOR_ID IN ({1}) AND RUN_ID = {2}) AS FEATURE
@@ -121,7 +120,7 @@ def read_precursor_feature_data(con, columnsToSelect, prec_ids, run_id, outfile)
         ## Check if Gene tables are present
         if check_sqlite_table(con, "GENE"):
             gene_table_joins = '''
-            LEFT JOIN PEPTIDE_GENE_MAPPING ON PEPTIDE.ID = PEPTIDE_GENE_MAPPING.GENE_ID
+            LEFT JOIN PEPTIDE_GENE_MAPPING ON PEPTIDE.ID = PEPTIDE_GENE_MAPPING.PEPTIDE_ID
             LEFT JOIN GENE ON PEPTIDE_GENE_MAPPING.GENE_ID = GENE.ID
             '''
         else:
