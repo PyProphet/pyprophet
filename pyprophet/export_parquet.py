@@ -212,33 +212,31 @@ def read_transition_feature_data(con, columnsToSelect, prec_ids, run_id, outfile
         # First read feature data
         precursor_df = read_precursor_feature_data(con, columnsToSelect, prec_ids, run_id, outfile)
 
-        feat_ids = precursor_df['FEATURE_ID'].drop_duplicates().astype('str').values
+        # drop features that are -1 as this means the feature was not found
+        feat_ids = precursor_df[precursor_df['FEATURE_ID'] != -1]['FEATURE_ID'].drop_duplicates().astype('str').values
 
 
-        # Append transition level data
-
+        # Read transition feature data into pandas dataframe
         transition_feature_query = f'''SELECT {','.join([col.strip() for col in columnsToSelect.split(',') if re.search('^FEATURE_TRANSITION', col.strip())] + ['FEATURE_TRANSITION.FEATURE_ID as FEATURE_ID'])} FROM (SELECT ID AS FEATURE_ID FROM FEATURE WHERE ID IN ({','.join(feat_ids)}) AND RUN_ID = {run_id}) AS FEATURE
         LEFT JOIN FEATURE_TRANSITION ON FEATURE_TRANSITION.FEATURE_ID = FEATURE.FEATURE_ID
         '''
-
-        # Read transition feature data into pandas dataframe
-
         df_transition_feature = pd.read_sql(transition_feature_query, con)
 
+        # Reads transition data into pandas dataframe
         transition_query = f'''
         SELECT {','.join([col.strip() for col in columnsToSelect.split(',') if re.search('^TRANSITION', col.strip())] + ['TRANSITION.ID AS TRANSITION_ID'])}
         FROM (SELECT * FROM TRANSITION_PRECURSOR_MAPPING WHERE PRECURSOR_ID in ({','.join(prec_ids)})) AS TRANSITION_PRECURSOR_MAPPING
         LEFT JOIN TRANSITION ON TRANSITION_PRECURSOR_MAPPING.TRANSITION_ID = TRANSITION.ID
         '''
-
-        # Reads tranasition data into pandas dataframe
         df_transition = pd.read_sql(transition_query, con)
 
         # merge transition with transition feature data
-        df_tmp = pd.merge(df_transition_feature, df_transition, how='outer', on=['TRANSITION_ID'])
+        df_tmp = pd.merge(df_transition, df_transition_feature, how='left', on=['TRANSITION_ID'])
+
+        df_tmp['FEATURE_ID'] = df_tmp['FEATURE_ID'].fillna(-1).astype(int)
 
         # merge transition and precursor level data
-        return pd.merge(df_tmp, precursor_df, how='outer', on=['FEATURE_ID'])
+        return pd.merge(df_tmp, precursor_df, how='left', on=['FEATURE_ID'])
 
 def append_bit_masks(outfile):
     # Read data from data written to parquet file
