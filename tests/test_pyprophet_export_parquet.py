@@ -27,7 +27,7 @@ def _run_cmdline(cmdline):
     return stdout
 
 
-def _run_export_parquet_single_run(temp_folder, transitionLevel=False, threads=1, chunksize=1000, pd_testing_kwargs=dict(check_dtype=False, check_names=False)):
+def _run_export_parquet_single_run(temp_folder, transitionLevel=False, threads=1, chunksize=1000, pd_testing_kwargs=dict(check_dtype=False, check_names=False), dropNotFound=False):
     os.chdir(temp_folder)
     DATA_NAME="dummyOSWScoredData.osw"
     data_path = os.path.join(DATA_FOLDER, DATA_NAME)
@@ -46,14 +46,41 @@ def _run_export_parquet_single_run(temp_folder, transitionLevel=False, threads=1
     parquet = pd.read_parquet("dummyOSWScoredData.parquet") ## automatically with parquet ending of input file name
 
     if transitionLevel:
-        expectedLength = len(pd.read_sql("select * from feature_transition", conn)) # length of FEATURE_TRANSITION table
+        if dropNotFound: # length of FEATURE_TRANSITION table
+            expectedLength = len(pd.read_sql("select * from feature_transition", conn)) 
+        else:
+            featureTransition = pd.read_sql("select * from feature_transition", conn)
+            precursorTransition = pd.read_sql("select * from transition_precursor_mapping", conn)
+            featureTable = pd.read_sql("select * from feature", conn)
+
+            numTransNoFeature = len(precursorTransition[~precursorTransition['PRECURSOR_ID'].isin(featureTable['PRECURSOR_ID'])])
+
+            expectedLength = numTransNoFeature + len(featureTransition)
+
         assert(expectedLength == len(parquet))
     else:
-        expectedLength = len(pd.read_sql("select * from feature", conn)) # length of feature table
+        if dropNotFound: # expected length, length of feature table
+            expectedLength = len(pd.read_sql("select * from feature", conn)) 
+        else:
+            # Expected length is number of features + number of precursors with no feature
+            featureTable = pd.read_sql("select * from feature", conn)
+            precTable = pd.read_sql("select * from precursor", conn)
+
+            numPrecsNoFeature = len(precTable[~precTable['ID'].isin(featureTable['PRECURSOR_ID'])])
+            expectedLength = numPrecsNoFeature + len(featureTable)
+
         assert(expectedLength == len(parquet))
 
     ########### FEATURE LEVEL TESTS ########
     # Tests that columns are equal across different sqlite3 tables to ensure joins occured correctly
+
+    if transitionLevel:
+        ## check features and transitions joined properly for those all cases (including those with no features
+        ## Way library was created precursor and transition m/z both are in the same 100s (e.g. if precursor m/z is 700 transition mz can be 701) 
+        pd.testing.assert_series_equal(parquet['PRECURSOR.PRECURSOR_MZ'] // 100, parquet['TRANSITION.PRODUCT_MZ'] // 100, **pd_testing_kwargs)
+
+    ### Note: Current tests assume no na
+    parquet = parquet.dropna()
     pd.testing.assert_series_equal(parquet['FEATURE_MS1.APEX_INTENSITY'], parquet['PRECURSOR_ID'], **pd_testing_kwargs)
     pd.testing.assert_series_equal(parquet['FEATURE_MS2.APEX_INTENSITY'],  parquet['PRECURSOR_ID'], **pd_testing_kwargs)
 
@@ -78,7 +105,7 @@ def test_export_parquet_single_run_transition_level(tmpdir):
 
 
 def test_multithread_export_parquet_single_run(tmpdir):
-	_run_export_parquet_single_run(tmpdir, transitionLevel=False, threads=2, chunksize=1)
+	_run_export_parquet_single_run(tmpdir, transitionLevel=False, threads=2, chunksize=2)
 
 def test_multithread_export_parquet_single_run_transition_level(tmpdir):
-	_run_export_parquet_single_run(tmpdir, transitionLevel=True, threads=2, chunksize=1)
+	_run_export_parquet_single_run(tmpdir, transitionLevel=True, threads=2, chunksize=2)
