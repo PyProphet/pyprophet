@@ -356,9 +356,10 @@ def export(infile, outfile, format, outcsv, transition_quantification, max_trans
 @click.option('--out', 'outfile', required=False, type=click.Path(exists=False), help='Output parquet file.')
 @click.option('--transitionLevel', 'transitionLevel', is_flag=True, help='Whether to export transition level data as well')
 @click.option('--separate_runs/--no-separate_runs', default=True, show_default=True, help='If the input file is a merged file, create separate parquet files per run')
+@click.option('--onlyFeatures', 'onlyFeatures', is_flag=True, help='Only include precursors that have a corresponding feature')
 @click.option('--chunksize', default=1000, show_default=True, type=int, help='Amount of precursor id batch sizes to process when querying OSW file. This helps reduce memory consumption during large sql calls.')
 @click.option('--threads', default=1, show_default=True, type=int, help='Number of threads used for exporting. -1 means all available CPUs.', callback=transform_threads)
-def export_parquet(infile, outfile, transitionLevel, separate_runs, chunksize, threads):
+def export_parquet(infile, outfile, transitionLevel, onlyFeatures, separate_runs, chunksize, threads):
     """
     Export all transition data to parquet file
     """
@@ -371,7 +372,7 @@ def export_parquet(infile, outfile, transitionLevel, separate_runs, chunksize, t
         if not overwrite:
             raise click.ClickException(f"Aborting: {outfile} already exists!")
     click.echo("Info: Parquet file will be written to {}".format(outfile))
-    export_to_parquet(os.path.abspath(infile), os.path.abspath(outfile), transitionLevel, separate_runs, chunksize, threads)
+    export_to_parquet(os.path.abspath(infile), os.path.abspath(outfile), transitionLevel, onlyFeatures, separate_runs, chunksize, threads)
 
 # Export Compound TSV
 @cli.command()

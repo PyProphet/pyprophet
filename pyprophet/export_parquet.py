@@ -102,7 +102,15 @@ def validate_datatypes(df):
 
     return df
 
-def read_precursor_feature_data(con, columnsToSelect, prec_ids, run_id, outfile):
+'''
+This method loads parquet data at the feature level
+con = sqlite3 connection
+columnsToSelect = columnsIn the outputted parquet file
+prec_ids = precursor ids to create rows for
+run_id = run_id operating on
+onlyFeatures = If true, do not export precursors with no associated features
+'''
+def read_precursor_feature_data(con, columnsToSelect, prec_ids, run_id, onlyFeatures):
         # Feature Data
         feature_query = '''
         SELECT {0}
@@ -138,10 +146,14 @@ def read_precursor_feature_data(con, columnsToSelect, prec_ids, run_id, outfile)
         # Read into Pandas Dataframe
         df_prec = pd.read_sql(precursor_query, con)
 
-        # Merge Feature and Precursor Tables
-        df_tmp = pd.merge(df_feature, df_prec, how='outer', on=['PRECURSOR_ID'])
-        # Fill in run for cases where precursors have no features identified
-        df_tmp['FEATURE.RUN_ID'] = df_tmp['FEATURE.RUN_ID'].dropna().unique()[0]
+        if onlyFeatures:
+            df_tmp = pd.merge(df_feature, df_prec, on=['PRECURSOR_ID'])
+
+        else:
+            # Merge Feature and Precursor Tables
+            df_tmp = pd.merge(df_feature, df_prec, how='outer', on=['PRECURSOR_ID'])
+            # Fill in run for cases where precursors have no features identified
+            df_tmp['FEATURE.RUN_ID'] = df_tmp['FEATURE.RUN_ID'].dropna().unique()[0]
 
         # Check to see if GENE_ID is in table, and check to see if all values are NULL
         if 'GENE_ID' in df_tmp.columns:
@@ -207,10 +219,19 @@ def read_precursor_feature_data(con, columnsToSelect, prec_ids, run_id, outfile)
         df_tmp = validate_datatypes(df_tmp)
         return df_tmp
 
-def read_transition_feature_data(con, columnsToSelect, prec_ids, run_id, outfile):
+'''
+This method converts sqlite3 data into a pandas dataframe where each row is a transition
+con = sqlite3 connection
+columnsTOSelect = resulting columns in pandas datafrmae
+prec_ids = precursor ids for transitions to load
+run_id = run_id for transitions to load
+onlyFeatures = only include transitions who have a corresponding feature
+** Note this assumes that if a feature is present there will be an entry for all of its corresponding transitions, in other words there is no feature which has some transitions as NAN and some as actual values.
+'''
+def read_transition_feature_data(con, columnsToSelect, prec_ids, run_id, onlyFeatures):
 
         # First read feature data
-        precursor_df = read_precursor_feature_data(con, columnsToSelect, prec_ids, run_id, outfile)
+        precursor_df = read_precursor_feature_data(con, columnsToSelect, prec_ids, run_id, onlyFeatures)
 
         # drop features that are -1 as this means the feature was not found
         feat_ids = precursor_df[precursor_df['FEATURE_ID'] != -1]['FEATURE_ID'].drop_duplicates().astype('str').values
@@ -231,9 +252,11 @@ def read_transition_feature_data(con, columnsToSelect, prec_ids, run_id, outfile
         df_transition = pd.read_sql(transition_query, con)
 
         # merge transition with transition feature data
-        df_tmp = pd.merge(df_transition, df_transition_feature, how='left', on=['TRANSITION_ID'])
-
-        df_tmp['FEATURE_ID'] = df_tmp['FEATURE_ID'].fillna(-1).astype(int)
+        if onlyFeatures:
+            df_tmp = pd.merge(df_transition, df_transition_feature, on=['TRANSITION_ID']) #inner join removes transitions with no features
+        else:
+            df_tmp = pd.merge(df_transition, df_transition_feature, how='left', on=['TRANSITION_ID'])
+            df_tmp['FEATURE_ID'] = df_tmp['FEATURE_ID'].fillna(-1).astype(int)
 
         # merge transition and precursor level data
         return pd.merge(df_tmp, precursor_df, how='left', on=['FEATURE_ID'])
@@ -286,7 +309,7 @@ def append_metadata(con, outfile):
     ## export to parquet 
     pq.write_table(fixed_table, outfile) 
 
-def osw_to_parquet_writer(con, columnsToSelect, precursor_id_batches, run_ids, outfile, osw_data_reader=read_precursor_feature_data, pbar_position=0):
+def osw_to_parquet_writer(con, columnsToSelect, precursor_id_batches, run_ids, outfile, onlyFeatures, osw_data_reader=read_precursor_feature_data, pbar_position=0):
     # If an input file is passed instead of a sqlite3 connection, establish a connection
     if not isinstance(con, sqlite3.Connection):
         con = sqlite3.connect(con)
@@ -294,7 +317,7 @@ def osw_to_parquet_writer(con, columnsToSelect, precursor_id_batches, run_ids, o
         writer = None
         for run_id in run_ids:
             for prec_id in tqdm(precursor_id_batches, desc=f"Info: Reading data for run {run_id} - Thread {pbar_position}...", total=len(precursor_id_batches), position=pbar_position):
-                df = osw_data_reader(con, columnsToSelect, prec_id['ID'].astype(str).values, run_id, outfile)
+                df = osw_data_reader(con, columnsToSelect, prec_id['ID'].astype(str).values, run_id, onlyFeatures)
                 writer = append_to_parquet_table(df, outfile, writer)
         if writer:
             writer.close()
@@ -310,7 +333,7 @@ def osw_to_parquet_writer(con, columnsToSelect, precursor_id_batches, run_ids, o
         for run_id, out_file in zip(run_ids, outfile):
             writer = None
             for prec_id in tqdm(precursor_id_batches, desc=f"Info: Reading data for run {run_id} - Thread {pbar_position}...", total=len(precursor_id_batches), position=pbar_position):
-                df = osw_data_reader(con, columnsToSelect, prec_id['ID'].astype(str).values, run_id, out_file)
+                df = osw_data_reader(con, columnsToSelect, prec_id['ID'].astype(str).values, run_id, onlyFeatures)
                 writer = append_to_parquet_table(df, out_file, writer)
             if writer:
                 writer.close()
@@ -324,7 +347,7 @@ def osw_to_parquet_writer(con, columnsToSelect, precursor_id_batches, run_ids, o
 
 # this method is only currently supported for combined output and not with ipf
 @method_timer
-def export_to_parquet(infile, outfile, transitionLevel, separate_runs=True, chunksize=1000, threads=1):
+def export_to_parquet(infile, outfile, transitionLevel, onlyFeatures=False, separate_runs=True, chunksize=1000, threads=1):
     '''
     Convert an OSW sqlite file to Parquet format
 
@@ -479,7 +502,7 @@ def export_to_parquet(infile, outfile, transitionLevel, separate_runs=True, chun
 
     with code_block_timer(f"Info: Extracting data from OSW file..."):
         if threads == 1: # Single Thread Processing
-            osw_to_parquet_writer(con, columnsToSelect, precursor_id_batches, run_ids, outfile, osw_data_reader=osw_data_reader)
+            osw_to_parquet_writer(con, columnsToSelect, precursor_id_batches, run_ids, outfile, onlyFeatures, osw_data_reader=osw_data_reader)
             con.close()
         elif threads > 1 and len(run_ids) > 1 and isinstance(outfile, list): # Parallel process runs and save individual parquets
             # Close connection to database, since each thread will establish it's own connection
@@ -499,7 +522,7 @@ def export_to_parquet(infile, outfile, transitionLevel, separate_runs=True, chun
                 todo_outfiles = outfile[start:end]
                 todo_run_ids = run_ids[start:end].tolist()
                 pbar_positions = list(range(len(todo_outfiles)))
-                _ = pool.starmap( osw_to_parquet_writer, zip([infile] * todo, [columnsToSelect] * todo, [precursor_id_batches] * todo, [[id] for id in todo_run_ids], todo_outfiles, [osw_data_reader] * todo, pbar_positions) )
+                _ = pool.starmap( osw_to_parquet_writer, zip([infile] * todo, [columnsToSelect] * todo, [precursor_id_batches] * todo, [[id] for id in todo_run_ids], todo_outfiles, [onlyFeatures] * todo, [osw_data_reader] * todo, pbar_positions) )
                 start+=todo
                 end+=todo
             pool.close()
@@ -523,7 +546,7 @@ def export_to_parquet(infile, outfile, transitionLevel, separate_runs=True, chun
                 todo_outfiles = tmp_outfiles[start:end]
                 todo_run_ids = run_ids[start:end].tolist()
                 pbar_positions = list(range(len(todo_outfiles)))
-                _ = pool.starmap( osw_to_parquet_writer, zip([infile] * todo, [columnsToSelect] * todo, [precursor_id_batches] * todo, [[id] for id in todo_run_ids], todo_outfiles, [osw_data_reader] * todo, pbar_positions) )
+                _ = pool.starmap( osw_to_parquet_writer, zip([infile] * todo, [columnsToSelect] * todo, [precursor_id_batches] * todo, [[id] for id in todo_run_ids], todo_outfiles, [onlyFeatures] * todo, [osw_data_reader] * todo, pbar_positions) )
                 start+=todo
                 end+=todo
             pool.close()
@@ -544,7 +567,7 @@ def export_to_parquet(infile, outfile, transitionLevel, separate_runs=True, chun
             pbar_positions = list(range(len(tmp_outfiles)))
             # Initiate a pool with nthreads for parallel processing
             pool = multiprocessing.Pool(processes=threads)
-            _ = pool.starmap( osw_to_parquet_writer, zip([infile] * threads, [columnsToSelect] * threads, list(chunks(precursor_id_batches, threads)), [[id] for id in run_ids.tolist() * threads], tmp_outfiles, [osw_data_reader] * threads, pbar_positions) )
+            _ = pool.starmap( osw_to_parquet_writer, zip([infile] * threads, [columnsToSelect] * threads, list(chunks(precursor_id_batches, threads)), [[id] for id in run_ids.tolist() * threads], tmp_outfiles, [onlyFeatures] * threads, [osw_data_reader] * threads, pbar_positions) )
             pool.close()
             pool.join()
             df = pd.concat(map(pd.read_parquet, tmp_outfiles))

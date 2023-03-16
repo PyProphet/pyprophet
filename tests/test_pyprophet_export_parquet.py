@@ -27,7 +27,7 @@ def _run_cmdline(cmdline):
     return stdout
 
 
-def _run_export_parquet_single_run(temp_folder, transitionLevel=False, threads=1, chunksize=1000, pd_testing_kwargs=dict(check_dtype=False, check_names=False), dropNotFound=False):
+def _run_export_parquet_single_run(temp_folder, transitionLevel=False, threads=1, chunksize=1000, pd_testing_kwargs=dict(check_dtype=False, check_names=False), onlyFeatures=False):
     os.chdir(temp_folder)
     DATA_NAME="dummyOSWScoredData.osw"
     data_path = os.path.join(DATA_FOLDER, DATA_NAME)
@@ -39,6 +39,8 @@ def _run_export_parquet_single_run(temp_folder, transitionLevel=False, threads=1
     # if testing transition level add --transitionLevel flag
     if transitionLevel:
         cmdline += " --transitionLevel"
+    if onlyFeatures:
+        cmdline += " --onlyFeatures"
 
     stdout = _run_cmdline(cmdline)
 
@@ -46,7 +48,7 @@ def _run_export_parquet_single_run(temp_folder, transitionLevel=False, threads=1
     parquet = pd.read_parquet("dummyOSWScoredData.parquet") ## automatically with parquet ending of input file name
 
     if transitionLevel:
-        if dropNotFound: # length of FEATURE_TRANSITION table
+        if onlyFeatures: # length of FEATURE_TRANSITION table
             expectedLength = len(pd.read_sql("select * from feature_transition", conn)) 
         else:
             featureTransition = pd.read_sql("select * from feature_transition", conn)
@@ -59,7 +61,7 @@ def _run_export_parquet_single_run(temp_folder, transitionLevel=False, threads=1
 
         assert(expectedLength == len(parquet))
     else:
-        if dropNotFound: # expected length, length of feature table
+        if onlyFeatures: # expected length, length of feature table
             expectedLength = len(pd.read_sql("select * from feature", conn)) 
         else:
             # Expected length is number of features + number of precursors with no feature
@@ -100,12 +102,28 @@ def test_export_parquet_single_run(tmpdir):
 	_run_export_parquet_single_run(tmpdir, transitionLevel=False)
 
 	
-def test_export_parquet_single_run_transition_level(tmpdir):
+def test_export_parquet_single_run_transitionLevel(tmpdir):
 	_run_export_parquet_single_run(tmpdir, transitionLevel=True)
+
+
+def test_export_parquet_single_run_onlyFeatures(tmpdir):
+	_run_export_parquet_single_run(tmpdir, onlyFeatures=True)
+
+
+def test_export_parquet_single_run_transitionLevel_onlyFeatures(tmpdir):
+	_run_export_parquet_single_run(tmpdir, transitionLevel=True, onlyFeatures=True)
 
 
 def test_multithread_export_parquet_single_run(tmpdir):
 	_run_export_parquet_single_run(tmpdir, transitionLevel=False, threads=2, chunksize=2)
 
-def test_multithread_export_parquet_single_run_transition_level(tmpdir):
+def test_multithread_export_parquet_single_run_transitionLevel(tmpdir):
 	_run_export_parquet_single_run(tmpdir, transitionLevel=True, threads=2, chunksize=2)
+
+
+def test_multithread_export_parquet_single_run_onlyFeatures(tmpdir):
+	_run_export_parquet_single_run(tmpdir, onlyFeatures=True, threads=2, chunksize=4)
+
+
+def test_multithread_export_parquet_single_run_transitionLevel_onlyFeatures(tmpdir):
+	_run_export_parquet_single_run(tmpdir, transitionLevel=True, onlyFeatures=True, threads=2, chunksize=4)
