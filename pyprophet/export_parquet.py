@@ -165,14 +165,18 @@ def read_precursor_feature_data(con, columnsToSelect, prec_ids, run_id, onlyFeat
             df_peptide_scores = pd.read_sql(f'''
             SELECT * 
             FROM SCORE_PEPTIDE
-            WHERE RUN_ID = {run_id} 
+            WHERE (RUN_ID = {run_id} or RUN_ID is NULL)
             AND PEPTIDE_ID in ({','.join(df_prec.PEPTIDE_ID.astype(str).values.tolist())})
             ''', con)
-            # Check if there are no scores for current precursor batch, if so, then fill in dummy data to satisfy constant schema
+           # Check if there are no scores for current precursor batch, if so, then fill in dummy data to satisfy constant schema
             if df_peptide_scores.shape[0]==0:
                 # Get contexts that are in the OSW
                 df_peptide_contexts = pd.read_sql(f'SELECT DISTINCT CONTEXT FROM SCORE_PEPTIDE', con)
                 df_peptide_scores['CONTEXT'] = df_peptide_contexts 
+
+            # For joining to work properly, since we know the run_id will be what is provided by the function, fill in the run_id
+            df_peptide_scores['RUN_ID'] = run_id
+ 
             df_peptide_scores_wide = df_peptide_scores.pivot(index=['RUN_ID', 'PEPTIDE_ID'], columns='CONTEXT')
             df_peptide_scores_wide.columns = ['SCORE_PEPTIDE.' + col.upper() for col in df_peptide_scores_wide.columns.map('_'.join)]
             df_peptide_scores_wide = df_peptide_scores_wide.reset_index()
@@ -183,14 +187,18 @@ def read_precursor_feature_data(con, columnsToSelect, prec_ids, run_id, onlyFeat
             df_protein_scores = pd.read_sql(f'''
             SELECT * 
             FROM SCORE_PROTEIN
-            WHERE RUN_ID = {run_id} 
+            WHERE (RUN_ID = {run_id} or RUN_ID is NULL)
             AND PROTEIN_ID in ({','.join(df_prec.PROTEIN_ID.astype(str).values.tolist())})
             ''', con)
-            # Check if there are no scores for current precursor batch, if so, then fill in dummy data to satisfy constant schema
+           # Check if there are no scores for current precursor batch, if so, then fill in dummy data to satisfy constant schema
             if df_protein_scores.shape[0]==0:
                 # Get contexts that are in the OSW
                 df_protein_contexts = pd.read_sql(f'SELECT DISTINCT CONTEXT FROM SCORE_PROTEIN', con)
                 df_protein_scores['CONTEXT'] = df_protein_contexts 
+
+            # For joining to work properly, since we know the run_id will be what is provided by the function, fill in the run_id
+            df_protein_scores['RUN_ID'] = run_id
+
             df_protein_scores_wide = df_protein_scores.pivot(index=['RUN_ID', 'PROTEIN_ID'], columns='CONTEXT')
             df_protein_scores_wide.columns = ['SCORE_PROTEIN.' + col.upper() for col in df_protein_scores_wide.columns.map('_'.join)]
             df_protein_scores_wide = df_protein_scores_wide.reset_index()
@@ -201,7 +209,7 @@ def read_precursor_feature_data(con, columnsToSelect, prec_ids, run_id, onlyFeat
             df_gene_scores = pd.read_sql(f'''
             SELECT * 
             FROM SCORE_GENE
-            WHERE RUN_ID = {run_id} 
+            WHERE (RUN_ID = {run_id} or RUN_ID is NULL)
             AND GENE_ID in ({','.join(df_prec.GENE_ID.astype(str).values.tolist())})
             ''', con)
             # Check if there are no scores for current precursor batch, if so, then fill in dummy data to satisfy constant schema
@@ -209,6 +217,10 @@ def read_precursor_feature_data(con, columnsToSelect, prec_ids, run_id, onlyFeat
                 # Get contexts that are in the OSW
                 df_gene_contexts = pd.read_sql(f'SELECT DISTINCT CONTEXT FROM SCORE_GENE', con)
                 df_gene_scores['CONTEXT'] = df_gene_contexts 
+
+            # For joining to work properly, since we know the run_id will be what is provided by the function, fill in the run_id
+            df_gene_scores['RUN_ID'] = run_id
+
             df_gene_scores_wide = df_gene_scores.pivot(index=['RUN_ID', 'GENE_ID'], columns='CONTEXT')
             df_gene_scores_wide.columns = ['SCORE_GENE.' + col.upper() for col in df_gene_scores_wide.columns.map('_'.join)]
             df_gene_scores_wide = df_gene_scores_wide.reset_index()
