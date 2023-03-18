@@ -123,6 +123,9 @@ def read_precursor_feature_data(con, columnsToSelect, prec_ids, run_id, onlyFeat
 
         # Read into Pandas Dataframe
         df_feature = pd.read_sql(feature_query, con)
+        df_feature['FEATURE_ID'] = df_feature['FEATURE_ID'].astype('Int64')
+        df_feature['FEATURE.RUN_ID'] = df_feature['FEATURE.RUN_ID'].astype('Int64')
+        df_feature['PRECURSOR_ID'] = df_feature['PRECURSOR_ID'].astype('Int64')
 
         # Precursor Library Data
         ## Check if Gene tables are present
@@ -145,6 +148,7 @@ def read_precursor_feature_data(con, columnsToSelect, prec_ids, run_id, onlyFeat
         '''
         # Read into Pandas Dataframe
         df_prec = pd.read_sql(precursor_query, con)
+        df_prec['PRECURSOR_ID'] = df_prec['PRECURSOR_ID'].astype("Int64")
 
         if onlyFeatures:
             df_tmp = pd.merge(df_feature, df_prec, on=['PRECURSOR_ID'])
@@ -153,7 +157,9 @@ def read_precursor_feature_data(con, columnsToSelect, prec_ids, run_id, onlyFeat
             # Merge Feature and Precursor Tables
             df_tmp = pd.merge(df_feature, df_prec, how='outer', on=['PRECURSOR_ID'])
             # Fill in run for cases where precursors have no features identified
-            df_tmp['FEATURE.RUN_ID'] = df_tmp['FEATURE.RUN_ID'].dropna().unique()[0]
+
+            # Because of integer casting, the run_id number can get messed up fix it here
+            df_tmp['FEATURE.RUN_ID'] = df_tmp['FEATURE.RUN_ID'].astype("Int64").fillna(run_id)
 
         # Check to see if GENE_ID is in table, and check to see if all values are NULL
         if 'GENE_ID' in df_tmp.columns:
@@ -190,6 +196,7 @@ def read_precursor_feature_data(con, columnsToSelect, prec_ids, run_id, onlyFeat
             WHERE (RUN_ID = {run_id} or RUN_ID is NULL)
             AND PROTEIN_ID in ({','.join(df_prec.PROTEIN_ID.astype(str).values.tolist())})
             ''', con)
+
            # Check if there are no scores for current precursor batch, if so, then fill in dummy data to satisfy constant schema
             if df_protein_scores.shape[0]==0:
                 # Get contexts that are in the OSW
@@ -203,7 +210,9 @@ def read_precursor_feature_data(con, columnsToSelect, prec_ids, run_id, onlyFeat
             df_protein_scores_wide.columns = ['SCORE_PROTEIN.' + col.upper() for col in df_protein_scores_wide.columns.map('_'.join)]
             df_protein_scores_wide = df_protein_scores_wide.reset_index()
             df_tmp = pd.merge(df_tmp, df_protein_scores_wide, how='left', left_on=['PROTEIN_ID', 'FEATURE.RUN_ID'], right_on=['PROTEIN_ID', 'RUN_ID'])
+
             df_tmp.drop(columns='RUN_ID', inplace=True)
+
 
         if check_sqlite_table(con, "SCORE_GENE"):
             df_gene_scores = pd.read_sql(f'''
@@ -248,12 +257,13 @@ def read_transition_feature_data(con, columnsToSelect, prec_ids, run_id, onlyFea
         # drop features that are -1 as this means the feature was not found
         feat_ids = precursor_df[precursor_df['FEATURE_ID'] != -1]['FEATURE_ID'].drop_duplicates().astype('str').values
 
-
         # Read transition feature data into pandas dataframe
         transition_feature_query = f'''SELECT {','.join([col.strip() for col in columnsToSelect.split(',') if re.search('^FEATURE_TRANSITION', col.strip())] + ['FEATURE_TRANSITION.FEATURE_ID as FEATURE_ID'])} FROM (SELECT ID AS FEATURE_ID FROM FEATURE WHERE ID IN ({','.join(feat_ids)}) AND RUN_ID = {run_id}) AS FEATURE
         LEFT JOIN FEATURE_TRANSITION ON FEATURE_TRANSITION.FEATURE_ID = FEATURE.FEATURE_ID
         '''
         df_transition_feature = pd.read_sql(transition_feature_query, con)
+
+        df_transition_feature['FEATURE_ID'] = df_transition_feature['FEATURE_ID'].astype("Int64")
 
         # Reads transition data into pandas dataframe
         transition_query = f'''
@@ -268,7 +278,7 @@ def read_transition_feature_data(con, columnsToSelect, prec_ids, run_id, onlyFea
             df_tmp = pd.merge(df_transition, df_transition_feature, on=['TRANSITION_ID']) #inner join removes transitions with no features
         else:
             df_tmp = pd.merge(df_transition, df_transition_feature, how='left', on=['TRANSITION_ID'])
-            df_tmp['FEATURE_ID'] = df_tmp['FEATURE_ID'].fillna(-1).astype(int)
+            df_tmp['FEATURE_ID'] = df_tmp['FEATURE_ID'].fillna(-1)
 
         # merge transition and precursor level data
         return pd.merge(df_tmp, precursor_df, how='left', on=['FEATURE_ID'])
