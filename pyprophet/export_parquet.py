@@ -486,7 +486,7 @@ def export_to_parquet(infile, outfile, transitionLevel, onlyFeatures=False, sepa
 
     ### rename column names that are in common 
     whitelist = set(['PEPTIDE_ID', 'FEATURE_ID', 'TRANSITION_ID', 'PRECURSOR_ID', 'PROTEIN_ID', 'GENE_ID', 'DECOY'])  # these columns should not be renamed
-    renamed_columns = {c: [col if 'AS' in col  else f"{c}.{col} AS '{c}.{col}'" if col not in whitelist else f"{c}.{col} AS '{col}'" for col in columns[c]] for c in columns.keys()}
+    renamed_columns = {c: [col if ' AS ' in col  else f"{c}.{col} AS '{c}.{col}'" if col not in whitelist else f"{c}.{col} AS '{col}'" for col in columns[c]] for c in columns.keys()}
 
     # create a list of all the columns
     columns_list = [col for c in renamed_columns.values() for col in c]
