@@ -1,7 +1,7 @@
    level                          score      weight
 0    ms1           main_var_xcorr_shape  7.9212e-01
 1    ms2           main_var_xcorr_shape -2.5189e+00
-2    ms2              var_bseries_score  4.2889e-15
+2    ms2              var_bseries_score  1.0149e-15
 3    ms2              var_dotprod_score  4.9092e+00
 4    ms2            var_intensity_score  1.8231e+00
 5    ms1  var_isotope_correlation_score  1.3332e-01
