@@ -229,8 +229,8 @@ def filter_osw(oswfiles, remove_decoys=True, omit_tables=[], max_gene_fdr=None, 
             # Copy original full tables
             copy_table(c, conn, feature_ids, "FEATURE", "ID", omit_tables)
             if check_sqlite_table(conn, 'FEATURE_MS1'):
-                copy_table(c, conn, feature_ids, "FEATURE_MS1", "ID", omit_tables)
-            copy_table(c, conn, feature_ids, "FEATURE_MS2", "ID", omit_tables)
+                copy_table(c, conn, feature_ids, "FEATURE_MS1", "FEATURE_ID", omit_tables)
+            copy_table(c, conn, feature_ids, "FEATURE_MS2", "FEATURE_ID", omit_tables)
             if check_sqlite_table(conn, 'FEATURE_TRANSITION'):
                 copy_table(c, conn, feature_ids, "FEATURE_TRANSITION", "FEATURE_ID", omit_tables)
             copy_table(c, conn, precursor_ids, "PRECURSOR", "ID", omit_tables)
