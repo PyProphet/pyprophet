@@ -36,7 +36,7 @@ def copy_table(c, conn, keep_ids, tbl, id_col, omit_tables=[]):
         conn.commit()
 
 def create_index_if(c, conn, stmt, tbl, omit_tables=[]):
-    if tbl not in omit_tables:
+    if tbl not in omit_tables and check_sqlite_table(conn, tbl):
         c.execute(stmt)
         conn.commit()
 
