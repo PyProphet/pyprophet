@@ -60,7 +60,7 @@ setup(name='pyprophet',
           "statsmodels >= 0.8.0",
           "matplotlib",
           "tabulate",
-          "PyPDF2"
+          "pypdf"
       ],
       entry_points={
           'console_scripts': [
