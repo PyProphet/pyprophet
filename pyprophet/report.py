@@ -6,7 +6,8 @@ try:
 except ImportError:
     plt = None
 
-from PyPDF2 import PdfMerger, PdfReader
+from pypdf import PdfMerger, PdfReader
+
 
 import os
 
@@ -79,7 +80,7 @@ def save_report(pdf_path, title, top_decoys, top_targets, cutoffs, svalues, qval
     if pvalues is not None:
         counts, __, __ = plt.hist(pvalues, bins=20, density=True)
         plt.plot([0, 1], [pi0['pi0'], pi0['pi0']], "r")
-        plt.title("p-value density histogram: $\pi_0$ = " + str(around(pi0['pi0'], decimals=3)))
+        plt.title(r"p-value density histogram: $\pi_0$ = " + str(around(pi0['pi0'], decimals=3)))
         plt.xlabel("p-value")
         plt.ylabel("density histogram")
 
@@ -89,9 +90,9 @@ def save_report(pdf_path, title, top_decoys, top_targets, cutoffs, svalues, qval
         plt.plot(pi0['lambda_'], pi0['pi0_smooth'], "r")
         plt.xlim([0,1])
         plt.ylim([0,1])
-        plt.title("$\pi_0$ smoothing fit plot")
-        plt.xlabel("$\lambda$")
-        plt.ylabel("$\pi_0$($\lambda$)")
+        plt.title(r"$\pi_0$ smoothing fit plot")
+        plt.xlabel(r"$\lambda$")
+        plt.ylabel(r"$\pi_0$($\lambda$)")
 
     plt.suptitle(title)
     plt.savefig(pdf_path)
@@ -186,9 +187,9 @@ def main_score_selection_report(title, sel_column, mapper, decoy_scores, target_
         counts, __, __ = plt.hist(target_pvalues, bins=20, density=True)
         if pi0 is not None:
             plt.plot([0, 1], [pi0['pi0'], pi0['pi0']], "r")
-            plt.title("p-value density histogram: $\pi_0$ = " + str(around(pi0['pi0'], decimals=3)))
+            plt.title(r"p-value density histogram: $\pi_0$ = " + str(around(pi0['pi0'], decimals=3)))
         else:
-            plt.title("p-value density histogram: $\pi_0$ estimation failed.")
+            plt.title(r"p-value density histogram: $\pi_0$ estimation failed.")
         plt.xlabel("target p-values")
         plt.ylabel("density histogram")
     # Finalize figure
