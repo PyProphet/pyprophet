@@ -346,11 +346,11 @@ def osw_to_parquet_writer(con, columnsToSelect, precursor_id_batches, run_ids, o
             
             # create masks for easier data exploration
             # click.echo("Info: Creating bitwise maps ...")
-            append_bit_masks(outfile)
+            #append_bit_masks(outfile)
                
             # Append metadata
             # click.echo("Info: Saving metaData ...")
-            append_metadata(con, outfile)
+            #append_metadata(con, outfile)
     else:
         for run_id, out_file in zip(run_ids, outfile):
             writer = None
@@ -361,10 +361,10 @@ def osw_to_parquet_writer(con, columnsToSelect, precursor_id_batches, run_ids, o
                 writer.close()
             # create masks for easier data exploration
             # click.echo("Info: Creating bitwise maps ...")
-            append_bit_masks(out_file)
+            #append_bit_masks(out_file)
             # Append metadata
             # click.echo("Info: Saving metaData ...")
-            append_metadata(con, out_file)
+            #append_metadata(con, out_file)
 
 
 # this method is only currently supported for combined output and not with ipf
