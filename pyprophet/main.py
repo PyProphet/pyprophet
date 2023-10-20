@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import click
 import sys
+import os
 import pathlib
 import ast
 
@@ -12,6 +13,7 @@ from .export import export_tsv, export_score_plots
 from .export_compound import export_compound_tsv
 from .filter import filter_sqmass, filter_osw
 from .data_handling import (transform_pi0_lambda, transform_threads, transform_subsample_ratio, check_sqlite_table)
+from .export_parquet import export_to_parquet
 from functools import update_wrapper
 import sqlite3
 from tabulate import tabulate
@@ -33,8 +35,6 @@ def cli():
 
     Visit http://openswath.org for usage instructions and help.
     """
-
-
 
 # https://stackoverflow.com/a/47730333
 class PythonLiteralOption(click.Option):
@@ -349,6 +349,30 @@ def export(infile, outfile, format, outcsv, transition_quantification, max_trans
 
         export_tsv(infile, outfile, format, outcsv, transition_quantification, max_transition_pep, ipf, ipf_max_peptidoform_pep, max_rs_peakgroup_qvalue, peptide, max_global_peptide_qvalue, protein, max_global_protein_qvalue)
 
+
+# Export to Paruqet
+@cli.command()
+@click.option('--in', 'infile', required=True, type=click.Path(exists=True), help='PyProphet input file.')
+@click.option('--out', 'outfile', required=False, type=click.Path(exists=False), help='Output parquet file.')
+@click.option('--transitionLevel', 'transitionLevel', is_flag=True, help='Whether to export transition level data as well')
+@click.option('--separate_runs/--no-separate_runs', default=True, show_default=True, help='If the input file is a merged file, create separate parquet files per run')
+@click.option('--onlyFeatures', 'onlyFeatures', is_flag=True, help='Only include precursors that have a corresponding feature')
+@click.option('--chunksize', default=1000, show_default=True, type=int, help='Amount of precursor id batch sizes to process when querying OSW file. This helps reduce memory consumption during large sql calls.')
+@click.option('--threads', default=1, show_default=True, type=int, help='Number of threads used for exporting. -1 means all available CPUs.', callback=transform_threads)
+def export_parquet(infile, outfile, transitionLevel, onlyFeatures, separate_runs, chunksize, threads):
+    """
+    Export all transition data to parquet file
+    """
+    if transitionLevel:
+        click.echo("Info: Will export transition level data")
+    if outfile is None:
+        outfile = infile.split(".osw")[0] + ".parquet"
+    if os.path.exists(outfile):
+        overwrite = click.confirm(f"{outfile} already exists, would you like to overwrite?")
+        if not overwrite:
+            raise click.ClickException(f"Aborting: {outfile} already exists!")
+    click.echo("Info: Parquet file will be written to {}".format(outfile))
+    export_to_parquet(os.path.abspath(infile), os.path.abspath(outfile), transitionLevel, onlyFeatures, separate_runs, chunksize, threads)
 
 # Export Compound TSV
 @cli.command()
