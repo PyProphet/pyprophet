@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
+import pyarrow.dataset as ds
 import sqlite3
 import click
 from .data_handling import check_sqlite_table, to_valid_filename
@@ -592,12 +593,15 @@ def export_to_parquet(infile, outfile, transitionLevel, onlyFeatures=False, sepa
             _ = pool.starmap( osw_to_parquet_writer, zip([infile] * threads, [columnsToSelect] * threads, list(chunks(precursor_id_batches, threads)), [[id] for id in run_ids.tolist() * threads], tmp_outfiles, [onlyFeatures] * threads, [osw_data_reader] * threads, pbar_positions) )
             pool.close()
             pool.join()
-            df = pd.concat(map(pd.read_parquet, tmp_outfiles))
+
+            ### Combine temporary parquets in memory efficient way
+            dataset = ds.dataset(tmp_outfiles)
+            writer = pq.ParquetWriter(outfile, dataset.schema)
+            for batch in dataset.to_batches():
+                writer.write_batch(batch)
+
             # Remove tmp parquets
             _ = list(map(os.remove, tmp_outfiles))
-            table = pa.Table.from_pandas(df)
-            # Write out to parquet file with bitmasks
-            pq.write_table(table, outfile)
  
 
     con.close()
