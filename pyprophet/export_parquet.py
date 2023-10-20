@@ -47,6 +47,25 @@ def chunks(l, n):
     for i in range(0, n):
         yield l[i::n]
 
+### Combine temporary outfiles into a single paruqet file. Read in batches in order not to overwhelm memory 
+def combineTmpOutfiles(tmp_outfiles, outfile):
+    """
+    Comine Temporary parquet files into a single parquet file
+    tmp_outfiles = list of temporary outfile paths
+    outfile = path of the combined parquet file to be created 
+    """
+
+    ### Combine temporary parquets in memory efficient way
+    dataset = ds.dataset(tmp_outfiles)
+    writer = pq.ParquetWriter(outfile, dataset.schema)
+    for batch in dataset.to_batches():
+        writer.write_batch(batch)
+
+    # Remove tmp parquets
+    _ = list(map(os.remove, tmp_outfiles))
+
+
+
 # See: https://stackoverflow.com/questions/47113813/using-pyarrow-how-do-you-append-to-parquet-file
 def append_to_parquet_table(dataframe, filepath=None, writer=None):
     """Method writes/append dataframes in parquet format.
@@ -574,12 +593,9 @@ def export_to_parquet(infile, outfile, transitionLevel, onlyFeatures=False, sepa
                 end+=todo
             pool.close()
             pool.join()
-            df = pd.concat(map(pd.read_parquet, tmp_outfiles))
-            # Remove tmp parquets
-            _ = list(map(os.remove, tmp_outfiles))
-            table = pa.Table.from_pandas(df)
-            # Write out to parquet file with bitmasks
-            pq.write_table(table, outfile)
+
+            combineTmpOutfiles(tmp_outfiles, outfile)
+
         elif threads > 1 and len(run_ids) == 1 and isinstance(outfile, str): # Parallel process single file, parallelize on precursor id batches
             # Close connection to database, since each thread will establish it's own connection
             con.close()
@@ -594,15 +610,7 @@ def export_to_parquet(infile, outfile, transitionLevel, onlyFeatures=False, sepa
             pool.close()
             pool.join()
 
-            ### Combine temporary parquets in memory efficient way
-            dataset = ds.dataset(tmp_outfiles)
-            writer = pq.ParquetWriter(outfile, dataset.schema)
-            for batch in dataset.to_batches():
-                writer.write_batch(batch)
-
-            # Remove tmp parquets
-            _ = list(map(os.remove, tmp_outfiles))
- 
+            combineTmpOutfiles(tmp_outfiles, outfile)
 
     con.close()
     
