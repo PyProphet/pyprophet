@@ -82,61 +82,74 @@ def get_ids_stmt(keep_ids):
     return ids_stmt 
 
 
-def filter_sqmass(sqmassfiles, infile, max_precursor_pep, max_peakgroup_pep, max_transition_pep):
-    con = sqlite3.connect(infile)
+def filter_sqmass(sqmassfiles, infile=None, max_precursor_pep=0.7, max_peakgroup_pep=0.7, max_transition_pep=0.7, keep_naked_peptides=[]):
+    if infile is not None:
+        con = sqlite3.connect(infile)
 
     # process each sqmassfile independently
     for sqm_in in sqmassfiles:
         sqm_out = sqm_in.split(".sqMass")[0] + "_filtered.sqMass"
 
-        if check_sqlite_table(con, 'SCORE_MS1') and check_sqlite_table(con, 'SCORE_MS2') and check_sqlite_table(con, 'SCORE_TRANSITION'):
-            transitions = pd.read_sql_query('''
-SELECT TRANSITION_ID AS transition_id
-FROM PRECURSOR
-INNER JOIN FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID
-INNER JOIN SCORE_MS1 ON FEATURE.ID = SCORE_MS1.FEATURE_ID
-INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
-INNER JOIN SCORE_TRANSITION ON FEATURE.ID = SCORE_TRANSITION.FEATURE_ID
-INNER JOIN RUN ON FEATURE.RUN_ID = RUN.ID
-WHERE SCORE_MS1.PEP <= {0}
-  AND SCORE_MS2.PEP <= {1}
-  AND SCORE_TRANSITION.PEP <= {2}
-  AND FILENAME LIKE '%{3}%';
-'''.format(max_precursor_pep, max_peakgroup_pep, max_transition_pep, sqm_in.split(".sqMass")[0]), con)['transition_id'].values
+        if infile is not None:
+            if check_sqlite_table(con, 'SCORE_MS1') and check_sqlite_table(con, 'SCORE_MS2') and check_sqlite_table(con, 'SCORE_TRANSITION'):
+                transitions = pd.read_sql_query('''
+    SELECT TRANSITION_ID AS transition_id
+    FROM PRECURSOR
+    INNER JOIN FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID
+    INNER JOIN SCORE_MS1 ON FEATURE.ID = SCORE_MS1.FEATURE_ID
+    INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
+    INNER JOIN SCORE_TRANSITION ON FEATURE.ID = SCORE_TRANSITION.FEATURE_ID
+    INNER JOIN RUN ON FEATURE.RUN_ID = RUN.ID
+    WHERE SCORE_MS1.PEP <= {0}
+    AND SCORE_MS2.PEP <= {1}
+    AND SCORE_TRANSITION.PEP <= {2}
+    AND FILENAME LIKE '%{3}%';
+    '''.format(max_precursor_pep, max_peakgroup_pep, max_transition_pep, sqm_in.split(".sqMass")[0]), con)['transition_id'].values
 
-        elif check_sqlite_table(con, 'SCORE_MS1') and check_sqlite_table(con, 'SCORE_MS2') and not check_sqlite_table(con, 'SCORE_TRANSITION'):
-            transitions = pd.read_sql_query('''
-SELECT TRANSITION_ID AS transition_id
-FROM PRECURSOR
-INNER JOIN FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID
-INNER JOIN SCORE_MS1 ON FEATURE.ID = SCORE_MS1.FEATURE_ID
-INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
-INNER JOIN FEATURE_TRANSITION ON FEATURE.ID = FEATURE_TRANSITION.FEATURE_ID
-INNER JOIN RUN ON FEATURE.RUN_ID = RUN.ID
-WHERE SCORE_MS1.PEP <= {0}
-  AND SCORE_MS2.PEP <= {1}
-  AND FILENAME LIKE '%{2}%';
-'''.format(max_precursor_pep, max_peakgroup_pep, sqm_in.split(".sqMass")[0]), con)['transition_id'].values
+            elif check_sqlite_table(con, 'SCORE_MS1') and check_sqlite_table(con, 'SCORE_MS2') and not check_sqlite_table(con, 'SCORE_TRANSITION'):
+                transitions = pd.read_sql_query('''
+    SELECT TRANSITION_ID AS transition_id
+    FROM PRECURSOR
+    INNER JOIN FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID
+    INNER JOIN SCORE_MS1 ON FEATURE.ID = SCORE_MS1.FEATURE_ID
+    INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
+    INNER JOIN FEATURE_TRANSITION ON FEATURE.ID = FEATURE_TRANSITION.FEATURE_ID
+    INNER JOIN RUN ON FEATURE.RUN_ID = RUN.ID
+    WHERE SCORE_MS1.PEP <= {0}
+    AND SCORE_MS2.PEP <= {1}
+    AND FILENAME LIKE '%{2}%';
+    '''.format(max_precursor_pep, max_peakgroup_pep, sqm_in.split(".sqMass")[0]), con)['transition_id'].values
 
-        elif not check_sqlite_table(con, 'SCORE_MS1') and check_sqlite_table(con, 'SCORE_MS2') and not check_sqlite_table(con, 'SCORE_TRANSITION'):
-            transitions = pd.read_sql_query('''
-SELECT TRANSITION_ID AS transition_id
-FROM PRECURSOR
-INNER JOIN FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID
-INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
-INNER JOIN FEATURE_TRANSITION ON FEATURE.ID = FEATURE_TRANSITION.FEATURE_ID
-INNER JOIN RUN ON FEATURE.RUN_ID = RUN.ID
-WHERE SCORE_MS2.PEP <= {0}
-  AND FILENAME LIKE '%{1}%';
-}
-'''.format(max_peakgroup_pep, sqm_in.split(".sqMass")[0]), con)['transition_id'].values
+            elif not check_sqlite_table(con, 'SCORE_MS1') and check_sqlite_table(con, 'SCORE_MS2') and not check_sqlite_table(con, 'SCORE_TRANSITION'):
+                transitions = pd.read_sql_query('''
+    SELECT TRANSITION_ID AS transition_id
+    FROM PRECURSOR
+    INNER JOIN FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID
+    INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
+    INNER JOIN FEATURE_TRANSITION ON FEATURE.ID = FEATURE_TRANSITION.FEATURE_ID
+    INNER JOIN RUN ON FEATURE.RUN_ID = RUN.ID
+    WHERE SCORE_MS2.PEP <= {0}
+    AND FILENAME LIKE '%{1}%';
+    }
+    '''.format(max_peakgroup_pep, sqm_in.split(".sqMass")[0]), con)['transition_id'].values
+                
+            else:
+                raise click.ClickException("Conduct scoring on MS1, MS2 and/or transition-level before filtering.")
             
+        elif len(keep_naked_peptides) != 0:
+            con = sqlite3.connect(sqm_in)
+            transitions = pd.read_sql_query(f'''
+    SELECT NATIVE_ID
+    FROM CHROMATOGRAM
+    INNER JOIN PRECURSOR ON PRECURSOR.CHROMATOGRAM_ID = CHROMATOGRAM.ID
+    WHERE PRECURSOR.PEPTIDE_SEQUENCE IN ('{"','".join(keep_naked_peptides)}')''', con)['NATIVE_ID'].values
+            con.close()
         else:
-            raise click.ClickException("Conduct scoring on MS1, MS2 and/or transition-level before filtering.")
+            raise click.ClickException("Please provide either an associated OSW file to filter based on scoring or a list of peptides to keep.")
 
         filter_chrom_by_labels(sqm_in, sqm_out, transitions)
 
-def filter_osw(oswfiles, remove_decoys=True, omit_tables=[], max_gene_fdr=None, max_protein_fdr=None, max_peptide_fdr=None, max_ms2_fdr=None):
+def filter_osw(oswfiles, remove_decoys=True, omit_tables=[], max_gene_fdr=None, max_protein_fdr=None, max_peptide_fdr=None, max_ms2_fdr=None, keep_naked_peptides=[]):
 
     # process each oswfile independently
     for osw_in in oswfiles:
@@ -154,34 +167,77 @@ def filter_osw(oswfiles, remove_decoys=True, omit_tables=[], max_gene_fdr=None, 
         else:
             decoy_query = ""
 
+        # Generate gene, protein, peptide, precursor and transition id table for specific filters
+        # keep_peptides is a list of strings of peptide sequences to keep
+        if len(keep_naked_peptides) != 0:
+
+            keep_peptides_ids = np.unique(list(c.execute(f"""SELECT ID FROM PEPTIDE WHERE UNMODIFIED_SEQUENCE IN ('{"','".join(keep_naked_peptides)}')""")))
+            assert (len(keep_peptides_ids) >0), "There seems to be no peptides in the UNMODIFIED_SEQUENCE column in the PEPTIDE table matching the peptides in the keep_naked_peptides list... {keep_naked_peptides}"
+            keep_peptide_ids_stmt = get_ids_stmt(keep_peptides_ids)
+
+            keep_precursor_ids = np.unique(list(c.execute(f"SELECT PRECURSOR_ID FROM PRECURSOR_PEPTIDE_MAPPING WHERE PEPTIDE_ID IN {keep_peptide_ids_stmt}")))
+            keep_precursor_ids_stmt = get_ids_stmt(keep_precursor_ids)
+
+            keep_transition_ids = np.unique(list(c.execute(f"SELECT TRANSITION_ID FROM TRANSITION_PRECURSOR_MAPPING WHERE PRECURSOR_ID IN {keep_precursor_ids_stmt}")))
+
+            if check_sqlite_table(conn, 'TRANSITION_PEPTIDE_MAPPING'):
+                keep_transition_pep_ids = np.unique(list(c.execute(f"SELECT TRANSITION_ID FROM TRANSITION_PEPTIDE_MAPPING WHERE PEPTIDE_ID IN {keep_peptide_ids_stmt}")))
+                keep_transition_ids = np.hstack((keep_transition_ids, keep_transition_pep_ids))
+
+            keep_protein_ids = np.unique(list(c.execute(f"SELECT PROTEIN_ID FROM PEPTIDE_PROTEIN_MAPPING WHERE PEPTIDE_ID IN {keep_peptide_ids_stmt}")))
+
+            if check_sqlite_table(conn, 'GENE'):
+                keep_gene_ids = np.unique(list(c.execute(f"SELECT GENE_ID FROM PEPTIDE_GENE_MAPPING WHERE PEPTIDE_ID IN {keep_peptide_ids_stmt}")))
+        else:
+            keep_peptides_ids = None
+            keep_precursor_ids = None
+            keep_transition_ids = None
+            keep_protein_ids = None
+            if check_sqlite_table(conn, 'GENE'):
+                keep_gene_ids = None
+            
+
         # Table(s) - GENE and SCORE_GENE
         if max_gene_fdr is not None and check_sqlite_table(conn, 'SCORE_GENE'):
             gene_ids = np.unique(list(c.execute(f"SELECT GENE_ID FROM SCORE_GENE INNER JOIN GENE ON GENE.ID = SCORE_GENE.GENE_ID WHERE QVALUE <= {max_gene_fdr} {decoy_query}")))
+            # Further reduce gene_ids only if gene_ids is also in keep_gene_ids
+            if keep_gene_ids is not None:
+                gene_ids = np.intersect1d(gene_ids, keep_gene_ids)
             click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Filtering for {len(gene_ids)} gene ids with gene score q-value <= {max_gene_fdr} with decoy removal = {remove_decoys}...")
             # Copy filtered tables
             copy_table(c, conn, gene_ids, "GENE", "ID", omit_tables)
             copy_table(c, conn, gene_ids, "SCORE_GENE", "GENE_ID", omit_tables)
         else:
-            # Copy original full tables
-            gene_ids = np.unique(list(c.execute(f"SELECT ID FROM GENE WHERE ID IS NOT NULL {decoy_query}")))            
-            if len(gene_ids)!=0:
-                copy_table(c, conn, gene_ids, "GENE", "ID", omit_tables)
-            elif check_sqlite_table(conn, 'GENE'):
-                c.execute('CREATE TABLE other.GENE as SELECT * FROM GENE')
-                conn.commit()
+            if check_sqlite_table(conn, 'GENE'):
+                # Copy original full tables
+                gene_ids = np.unique(list(c.execute(f"SELECT ID FROM GENE WHERE ID IS NOT NULL {decoy_query}")))  
+                # Further reduce gene_ids only if gene_ids is also in keep_gene_ids
+                if keep_gene_ids is not None:
+                    gene_ids = np.intersect1d(gene_ids, keep_gene_ids)          
+                if len(gene_ids)!=0:
+                    copy_table(c, conn, gene_ids, "GENE", "ID", omit_tables)
+                elif check_sqlite_table(conn, 'GENE'):
+                    c.execute('CREATE TABLE other.GENE as SELECT * FROM GENE')
+                    conn.commit()
             if check_sqlite_table(conn, 'SCORE_GENE'):
                 copy_table(c, conn, gene_ids, "SCORE_GENE", "GENE_ID", omit_tables)
 
         # Table(s) - PROTEIN and SCORE_PROTEIN
         if max_protein_fdr is not None and check_sqlite_table(conn, 'SCORE_PROTEIN'):
             protein_ids = np.unique(list(c.execute(f"SELECT PROTEIN_ID FROM SCORE_PROTEIN INNER JOIN PROTEIN ON PROTEIN.ID = SCORE_PROTEIN.PROTEIN_ID WHERE QVALUE <= {max_protein_fdr} {decoy_query}")))
+            # Further reduce protein_ids only if protein_ids is also in keep_protein_ids
+            if keep_protein_ids is not None:
+                protein_ids = np.intersect1d(protein_ids, keep_protein_ids)
             click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Filtering for {len(protein_ids)} protein ids with protein score q-value <= {max_protein_fdr} with decoy removal = {remove_decoys}...")
             # Copy filtered tables
             copy_table(c, conn, protein_ids, "PROTEIN", "ID", omit_tables)
             copy_table(c, conn, protein_ids, "SCORE_PROTEIN", "PROTEIN_ID", omit_tables)
         else:
             # Copy original full tables
-            protein_ids = np.unique(list(c.execute(f"SELECT ID FROM PROTEIN WHERE ID IS NOT NULL {decoy_query}")))            
+            protein_ids = np.unique(list(c.execute(f"SELECT ID FROM PROTEIN WHERE ID IS NOT NULL {decoy_query}")))          
+            # Further reduce protein_ids only if protein_ids is also in keep_protein_ids
+            if keep_protein_ids is not None:
+                protein_ids = np.intersect1d(protein_ids, keep_protein_ids)
             copy_table(c, conn, protein_ids, "PROTEIN", "ID", omit_tables)
             if check_sqlite_table(conn, 'SCORE_PROTEIN'):
                 copy_table(c, conn, protein_ids, "SCORE_PROTEIN", "PROTEIN_ID", omit_tables)
@@ -189,6 +245,9 @@ def filter_osw(oswfiles, remove_decoys=True, omit_tables=[], max_gene_fdr=None, 
         # Table(s) - PEPTIDE, SCORE_PEPTIDE and PEPTIDE_XXXX_MAPPING
         if max_peptide_fdr is not None and check_sqlite_table(conn, 'SCORE_PEPTIDE'):
             peptide_ids = np.unique(list(c.execute(f"SELECT PEPTIDE_ID FROM SCORE_PEPTIDE INNER JOIN PEPTIDE ON PEPTIDE.ID = SCORE_PEPTIDE.PEPTIDE_ID WHERE QVALUE <= {max_peptide_fdr} {decoy_query}")))
+            # Further reduce peptide_ids only if peptide_ids is also in keep_peptides_ids
+            if keep_peptides_ids is not None:
+                peptide_ids = np.intersect1d(peptide_ids, keep_peptides_ids)
             click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Filtering for {len(peptide_ids)} peptide ids with peptide score q-value <= {max_peptide_fdr} with decoy removal = {remove_decoys}...")
             # Copy filtered tables
             copy_table(c, conn, peptide_ids, "PEPTIDE", "ID", omit_tables)
@@ -199,10 +258,15 @@ def filter_osw(oswfiles, remove_decoys=True, omit_tables=[], max_gene_fdr=None, 
         else:
             # Copy original full tables
             peptide_ids = np.unique(list(c.execute(f"SELECT ID FROM PEPTIDE WHERE ID IS NOT NULL {decoy_query}")))
+            # Further reduce peptide_ids only if peptide_ids is also in keep_peptides_ids
+            if keep_peptides_ids is not None:
+                peptide_ids = np.intersect1d(peptide_ids, keep_peptides_ids)
             copy_table(c, conn, peptide_ids, "PEPTIDE", "ID", omit_tables)
             copy_table(c, conn, peptide_ids, "PRECURSOR_PEPTIDE_MAPPING", "PEPTIDE_ID", omit_tables)
             copy_table(c, conn, peptide_ids, "PEPTIDE_PROTEIN_MAPPING", "PEPTIDE_ID", omit_tables)
-            copy_table(c, conn, peptide_ids, "PEPTIDE_GENE_MAPPING", "PEPTIDE_ID", omit_tables)
+            if check_sqlite_table(conn, 'PEPTIDE_GENE_MAPPING'):
+                copy_table(c, conn, peptide_ids, "PEPTIDE_GENE_MAPPING", "PEPTIDE_ID", omit_tables)
+
             if check_sqlite_table(conn, 'SCORE_PEPTIDE'):
                 copy_table(c, conn, peptide_ids, "SCORE_PEPTIDE", "PEPTIDE_ID", omit_tables)
         
@@ -211,6 +275,11 @@ def filter_osw(oswfiles, remove_decoys=True, omit_tables=[], max_gene_fdr=None, 
             feature_precursor_ids = np.array(list(c.execute(f"SELECT FEATURE_ID, PRECURSOR_ID FROM SCORE_MS2 INNER JOIN (SELECT FEATURE.ID, PRECURSOR_ID FROM FEATURE INNER JOIN PRECURSOR ON FEATURE.PRECURSOR_ID = PRECURSOR.ID WHERE PRECURSOR.ID IS NOT NULL {decoy_query}) AS FEATURE ON FEATURE.ID = SCORE_MS2.FEATURE_ID WHERE QVALUE <= {max_peptide_fdr}")))
             feature_ids = np.unique(feature_precursor_ids[:,0])
             precursor_ids = np.unique(feature_precursor_ids[:,1])
+            # Further reduce precursor_ids only if precursor_ids is also in keep_precursor_ids
+            if keep_precursor_ids is not None:
+                precursor_ids = np.intersect1d(precursor_ids, keep_precursor_ids)
+                # further reduce feature_ids
+                feature_ids = np.unique(list(c.execute(f"SELECT ID FROM FEATURE WHERE PRECURSOR_ID IN {get_ids_stmt(precursor_ids)}")))
             click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Filtering for {len(feature_ids)} feature ids across {len(precursor_ids)} unique precursor ids with ms2 score q-value <= {max_ms2_fdr} with decoy removal = {remove_decoys}...")
             # Copy filtered tables
             copy_table(c, conn, feature_ids, "FEATURE", "ID", omit_tables)
@@ -226,6 +295,11 @@ def filter_osw(oswfiles, remove_decoys=True, omit_tables=[], max_gene_fdr=None, 
             feature_precursor_ids = np.array(list(c.execute(f"SELECT ID, PRECURSOR_ID FROM (SELECT FEATURE.ID, PRECURSOR_ID FROM FEATURE INNER JOIN PRECURSOR ON FEATURE.PRECURSOR_ID = PRECURSOR.ID WHERE PRECURSOR.ID IS NOT NULL {decoy_query}) AS FEATURE")))
             feature_ids = np.unique(feature_precursor_ids[:,0])
             precursor_ids = np.unique(feature_precursor_ids[:,1])
+            # Further reduce precursor_ids only if precursor_ids is also in keep_precursor_ids
+            if keep_precursor_ids is not None:
+                precursor_ids = np.intersect1d(precursor_ids, keep_precursor_ids)
+                # further reduce feature_ids
+                feature_ids = np.unique(list(c.execute(f"SELECT ID FROM FEATURE WHERE PRECURSOR_ID IN {get_ids_stmt(precursor_ids)}")))
             # Copy original full tables
             copy_table(c, conn, feature_ids, "FEATURE", "ID", omit_tables)
             if check_sqlite_table(conn, 'FEATURE_MS1'):
@@ -239,6 +313,9 @@ def filter_osw(oswfiles, remove_decoys=True, omit_tables=[], max_gene_fdr=None, 
         
         # Table(s) - TRANSITION, TRANSITION_PRECURSOR_MAPPING, TRANSITION_PEPTIDE_MAPPING
         transition_ids = np.unique(list(c.execute(f"SELECT ID FROM TRANSITION LEFT JOIN (SELECT * FROM TRANSITION_PRECURSOR_MAPPING WHERE PRECURSOR_ID IN {tuple(precursor_ids)}) AS TRANSITION_PRECURSOR_MAPPING ON TRANSITION.ID = TRANSITION_PRECURSOR_MAPPING.TRANSITION_ID LEFT JOIN (SELECT * FROM TRANSITION_PEPTIDE_MAPPING WHERE PEPTIDE_ID IN {tuple(peptide_ids)}) AS TRANSITION_PEPTIDE_MAPPING ON TRANSITION.ID = TRANSITION_PEPTIDE_MAPPING.TRANSITION_ID")))
+        # Further reduce transition_ids only if transition_ids is also in keep_transition_ids
+        if keep_transition_ids is not None:
+            transition_ids = np.intersect1d(transition_ids, keep_transition_ids)
         # Ensure there are ids to filter for
         assert (len(transition_ids) >0), "There seems to be no transition ids to retain after filtering..."
         click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Filtering for  {len(transition_ids)} transition ids for {len(peptide_ids)} peptides ids and {len(precursor_ids)} precursor ids...")
@@ -251,7 +328,8 @@ def filter_osw(oswfiles, remove_decoys=True, omit_tables=[], max_gene_fdr=None, 
 
         # Table(s) - RUN, VERSION
         c.execute('CREATE TABLE other.RUN as SELECT * FROM RUN')
-        c.execute('CREATE TABLE other.VERSION as SELECT * FROM VERSION')
+        if check_sqlite_table(conn, 'VERSION'):
+            c.execute('CREATE TABLE other.VERSION as SELECT * FROM VERSION')
         conn.commit()
 
         # Create Indexes
