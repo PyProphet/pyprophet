@@ -251,10 +251,13 @@ def filter_osw(oswfiles, remove_decoys=True, omit_tables=[], max_gene_fdr=None, 
             click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Filtering for {len(peptide_ids)} peptide ids with peptide score q-value <= {max_peptide_fdr} with decoy removal = {remove_decoys}...")
             # Copy filtered tables
             copy_table(c, conn, peptide_ids, "PEPTIDE", "ID", omit_tables)
+            if check_sqlite_table(conn, 'SCORE_IPF'):
+                copy_table(c, conn, peptide_ids, "SCORE_IPF", "PEPTIDE_ID", omit_tables)
             copy_table(c, conn, peptide_ids, "SCORE_PEPTIDE", "PEPTIDE_ID", omit_tables)
             copy_table(c, conn, peptide_ids, "PRECURSOR_PEPTIDE_MAPPING", "PEPTIDE_ID", omit_tables)
             copy_table(c, conn, peptide_ids, "PEPTIDE_PROTEIN_MAPPING", "PEPTIDE_ID", omit_tables)
-            copy_table(c, conn, peptide_ids, "PEPTIDE_GENE_MAPPING", "PEPTIDE_ID", omit_tables)
+            if check_sqlite_table(conn, 'PEPTIDE_GENE_MAPPING'):
+                copy_table(c, conn, peptide_ids, "PEPTIDE_GENE_MAPPING", "PEPTIDE_ID", omit_tables)
         else:
             # Copy original full tables
             peptide_ids = np.unique(list(c.execute(f"SELECT ID FROM PEPTIDE WHERE ID IS NOT NULL {decoy_query}")))
@@ -266,7 +269,8 @@ def filter_osw(oswfiles, remove_decoys=True, omit_tables=[], max_gene_fdr=None, 
             copy_table(c, conn, peptide_ids, "PEPTIDE_PROTEIN_MAPPING", "PEPTIDE_ID", omit_tables)
             if check_sqlite_table(conn, 'PEPTIDE_GENE_MAPPING'):
                 copy_table(c, conn, peptide_ids, "PEPTIDE_GENE_MAPPING", "PEPTIDE_ID", omit_tables)
-
+            if check_sqlite_table(conn, 'SCORE_IPF'):
+                copy_table(c, conn, peptide_ids, "SCORE_IPF", "PEPTIDE_ID", omit_tables)
             if check_sqlite_table(conn, 'SCORE_PEPTIDE'):
                 copy_table(c, conn, peptide_ids, "SCORE_PEPTIDE", "PEPTIDE_ID", omit_tables)
         
