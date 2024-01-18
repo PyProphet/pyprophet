@@ -14,7 +14,6 @@ def filter_chrom_by_labels(infile, outfile, labels):
 
     labels = [ "'" + str(l) + "'" for l in labels]
     labels_stmt = get_ids_stmt(labels)
-
     stmt = "SELECT ID FROM CHROMATOGRAM WHERE NATIVE_ID IN %s" % labels_stmt
     keep_ids = [i[0] for i in list(c.execute(stmt))]
     click.echo("Keep %s chromatograms" % len(keep_ids) )
@@ -88,6 +87,7 @@ def filter_sqmass(sqmassfiles, infile=None, max_precursor_pep=0.7, max_peakgroup
 
     # process each sqmassfile independently
     for sqm_in in sqmassfiles:
+        click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Begin filtering {sqm_in}...")
         sqm_out = sqm_in.split(".sqMass")[0] + "_filtered.sqMass"
 
         if infile is not None:
@@ -121,6 +121,7 @@ def filter_sqmass(sqmassfiles, infile=None, max_precursor_pep=0.7, max_peakgroup
     '''.format(max_precursor_pep, max_peakgroup_pep, sqm_in.split(".sqMass")[0]), con)['transition_id'].values
 
             elif not check_sqlite_table(con, 'SCORE_MS1') and check_sqlite_table(con, 'SCORE_MS2') and not check_sqlite_table(con, 'SCORE_TRANSITION'):
+                click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Filtering for MS2 PEP <= {max_peakgroup_pep} for {sqm_in.split('.sqMass')[0]}...")
                 transitions = pd.read_sql_query('''
     SELECT TRANSITION_ID AS transition_id
     FROM PRECURSOR
@@ -130,9 +131,7 @@ def filter_sqmass(sqmassfiles, infile=None, max_precursor_pep=0.7, max_peakgroup
     INNER JOIN RUN ON FEATURE.RUN_ID = RUN.ID
     WHERE SCORE_MS2.PEP <= {0}
     AND FILENAME LIKE '%{1}%';
-    }
     '''.format(max_peakgroup_pep, sqm_in.split(".sqMass")[0]), con)['transition_id'].values
-                
             else:
                 raise click.ClickException("Conduct scoring on MS1, MS2 and/or transition-level before filtering.")
             
@@ -151,6 +150,16 @@ def filter_sqmass(sqmassfiles, infile=None, max_precursor_pep=0.7, max_peakgroup
 
 def filter_osw(oswfiles, remove_decoys=True, omit_tables=[], max_gene_fdr=None, max_protein_fdr=None, max_peptide_fdr=None, max_ms2_fdr=None, keep_naked_peptides=[]):
 
+    print("Filtering OSW files...")
+    print("Parameters:")
+    print("  - remove_decoys: %s" % remove_decoys)
+    print("  - omit_tables: %s" % omit_tables)
+    print("  - max_gene_fdr: %s" % max_gene_fdr)
+    print("  - max_protein_fdr: %s" % max_protein_fdr)
+    print("  - max_peptide_fdr: %s" % max_peptide_fdr)
+    print("  - max_ms2_fdr: %s" % max_ms2_fdr)
+    print("  - keep_naked_peptides: %s" % keep_naked_peptides)
+        
     # process each oswfile independently
     for osw_in in oswfiles:
         osw_out = osw_in.split(".osw")[0] + "_filtered.osw"
@@ -276,7 +285,7 @@ def filter_osw(oswfiles, remove_decoys=True, omit_tables=[], max_gene_fdr=None, 
         
         # Table(s) - SCORE_MS2, FEATURE, FEATURE_MS1,  FEATURE_MS2, FEATURE_TRANSITION, PRECURSOR
         if max_ms2_fdr is not None and check_sqlite_table(conn, 'SCORE_MS2'):
-            feature_precursor_ids = np.array(list(c.execute(f"SELECT FEATURE_ID, PRECURSOR_ID FROM SCORE_MS2 INNER JOIN (SELECT FEATURE.ID, PRECURSOR_ID FROM FEATURE INNER JOIN PRECURSOR ON FEATURE.PRECURSOR_ID = PRECURSOR.ID WHERE PRECURSOR.ID IS NOT NULL {decoy_query}) AS FEATURE ON FEATURE.ID = SCORE_MS2.FEATURE_ID WHERE QVALUE <= {max_peptide_fdr}")))
+            feature_precursor_ids = np.array(list(c.execute(f"SELECT FEATURE_ID, PRECURSOR_ID FROM SCORE_MS2 INNER JOIN (SELECT FEATURE.ID, PRECURSOR_ID FROM FEATURE INNER JOIN PRECURSOR ON FEATURE.PRECURSOR_ID = PRECURSOR.ID WHERE PRECURSOR.ID IS NOT NULL {decoy_query}) AS FEATURE ON FEATURE.ID = SCORE_MS2.FEATURE_ID WHERE QVALUE <= {max_ms2_fdr}")))
             feature_ids = np.unique(feature_precursor_ids[:,0])
             precursor_ids = np.unique(feature_precursor_ids[:,1])
             # Further reduce precursor_ids only if precursor_ids is also in keep_precursor_ids
