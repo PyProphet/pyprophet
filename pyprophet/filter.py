@@ -9,6 +9,9 @@ from .data_handling import check_sqlite_table
 
 # Filter a sqMass chromatogram file by given input labels
 def filter_chrom_by_labels(infile, outfile, labels):
+    if len(labels) == 0:
+        raise click.ClickException("No transition ids to filter chromatograms, try adjust the filtering criteria.")
+    
     conn = sqlite3.connect(infile)
     c = conn.cursor()
 
@@ -81,9 +84,14 @@ def get_ids_stmt(keep_ids):
     return ids_stmt 
 
 
-def filter_sqmass(sqmassfiles, infile=None, max_precursor_pep=0.7, max_peakgroup_pep=0.7, max_transition_pep=0.7, keep_naked_peptides=[]):
+def filter_sqmass(sqmassfiles, infile=None, max_precursor_pep=0.7, max_peakgroup_pep=0.7, max_transition_pep=0.7, keep_naked_peptides=[], remove_decoys=True):
     if infile is not None:
         con = sqlite3.connect(infile)
+        
+    if remove_decoys:
+        decoy_query = " AND DECOY=0"
+    else:
+        decoy_query = ""
 
     # process each sqmassfile independently
     for sqm_in in sqmassfiles:
@@ -103,8 +111,9 @@ def filter_sqmass(sqmassfiles, infile=None, max_precursor_pep=0.7, max_peakgroup
     WHERE SCORE_MS1.PEP <= {0}
     AND SCORE_MS2.PEP <= {1}
     AND SCORE_TRANSITION.PEP <= {2}
-    AND FILENAME LIKE '%{3}%';
-    '''.format(max_precursor_pep, max_peakgroup_pep, max_transition_pep, sqm_in.split(".sqMass")[0]), con)['transition_id'].values
+    AND FILENAME LIKE '%{3}%'
+    {4};
+    '''.format(max_precursor_pep, max_peakgroup_pep, max_transition_pep, sqm_in.split(".sqMass")[0], decoy_query), con)['transition_id'].values
 
             elif check_sqlite_table(con, 'SCORE_MS1') and check_sqlite_table(con, 'SCORE_MS2') and not check_sqlite_table(con, 'SCORE_TRANSITION'):
                 transitions = pd.read_sql_query('''
@@ -117,11 +126,11 @@ def filter_sqmass(sqmassfiles, infile=None, max_precursor_pep=0.7, max_peakgroup
     INNER JOIN RUN ON FEATURE.RUN_ID = RUN.ID
     WHERE SCORE_MS1.PEP <= {0}
     AND SCORE_MS2.PEP <= {1}
-    AND FILENAME LIKE '%{2}%';
-    '''.format(max_precursor_pep, max_peakgroup_pep, sqm_in.split(".sqMass")[0]), con)['transition_id'].values
+    AND FILENAME LIKE '%{2}%'
+    {3};
+    '''.format(max_precursor_pep, max_peakgroup_pep, sqm_in.split(".sqMass")[0], decoy_query), con)['transition_id'].values
 
             elif not check_sqlite_table(con, 'SCORE_MS1') and check_sqlite_table(con, 'SCORE_MS2') and not check_sqlite_table(con, 'SCORE_TRANSITION'):
-                click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Filtering for MS2 PEP <= {max_peakgroup_pep} for {sqm_in.split('.sqMass')[0]}...")
                 transitions = pd.read_sql_query('''
     SELECT TRANSITION_ID AS transition_id
     FROM PRECURSOR
@@ -130,8 +139,9 @@ def filter_sqmass(sqmassfiles, infile=None, max_precursor_pep=0.7, max_peakgroup
     INNER JOIN FEATURE_TRANSITION ON FEATURE.ID = FEATURE_TRANSITION.FEATURE_ID
     INNER JOIN RUN ON FEATURE.RUN_ID = RUN.ID
     WHERE SCORE_MS2.PEP <= {0}
-    AND FILENAME LIKE '%{1}%';
-    '''.format(max_peakgroup_pep, sqm_in.split(".sqMass")[0]), con)['transition_id'].values
+    AND FILENAME LIKE '%{1}%'
+    {2};
+    '''.format(max_peakgroup_pep, sqm_in.split(".sqMass")[0], decoy_query), con)['transition_id'].values
             else:
                 raise click.ClickException("Conduct scoring on MS1, MS2 and/or transition-level before filtering.")
             
@@ -141,7 +151,7 @@ def filter_sqmass(sqmassfiles, infile=None, max_precursor_pep=0.7, max_peakgroup
     SELECT NATIVE_ID
     FROM CHROMATOGRAM
     INNER JOIN PRECURSOR ON PRECURSOR.CHROMATOGRAM_ID = CHROMATOGRAM.ID
-    WHERE PRECURSOR.PEPTIDE_SEQUENCE IN ('{"','".join(keep_naked_peptides)}')''', con)['NATIVE_ID'].values
+    WHERE PRECURSOR.PEPTIDE_SEQUENCE IN ('{"','".join(keep_naked_peptides)}') ''', con)['NATIVE_ID'].values
             con.close()
         else:
             raise click.ClickException("Please provide either an associated OSW file to filter based on scoring or a list of peptides to keep.")
