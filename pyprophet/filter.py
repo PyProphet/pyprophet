@@ -30,10 +30,17 @@ def filter_chrom_by_labels(infile, outfile, labels):
     copy_database(c, conn, outfile, keep_ids)
 
 
-def copy_table(c, conn, keep_ids, tbl, id_col, omit_tables=[]):
+def copy_table(c, conn, keep_ids, tbl, id_col, omit_tables=[], extra_id_col=None, extra_keep_ids=None):
     if tbl not in omit_tables:
         stmt = "CREATE TABLE other.%s AS SELECT * FROM %s WHERE %s IN " % (tbl, tbl, id_col)
-        stmt += get_ids_stmt(keep_ids) + ";"
+        stmt += get_ids_stmt(keep_ids) 
+        if extra_id_col is not None and extra_keep_ids is not None:
+            stmt += " AND %s IN " % extra_id_col
+            stmt += get_ids_stmt(extra_keep_ids)
+            if extra_id_col == "RUN_ID":
+                stmt += " OR %s IS NULL" % extra_id_col
+        stmt += ";"
+        
         c.execute(stmt)
         conn.commit()
 
@@ -158,7 +165,7 @@ def filter_sqmass(sqmassfiles, infile=None, max_precursor_pep=0.7, max_peakgroup
 
         filter_chrom_by_labels(sqm_in, sqm_out, transitions)
 
-def filter_osw(oswfiles, remove_decoys=True, omit_tables=[], max_gene_fdr=None, max_protein_fdr=None, max_peptide_fdr=None, max_ms2_fdr=None, keep_naked_peptides=[]):
+def filter_osw(oswfiles, remove_decoys=True, omit_tables=[], max_gene_fdr=None, max_protein_fdr=None, max_peptide_fdr=None, max_ms2_fdr=None, keep_naked_peptides=[], run_ids=[]):
 
     print("Filtering OSW files...")
     print("Parameters:")
@@ -169,6 +176,7 @@ def filter_osw(oswfiles, remove_decoys=True, omit_tables=[], max_gene_fdr=None, 
     print("  - max_peptide_fdr: %s" % max_peptide_fdr)
     print("  - max_ms2_fdr: %s" % max_ms2_fdr)
     print("  - keep_naked_peptides: %s" % keep_naked_peptides)
+    print("  - run_ids: %s" % run_ids)
         
     # process each oswfile independently
     for osw_in in oswfiles:
@@ -215,7 +223,15 @@ def filter_osw(oswfiles, remove_decoys=True, omit_tables=[], max_gene_fdr=None, 
             if check_sqlite_table(conn, 'GENE'):
                 keep_gene_ids = None
             
-
+        if len(run_ids) != 0:
+            keep_feature_ids = np.unique(list(c.execute(f"""SELECT ID FROM FEATURE WHERE RUN_ID IN ('{"','".join(run_ids)}')""")))
+            extra_run_id_col = "RUN_ID"
+            keep_run_ids = run_ids
+        else:
+            keep_feature_ids = None
+            extra_run_id_col = None
+            keep_run_ids = None
+        
         # Table(s) - GENE and SCORE_GENE
         if max_gene_fdr is not None and check_sqlite_table(conn, 'SCORE_GENE'):
             gene_ids = np.unique(list(c.execute(f"SELECT GENE_ID FROM SCORE_GENE INNER JOIN GENE ON GENE.ID = SCORE_GENE.GENE_ID WHERE QVALUE <= {max_gene_fdr} {decoy_query}")))
@@ -225,7 +241,7 @@ def filter_osw(oswfiles, remove_decoys=True, omit_tables=[], max_gene_fdr=None, 
             click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Filtering for {len(gene_ids)} gene ids with gene score q-value <= {max_gene_fdr} with decoy removal = {remove_decoys}...")
             # Copy filtered tables
             copy_table(c, conn, gene_ids, "GENE", "ID", omit_tables)
-            copy_table(c, conn, gene_ids, "SCORE_GENE", "GENE_ID", omit_tables)
+            copy_table(c, conn, gene_ids, "SCORE_GENE", "GENE_ID", omit_tables, extra_run_id_col, keep_run_ids)
         else:
             if check_sqlite_table(conn, 'GENE'):
                 # Copy original full tables
@@ -239,7 +255,7 @@ def filter_osw(oswfiles, remove_decoys=True, omit_tables=[], max_gene_fdr=None, 
                     c.execute('CREATE TABLE other.GENE as SELECT * FROM GENE')
                     conn.commit()
             if check_sqlite_table(conn, 'SCORE_GENE'):
-                copy_table(c, conn, gene_ids, "SCORE_GENE", "GENE_ID", omit_tables)
+                copy_table(c, conn, gene_ids, "SCORE_GENE", "GENE_ID", omit_tables, extra_run_id_col, keep_run_ids)
 
         # Table(s) - PROTEIN and SCORE_PROTEIN
         if max_protein_fdr is not None and check_sqlite_table(conn, 'SCORE_PROTEIN'):
@@ -250,7 +266,7 @@ def filter_osw(oswfiles, remove_decoys=True, omit_tables=[], max_gene_fdr=None, 
             click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Filtering for {len(protein_ids)} protein ids with protein score q-value <= {max_protein_fdr} with decoy removal = {remove_decoys}...")
             # Copy filtered tables
             copy_table(c, conn, protein_ids, "PROTEIN", "ID", omit_tables)
-            copy_table(c, conn, protein_ids, "SCORE_PROTEIN", "PROTEIN_ID", omit_tables)
+            copy_table(c, conn, protein_ids, "SCORE_PROTEIN", "PROTEIN_ID", omit_tables, extra_run_id_col, keep_run_ids)
         else:
             # Copy original full tables
             protein_ids = np.unique(list(c.execute(f"SELECT ID FROM PROTEIN WHERE ID IS NOT NULL {decoy_query}")))          
@@ -259,7 +275,7 @@ def filter_osw(oswfiles, remove_decoys=True, omit_tables=[], max_gene_fdr=None, 
                 protein_ids = np.intersect1d(protein_ids, keep_protein_ids)
             copy_table(c, conn, protein_ids, "PROTEIN", "ID", omit_tables)
             if check_sqlite_table(conn, 'SCORE_PROTEIN'):
-                copy_table(c, conn, protein_ids, "SCORE_PROTEIN", "PROTEIN_ID", omit_tables)
+                copy_table(c, conn, protein_ids, "SCORE_PROTEIN", "PROTEIN_ID", omit_tables, extra_run_id_col, keep_run_ids)
 
         # Table(s) - PEPTIDE, SCORE_PEPTIDE and PEPTIDE_XXXX_MAPPING
         if max_peptide_fdr is not None and check_sqlite_table(conn, 'SCORE_PEPTIDE'):
@@ -272,7 +288,7 @@ def filter_osw(oswfiles, remove_decoys=True, omit_tables=[], max_gene_fdr=None, 
             copy_table(c, conn, peptide_ids, "PEPTIDE", "ID", omit_tables)
             if check_sqlite_table(conn, 'SCORE_IPF'):
                 copy_table(c, conn, peptide_ids, "SCORE_IPF", "PEPTIDE_ID", omit_tables)
-            copy_table(c, conn, peptide_ids, "SCORE_PEPTIDE", "PEPTIDE_ID", omit_tables)
+            copy_table(c, conn, peptide_ids, "SCORE_PEPTIDE", "PEPTIDE_ID", omit_tables, extra_run_id_col, keep_run_ids)
             copy_table(c, conn, peptide_ids, "PRECURSOR_PEPTIDE_MAPPING", "PEPTIDE_ID", omit_tables)
             copy_table(c, conn, peptide_ids, "PEPTIDE_PROTEIN_MAPPING", "PEPTIDE_ID", omit_tables)
             if check_sqlite_table(conn, 'PEPTIDE_GENE_MAPPING'):
@@ -291,7 +307,7 @@ def filter_osw(oswfiles, remove_decoys=True, omit_tables=[], max_gene_fdr=None, 
             if check_sqlite_table(conn, 'SCORE_IPF'):
                 copy_table(c, conn, peptide_ids, "SCORE_IPF", "PEPTIDE_ID", omit_tables)
             if check_sqlite_table(conn, 'SCORE_PEPTIDE'):
-                copy_table(c, conn, peptide_ids, "SCORE_PEPTIDE", "PEPTIDE_ID", omit_tables)
+                copy_table(c, conn, peptide_ids, "SCORE_PEPTIDE", "PEPTIDE_ID", omit_tables, extra_run_id_col, keep_run_ids)
         
         # Table(s) - SCORE_MS2, FEATURE, FEATURE_MS1,  FEATURE_MS2, FEATURE_TRANSITION, PRECURSOR
         if max_ms2_fdr is not None and check_sqlite_table(conn, 'SCORE_MS2'):
@@ -303,6 +319,9 @@ def filter_osw(oswfiles, remove_decoys=True, omit_tables=[], max_gene_fdr=None, 
                 precursor_ids = np.intersect1d(precursor_ids, keep_precursor_ids)
                 # further reduce feature_ids
                 feature_ids = np.unique(list(c.execute(f"SELECT ID FROM FEATURE WHERE PRECURSOR_ID IN {get_ids_stmt(precursor_ids)}")))
+            # Further reduce feature_ids only if feature_ids is also in keep_feature_ids
+            if keep_feature_ids is not None:
+                feature_ids = np.intersect1d(feature_ids, keep_feature_ids)
             click.echo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] INFO: Filtering for {len(feature_ids)} feature ids across {len(precursor_ids)} unique precursor ids with ms2 score q-value <= {max_ms2_fdr} with decoy removal = {remove_decoys}...")
             # Copy filtered tables
             copy_table(c, conn, feature_ids, "FEATURE", "ID", omit_tables)
@@ -323,6 +342,9 @@ def filter_osw(oswfiles, remove_decoys=True, omit_tables=[], max_gene_fdr=None, 
                 precursor_ids = np.intersect1d(precursor_ids, keep_precursor_ids)
                 # further reduce feature_ids
                 feature_ids = np.unique(list(c.execute(f"SELECT ID FROM FEATURE WHERE PRECURSOR_ID IN {get_ids_stmt(precursor_ids)}")))
+            # Further reduce feature_ids only if feature_ids is also in keep_feature_ids
+            if keep_feature_ids is not None:
+                feature_ids = np.intersect1d(feature_ids, keep_feature_ids)
             # Copy original full tables
             copy_table(c, conn, feature_ids, "FEATURE", "ID", omit_tables)
             if check_sqlite_table(conn, 'FEATURE_MS1'):
@@ -350,7 +372,11 @@ def filter_osw(oswfiles, remove_decoys=True, omit_tables=[], max_gene_fdr=None, 
             copy_table(c, conn, transition_ids, "SCORE_TRANSITION", "TRANSITION_ID", omit_tables)
 
         # Table(s) - RUN, VERSION
-        c.execute('CREATE TABLE other.RUN as SELECT * FROM RUN')
+        if len(run_ids) != 0:
+            run_query = f""" WHERE ID IN ('{"','".join(run_ids)}')"""
+        else:
+            run_query = ""
+        c.execute(f'CREATE TABLE other.RUN as SELECT * FROM RUN {run_query}')
         if check_sqlite_table(conn, 'VERSION'):
             c.execute('CREATE TABLE other.VERSION as SELECT * FROM VERSION')
         conn.commit()
