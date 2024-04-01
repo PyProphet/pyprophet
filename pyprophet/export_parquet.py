@@ -13,11 +13,11 @@ def getPeptideProteinScoreTable(conndb, level):
         
     nonGlobal= conndb.sql(f"select * from {score_table} where context != 'global'").df()
     nonGlobal= nonGlobal.pivot(index=[id, 'RUN_ID'], columns='CONTEXT')
-    nonGlobal.columns = [f'{score_table}.' + col.upper() for col in nonGlobal.columns.map('_'.join)]
+    nonGlobal.columns = [ col.upper() for col in nonGlobal.columns.map('_'.join)]
     nonGlobal= nonGlobal.reset_index()
         
     glob = conndb.sql(f"select {id}, SCORE, PVALUE, QVALUE, PEP from {score_table} where context == 'global'").df()
-    glob.columns = [f'{score_table}.' + col.upper() + '_GLOBAL' if col != id else col for col in glob.columns ]
+    glob.columns = [ col.upper() + '_GLOBAL' if col != id else col for col in glob.columns ]
 
     return nonGlobal.merge(glob, how='outer')
     
@@ -90,16 +90,37 @@ def export_to_parquet(infile, outfile, transitionLevel):
 
         con.executescript(idx_transition_query)
 
+ 
+    ## Check if Gene tables are present
+    if check_sqlite_table(con, "GENE"):
+        gene_table_joins = '''
+        LEFT JOIN PEPTIDE_GENE_MAPPING ON PEPTIDE.ID = PEPTIDE_GENE_MAPPING.PEPTIDE_ID
+        LEFT JOIN GENE ON PEPTIDE_GENE_MAPPING.GENE_ID = GENE.ID
+        '''
+    else:
+        gene_table_joins = ''
     
+
+  
+   
     # since do not want all of the columns (some columns are twice per table) manually select the columns want in a list, (note do not want decoy)
     # note TRAML_ID for precursor and transition are not the same
     columns = {}
+    gene_table_joins = ''
+    pepJoin = ''
+    protJoin = ''
     ## library 
     columns['PRECURSOR'] = ['TRAML_ID', 'GROUP_LABEL', 'PRECURSOR_MZ', 'CHARGE', 'LIBRARY_INTENSITY', 'LIBRARY_RT', 'LIBRARY_DRIFT_TIME', 'DECOY']
     columns['PEPTIDE'] = ['UNMODIFIED_SEQUENCE', 'MODIFIED_SEQUENCE']
     columns['PROTEIN'] = ['PROTEIN_ACCESSION']
+
     if check_sqlite_table(con, "GENE") and pd.read_sql('SELECT GENE_NAME FROM GENE', con).GENE_NAME[0]!='NA':
         columns['GENE'] = ['GENE_NAME']
+        # add gene table joins
+        gene_table_joins = '''
+        LEFT JOIN PEPTIDE_GENE_MAPPING ON PEPTIDE.ID = PEPTIDE_GENE_MAPPING.PEPTIDE_ID
+        LEFT JOIN GENE ON PEPTIDE_GENE_MAPPING.GENE_ID = GENE.ID
+        '''
 
     ## features
     columns['FEATURE'] = ['RUN_ID', 'EXP_RT', 'EXP_IM', 'NORM_RT', 'DELTA_RT', 'LEFT_WIDTH', 'RIGHT_WIDTH']
@@ -116,6 +137,20 @@ def export_to_parquet(infile, outfile, transitionLevel):
 
     ### pyprophet scores 
     columns['SCORE_MS2'] = ["SCORE", "RANK", "PVALUE", "QVALUE", "PEP"]
+
+    # Check for Peptide/Protein scores Context Scores
+    if check_sqlite_table(con, "SCORE_PEPTIDE"):
+        print("True")
+        pepTable = getPeptideProteinScoreTable(condb, "peptide")
+        print(pepTable)
+        pepJoin = 'LEFT JOIN pepTable ON pepTable.PEPTIDE_ID = PEPTIDE.ID'
+        columns['pepTable'] = list(set(pepTable.columns).difference(set(['PEPTIDE_ID', 'RUN_ID']))) # all columns except PEPTIDE_ID and RUN_ID
+
+
+    if check_sqlite_table(con, "SCORE_PROTEIN"):
+        protTable = getPeptideProteinScoreTable(condb, "protein")
+        protJoin = 'LEFT JOIN protTable ON protTable.PROTEIN_ID = PROTEIN.ID'
+        columns['protTable'] = list(set(protTable.columns).difference(set(['PROTEIN_ID', 'RUN_ID']))) # all columns except PEPTIDE_ID and RUN_ID
 
     ## other
     columns['RUN'] = ['FILENAME']
@@ -135,33 +170,27 @@ def export_to_parquet(infile, outfile, transitionLevel):
 
     ### rename column names that are in common 
     whitelist = set(['PEPTIDE_ID', 'FEATURE_ID', 'TRANSITION_ID', 'PRECURSOR_ID', 'PROTEIN_ID', 'GENE_ID', 'DECOY'])  # these columns should not be renamed
-    renamed_columns = {c: [col if ' AS ' in col  else f"{c}.{col} AS '{c}.{col}'" if col not in whitelist else f"{c}.{col} AS '{col}'" for col in columns[c]] for c in columns.keys()}
+    
+    for table in columns.keys(): # iterate through all tables
+        ## rename pepTable and protTable to be inline with sql scheme
+        if table == 'pepTable':
+            renamed_table = 'SCORE_PEPTIDE'
+        elif table == 'protTable':
+            renamed_table = 'SCORE_PROTEIN'
+        else:
+            renamed_table = table
+        for c_idx, c in enumerate(columns[table]): # iterate through all columns in the table
+            if c in whitelist:
+                columns[table][c_idx] = f"{table}.{c} AS {c}"
+            else:
+                columns[table][c_idx] = f"{table}.{c} AS '{renamed_table}.{c}'"
+
 
     # create a list of all the columns
-    columns_list = [col for c in renamed_columns.values() for col in c]
+    columns_list = [col for c in columns.values() for col in c]
 
     # join the list into a single string separated by a comma and a space
     columnsToSelect = ", ".join(columns_list)
-
-
-    ## Check if Gene tables are present
-    if check_sqlite_table(con, "GENE"):
-        gene_table_joins = '''
-        LEFT JOIN PEPTIDE_GENE_MAPPING ON PEPTIDE.ID = PEPTIDE_GENE_MAPPING.PEPTIDE_ID
-        LEFT JOIN GENE ON PEPTIDE_GENE_MAPPING.GENE_ID = GENE.ID
-        '''
-    else:
-        gene_table_joins = ''
-    
-
-    # Check for Inferrence Context Scores
-    if check_sqlite_table(con, "SCORE_PEPTIDE"):
-        pepTable = getPeptideProteinScoreTable(condb, "peptide")
-        pepJoin = 'LEFT JOIN pepTable ON pepTable.PEPTIDE_ID = PEPTIDE.ID'
-
-    if check_sqlite_table(con, "SCORE_PROTEIN"):
-        protTable = getPeptideProteinScoreTable(condb, "protein")
-        protJoin = 'LEFT JOIN protTable ON protTable.PROTEIN_ID = PROTEIN.ID'
 
     # First read feature data
     # Feature Data
@@ -203,4 +232,5 @@ def export_to_parquet(infile, outfile, transitionLevel):
         {pepJoin}
         {protJoin}
         '''
+    print(feature_query)
     condb.sql(feature_query).write_parquet(outfile)
