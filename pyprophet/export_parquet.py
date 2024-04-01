@@ -141,7 +141,6 @@ def export_to_parquet(infile, outfile, transitionLevel):
     # Check for Peptide/Protein scores Context Scores
     if check_sqlite_table(con, "SCORE_PEPTIDE"):
         pepTable = getPeptideProteinScoreTable(condb, "peptide")
-        print(pepTable)
         pepJoin = 'LEFT JOIN pepTable ON pepTable.PEPTIDE_ID = PEPTIDE.ID'
         columns['pepTable'] = list(set(pepTable.columns).difference(set(['PEPTIDE_ID', 'RUN_ID']))) # all columns except PEPTIDE_ID and RUN_ID
 
@@ -157,15 +156,15 @@ def export_to_parquet(infile, outfile, transitionLevel):
 
     ## mappings
     columns['PRECURSOR_PEPTIDE_MAPPING'] = ['PEPTIDE_ID', 'PRECURSOR_ID']
-    #columns['TRANSITION_PRECURSOR_MAPPING'] = ['PRECURSOR_ID']
     columns['PEPTIDE_PROTEIN_MAPPING'] = ['PROTEIN_ID']
     if check_sqlite_table(con, "GENE") and pd.read_sql('SELECT GENE_NAME FROM GENE', con).GENE_NAME[0]!='NA':
         columns['PEPTIDE_GENE_MAPPING'] = ['GENE_ID']
 
     # transition level
     if transitionLevel:
-        columns['FEATURE_TRANSITION'] = ['TRANSITION_ID', 'AREA_INTENSITY', 'TOTAL_AREA_INTENSITY', 'APEX_INTENSITY', 'TOTAL_MI', 'VAR_INTENSITY_SCORE', 'VAR_INTENSITY_RATIO_SCORE', 'VAR_LOG_INTENSITY', 'VAR_XCORR_COELUTION', 'VAR_XCORR_SHAPE', 'VAR_LOG_SN_SCORE', 'VAR_MASSDEV_SCORE', 'VAR_MI_SCORE', 'VAR_MI_RATIO_SCORE', 'VAR_ISOTOPE_CORRELATION_SCORE', 'VAR_ISOTOPE_OVERLAP_SCORE']
+        columns['FEATURE_TRANSITION'] = ['AREA_INTENSITY', 'TOTAL_AREA_INTENSITY', 'APEX_INTENSITY', 'TOTAL_MI', 'VAR_INTENSITY_SCORE', 'VAR_INTENSITY_RATIO_SCORE', 'VAR_LOG_INTENSITY', 'VAR_XCORR_COELUTION', 'VAR_XCORR_SHAPE', 'VAR_LOG_SN_SCORE', 'VAR_MASSDEV_SCORE', 'VAR_MI_SCORE', 'VAR_MI_RATIO_SCORE', 'VAR_ISOTOPE_CORRELATION_SCORE', 'VAR_ISOTOPE_OVERLAP_SCORE']
         columns['TRANSITION'] = ['TRAML_ID', 'PRODUCT_MZ', 'CHARGE', 'TYPE', 'ORDINAL', 'DETECTING', 'IDENTIFYING', 'QUANTIFYING', 'LIBRARY_INTENSITY']
+        columns['TRANSITION_PRECURSOR_MAPPING'] = ['TRANSITION_ID']
 
     ### rename column names that are in common 
     whitelist = set(['PEPTIDE_ID', 'FEATURE_ID', 'TRANSITION_ID', 'PRECURSOR_ID', 'PROTEIN_ID', 'GENE_ID', 'DECOY', 'RUN_ID'])  # these columns should not be renamed
@@ -215,10 +214,11 @@ def export_to_parquet(infile, outfile, transitionLevel):
         # merge transition and precursor level data
         feature_query = f'''
         SELECT {columnsToSelect}
-        FROM FEATURE_TRANSITION
-        FULL JOIN TRANSITION ON FEATURE_TRANSITION.TRANSITION_ID = TRANSITION.ID
-        FULL JOIN FEATURE ON FEATURE_TRANSITION.FEATURE_ID = FEATURE.ID
-        FULL JOIN PRECURSOR ON FEATURE.PRECURSOR_ID = PRECURSOR.ID
+        FROM TRANSITION_PRECURSOR_MAPPING
+        LEFT JOIN TRANSITION ON TRANSITION_PRECURSOR_MAPPING.TRANSITION_ID = TRANSITION.ID
+        LEFT JOIN PRECURSOR ON TRANSITION_PRECURSOR_MAPPING.PRECURSOR_ID = PRECURSOR.ID
+        LEFT JOIN FEATURE_TRANSITION ON TRANSITION.ID = FEATURE_TRANSITION.TRANSITION_ID 
+        LEFT JOIN FEATURE ON FEATURE_TRANSITION.FEATURE_ID = FEATURE.ID
         LEFT JOIN RUN ON FEATURE.RUN_ID = RUN.ID
         LEFT JOIN FEATURE_MS1 ON FEATURE.ID = FEATURE_MS1.FEATURE_ID
         LEFT JOIN FEATURE_MS2 ON FEATURE.ID = FEATURE_MS2.FEATURE_ID
