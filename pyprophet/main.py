@@ -372,7 +372,7 @@ def export_parquet(infile, outfile, transitionLevel, onlyFeatures, separate_runs
         if not overwrite:
             raise click.ClickException(f"Aborting: {outfile} already exists!")
     click.echo("Info: Parquet file will be written to {}".format(outfile))
-    export_to_parquet(os.path.abspath(infile), os.path.abspath(outfile), transitionLevel, onlyFeatures, separate_runs, chunksize, threads)
+    export_to_parquet(os.path.abspath(infile), os.path.abspath(outfile), transitionLevel)
 
 # Export Compound TSV
 @cli.command()
