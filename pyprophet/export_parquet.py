@@ -13,8 +13,9 @@ def getPeptideProteinScoreTable(conndb, level):
         
     nonGlobal= conndb.sql(f"select * from {score_table} where context != 'global'").df()
     nonGlobal= nonGlobal.pivot(index=[id, 'RUN_ID'], columns='CONTEXT')
-    nonGlobal.columns = [ col.upper() for col in nonGlobal.columns.map('_'.join)]
+    nonGlobal.columns = [ col.upper().replace('-', '') for col in nonGlobal.columns.map('_'.join)]
     nonGlobal= nonGlobal.reset_index()
+    print(nonGlobal)
         
     glob = conndb.sql(f"select {id}, SCORE, PVALUE, QVALUE, PEP from {score_table} where context == 'global'").df()
     glob.columns = [ col.upper() + '_GLOBAL' if col != id else col for col in glob.columns ]
@@ -143,6 +144,7 @@ def export_to_parquet(infile, outfile, transitionLevel):
         pepTable = getPeptideProteinScoreTable(condb, "peptide")
         pepJoin = 'LEFT JOIN pepTable ON pepTable.PEPTIDE_ID = PEPTIDE.ID'
         columns['pepTable'] = list(set(pepTable.columns).difference(set(['PEPTIDE_ID', 'RUN_ID']))) # all columns except PEPTIDE_ID and RUN_ID
+        print(columns['pepTable'])
 
 
     if check_sqlite_table(con, "SCORE_PROTEIN"):
@@ -186,6 +188,7 @@ def export_to_parquet(infile, outfile, transitionLevel):
 
     # create a list of all the columns
     columns_list = [col for c in columns.values() for col in c]
+    print(columns_list)
 
     # join the list into a single string separated by a comma and a space
     columnsToSelect = ", ".join(columns_list)
