@@ -15,9 +15,8 @@ def getPeptideProteinScoreTable(conndb, level):
     nonGlobal= nonGlobal.pivot(index=[id, 'RUN_ID'], columns='CONTEXT')
     nonGlobal.columns = [ col.upper().replace('-', '') for col in nonGlobal.columns.map('_'.join)]
     nonGlobal= nonGlobal.reset_index()
-    print(nonGlobal)
         
-    glob = conndb.sql(f"select {id}, SCORE, PVALUE, QVALUE, PEP from {score_table} where context == 'global'").df()
+    glob = conndb.sql(f"select {id}, RUN_ID, SCORE, PVALUE, QVALUE, PEP from {score_table} where context == 'global'").df()
     glob.columns = [ col.upper() + '_GLOBAL' if col != id else col for col in glob.columns ]
 
     return nonGlobal.merge(glob, how='outer')
@@ -142,14 +141,13 @@ def export_to_parquet(infile, outfile, transitionLevel):
     # Check for Peptide/Protein scores Context Scores
     if check_sqlite_table(con, "SCORE_PEPTIDE"):
         pepTable = getPeptideProteinScoreTable(condb, "peptide")
-        pepJoin = 'LEFT JOIN pepTable ON pepTable.PEPTIDE_ID = PEPTIDE.ID'
+        pepJoin = 'LEFT JOIN pepTable ON pepTable.PEPTIDE_ID = PEPTIDE.ID and pepTable.RUN_ID = RUN.ID'
         columns['pepTable'] = list(set(pepTable.columns).difference(set(['PEPTIDE_ID', 'RUN_ID']))) # all columns except PEPTIDE_ID and RUN_ID
-        print(columns['pepTable'])
 
 
     if check_sqlite_table(con, "SCORE_PROTEIN"):
         protTable = getPeptideProteinScoreTable(condb, "protein")
-        protJoin = 'LEFT JOIN protTable ON protTable.PROTEIN_ID = PROTEIN.ID'
+        protJoin = 'LEFT JOIN protTable ON protTable.PROTEIN_ID = PROTEIN.ID and protTable.RUN_ID = RUN.ID'
         columns['protTable'] = list(set(protTable.columns).difference(set(['PROTEIN_ID', 'RUN_ID']))) # all columns except PEPTIDE_ID and RUN_ID
 
     ## other
@@ -188,7 +186,6 @@ def export_to_parquet(infile, outfile, transitionLevel):
 
     # create a list of all the columns
     columns_list = [col for c in columns.values() for col in c]
-    print(columns_list)
 
     # join the list into a single string separated by a comma and a space
     columnsToSelect = ", ".join(columns_list)
