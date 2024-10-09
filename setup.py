@@ -49,6 +49,7 @@ setup(name='pyprophet',
       zip_safe=False,
       install_requires=[
           "Click",
+          "duckdb",
           "numpy >= 1.9.0",
           "scipy",
           "pandas >= 0.17",
@@ -60,6 +61,7 @@ setup(name='pyprophet',
           "statsmodels >= 0.8.0",
           "matplotlib",
           "tabulate",
+          "pyarrow",
           "pypdf"
       ],
       entry_points={
