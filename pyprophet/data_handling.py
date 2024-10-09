@@ -5,7 +5,6 @@ import click
 import sys
 import os
 import multiprocessing
-import re
 
 from .optimized import find_top_ranked, rank
 
@@ -14,21 +13,6 @@ try:
 except NameError:
     def profile(fun):
         return fun
-
-def to_valid_filename(string):
-    """Convert a string to a valid filename by removing invalid characters and limiting the length.
-    
-    Args:
-        string (str): The input string to convert.
-    
-    Returns:
-        str: The input string with invalid characters removed and a length of at most 255 characters.
-    """
-    # remove invalid characters from the string
-    valid_string = re.sub(r'[#%&{}$= !@+`<>:"/\\|?*]', '', string)
-
-    # limit the length of the string to 255 characters
-    return valid_string[:255]
 
 # selection of scores with low cross-correlation for metabolomics scoring
 def use_metabolomics_scores():
