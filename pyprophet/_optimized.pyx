@@ -55,7 +55,7 @@ def find_nearest_matches(DATA_TYPE[:] basis, DATA_TYPE[:] sample_points, use_sor
                 best_j = high
             else:
                 while low < high - 1:
-                    mid = (low + high) / 2
+                    mid = (low + high) // 2
                     if basis[mid] == sp_i:
                         best_j = mid
                     if basis[mid] < sp_i:
@@ -83,7 +83,7 @@ def find_nearest_matches(DATA_TYPE[:] basis, DATA_TYPE[:] sample_points, use_sor
                 best_j = high
             else:
                 while low < high - 1:
-                    mid = (low + high) / 2
+                    mid = (low + high) // 2
                     if basis[mid] == sp_i:
                         best_j = mid
                         break
