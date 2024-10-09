@@ -422,17 +422,19 @@ def export_compound(infile, outfile, format, outcsv, max_rs_peakgroup_qvalue):
 @click.option('--max_protein_fdr', default=None, show_default=True, type=float, help='Maximum QVALUE to retain scored proteins in OSW.  [default: None]')
 @click.option('--max_peptide_fdr', default=None, show_default=True, type=float, help='Maximum QVALUE to retain scored peptides in OSW.  [default: None]')
 @click.option('--max_ms2_fdr', default=None, show_default=True, type=float, help='Maximum QVALUE to retain scored MS2 Features in OSW.  [default: None]')
-def filter(sqldbfiles, infile, max_precursor_pep, max_peakgroup_pep, max_transition_pep, remove_decoys, omit_tables, max_gene_fdr, max_protein_fdr, max_peptide_fdr, max_ms2_fdr):
+@click.option('--keep_naked_peptides', default="[]", show_default=True, cls=PythonLiteralOption, help="""Filter for specific UNMODIFIED_PEPTIDES. i.e. `--keep_naked_peptides '["ANSSPTTNIDHLK", "ESTAEPDSLSR"]'`""")
+@click.option('--run_ids', default="[]", show_default=True, cls=PythonLiteralOption, help="""Filter for specific RUN_IDs. i.e. `--run_ids '["8889961272137748833", "8627438106464817423"]'`""")
+def filter(sqldbfiles, infile, max_precursor_pep, max_peakgroup_pep, max_transition_pep, remove_decoys, omit_tables, max_gene_fdr, max_protein_fdr, max_peptide_fdr, max_ms2_fdr, keep_naked_peptides, run_ids):
     """
     Filter sqMass files or osw files
     """
         
     if all([pathlib.PurePosixPath(file).suffix.lower()=='.sqmass' for file in sqldbfiles]):
-        if infile is None:
-            click.ClickException("If you are filtering sqMass files, you need to provide a PyProphet file via `--in` flag.")
-        filter_sqmass(sqldbfiles, infile, max_precursor_pep, max_peakgroup_pep, max_transition_pep)
+        if infile is None and len(keep_naked_peptides) == 0:
+            click.ClickException("If you are filtering sqMass files, you need to provide a PyProphet file via `--in` flag or you need to provide a list of naked peptide sequences to filter for.")
+        filter_sqmass(sqldbfiles, infile, max_precursor_pep, max_peakgroup_pep, max_transition_pep, keep_naked_peptides, remove_decoys)
     elif all([pathlib.PurePosixPath(file).suffix.lower()=='.osw' for file in sqldbfiles]):
-        filter_osw(sqldbfiles, remove_decoys, omit_tables, max_gene_fdr, max_protein_fdr, max_peptide_fdr, max_ms2_fdr)
+        filter_osw(sqldbfiles, remove_decoys, omit_tables, max_gene_fdr, max_protein_fdr, max_peptide_fdr, max_ms2_fdr, keep_naked_peptides, run_ids)
     else:
         click.ClickException(f"There seems to be something wrong with the input sqlite db files. Make sure they are all either sqMass files or all OSW files, these are mutually exclusive.\nYour input files: {sqldbfiles}")
 
