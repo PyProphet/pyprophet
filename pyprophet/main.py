@@ -9,6 +9,7 @@ import ast
 from .runner import PyProphetLearner, PyProphetWeightApplier
 from .ipf import infer_peptidoforms
 from .levels_contexts import infer_peptides, infer_proteins, infer_genes, subsample_osw, reduce_osw, merge_osw, backpropagate_oswr
+from .split import split_osw
 from .export import export_tsv, export_score_plots
 from .export_compound import export_compound_tsv
 from .filter import filter_sqmass, filter_osw
@@ -296,6 +297,15 @@ def merge(infiles, outfile, same_run, templatefile, merged_post_scored_runs):
 
     merge_osw(infiles, outfile, templatefile, same_run, merged_post_scored_runs)
 
+# Spliting of a merge osw into single runs
+@cli.command()
+@click.option('--in', 'infile', required=True, type=click.Path(exists=True), help='Merged OSW input file.')
+@click.option('--threads', default=-1, show_default=True, type=int, help='Number of threads used for splitting. -1 means all available CPUs.', callback=transform_threads)
+def split(infile, threads):
+    """
+    Split a merged OSW file into single runs.
+    """
+    split_osw(infile, threads)
 
 # Backpropagate multi-run peptide and protein scores to single files
 @cli.command()
