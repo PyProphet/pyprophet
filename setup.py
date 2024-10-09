@@ -49,6 +49,7 @@ setup(name='pyprophet',
       zip_safe=False,
       install_requires=[
           "Click",
+          "duckdb",
           "numpy >= 1.9.0",
           "scipy",
           "pandas >= 0.17",
