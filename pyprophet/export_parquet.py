@@ -22,7 +22,7 @@ def getPeptideProteinScoreTable(conndb, level):
     return nonGlobal.merge(glob, how='outer')
     
 # this method is only currently supported for combined output and not with ipf
-def export_to_parquet(infile, outfile, transitionLevel):
+def export_to_parquet(infile, outfile, transitionLevel, onlyFeatures=False):
     '''
     Convert an OSW sqlite file to Parquet format
 
@@ -30,6 +30,7 @@ def export_to_parquet(infile, outfile, transitionLevel):
         infile: (str) path to osw sqlite file
         outfile: (str) path to write out parquet file
         transitionLevel: (bool) append transition level data
+        onlyFeatures: (bool) Only output precursors associated with a feature
     
     Return:
         None
@@ -187,13 +188,15 @@ def export_to_parquet(infile, outfile, transitionLevel):
     # join the list into a single string separated by a comma and a space
     columnsToSelect = ", ".join(columns_list)
 
+    join_features = "LEFT JOIN" if onlyFeatures else "FULL JOIN"
+
     # First read feature data
     # Feature Data
     if not transitionLevel:
         feature_query = f'''
         SELECT {columnsToSelect}
         FROM FEATURE
-        FULL JOIN PRECURSOR ON FEATURE.PRECURSOR_ID = PRECURSOR.ID
+        {join_features} PRECURSOR ON FEATURE.PRECURSOR_ID = PRECURSOR.ID
         LEFT JOIN RUN ON FEATURE.RUN_ID = RUN.ID
         LEFT JOIN FEATURE_MS1 ON FEATURE.ID = FEATURE_MS1.FEATURE_ID
         LEFT JOIN FEATURE_MS2 ON FEATURE.ID = FEATURE_MS2.FEATURE_ID
@@ -209,23 +212,44 @@ def export_to_parquet(infile, outfile, transitionLevel):
     else: # is transition level
         
         # merge transition and precursor level data
-        feature_query = f'''
-        SELECT {columnsToSelect}
-        FROM TRANSITION_PRECURSOR_MAPPING
-        LEFT JOIN TRANSITION ON TRANSITION_PRECURSOR_MAPPING.TRANSITION_ID = TRANSITION.ID
-        LEFT JOIN PRECURSOR ON TRANSITION_PRECURSOR_MAPPING.PRECURSOR_ID = PRECURSOR.ID
-        LEFT JOIN FEATURE_TRANSITION ON TRANSITION.ID = FEATURE_TRANSITION.TRANSITION_ID 
-        LEFT JOIN FEATURE ON FEATURE_TRANSITION.FEATURE_ID = FEATURE.ID
-        LEFT JOIN RUN ON FEATURE.RUN_ID = RUN.ID
-        LEFT JOIN FEATURE_MS1 ON FEATURE.ID = FEATURE_MS1.FEATURE_ID
-        LEFT JOIN FEATURE_MS2 ON FEATURE.ID = FEATURE_MS2.FEATURE_ID
-        LEFT JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
-        LEFT JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
-        LEFT JOIN PEPTIDE ON PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
-        LEFT JOIN PEPTIDE_PROTEIN_MAPPING ON PEPTIDE.ID = PEPTIDE_PROTEIN_MAPPING.PEPTIDE_ID
-        LEFT JOIN PROTEIN ON PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID = PROTEIN.ID
-        {gene_table_joins}
-        {pepJoin}
-        {protJoin}
-        '''
+        if not onlyFeatures:
+            feature_query = f'''
+            SELECT {columnsToSelect}
+            FROM TRANSITION_PRECURSOR_MAPPING
+            LEFT JOIN TRANSITION ON TRANSITION_PRECURSOR_MAPPING.TRANSITION_ID = TRANSITION.ID
+            LEFT JOIN PRECURSOR ON TRANSITION_PRECURSOR_MAPPING.PRECURSOR_ID = PRECURSOR.ID
+            LEFT JOIN FEATURE_TRANSITION ON TRANSITION.ID = FEATURE_TRANSITION.TRANSITION_ID 
+            LEFT JOIN FEATURE ON FEATURE_TRANSITION.FEATURE_ID = FEATURE.ID
+            LEFT JOIN RUN ON FEATURE.RUN_ID = RUN.ID
+            LEFT JOIN FEATURE_MS1 ON FEATURE.ID = FEATURE_MS1.FEATURE_ID
+            LEFT JOIN FEATURE_MS2 ON FEATURE.ID = FEATURE_MS2.FEATURE_ID
+            LEFT JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
+            LEFT JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
+            LEFT JOIN PEPTIDE ON PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
+            LEFT JOIN PEPTIDE_PROTEIN_MAPPING ON PEPTIDE.ID = PEPTIDE_PROTEIN_MAPPING.PEPTIDE_ID
+            LEFT JOIN PROTEIN ON PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID = PROTEIN.ID
+            {gene_table_joins}
+            {pepJoin}
+            {protJoin}
+            '''
+        else:
+            feature_query = f'''
+            SELECT {columnsToSelect}
+            FROM FEATURE_TRANSITION 
+            LEFT JOIN TRANSITION ON FEATURE_TRANSITION.TRANSITION_ID = TRANSITION.ID
+            LEFT JOIN FEATURE ON FEATURE_TRANSITION.FEATURE_ID = FEATURE.ID
+            LEFT JOIN PRECURSOR ON FEATURE.PRECURSOR_ID = PRECURSOR.ID
+            LEFT JOIN TRANSITION_PRECURSOR_MAPPING ON TRANSITION_PRECURSOR_MAPPING.TRANSITION_ID = TRANSITION.ID
+            LEFT JOIN RUN ON FEATURE.RUN_ID = RUN.ID
+            LEFT JOIN FEATURE_MS1 ON FEATURE.ID = FEATURE_MS1.FEATURE_ID
+            LEFT JOIN FEATURE_MS2 ON FEATURE.ID = FEATURE_MS2.FEATURE_ID
+            LEFT JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
+            LEFT JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
+            LEFT JOIN PEPTIDE ON PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
+            LEFT JOIN PEPTIDE_PROTEIN_MAPPING ON PEPTIDE.ID = PEPTIDE_PROTEIN_MAPPING.PEPTIDE_ID
+            LEFT JOIN PROTEIN ON PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID = PROTEIN.ID
+            {gene_table_joins}
+            {pepJoin}
+            {protJoin}
+            '''
     condb.sql(feature_query).write_parquet(outfile)
