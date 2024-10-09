@@ -30,9 +30,6 @@ def export_to_parquet(infile, outfile, transitionLevel):
         infile: (str) path to osw sqlite file
         outfile: (str) path to write out parquet file
         transitionLevel: (bool) append transition level data
-        separate_runs: (bool) if the input file is a merged file, create separate parquet files
-        chunksize: (int) read in the data into chunks for low-memory requirements
-        threads: (int) number of threads to use for parallelizing on precursor ids
     
     Return:
         None
