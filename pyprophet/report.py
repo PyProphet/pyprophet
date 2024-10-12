@@ -69,7 +69,7 @@ def save_report(pdf_path, title, top_decoys, top_targets, cutoffs, svalues, qval
     s_value_cutoff = svalues[argmin(abs(qvalues - 0.01))]
     d_cutoff_at_1_pcnt = cutoffs[svalues==s_value_cutoff][-1]
 
-    plt.axvline(x=d_cutoff_at_1_pcnt, color='black', linestyle='--', linewidth=2)
+    plt.axvline(x=d_cutoff_at_1_pcnt, color='grey', linestyle='--', linewidth=2)
 
     y_max = plt.gca().get_ylim()[1] 
     plt.text(
@@ -102,7 +102,7 @@ def save_report(pdf_path, title, top_decoys, top_targets, cutoffs, svalues, qval
     plt.plot(xs, ddensity(xs), color=d_col, label='decoy')
     plt.legend(loc=2)
 
-    plt.axvline(x=d_cutoff_at_1_pcnt, color='black', linestyle='--', linewidth=2)
+    plt.axvline(x=d_cutoff_at_1_pcnt, color='grey', linestyle='--', linewidth=2)
 
     y_max = plt.gca().get_ylim()[1] 
     plt.text(
