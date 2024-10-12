@@ -8,12 +8,11 @@ except ImportError:
 
 from pypdf import PdfMerger, PdfReader
 
-
 import os
 
 import click
 from scipy.stats import gaussian_kde
-from numpy import linspace, concatenate, around
+from numpy import linspace, concatenate, around, argmin, sort, arange, interp, array, degrees, arctan
 
 def color_blind_friendly(color_palette):
     
@@ -23,6 +22,13 @@ def color_blind_friendly(color_palette):
         click.echo(f"WARN: {color_palette} is not a valid color_palette, must be one of 'normal'. 'protan', 'deutran', or 'tritan'. Using default 'normal'.")
         color_palette = "normal"
     return color_dict[color_palette][0], color_dict[color_palette][1]
+
+def ecdf(data):
+    """Compute ECDF for a one-dimensional array of scores."""
+    data = sort(data)
+    n = len(data)
+    y = arange(1, n+1) / n
+    return data, y
 
 def save_report(pdf_path, title, top_decoys, top_targets, cutoffs, svalues, qvalues, pvalues, pi0, color_palette="normal"):
 
@@ -60,6 +66,26 @@ def save_report(pdf_path, title, top_decoys, top_targets, cutoffs, svalues, qval
         [top_targets, top_decoys], 20, color=[t_col, d_col], label=['target', 'decoy'], histtype='bar')
     plt.legend(loc=2)
 
+    s_value_cutoff = svalues[argmin(abs(qvalues - 0.01))]
+    d_cutoff_at_1_pcnt = cutoffs[svalues==s_value_cutoff][-1]
+
+    plt.axvline(x=d_cutoff_at_1_pcnt, color='grey', linestyle='--', linewidth=2)
+
+    y_max = plt.gca().get_ylim()[1] 
+    plt.text(
+        d_cutoff_at_1_pcnt + 0.05,
+        y_max * 0.95,  
+        f'Cutoff @ 1%: {d_cutoff_at_1_pcnt:.2f}',
+        color="black",
+        ha="left",
+        va="top",
+        fontsize=7,
+        fontweight="bold",
+        bbox=dict(
+            facecolor="lightgray", alpha=0.5, edgecolor="none"
+        ),  
+    )
+
     plt.subplot(324)
     tdensity = gaussian_kde(top_targets)
     tdensity.covariance_factor = lambda: .25
@@ -75,6 +101,23 @@ def save_report(pdf_path, title, top_decoys, top_targets, cutoffs, svalues, qval
     plt.plot(xs, tdensity(xs), color=t_col, label='target')
     plt.plot(xs, ddensity(xs), color=d_col, label='decoy')
     plt.legend(loc=2)
+
+    plt.axvline(x=d_cutoff_at_1_pcnt, color='grey', linestyle='--', linewidth=2)
+
+    y_max = plt.gca().get_ylim()[1] 
+    plt.text(
+        d_cutoff_at_1_pcnt + 0.05,
+        y_max * 0.95,  
+        f'Cutoff @ 1%: {d_cutoff_at_1_pcnt:.2f}',
+        color="black",
+        ha="left",
+        va="top",
+        fontsize=7,
+        fontweight="bold",
+        bbox=dict(
+            facecolor="lightgray", alpha=0.5, edgecolor="none"
+        ),  
+    )
 
     plt.subplot(325)
     if pvalues is not None:
@@ -93,6 +136,39 @@ def save_report(pdf_path, title, top_decoys, top_targets, cutoffs, svalues, qval
         plt.title(r"$\pi_0$ smoothing fit plot")
         plt.xlabel(r"$\lambda$")
         plt.ylabel(r"$\pi_0$($\lambda$)")
+    else:
+        # Generate a P-P plot as described in Debrie, E. et. al. (2023) Journal or Proteome Research. https://doi.org/10.1021/acs.jproteome.2c00423
+        
+        # Calculate ECDF for top_targets and top_decoys
+        x_target, y_target = ecdf(array(top_targets))
+        x_decoy, y_decoy = ecdf(array(top_decoys))
+
+        # Create a sequence of points for plotting (common x-axis for ECDF comparison)
+        x_seq = linspace(min(x_target.min(), x_decoy.min()), 
+                    max(x_target.max(), x_decoy.max()), 1000)
+
+        # Interpolate ECDF values for the sequence of points
+        y_target_interp = interp(x_seq, x_target, y_target)
+        y_decoy_interp = interp(x_seq, x_decoy, y_decoy)
+
+        plt.subplot(326)
+        plt.scatter(y_decoy_interp, y_target_interp, s=3, alpha=0.5, label='Target vs Decoy ECDF')
+
+        plt.plot([0, 1], [0, 1], color='red', linestyle='--', label='y = x (Perfect match)')
+
+        plt.plot([0, 1], [0, pi0['pi0']], color='blue', linestyle=':', label=f'y = {pi0["pi0"]:.2f} * x (Estimated pi0)')
+
+        plt.title("P-P Plot")
+        plt.xlabel("Decoy ECDF")
+        plt.ylabel("Target ECDF")
+
+        plt.gca().set_aspect('equal', adjustable='box')
+
+        plt.text(0.5, 0.55, "y = x (Perfect match)", color='red', rotation=45, ha='left', fontsize=7)
+        plt.text(0.05, 0.95, f"y = {pi0['pi0']:.4f} * x (Estimated pi0)", color='blue', ha='left', fontsize=7)
+
+        plt.xlim([0, 1])
+        plt.ylim([0, 1])
 
     plt.suptitle(title)
     plt.savefig(pdf_path)
