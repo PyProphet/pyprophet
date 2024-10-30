@@ -2,6 +2,7 @@ import duckdb
 import sqlite3
 import pandas as pd
 from pyprophet.export import check_sqlite_table
+from duckdb_extensions import extension_importer
 
 def getPeptideProteinScoreTable(conndb, level):
     if level == 'peptide':
@@ -43,10 +44,9 @@ def export_to_parquet(infile, outfile, transitionLevel, onlyFeatures=False):
     Return:
         None
     '''
+    extension_importer.import_extension("sqlite_scanner")
     condb = duckdb.connect(infile)
     con = sqlite3.connect(infile)
-
-    print(getVarColumnNames(condb, 'FEATURE_MS2'))
 
     # Main query for standard OpenSWATH
     idx_query = '''
@@ -110,7 +110,10 @@ def export_to_parquet(infile, outfile, transitionLevel, onlyFeatures=False):
     
 
   
-   
+    # check if IM columns exist
+    query = con.execute("select count(*) as cntrec from pragma_table_info('feature_MS2') where name='EXP_IM'")
+    hasIm = query.fetchone()[0] > 0
+  
     # since do not want all of the columns (some columns are twice per table) manually select the columns want in a list, (note do not want decoy)
     # note TRAML_ID for precursor and transition are not the same
     columns = {}
@@ -118,7 +121,10 @@ def export_to_parquet(infile, outfile, transitionLevel, onlyFeatures=False):
     pepJoin = ''
     protJoin = ''
     ## library 
-    columns['PRECURSOR'] = ['TRAML_ID', 'GROUP_LABEL', 'PRECURSOR_MZ', 'CHARGE', 'LIBRARY_INTENSITY', 'LIBRARY_RT', 'LIBRARY_DRIFT_TIME', 'DECOY']
+    columns['PRECURSOR'] = ['TRAML_ID', 'GROUP_LABEL', 'PRECURSOR_MZ', 'CHARGE', 'LIBRARY_INTENSITY', 'LIBRARY_RT', 'DECOY']
+    if hasIm:
+        columns['PRECURSOR'].append("LIBRARY_DRIFT_TIME")
+
     columns['PEPTIDE'] = ['UNMODIFIED_SEQUENCE', 'MODIFIED_SEQUENCE']
     columns['PROTEIN'] = ['PROTEIN_ACCESSION']
 
@@ -132,12 +138,8 @@ def export_to_parquet(infile, outfile, transitionLevel, onlyFeatures=False):
 
     ## features
     columns['FEATURE'] = ['EXP_RT', 'EXP_IM', 'NORM_RT', 'DELTA_RT', 'LEFT_WIDTH', 'RIGHT_WIDTH']
-    columns['FEATURE_MS2'] = ['FEATURE_ID', 'AREA_INTENSITY', 'TOTAL_AREA_INTENSITY', 'APEX_INTENSITY', 'TOTAL_MI'] + getVarColumnNames(condb, 'FEATURE_MS2') 
-    columns['FEATURE_MS1'] = ['APEX_INTENSITY', 'VAR_MASSDEV_SCORE'] + getVarColumnNames(condb, 'FEATURE_MS1')
-
-    # check if IM columns exist
-    query = con.execute("select count(*) as cntrec from pragma_table_info('feature_MS2') where name='EXP_IM'")
-    hasIm = query.fetchone()[0] > 0
+    columns['FEATURE_MS2'] = ['FEATURE_ID', 'AREA_INTENSITY', 'TOTAL_AREA_INTENSITY', 'APEX_INTENSITY', 'TOTAL_MI'] + getVarColumnNames(con, 'FEATURE_MS2') 
+    columns['FEATURE_MS1'] = ['APEX_INTENSITY', 'VAR_MASSDEV_SCORE'] + getVarColumnNames(con, 'FEATURE_MS1')
     if hasIm:
         imColumns = ['EXP_IM', 'DELTA_IM']
         columns['FEATURE_MS2'] = columns['FEATURE_MS2'] + imColumns

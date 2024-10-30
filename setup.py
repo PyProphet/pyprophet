@@ -50,6 +50,8 @@ setup(name='pyprophet',
       install_requires=[
           "Click",
           "duckdb",
+          "duckdb-extensions",
+          "duckdb-extension-sqlite-scanner",
           "numpy >= 1.9.0",
           "scipy",
           "pandas >= 0.17",
