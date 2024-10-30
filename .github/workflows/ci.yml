@@ -1,0 +1,28 @@
+name: continuous-integration
+
+on: [push]
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest] # remove mac tests
+        # Latest pyOpenMS supports Python 3.10, and 3.11
+        python-version: ["3.10", "3.11"]
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pytest
+        pip install .
+
+    - name: Test
+      run: |
+        python -m pytest tests/ 
