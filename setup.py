@@ -1,7 +1,14 @@
 import sys
-#import numpy
 from setuptools import setup, find_packages
 from distutils.extension import Extension
+
+try:
+    import numpy
+except ImportError:
+    print("Numpy is not installed. Installing it now.")
+    import subprocess
+    subprocess.check_call(['pip', 'install', 'numpy'])
+    import numpy
 
 try:
     from Cython.Build import cythonize
@@ -36,6 +43,7 @@ setup(name='pyprophet',
       url="https://github.com/PyProphet/pyprophet",
       packages=find_packages(exclude=['ez_setup', 'examples', 'tests']),
       include_package_data=True,
+      include_dirs=[numpy.get_include()],
       classifiers=[
           'Development Status :: 3 - Alpha',
           'Environment :: Console',
