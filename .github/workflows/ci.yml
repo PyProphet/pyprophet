@@ -24,6 +24,9 @@ jobs:
         pip install pytest
         pip install .
 
+    - name: Compile cython module
+      run: python setup.py build_ext --inplace 
+
     - name: Test
       run: |
         python -m pytest tests/ 
