@@ -1,23 +1,20 @@
-import sys
-from setuptools import setup, Extension
+from setuptools import setup, Extension, find_packages
 from Cython.Build import cythonize
 import numpy
 
-use_cython = True
-ext = ".pyx" if use_cython else ".c"
+try:
+    from Cython.Build import cythonize
+except ImportError:
+    use_cython = False
+else:
+    use_cython = True
 
-extensions = [
-    Extension(
-        "pyprophet._optimized",
-        [f"pyprophet/_optimized{ext}"],
-        include_dirs=[numpy.get_include()],
-    )
-]
-
+ext_modules = []
 if use_cython:
-    extensions = cythonize(extensions)
+    ext_modules += [Extension("pyprophet._optimized", ["pyprophet/_optimized.pyx"])]
+    ext_modules = cythonize(ext_modules)
+else:
+    ext_modules += [Extension("pyprophet._optimized", ["pyprophet/_optimized.c"])]
 
-setup(
-    ext_modules=extensions,
-)
+setup(name='pyprophet', ext_modules=ext_modules, include_dirs=[numpy.get_include()])
 

@@ -44,7 +44,6 @@ dependencies = [
 pyprophet = "pyprophet.main:cli"
 
 [tool.setuptools]
-packages = ["pyprophet"]
+packages = { find = { exclude = ["ez_setup", "examples", "tests"] } }
 include-package-data = true
 zip-safe = false
-
