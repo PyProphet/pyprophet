@@ -233,7 +233,7 @@ def pi0est(p_values, lambda_ = np.arange(0.05,1.0,0.05), pi0_method = "smoother"
 
 @profile
 def qvalue(p_values, pi0, pfdr = False):
-    p = np.array(p_values)
+    p = np.array(p_values).copy()
 
     qvals_out = p
     rm_na = np.isfinite(p)
@@ -277,7 +277,7 @@ def bw_nrd0(x):
 @profile
 def lfdr(p_values, pi0, trunc = True, monotone = True, transf = "probit", adj = 1.5, eps = np.power(10.0,-8)):
     """ Estimate local FDR / posterior error probability from p-values according to bioconductor/qvalue """
-    p = np.array(p_values)
+    p = np.array(p_values).copy()
 
     # Compare to bioconductor/qvalue reference implementation
     # import rpy2
