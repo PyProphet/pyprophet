@@ -17,4 +17,3 @@ else:
     ext_modules += [Extension("pyprophet._optimized", ["pyprophet/_optimized.c"])]
 
 setup(name='pyprophet', ext_modules=ext_modules, include_dirs=[numpy.get_include()])
-
