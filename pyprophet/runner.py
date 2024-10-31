@@ -13,6 +13,8 @@ from .pyprophet import PyProphet
 from .report import save_report
 from .data_handling import is_sqlite_file, check_sqlite_table
 from shutil import copyfile
+import duckdb
+from duckdb_extensions import extension_importer
 
 try:
     profile
@@ -34,6 +36,8 @@ class PyProphetRunner(object):
             return(table)
 
         def read_osw(infile, level, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn):
+            extension_importer.import_extension("sqlite_scanner")
+            condb = duckdb.connect(infile)
             con = sqlite3.connect(infile)
 
             if level == "ms2" or level == "ms1ms2":
@@ -47,7 +51,7 @@ CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
 CREATE INDEX IF NOT EXISTS idx_feature_ms2_feature_id ON FEATURE_MS2 (FEATURE_ID);
 ''')
 
-                table = pd.read_sql_query('''
+                table = condb.sql('''
 SELECT *,
        RUN_ID || '_' || PRECURSOR_ID AS GROUP_ID
 FROM FEATURE_MS2
@@ -72,7 +76,7 @@ INNER JOIN
 ORDER BY RUN_ID,
          PRECURSOR.ID ASC,
          FEATURE.EXP_RT ASC;
-''', con)
+''').df()
             elif level == "ms1":
                 if not check_sqlite_table(con, "FEATURE_MS1"):
                     raise click.ClickException("MS1-level feature table not present in file.")
@@ -84,7 +88,7 @@ CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
 CREATE INDEX IF NOT EXISTS idx_feature_ms1_feature_id ON FEATURE_MS1 (FEATURE_ID);
 ''')
 
-                table = pd.read_sql_query('''
+                table = condb.sql('''
 SELECT *,
        RUN_ID || '_' || PRECURSOR_ID AS GROUP_ID
 FROM FEATURE_MS1
@@ -102,7 +106,7 @@ INNER JOIN
 ORDER BY RUN_ID,
          PRECURSOR.ID ASC,
          FEATURE.EXP_RT ASC;
-''', con)
+''').df()
             elif level == "transition":
                 if not check_sqlite_table(con, "SCORE_MS2"):
                     raise click.ClickException("Transition-level scoring for IPF requires prior MS2 or MS1MS2-level scoring. Please run 'pyprophet score --level=ms2' or 'pyprophet score --level=ms1ms2' on this file first.")
@@ -119,7 +123,7 @@ CREATE INDEX IF NOT EXISTS idx_feature_transition_feature_id ON FEATURE_TRANSITI
 CREATE INDEX IF NOT EXISTS idx_feature_transition_transition_id ON FEATURE_TRANSITION (TRANSITION_ID);
 ''')
 
-                table = pd.read_sql_query('''
+                table = condb.sql('''
 SELECT TRANSITION.DECOY AS DECOY,
        FEATURE_TRANSITION.*,
        PRECURSOR.CHARGE AS PRECURSOR_CHARGE,
@@ -148,7 +152,7 @@ ORDER BY RUN_ID,
          PRECURSOR.ID,
          FEATURE.EXP_RT,
          TRANSITION.ID;
-''' % (ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn), con)
+''' % (ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn)).df()
             else:
                 raise click.ClickException("Unspecified data level selected.")
 
