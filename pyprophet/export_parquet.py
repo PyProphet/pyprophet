@@ -139,7 +139,7 @@ def export_to_parquet(infile, outfile, transitionLevel, onlyFeatures=False):
     ## features
     columns['FEATURE'] = ['EXP_RT', 'EXP_IM', 'NORM_RT', 'DELTA_RT', 'LEFT_WIDTH', 'RIGHT_WIDTH']
     columns['FEATURE_MS2'] = ['FEATURE_ID', 'AREA_INTENSITY', 'TOTAL_AREA_INTENSITY', 'APEX_INTENSITY', 'TOTAL_MI'] + getVarColumnNames(con, 'FEATURE_MS2') 
-    columns['FEATURE_MS1'] = ['APEX_INTENSITY', 'VAR_MASSDEV_SCORE'] + getVarColumnNames(con, 'FEATURE_MS1')
+    columns['FEATURE_MS1'] = ['APEX_INTENSITY', 'AREA_INTENSITY'] + getVarColumnNames(con, 'FEATURE_MS1')
     if hasIm:
         imColumns = ['EXP_IM', 'DELTA_IM']
         columns['FEATURE_MS2'] = columns['FEATURE_MS2'] + imColumns
