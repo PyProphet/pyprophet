@@ -3,7 +3,7 @@ import click
 
 from .data_handling import Experiment, update_chosen_main_score_in_table
 from .classifiers import AbstractLearner, XGBLearner
-from .stats import mean_and_std_dev, find_cutoff
+from .stats import find_cutoff
 
 try:
     profile
@@ -88,13 +88,9 @@ class AbstractSemiSupervisedLearner(object):
 
         # after semi supervised iteration: classify full dataset
         clf_scores = self.score(experiment, params)
-        mu, nu = mean_and_std_dev(clf_scores)
         experiment.set_and_rerank("classifier_score", clf_scores)
 
-        td_scores = experiment.get_top_decoy_peaks()["classifier_score"]
-
-        mu, nu = mean_and_std_dev(td_scores)
-        experiment["classifier_score"] = (experiment["classifier_score"] - mu) / nu
+        experiment.normalize_score_by_decoys('classifier_score')
         experiment.rank_by("classifier_score")
 
         return params

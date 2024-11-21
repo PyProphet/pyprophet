@@ -118,10 +118,7 @@ def posterior_chromatogram_hypotheses_fast(experiment, prior_chrom_null):
 
 
 def mean_and_std_dev(values):
-    std = np.std(values, ddof=1)
-    if std == 0:
-        raise RuntimeError("Computed standard deviation is 0, cannot perform normalization")
-    return np.mean(values), std
+    return np.mean(values), np.std(values, ddof=1)
 
 
 def pnorm(stat, stat0):
