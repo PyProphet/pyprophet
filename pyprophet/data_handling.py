@@ -5,7 +5,7 @@ import click
 import sys
 import os
 import multiprocessing
-from sklearn.preprocessing import StandardScaler
+from .stats import mean_and_std_dev 
 
 from .optimized import find_top_ranked, rank
 
@@ -345,8 +345,13 @@ class Experiment(object):
             score_col_name: str, the name of the score column
         '''
         td_scores = self.get_top_decoy_peaks()[score_col_name]
-        transform = StandardScaler().fit(td_scores.values.reshape(-1, 1))
-        self.df.loc[:, score_col_name] = transform.transform(self.df[score_col_name].values.reshape(-1, 1))
+        mu, nu = mean_and_std_dev(td_scores)
+
+        if nu == 0:
+            raise Exception("Warning: Standard deviation of decoy scores is zero. Cannot normalize scores.")
+        
+        self.df.loc[:, score_col_name] = (self.df[score_col_name] - mu) / nu
+
 
     def filter_(self, idx):
         return Experiment(self.df[idx])
