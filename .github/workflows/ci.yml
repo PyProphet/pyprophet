@@ -9,8 +9,8 @@ jobs:
       matrix:
         os: [ubuntu-latest]
           #os: [ubuntu-latest, windows-latest, macos-latest] # remove mac tests
-        # Latest pyOpenMS supports Python 3.10, and 3.11
-        python-version: ["3.10", "3.11"]
+        # Requirements file generated with python=3.11 
+        python-version: ["3.11"]
     steps:
     - uses: actions/checkout@v4
 
@@ -21,8 +21,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install pytest
-        pip install pytest-regtest
+        pip install -r requirements.txt # test with requirements file so can easily bump with dependabot
         pip install .
 
     - name: Compile cython module
