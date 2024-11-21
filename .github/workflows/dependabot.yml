@@ -1,0 +1,9 @@
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/"  # Location of your pyproject.toml or requirements.txt
+    schedule:
+      interval: "weekly"  # Checks for updates every week
+    commit-message:
+      prefix: "deps"  # Prefix for pull request titles
+    open-pull-requests-limit: 5  # Limit the number of open PRs at a time
