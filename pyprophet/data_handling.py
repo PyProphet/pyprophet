@@ -5,6 +5,7 @@ import click
 import sys
 import os
 import multiprocessing
+from sklearn.preprocessing import StandardScaler
 
 from .optimized import find_top_ranked, rank
 
@@ -336,6 +337,16 @@ class Experiment(object):
     def get_feature_matrix(self, use_main_score):
         min_col = 5 if use_main_score else 6
         return self.df.iloc[:, min_col:-1].values
+    
+    def normalize_score_by_decoys(self, score_col_name):
+        '''
+        normalize the decoy scores to mean 0 and std 1, scale the targets accordingly
+        Args:
+            score_col_name: str, the name of the score column
+        '''
+        td_scores = self.get_top_decoy_peaks()[score_col_name]
+        transform = StandardScaler().fit(td_scores.values.reshape(-1, 1))
+        self.df.loc[:, score_col_name] = transform.transform(self.df[score_col_name].values.reshape(-1, 1))
 
     def filter_(self, idx):
         return Experiment(self.df[idx])
