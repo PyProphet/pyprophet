@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyprophet"
-version = "2.2.8"
+version = "2.2.9"
 description = "PyProphet: Semi-supervised learning and scoring of OpenSWATH results."
 readme = { file = "README.md", content-type = "text/markdown" }
 license = { text = "BSD" }
@@ -26,7 +26,7 @@ dependencies = [
     "duckdb",
     "duckdb-extensions",
     "duckdb-extension-sqlite-scanner",
-    "numpy >= 1.9.0",
+    "numpy >= 2.0",
     "scipy",
     "pandas >= 0.17",
     "cython",
@@ -40,6 +40,10 @@ dependencies = [
     "pyarrow",
     "pypdf"
 ]
+
+# Optional dependencies 
+[project.optional-dependencies]
+testing = ["pytest", "pytest-regtest"]
 
 # Define console entry points
 [project.scripts]
