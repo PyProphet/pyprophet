@@ -110,7 +110,6 @@ class XGBLearner(AbstractLearner):
             
             clf = xgb.XGBClassifier(random_state=42, verbosity=0, objective='binary:logitraw', eval_metric='auc', **params)
 
-            rng = np.random.default_rng(42)
             score = cross_val_score(clf, X, y, scoring='roc_auc', n_jobs=self.threads, cv=KFold(n_splits=3, shuffle=True, random_state=42)).mean()
             # click.echo("Info: AUC: {:.3f} hyperparameters: {}".format(score, params))
             return score
