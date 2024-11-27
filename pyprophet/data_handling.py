@@ -360,7 +360,7 @@ class Experiment(object):
     def add_peak_group_rank(self):
         ids = self.df.tg_num_id.values
         scores = self.df.d_score.values
-        peak_group_ranks = rank(ids, scores)
+        peak_group_ranks = rank(ids, scores.astype(np.float32, copy=False))
         self.df["peak_group_rank"] = peak_group_ranks
 
     @profile
