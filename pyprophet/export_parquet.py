@@ -172,7 +172,7 @@ def export_to_parquet(infile, outfile, transitionLevel, onlyFeatures=False):
 
     # transition level
     if transitionLevel:
-        columns['FEATURE_TRANSITION'] = ['AREA_INTENSITY', 'TOTAL_AREA_INTENSITY', 'APEX_INTENSITY', 'TOTAL_MI'] + getVarColumnNames(condb, 'FEATURE_TRANSITION')
+        columns['FEATURE_TRANSITION'] = ['AREA_INTENSITY', 'TOTAL_AREA_INTENSITY', 'APEX_INTENSITY', 'TOTAL_MI'] + getVarColumnNames(con, 'FEATURE_TRANSITION')
         columns['TRANSITION'] = ['TRAML_ID', 'PRODUCT_MZ', 'CHARGE', 'TYPE', 'ORDINAL', 'DETECTING', 'IDENTIFYING', 'QUANTIFYING', 'LIBRARY_INTENSITY']
         columns['TRANSITION_PRECURSOR_MAPPING'] = ['TRANSITION_ID']
 

@@ -110,7 +110,7 @@ class XGBLearner(AbstractLearner):
             
             clf = xgb.XGBClassifier(random_state=42, verbosity=0, objective='binary:logitraw', eval_metric='auc', **params)
 
-            score = cross_val_score(clf, X, y, scoring='roc_auc', n_jobs=self.threads, cv=KFold(n_splits=3, shuffle=True, random_state=np.random.RandomState(42))).mean()
+            score = cross_val_score(clf, X, y, scoring='roc_auc', n_jobs=self.threads, cv=KFold(n_splits=3, shuffle=True, random_state=42)).mean()
             # click.echo("Info: AUC: {:.3f} hyperparameters: {}".format(score, params))
             return score
 
@@ -129,7 +129,8 @@ class XGBLearner(AbstractLearner):
         xgb_params_complexity = self.xgb_params_tuned
         xgb_params_complexity.update({k: self.xgb_params_space[k] for k in ('max_depth', 'min_child_weight')})
 
-        best_complexity = fmin(fn=objective, space=xgb_params_complexity, algo=tpe.suggest, max_evals=self.xgb_hyperparams['autotune_num_rounds'], rstate=np.random.RandomState(42))
+        rng = np.random.default_rng(42)
+        best_complexity = fmin(fn=objective, space=xgb_params_complexity, algo=tpe.suggest, max_evals=self.xgb_hyperparams['autotune_num_rounds'], rstate=rng)
         best_complexity['max_depth'] = int(best_complexity['max_depth'])
         best_complexity['min_child_weight'] = int(best_complexity['min_child_weight'])
 
@@ -139,7 +140,7 @@ class XGBLearner(AbstractLearner):
         xgb_params_gamma = self.xgb_params_tuned
         xgb_params_gamma['gamma'] = self.xgb_params_space['gamma']
 
-        best_gamma = fmin(fn=objective, space=xgb_params_gamma, algo=tpe.suggest, max_evals=self.xgb_hyperparams['autotune_num_rounds'], rstate=np.random.RandomState(42))
+        best_gamma = fmin(fn=objective, space=xgb_params_gamma, algo=tpe.suggest, max_evals=self.xgb_hyperparams['autotune_num_rounds'], rstate=rng)
 
         self.xgb_params_tuned.update(best_gamma)
 
@@ -147,7 +148,7 @@ class XGBLearner(AbstractLearner):
         xgb_params_subsampling = self.xgb_params_tuned
         xgb_params_subsampling.update({k: self.xgb_params_space[k] for k in ('subsample', 'colsample_bytree', 'colsample_bylevel', 'colsample_bynode')})
 
-        best_subsampling = fmin(fn=objective, space=xgb_params_subsampling, algo=tpe.suggest, max_evals=self.xgb_hyperparams['autotune_num_rounds'], rstate=np.random.RandomState(42))
+        best_subsampling = fmin(fn=objective, space=xgb_params_subsampling, algo=tpe.suggest, max_evals=self.xgb_hyperparams['autotune_num_rounds'], rstate=rng)
 
         self.xgb_params_tuned.update(best_subsampling)
 
@@ -155,7 +156,7 @@ class XGBLearner(AbstractLearner):
         xgb_params_regularization = self.xgb_params_tuned
         xgb_params_regularization.update({k: self.xgb_params_space[k] for k in ('lambda', 'alpha')})
 
-        best_regularization = fmin(fn=objective, space=xgb_params_regularization, algo=tpe.suggest, max_evals=self.xgb_hyperparams['autotune_num_rounds'], rstate=np.random.RandomState(42))
+        best_regularization = fmin(fn=objective, space=xgb_params_regularization, algo=tpe.suggest, max_evals=self.xgb_hyperparams['autotune_num_rounds'], rstate=rng)
 
         self.xgb_params_tuned.update(best_regularization)
 
@@ -163,7 +164,7 @@ class XGBLearner(AbstractLearner):
         xgb_params_learning = self.xgb_params_tuned
         xgb_params_learning['eta'] = self.xgb_params_space['eta']
 
-        best_learning = fmin(fn=objective, space=xgb_params_learning, algo=tpe.suggest, max_evals=self.xgb_hyperparams['autotune_num_rounds'], rstate=np.random.RandomState(42))
+        best_learning = fmin(fn=objective, space=xgb_params_learning, algo=tpe.suggest, max_evals=self.xgb_hyperparams['autotune_num_rounds'], rstate=rng)
 
         self.xgb_params_tuned.update(best_learning)
         click.echo("Info: Optimal hyperparameters: {}".format(self.xgb_params_tuned))

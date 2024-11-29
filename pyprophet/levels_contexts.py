@@ -33,7 +33,12 @@ def statistics_report(data, outfile, context, analyte, parametric, pfdr, pi0_lam
         outfile = outfile + "_" + str(data['run_id'].unique()[0])
 
     # export PDF report
-    save_report(outfile + "_" + context + "_" + analyte + ".pdf", outfile + ": " + context + " " + analyte + "-level error-rate control", data[data.decoy==1]["score"], data[data.decoy==0]["score"], stat_table["cutoff"], stat_table["svalue"], stat_table["qvalue"], data[data.decoy==0]["p_value"], pi0, color_palette)
+    save_report(outfile + "_" + context + "_" + analyte + ".pdf", 
+                outfile + ": " + context + " " + analyte + "-level error-rate control", 
+                data[data.decoy==1]["score"].values, data[data.decoy==0]["score"].values, stat_table["cutoff"].values, 
+                stat_table["svalue"].values, stat_table["qvalue"].values, data[data.decoy==0]["p_value"].values, 
+                pi0, 
+                color_palette)
 
     return(data)
 
@@ -184,7 +189,7 @@ ORDER BY SCORE DESC
     con.close()
 
     if context == 'run-specific':
-        data = data.groupby('run_id').apply(statistics_report, outfile, context, "protein", parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, color_palette).reset_index()
+        data = data.groupby('run_id').apply(statistics_report, outfile, context, "protein", parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, color_palette)
 
     elif context in ['global', 'experiment-wide']:
         data = statistics_report(data, outfile, context, "protein", parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, color_palette)
@@ -257,7 +262,7 @@ ORDER BY SCORE DESC
     con.close()
 
     if context == 'run-specific':
-        data = data.groupby('run_id').apply(statistics_report, outfile, context, "peptide", parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, color_palette).reset_index()
+        data = data.groupby('run_id').apply(statistics_report, outfile, context, "peptide", parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, color_palette)
 
     elif context in ['global', 'experiment-wide']:
         data = statistics_report(data, outfile, context, "peptide", parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, color_palette)
