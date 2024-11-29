@@ -5,6 +5,7 @@ import click
 import sys
 import os
 import multiprocessing
+from .stats import mean_and_std_dev 
 
 from .optimized import find_top_ranked, rank
 
@@ -336,6 +337,21 @@ class Experiment(object):
     def get_feature_matrix(self, use_main_score):
         min_col = 5 if use_main_score else 6
         return self.df.iloc[:, min_col:-1].values
+    
+    def normalize_score_by_decoys(self, score_col_name):
+        '''
+        normalize the decoy scores to mean 0 and std 1, scale the targets accordingly
+        Args:
+            score_col_name: str, the name of the score column
+        '''
+        td_scores = self.get_top_decoy_peaks()[score_col_name]
+        mu, nu = mean_and_std_dev(td_scores)
+
+        if nu == 0:
+            raise Exception("Warning: Standard deviation of decoy scores is zero. Cannot normalize scores.")
+        
+        self.df.loc[:, score_col_name] = (self.df[score_col_name] - mu) / nu
+
 
     def filter_(self, idx):
         return Experiment(self.df[idx])
@@ -344,7 +360,7 @@ class Experiment(object):
     def add_peak_group_rank(self):
         ids = self.df.tg_num_id.values
         scores = self.df.d_score.values
-        peak_group_ranks = rank(ids, scores)
+        peak_group_ranks = rank(ids, scores.astype(np.float32, copy=False))
         self.df["peak_group_rank"] = peak_group_ranks
 
     @profile
