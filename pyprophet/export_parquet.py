@@ -17,10 +17,10 @@ def getPeptideProteinScoreTable(conndb, level):
     nonGlobal.columns = [ col.upper().replace('-', '') for col in nonGlobal.columns.map('_'.join)]
     nonGlobal= nonGlobal.reset_index()
         
-    glob = conndb.sql(f"select {id}, RUN_ID, SCORE, PVALUE, QVALUE, PEP from {score_table} where context == 'global'").df()
+    glob = conndb.sql(f"select {id}, SCORE, PVALUE, QVALUE, PEP from {score_table} where context == 'global'").df()
     glob.columns = [ col.upper() + '_GLOBAL' if col != id else col for col in glob.columns ]
 
-    return nonGlobal.merge(glob, how='outer')
+    return glob, nonGlobal
     
 def getVarColumnNames(condb, tableName):
     '''
@@ -139,7 +139,7 @@ def export_to_parquet(infile, outfile, transitionLevel, onlyFeatures=False):
     ## features
     columns['FEATURE'] = ['EXP_RT', 'EXP_IM', 'NORM_RT', 'DELTA_RT', 'LEFT_WIDTH', 'RIGHT_WIDTH']
     columns['FEATURE_MS2'] = ['FEATURE_ID', 'AREA_INTENSITY', 'TOTAL_AREA_INTENSITY', 'APEX_INTENSITY', 'TOTAL_MI'] + getVarColumnNames(con, 'FEATURE_MS2') 
-    columns['FEATURE_MS1'] = ['APEX_INTENSITY', 'VAR_MASSDEV_SCORE'] + getVarColumnNames(con, 'FEATURE_MS1')
+    columns['FEATURE_MS1'] = ['APEX_INTENSITY', 'AREA_INTENSITY'] + getVarColumnNames(con, 'FEATURE_MS1')
     if hasIm:
         imColumns = ['EXP_IM', 'DELTA_IM']
         columns['FEATURE_MS2'] = columns['FEATURE_MS2'] + imColumns
@@ -150,15 +150,19 @@ def export_to_parquet(infile, outfile, transitionLevel, onlyFeatures=False):
 
     # Check for Peptide/Protein scores Context Scores
     if check_sqlite_table(con, "SCORE_PEPTIDE"):
-        pepTable = getPeptideProteinScoreTable(condb, "peptide")
-        pepJoin = 'LEFT JOIN pepTable ON pepTable.PEPTIDE_ID = PEPTIDE.ID and pepTable.RUN_ID = RUN.ID'
-        columns['pepTable'] = list(set(pepTable.columns).difference(set(['PEPTIDE_ID', 'RUN_ID']))) # all columns except PEPTIDE_ID and RUN_ID
+        pepTable_global, pepTable_nonGlobal = getPeptideProteinScoreTable(condb, "peptide")
+        pepJoin = '''LEFT JOIN pepTable_nonGlobal ON pepTable_nonGlobal.PEPTIDE_ID = PEPTIDE.ID and pepTable_nonGlobal.RUN_ID = RUN.ID
+                     LEFT JOIN pepTable_global ON pepTable_global.PEPTIDE_ID = PEPTIDE.ID'''
+        columns['pepTable_nonGlobal'] = list(set(pepTable_nonGlobal.columns).difference(set(['PEPTIDE_ID', 'RUN_ID']))) # all columns except PEPTIDE_ID and RUN_ID
+        columns['pepTable_global'] = list(set(pepTable_global.columns).difference(set(['PEPTIDE_ID']))) # all columns except PEPTIDE_ID and RUN_ID
 
 
     if check_sqlite_table(con, "SCORE_PROTEIN"):
-        protTable = getPeptideProteinScoreTable(condb, "protein")
-        protJoin = 'LEFT JOIN protTable ON protTable.PROTEIN_ID = PROTEIN.ID and protTable.RUN_ID = RUN.ID'
-        columns['protTable'] = list(set(protTable.columns).difference(set(['PROTEIN_ID', 'RUN_ID']))) # all columns except PEPTIDE_ID and RUN_ID
+        protTable_global, protTable_nonGlobal = getPeptideProteinScoreTable(condb, "protein")
+        protJoin = '''LEFT JOIN protTable_nonGlobal ON protTable_nonGlobal.PROTEIN_ID = PROTEIN.ID and protTable_nonGlobal.RUN_ID = RUN.ID
+                      LEFT JOIN protTable_global ON protTable_global.PROTEIN_ID = PROTEIN.ID'''
+        columns['protTable_nonGlobal'] = list(set(protTable_nonGlobal.columns).difference(set(['PROTEIN_ID', 'RUN_ID']))) # all columns except PROTEIN_ID and RUN_ID
+        columns['protTable_global'] = list(set(protTable_global.columns).difference(set(['PROTEIN_ID']))) # all columns except PROTEIN_ID
 
     ## other
     columns['RUN'] = ['FILENAME']
@@ -181,9 +185,9 @@ def export_to_parquet(infile, outfile, transitionLevel, onlyFeatures=False):
     
     for table in columns.keys(): # iterate through all tables
         ## rename pepTable and protTable to be inline with sql scheme
-        if table == 'pepTable':
+        if table in ['pepTable_nonGlobal','pepTable_global']:
             renamed_table = 'SCORE_PEPTIDE'
-        elif table == 'protTable':
+        elif table in ['protTable_nonGlobal', 'protTable_global']:
             renamed_table = 'SCORE_PROTEIN'
         else:
             renamed_table = table
