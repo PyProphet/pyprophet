@@ -1,13 +1,17 @@
+import duckdb
+from duckdb_extensions import extension_importer
 import pandas as pd
 import numpy as np
-import scipy as sp
 import sqlite3
-import sys
 import click
 
 from scipy.stats import rankdata
 from .data_handling import check_sqlite_table
 from shutil import copyfile
+
+## ensure proper extension installed
+extension_importer.import_extension("sqlite_scanner")
+
 
 def compute_model_fdr(data_in):
     data = np.asarray(data_in)
@@ -31,6 +35,7 @@ def read_pyp_peakgroup_precursor(path, ipf_max_peakgroup_pep, ipf_ms1_scoring, i
     click.echo("Info: Reading precursor-level data.")
     # precursors are restricted according to ipf_max_peakgroup_pep to exclude very poor peak groups
     con = sqlite3.connect(path)
+    condb = duckdb.connect(path)
 
     # only use MS2 precursors
     if not ipf_ms1_scoring and ipf_ms2_scoring:
@@ -47,7 +52,7 @@ CREATE INDEX IF NOT EXISTS idx_score_transition_feature_id ON SCORE_TRANSITION (
 CREATE INDEX IF NOT EXISTS idx_score_transition_transition_id ON SCORE_TRANSITION (TRANSITION_ID);
 ''')
 
-        data = pd.read_sql_query('''
+        data = condb.sql('''
 SELECT FEATURE.ID AS FEATURE_ID,
        SCORE_MS2.PEP AS MS2_PEAKGROUP_PEP,
        NULL AS MS1_PRECURSOR_PEP,
@@ -64,7 +69,7 @@ INNER JOIN
      AND TRANSITION.DECOY=0) AS SCORE_TRANSITION ON FEATURE.ID = SCORE_TRANSITION.FEATURE_ID
 WHERE PRECURSOR.DECOY=0
   AND SCORE_MS2.PEP < %s;
-''' % ipf_max_peakgroup_pep, con)
+''' % ipf_max_peakgroup_pep).df()
 
     # only use MS1 precursors
     elif ipf_ms1_scoring and not ipf_ms2_scoring:
@@ -79,7 +84,7 @@ CREATE INDEX IF NOT EXISTS idx_score_ms1_feature_id ON SCORE_MS1 (FEATURE_ID);
 CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);
 ''')
 
-        data = pd.read_sql_query('''
+        data = condb.sql('''
 SELECT FEATURE.ID AS FEATURE_ID,
        SCORE_MS2.PEP AS MS2_PEAKGROUP_PEP,
        SCORE_MS1.PEP AS MS1_PRECURSOR_PEP,
@@ -90,7 +95,7 @@ INNER JOIN SCORE_MS1 ON FEATURE.ID = SCORE_MS1.FEATURE_ID
 INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
 WHERE PRECURSOR.DECOY=0
   AND SCORE_MS2.PEP < %s;
-''' % ipf_max_peakgroup_pep, con)
+''' % ipf_max_peakgroup_pep).df()
 
     # use both MS1 and MS2 precursors
     elif ipf_ms1_scoring and ipf_ms2_scoring:
@@ -108,7 +113,7 @@ CREATE INDEX IF NOT EXISTS idx_score_transition_feature_id ON SCORE_TRANSITION (
 CREATE INDEX IF NOT EXISTS idx_score_transition_transition_id ON SCORE_TRANSITION (TRANSITION_ID);
 ''')
 
-        data = pd.read_sql_query('''
+        data = condb.sql('''
 SELECT FEATURE.ID AS FEATURE_ID,
        SCORE_MS2.PEP AS MS2_PEAKGROUP_PEP,
        SCORE_MS1.PEP AS MS1_PRECURSOR_PEP,
@@ -126,7 +131,7 @@ INNER JOIN
      AND TRANSITION.DECOY=0) AS SCORE_TRANSITION ON FEATURE.ID = SCORE_TRANSITION.FEATURE_ID
 WHERE PRECURSOR.DECOY=0
   AND SCORE_MS2.PEP < %s;
-''' % ipf_max_peakgroup_pep, con)
+''' % ipf_max_peakgroup_pep).df()
 
     # do not use any precursor information
     else:
@@ -140,7 +145,7 @@ CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
 CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);
 ''')
 
-        data = pd.read_sql_query('''
+        data = condb.sql('''
 SELECT FEATURE.ID AS FEATURE_ID,
        SCORE_MS2.PEP AS MS2_PEAKGROUP_PEP,
        NULL AS MS1_PRECURSOR_PEP,
@@ -150,11 +155,11 @@ INNER JOIN FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID
 INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
 WHERE PRECURSOR.DECOY=0
   AND SCORE_MS2.PEP < %s;
-''' % ipf_max_peakgroup_pep, con)
+''' % ipf_max_peakgroup_pep).df()
 
     data.columns = [col.lower() for col in data.columns]
     con.close()
-
+    condb.close()
     return data
 
 
@@ -162,6 +167,7 @@ def read_pyp_transition(path, ipf_max_transition_pep, ipf_h0):
     click.echo("Info: Reading peptidoform-level data.")
     # only the evidence is restricted to ipf_max_transition_pep, the peptidoform-space is complete
     con = sqlite3.connect(path)
+    condb = duckdb.connect(path)
 
     con.executescript('''
 CREATE INDEX IF NOT EXISTS idx_transition_peptide_mapping_transition_id ON TRANSITION_PEPTIDE_MAPPING (TRANSITION_ID);
@@ -171,7 +177,7 @@ CREATE INDEX IF NOT EXISTS idx_score_transition_transition_id ON SCORE_TRANSITIO
 ''')
 
     # transition-level evidence
-    evidence = pd.read_sql_query('''
+    evidence = condb.sql('''
 SELECT FEATURE_ID,
        TRANSITION_ID,
        PEP
@@ -180,11 +186,11 @@ INNER JOIN TRANSITION ON SCORE_TRANSITION.TRANSITION_ID = TRANSITION.ID
 WHERE TRANSITION.TYPE!=''
   AND TRANSITION.DECOY=0
   AND PEP < %s;
- ''' % ipf_max_transition_pep, con)
+ ''' % ipf_max_transition_pep).df()
     evidence.columns = [col.lower() for col in evidence.columns]
 
     # transition-level bitmask
-    bitmask = pd.read_sql_query('''
+    bitmask = condb.sql('''
 SELECT DISTINCT TRANSITION.ID AS TRANSITION_ID,
                 PEPTIDE_ID,
                 1 AS BMASK
@@ -193,11 +199,11 @@ INNER JOIN TRANSITION ON SCORE_TRANSITION.TRANSITION_ID = TRANSITION.ID
 INNER JOIN TRANSITION_PEPTIDE_MAPPING ON TRANSITION.ID = TRANSITION_PEPTIDE_MAPPING.TRANSITION_ID
 WHERE TRANSITION.TYPE!=''
   AND TRANSITION.DECOY=0;
-''', con)
+''').df()
     bitmask.columns = [col.lower() for col in bitmask.columns]
 
     # potential peptidoforms per feature
-    num_peptidoforms = pd.read_sql_query('''
+    num_peptidoforms = condb.sql('''
 SELECT FEATURE_ID,
        COUNT(DISTINCT PEPTIDE_ID) AS NUM_PEPTIDOFORMS
 FROM SCORE_TRANSITION
@@ -207,11 +213,11 @@ WHERE TRANSITION.TYPE!=''
   AND TRANSITION.DECOY=0
 GROUP BY FEATURE_ID
 ORDER BY FEATURE_ID;
-''', con)
+''').df()
     num_peptidoforms.columns = [col.lower() for col in num_peptidoforms.columns]
 
     # peptidoform space per feature
-    peptidoforms = pd.read_sql_query('''
+    peptidoforms = condb.sql('''
 SELECT DISTINCT FEATURE_ID,
                 PEPTIDE_ID
 FROM SCORE_TRANSITION
@@ -220,10 +226,11 @@ INNER JOIN TRANSITION_PEPTIDE_MAPPING ON TRANSITION.ID = TRANSITION_PEPTIDE_MAPP
 WHERE TRANSITION.TYPE!=''
   AND TRANSITION.DECOY=0
 ORDER BY FEATURE_ID;
-''', con)
+''').df()
     peptidoforms.columns = [col.lower() for col in peptidoforms.columns]
 
     con.close()
+    condb.close()
 
     # add h0 (peptide_id: -1) to peptidoform-space if necessary
     if ipf_h0:

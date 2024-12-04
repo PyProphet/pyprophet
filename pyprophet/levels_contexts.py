@@ -1,15 +1,17 @@
-import sys
 import os
 import click
 import pandas as pd
-import numpy as np
 import sqlite3
+import duckdb
+from duckdb_extensions import extension_importer
 
 from .stats import error_statistics, lookup_values_from_error_table, final_err_table, summary_err_table
 from .report import save_report
 from shutil import copyfile
 from .data_handling import check_sqlite_table
 
+## ensure proper extension installed
+extension_importer.import_extension("sqlite_scanner")
 
 def statistics_report(data, outfile, context, analyte, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, color_palette):
 
@@ -45,6 +47,7 @@ def statistics_report(data, outfile, context, analyte, parametric, pfdr, pi0_lam
 def infer_genes(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, color_palette):
 
     con = sqlite3.connect(infile)
+    condb = duckdb.connect(infile)
 
     if not check_sqlite_table(con, "SCORE_MS2"):
         raise click.ClickException("Apply scoring to MS2-level data before running gene-level scoring.")
@@ -69,7 +72,7 @@ CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
 CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);
 ''')
 
-        data = pd.read_sql_query('''
+        data = condb.sql('''
 SELECT %s AS RUN_ID,
        %s AS GROUP_ID,
        GENE.ID AS GENE_ID,
@@ -131,6 +134,7 @@ ORDER BY SCORE DESC
 def infer_proteins(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, color_palette):
 
     con = sqlite3.connect(infile)
+    condb = duckdb.connect(infile)
 
     if not check_sqlite_table(con, "SCORE_MS2"):
         raise click.ClickException("Apply scoring to MS2-level data before running protein-level scoring.")
@@ -141,7 +145,7 @@ def infer_proteins(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_m
             group_id = 'PROTEIN.ID'
         else:
             run_id = 'RUN_ID'
-            group_id = 'RUN_ID || "_" || PROTEIN.ID'
+            group_id = "RUN_ID || '_' || PROTEIN.ID"
 
         con.executescript('''
 CREATE INDEX IF NOT EXISTS idx_peptide_protein_mapping_protein_id ON PEPTIDE_PROTEIN_MAPPING (PROTEIN_ID);
@@ -155,13 +159,13 @@ CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
 CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);
 ''')
 
-        data = pd.read_sql_query('''
+        data = condb.sql('''
 SELECT %s AS RUN_ID,
        %s AS GROUP_ID,
        PROTEIN.ID AS PROTEIN_ID,
        PRECURSOR.DECOY AS DECOY,
-       SCORE,
-       "%s" AS CONTEXT
+       MAX(SCORE),
+       '%s' AS CONTEXT
 FROM PROTEIN
 INNER JOIN
   (SELECT PEPTIDE_PROTEIN_MAPPING.PEPTIDE_ID AS PEPTIDE_ID,
@@ -178,12 +182,12 @@ INNER JOIN PRECURSOR_PEPTIDE_MAPPING ON PEPTIDE.ID = PRECURSOR_PEPTIDE_MAPPING.P
 INNER JOIN PRECURSOR ON PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID = PRECURSOR.ID
 INNER JOIN FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID
 INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
-GROUP BY GROUP_ID
-HAVING MAX(SCORE)
-ORDER BY SCORE DESC
-''' % (run_id, group_id, context), con)
+GROUP BY GROUP_ID, RUN_ID, PROTEIN.ID, PRECURSOR.DECOY
+ORDER BY MAX(SCORE) DESC
+''' % (run_id, group_id, context)).df().rename(columns={"max(SCORE)": "score"})
     else:
         raise click.ClickException("Unspecified context selected.")
+    condb.close()
 
     data.columns = [col.lower() for col in data.columns]
     con.close()

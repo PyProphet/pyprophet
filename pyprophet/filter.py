@@ -1,3 +1,5 @@
+import duckdb
+from duckdb_extensions import extension_importer
 import pandas as pd
 import numpy as np
 import sqlite3
@@ -6,6 +8,9 @@ from datetime import datetime
 
 from .data_handling import check_sqlite_table
 
+
+## ensure proper extension installed
+extension_importer.import_extension("sqlite_scanner")
 
 # Filter a sqMass chromatogram file by given input labels
 def filter_chrom_by_labels(infile, outfile, labels):
@@ -94,6 +99,7 @@ def get_ids_stmt(keep_ids):
 def filter_sqmass(sqmassfiles, infile=None, max_precursor_pep=0.7, max_peakgroup_pep=0.7, max_transition_pep=0.7, keep_naked_peptides=[], remove_decoys=True):
     if infile is not None:
         con = sqlite3.connect(infile)
+        condb = duckdb.connect(infile)
         
     if remove_decoys:
         decoy_query = " AND DECOY=0"
@@ -107,7 +113,7 @@ def filter_sqmass(sqmassfiles, infile=None, max_precursor_pep=0.7, max_peakgroup
 
         if infile is not None:
             if check_sqlite_table(con, 'SCORE_MS1') and check_sqlite_table(con, 'SCORE_MS2') and check_sqlite_table(con, 'SCORE_TRANSITION'):
-                transitions = pd.read_sql_query('''
+                transitions = condb.sql('''
     SELECT TRANSITION_ID AS transition_id
     FROM PRECURSOR
     INNER JOIN FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID
@@ -120,10 +126,10 @@ def filter_sqmass(sqmassfiles, infile=None, max_precursor_pep=0.7, max_peakgroup
     AND SCORE_TRANSITION.PEP <= {2}
     AND FILENAME LIKE '%{3}%'
     {4};
-    '''.format(max_precursor_pep, max_peakgroup_pep, max_transition_pep, sqm_in.split(".sqMass")[0], decoy_query), con)['transition_id'].values
+    '''.format(max_precursor_pep, max_peakgroup_pep, max_transition_pep, sqm_in.split(".sqMass")[0], decoy_query)).df()['transition_id'].values
 
             elif check_sqlite_table(con, 'SCORE_MS1') and check_sqlite_table(con, 'SCORE_MS2') and not check_sqlite_table(con, 'SCORE_TRANSITION'):
-                transitions = pd.read_sql_query('''
+                transitions = condb.sql('''
     SELECT TRANSITION_ID AS transition_id
     FROM PRECURSOR
     INNER JOIN FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID
@@ -135,10 +141,10 @@ def filter_sqmass(sqmassfiles, infile=None, max_precursor_pep=0.7, max_peakgroup
     AND SCORE_MS2.PEP <= {1}
     AND FILENAME LIKE '%{2}%'
     {3};
-    '''.format(max_precursor_pep, max_peakgroup_pep, sqm_in.split(".sqMass")[0], decoy_query), con)['transition_id'].values
+    '''.format(max_precursor_pep, max_peakgroup_pep, sqm_in.split(".sqMass")[0], decoy_query)).df()['transition_id'].values
 
             elif not check_sqlite_table(con, 'SCORE_MS1') and check_sqlite_table(con, 'SCORE_MS2') and not check_sqlite_table(con, 'SCORE_TRANSITION'):
-                transitions = pd.read_sql_query('''
+                transitions = condb.sql('''
     SELECT TRANSITION_ID AS transition_id
     FROM PRECURSOR
     INNER JOIN FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID
@@ -148,22 +154,23 @@ def filter_sqmass(sqmassfiles, infile=None, max_precursor_pep=0.7, max_peakgroup
     WHERE SCORE_MS2.PEP <= {0}
     AND FILENAME LIKE '%{1}%'
     {2};
-    '''.format(max_peakgroup_pep, sqm_in.split(".sqMass")[0], decoy_query), con)['transition_id'].values
+    '''.format(max_peakgroup_pep, sqm_in.split(".sqMass")[0], decoy_query)).df()['transition_id'].values
             else:
                 raise click.ClickException("Conduct scoring on MS1, MS2 and/or transition-level before filtering.")
             
         elif len(keep_naked_peptides) != 0:
-            con = sqlite3.connect(sqm_in)
-            transitions = pd.read_sql_query(f'''
+            condb = duckdb.connect(sqm_in)
+            transitions = condb.sql(f'''
     SELECT NATIVE_ID
     FROM CHROMATOGRAM
     INNER JOIN PRECURSOR ON PRECURSOR.CHROMATOGRAM_ID = CHROMATOGRAM.ID
-    WHERE PRECURSOR.PEPTIDE_SEQUENCE IN ('{"','".join(keep_naked_peptides)}') ''', con)['NATIVE_ID'].values
-            con.close()
+    WHERE PRECURSOR.PEPTIDE_SEQUENCE IN ('{"','".join(keep_naked_peptides)}') ''').df()['NATIVE_ID'].values
+            condb.close()
         else:
             raise click.ClickException("Please provide either an associated OSW file to filter based on scoring or a list of peptides to keep.")
 
         filter_chrom_by_labels(sqm_in, sqm_out, transitions)
+    con.close()
 
 def filter_osw(oswfiles, remove_decoys=True, omit_tables=[], max_gene_fdr=None, max_protein_fdr=None, max_peptide_fdr=None, max_ms2_fdr=None, keep_naked_peptides=[], run_ids=[]):
 
