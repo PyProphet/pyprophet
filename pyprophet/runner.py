@@ -196,6 +196,9 @@ ORDER BY RUN_ID,
                 table = table.rename(index=str, columns={'precursor_charge': 'var_precursor_charge', 'product_charge': 'var_product_charge', 'transition_count': 'var_transition_count'})
 
             con.close()
+            condb.close()
+            print("in duckdb")
+            print(table)
             return(table)
 
         # Check for auto main score selection
