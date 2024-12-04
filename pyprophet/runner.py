@@ -197,8 +197,6 @@ ORDER BY RUN_ID,
 
             con.close()
             condb.close()
-            print("in duckdb")
-            print(table)
             return(table)
 
         # Check for auto main score selection

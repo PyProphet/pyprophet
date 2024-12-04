@@ -31,11 +31,11 @@ def compute_model_fdr(data_in):
     return fdr
 
 
+# NOTE: For testing purposes cannot use duckdb as order in sql statements is not guaranteed
 def read_pyp_peakgroup_precursor(path, ipf_max_peakgroup_pep, ipf_ms1_scoring, ipf_ms2_scoring):
     click.echo("Info: Reading precursor-level data.")
     # precursors are restricted according to ipf_max_peakgroup_pep to exclude very poor peak groups
     con = sqlite3.connect(path)
-    condb = duckdb.connect(path)
 
     # only use MS2 precursors
     if not ipf_ms1_scoring and ipf_ms2_scoring:
@@ -52,7 +52,7 @@ CREATE INDEX IF NOT EXISTS idx_score_transition_feature_id ON SCORE_TRANSITION (
 CREATE INDEX IF NOT EXISTS idx_score_transition_transition_id ON SCORE_TRANSITION (TRANSITION_ID);
 ''')
 
-        data = condb.sql('''
+        data = pd.read_sql('''
 SELECT FEATURE.ID AS FEATURE_ID,
        SCORE_MS2.PEP AS MS2_PEAKGROUP_PEP,
        NULL AS MS1_PRECURSOR_PEP,
@@ -69,7 +69,7 @@ INNER JOIN
      AND TRANSITION.DECOY=0) AS SCORE_TRANSITION ON FEATURE.ID = SCORE_TRANSITION.FEATURE_ID
 WHERE PRECURSOR.DECOY=0
   AND SCORE_MS2.PEP < %s;
-''' % ipf_max_peakgroup_pep).df()
+''' % ipf_max_peakgroup_pep, con)
 
     # only use MS1 precursors
     elif ipf_ms1_scoring and not ipf_ms2_scoring:
@@ -84,7 +84,7 @@ CREATE INDEX IF NOT EXISTS idx_score_ms1_feature_id ON SCORE_MS1 (FEATURE_ID);
 CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);
 ''')
 
-        data = condb.sql('''
+        data = pd.read_sql('''
 SELECT FEATURE.ID AS FEATURE_ID,
        SCORE_MS2.PEP AS MS2_PEAKGROUP_PEP,
        SCORE_MS1.PEP AS MS1_PRECURSOR_PEP,
@@ -95,7 +95,7 @@ INNER JOIN SCORE_MS1 ON FEATURE.ID = SCORE_MS1.FEATURE_ID
 INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
 WHERE PRECURSOR.DECOY=0
   AND SCORE_MS2.PEP < %s;
-''' % ipf_max_peakgroup_pep).df()
+''' % ipf_max_peakgroup_pep, con)
 
     # use both MS1 and MS2 precursors
     elif ipf_ms1_scoring and ipf_ms2_scoring:
@@ -113,7 +113,7 @@ CREATE INDEX IF NOT EXISTS idx_score_transition_feature_id ON SCORE_TRANSITION (
 CREATE INDEX IF NOT EXISTS idx_score_transition_transition_id ON SCORE_TRANSITION (TRANSITION_ID);
 ''')
 
-        data = condb.sql('''
+        data = pd.read_sql('''
 SELECT FEATURE.ID AS FEATURE_ID,
        SCORE_MS2.PEP AS MS2_PEAKGROUP_PEP,
        SCORE_MS1.PEP AS MS1_PRECURSOR_PEP,
@@ -131,7 +131,7 @@ INNER JOIN
      AND TRANSITION.DECOY=0) AS SCORE_TRANSITION ON FEATURE.ID = SCORE_TRANSITION.FEATURE_ID
 WHERE PRECURSOR.DECOY=0
   AND SCORE_MS2.PEP < %s;
-''' % ipf_max_peakgroup_pep).df()
+''' % ipf_max_peakgroup_pep, con)
 
     # do not use any precursor information
     else:
@@ -145,7 +145,7 @@ CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
 CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);
 ''')
 
-        data = condb.sql('''
+        data = pd.read_sql('''
 SELECT FEATURE.ID AS FEATURE_ID,
        SCORE_MS2.PEP AS MS2_PEAKGROUP_PEP,
        NULL AS MS1_PRECURSOR_PEP,
@@ -155,11 +155,10 @@ INNER JOIN FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID
 INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
 WHERE PRECURSOR.DECOY=0
   AND SCORE_MS2.PEP < %s;
-''' % ipf_max_peakgroup_pep).df()
+''' % ipf_max_peakgroup_pep, con)
 
     data.columns = [col.lower() for col in data.columns]
     con.close()
-    condb.close()
     return data
 
 
