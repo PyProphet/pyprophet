@@ -3,6 +3,7 @@ import sqlite3
 import pandas as pd
 from pyprophet.export import check_sqlite_table
 from duckdb_extensions import extension_importer
+import re
 
 def getPeptideProteinScoreTable(conndb, level):
     if level == 'peptide':
@@ -66,6 +67,9 @@ def export_to_parquet(infile, outfile, transitionLevel, onlyFeatures=False):
     CREATE INDEX IF NOT EXISTS idx_protein_protein_id ON PROTEIN (ID);
     CREATE INDEX IF NOT EXISTS idx_peptide_protein_mapping_peptide_id ON PEPTIDE_PROTEIN_MAPPING (PEPTIDE_ID);
 
+    CREATE INDEX IF NOT EXISTS idx_transition_id ON TRANSITION (ID);
+    CREATE INDEX IF NOT EXISTS idx_transition_precursor_mapping_transition_id ON TRANSITION_PRECURSOR_MAPPING (TRANSITION_ID);
+    CREATE INDEX IF NOT EXISTS idx_transition_precursor_mapping_precursor_id ON TRANSITION_PRECURSOR_MAPPING (PRECURSOR_ID);
     '''
 
     if check_sqlite_table(con, "FEATURE_MS1"):
@@ -200,19 +204,27 @@ def export_to_parquet(infile, outfile, transitionLevel, onlyFeatures=False):
 
     # create a list of all the columns
     columns_list = [col for c in columns.values() for col in c]
+    
+    # create a list of just aliases for groupby
+    pattern = re.compile(r"(.*)\sAS")
+    alias_list = [ pattern.search(col).group(1) for c in columns.values() for col in c]
 
     # join the list into a single string separated by a comma and a space
     columnsToSelect = ", ".join(columns_list)
-
-    join_features = "LEFT JOIN" if onlyFeatures else "FULL JOIN"
+    aliasToSelect = ", ".join(alias_list)
 
     # First read feature data
     # Feature Data
     if not transitionLevel:
         feature_query = f'''
-        SELECT {columnsToSelect}
-        FROM FEATURE
-        {join_features} PRECURSOR ON FEATURE.PRECURSOR_ID = PRECURSOR.ID
+        SELECT {columnsToSelect},
+        GROUP_CONCAT(TRANSITION.ID, ';') AS 'TRANSITION_ID',
+        GROUP_CONCAT(TRANSITION.ANNOTATION, ';') AS 'TRANSITION_ANNOTATION'
+        FROM TRANSITION_PRECURSOR_MAPPING
+        LEFT JOIN TRANSITION ON TRANSITION_PRECURSOR_MAPPING.TRANSITION_ID = TRANSITION.ID
+        LEFT JOIN PRECURSOR ON TRANSITION_PRECURSOR_MAPPING.PRECURSOR_ID = PRECURSOR.ID
+        LEFT JOIN FEATURE_TRANSITION ON TRANSITION.ID = FEATURE_TRANSITION.TRANSITION_ID 
+        LEFT JOIN FEATURE ON FEATURE_TRANSITION.FEATURE_ID = FEATURE.ID
         LEFT JOIN RUN ON FEATURE.RUN_ID = RUN.ID
         LEFT JOIN FEATURE_MS1 ON FEATURE.ID = FEATURE_MS1.FEATURE_ID
         LEFT JOIN FEATURE_MS2 ON FEATURE.ID = FEATURE_MS2.FEATURE_ID
@@ -224,6 +236,7 @@ def export_to_parquet(infile, outfile, transitionLevel, onlyFeatures=False):
         {gene_table_joins}
         {pepJoin}
         {protJoin}
+        GROUP BY {aliasToSelect}
         '''
     else: # is transition level
         
