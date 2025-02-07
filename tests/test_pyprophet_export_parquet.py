@@ -27,7 +27,7 @@ def _run_cmdline(cmdline):
     return stdout
 
 
-def _run_export_parquet_single_run(temp_folder, transitionLevel=False, pd_testing_kwargs=dict(check_dtype=False, check_names=False), onlyFeatures=False):
+def _run_export_parquet_single_run(temp_folder, transitionLevel=False, pd_testing_kwargs=dict(check_dtype=False, check_names=False), onlyFeatures=False, noDecoys=False):
     os.chdir(temp_folder)
     DATA_NAME="dummyOSWScoredData.osw"
     data_path = os.path.join(DATA_FOLDER, DATA_NAME)
@@ -41,6 +41,8 @@ def _run_export_parquet_single_run(temp_folder, transitionLevel=False, pd_testin
         cmdline += " --transitionLevel"
     if onlyFeatures:
         cmdline += " --onlyFeatures"
+    if noDecoys:
+        cmdline += " --noDecoys"
 
     stdout = _run_cmdline(cmdline)
 
@@ -73,6 +75,7 @@ def _run_export_parquet_single_run(temp_folder, transitionLevel=False, pd_testin
 
         assert(expectedLength == len(parquet))
 
+
     ########### FEATURE LEVEL TESTS ########
     # Tests that columns are equal across different sqlite3 tables to ensure joins occured correctly
 
@@ -95,6 +98,14 @@ def _run_export_parquet_single_run(temp_folder, transitionLevel=False, pd_testin
     pd.testing.assert_series_equal(parquet['SCORE_PEPTIDE.SCORE_GLOBAL'],  parquet['PEPTIDE_ID'], **pd_testing_kwargs)
     pd.testing.assert_series_equal(parquet['SCORE_PROTEIN.SCORE_GLOBAL'],  parquet['PROTEIN_ID'], **pd_testing_kwargs)
 
+    print(parquet)
+    # check is/no decoys
+    if noDecoys:
+         assert(parquet[parquet['DECOY'] == 1].shape[0] == 0)
+    else:
+         assert(parquet[parquet['DECOY'] == 1].shape[0] != 0)
+
+
     ############### TRANSTION LEVEL TESTS ################
     if transitionLevel:
         pd.testing.assert_series_equal(parquet['FEATURE_TRANSITION.AREA_INTENSITY'], parquet['TRANSITION.PRODUCT_MZ'] * (proxy_feature_id), **pd_testing_kwargs)
@@ -113,3 +124,9 @@ def test_export_parquet_single_run_onlyFeatures(tmpdir):
 
 def test_export_parquet_single_run_transitionLevel_onlyFeatures(tmpdir):
 	_run_export_parquet_single_run(tmpdir, transitionLevel=True, onlyFeatures=True)
+     
+def test_export_parquet_single_run_noDecoys(tmpdir):
+    _run_export_parquet_single_run(tmpdir, noDecoys=True)
+
+def test_export_parquet_single_run_transitionLevel_noDecoys(tmpdir):
+    _run_export_parquet_single_run(tmpdir, transitionLevel=True, noDecoys=True)
