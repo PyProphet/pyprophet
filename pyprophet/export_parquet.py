@@ -32,7 +32,7 @@ def getVarColumnNames(condb, tableName):
 
 
 # this method is only currently supported for combined output and not with ipf
-def export_to_parquet(infile, outfile, transitionLevel, onlyFeatures=False):
+def export_to_parquet(infile, outfile, transitionLevel=False, onlyFeatures=False, noDecoys=False):
     '''
     Convert an OSW sqlite file to Parquet format
 
@@ -217,6 +217,8 @@ def export_to_parquet(infile, outfile, transitionLevel, onlyFeatures=False):
     featureLvlPrefix = "GROUP_CONCAT(TRANSITION.ID, ';') AS 'TRANSITION_ID', GROUP_CONCAT(TRANSITION.ANNOTATION, ';') AS 'TRANSITION_ANNOTATION'" if not transitionLevel else ""
     featureLvlSuffix = f'GROUP BY {aliasToSelect}' if not transitionLevel else ""
 
+    decoyExclude = "WHERE PRECURSOR.DECOY == 0" if noDecoys else ""
+
     if not onlyFeatures:
         query = f'''
         SELECT {columnsToSelect},
@@ -237,6 +239,7 @@ def export_to_parquet(infile, outfile, transitionLevel, onlyFeatures=False):
         {gene_table_joins}
         {pepJoin}
         {protJoin}
+        {decoyExclude}
         {featureLvlSuffix}
         '''
     else:
@@ -259,6 +262,7 @@ def export_to_parquet(infile, outfile, transitionLevel, onlyFeatures=False):
         {gene_table_joins}
         {pepJoin}
         {protJoin}
+        {decoyExclude}
         {featureLvlSuffix}
         '''
     condb.sql(query).write_parquet(outfile)

@@ -368,7 +368,8 @@ def export(infile, outfile, format, outcsv, transition_quantification, max_trans
 @click.option('--out', 'outfile', required=False, type=click.Path(exists=False), help='Output parquet file.')
 @click.option('--transitionLevel', 'transitionLevel', is_flag=True, help='Whether to export transition level data as well')
 @click.option('--onlyFeatures', 'onlyFeatures', is_flag=True, help='Only include precursors that have a corresponding feature')
-def export_parquet(infile, outfile, transitionLevel, onlyFeatures):
+@click.option('--noDecoys', 'noDecoys', is_flag=True, help='Do not include decoys in the exported data')
+def export_parquet(infile, outfile, transitionLevel, onlyFeatures, noDecoys):
     """
     Export all transition data to parquet file
     """
@@ -381,7 +382,7 @@ def export_parquet(infile, outfile, transitionLevel, onlyFeatures):
         if not overwrite:
             raise click.ClickException(f"Aborting: {outfile} already exists!")
     click.echo("Info: Parquet file will be written to {}".format(outfile))
-    export_to_parquet(os.path.abspath(infile), os.path.abspath(outfile), transitionLevel, onlyFeatures)
+    export_to_parquet(os.path.abspath(infile), os.path.abspath(outfile), transitionLevel, onlyFeatures, noDecoys)
 
 # Export Compound TSV
 @cli.command()
