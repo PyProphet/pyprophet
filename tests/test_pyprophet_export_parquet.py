@@ -110,13 +110,14 @@ def _run_export_parquet_single_run(temp_folder, transitionLevel=False, pd_testin
 
     ### Note: Current tests assume no na
     parquet = parquet.dropna()
+    pseudo_feature_id = (parquet['FEATURE_ID'].astype(str).str.slice(start=0, stop=1)).astype(int)
     pd.testing.assert_series_equal(parquet['FEATURE_MS1.APEX_INTENSITY'], parquet['PRECURSOR_ID'], **pd_testing_kwargs)
     pd.testing.assert_series_equal(parquet['FEATURE_MS2.APEX_INTENSITY'],  parquet['PRECURSOR_ID'], **pd_testing_kwargs)
 
     pd.testing.assert_series_equal(parquet['FEATURE_MS1.EXP_IM'], parquet['FEATURE_MS2.EXP_IM'], **pd_testing_kwargs)
     pd.testing.assert_series_equal(parquet['FEATURE_MS2.DELTA_IM'],  parquet['FEATURE_MS1.DELTA_IM'], **pd_testing_kwargs)
 
-    pd.testing.assert_series_equal(parquet['SCORE_MS2.SCORE'],  (parquet['PRECURSOR_ID'] + 1) * parquet['FEATURE.EXP_RT'].astype(int) * (parquet['FEATURE_ID'].astype(int) + 1), **pd_testing_kwargs)
+    pd.testing.assert_series_equal(parquet['SCORE_MS2.SCORE'],  (parquet['PRECURSOR_ID'] + 1) * parquet['FEATURE.EXP_RT'].astype(int) * pseudo_feature_id, **pd_testing_kwargs)
     pd.testing.assert_series_equal(parquet['SCORE_PEPTIDE.SCORE_GLOBAL'],  parquet['PEPTIDE_ID'], **pd_testing_kwargs)
     pd.testing.assert_series_equal(parquet['SCORE_PROTEIN.SCORE_GLOBAL'],  parquet['PROTEIN_ID'], **pd_testing_kwargs)
 
@@ -128,7 +129,7 @@ def _run_export_parquet_single_run(temp_folder, transitionLevel=False, pd_testin
 
     ############### TRANSTION LEVEL TESTS ################
     if transitionLevel:
-        pd.testing.assert_series_equal(parquet['FEATURE_TRANSITION.AREA_INTENSITY'], parquet['TRANSITION.PRODUCT_MZ'] * (parquet['FEATURE_ID'].astype(int) + 1), **pd_testing_kwargs)
+        pd.testing.assert_series_equal(parquet['FEATURE_TRANSITION.AREA_INTENSITY'], parquet['TRANSITION.PRODUCT_MZ'] * pseudo_feature_id, **pd_testing_kwargs)
 	
 def test_export_parquet_single_run(tmpdir):
 	_run_export_parquet_single_run(tmpdir, transitionLevel=False)
