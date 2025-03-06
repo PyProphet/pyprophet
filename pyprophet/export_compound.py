@@ -1,12 +1,16 @@
-import pandas as pd
+import duckdb
+from duckdb_extensions import extension_importer
 import sqlite3
 
 from .data_handling import check_sqlite_table
 from .data_handling import write_scores_sql_command
-from .report import plot_scores
+
+## ensure proper extension installed
+extension_importer.import_extension("sqlite_scanner")
 
 def export_compound_tsv(infile, outfile, format, outcsv, max_rs_peakgroup_qvalue):
     con = sqlite3.connect(infile)
+    condb = duckdb.connect(infile)
 
 
     # output for merged but not scored pyprophet input     
@@ -25,7 +29,7 @@ def export_compound_tsv(infile, outfile, format, outcsv, max_rs_peakgroup_qvalue
             score_sql = ", " + score_sql # add comma at the beginning to fit to statement
             score_sql = score_sql[:-2] # remove additional space and comma from the end of the string
             
-        data = pd.read_sql_query("""
+        data = condb.sql("""
                     SELECT
                         RUN.ID AS id_run,
                         COMPOUND.ID AS id_compound,
@@ -36,8 +40,8 @@ def export_compound_tsv(infile, outfile, format, outcsv, max_rs_peakgroup_qvalue
                         FEATURE.EXP_RT AS RT,
                         FEATURE.EXP_RT - FEATURE.DELTA_RT AS assay_rt,
                         FEATURE.DELTA_RT AS delta_rt,
-                        PRECURSOR.LIBRARY_RT AS assay_RT,
-                        FEATURE.NORM_RT - PRECURSOR.LIBRARY_RT AS delta_RT,
+                        PRECURSOR.LIBRARY_RT AS assay_iRT,
+                        FEATURE.NORM_RT - PRECURSOR.LIBRARY_RT AS delta_iRT,
                         FEATURE.ID AS id,
                         COMPOUND.SUM_FORMULA AS sum_formula,
                         COMPOUND.COMPOUND_NAME AS compound_name,
@@ -58,10 +62,10 @@ def export_compound_tsv(infile, outfile, format, outcsv, max_rs_peakgroup_qvalue
                     LEFT JOIN FEATURE_MS1 ON FEATURE_MS1.FEATURE_ID = FEATURE.ID
                     LEFT JOIN FEATURE_MS2 ON FEATURE_MS2.FEATURE_ID = FEATURE.ID
                     ORDER BY transition_group_id
-                    """ % score_sql, con)
+                    """ % score_sql).df()
 
     elif check_sqlite_table(con, "SCORE_MS1"): # MS1 scoring performend
-        data = pd.read_sql_query("""
+        data = condb.sql("""
                                SELECT
                                    RUN.ID AS id_run,
                                    COMPOUND.ID AS id_compound,
@@ -72,8 +76,8 @@ def export_compound_tsv(infile, outfile, format, outcsv, max_rs_peakgroup_qvalue
                                    FEATURE.EXP_RT AS RT,
                                    FEATURE.EXP_RT - FEATURE.DELTA_RT AS assay_rt,
                                    FEATURE.DELTA_RT AS delta_rt,
-                                   PRECURSOR.LIBRARY_RT AS assay_RT,
-                                   FEATURE.NORM_RT - PRECURSOR.LIBRARY_RT AS delta_RT,
+                                   PRECURSOR.LIBRARY_RT AS assay_iRT,
+                                   FEATURE.NORM_RT - PRECURSOR.LIBRARY_RT AS delta_iRT,
                                    FEATURE.ID AS id,
                                    COMPOUND.SUM_FORMULA AS sum_formula,
                                    COMPOUND.COMPOUND_NAME AS compound_name,
@@ -99,9 +103,9 @@ def export_compound_tsv(infile, outfile, format, outcsv, max_rs_peakgroup_qvalue
                                WHERE SCORE_MS1.QVALUE < %s
                                ORDER BY transition_group_id,
                                         peak_group_rank;
-                               """ % max_rs_peakgroup_qvalue, con)
+                               """ % max_rs_peakgroup_qvalue).df()
     else: # MS2 or MS1MS2 scoring performend
-        data = pd.read_sql_query("""
+        data = condb.sql("""
                                SELECT
                                    RUN.ID AS id_run,
                                    COMPOUND.ID AS id_compound,
@@ -112,8 +116,8 @@ def export_compound_tsv(infile, outfile, format, outcsv, max_rs_peakgroup_qvalue
                                    FEATURE.EXP_RT AS RT,
                                    FEATURE.EXP_RT - FEATURE.DELTA_RT AS assay_rt,
                                    FEATURE.DELTA_RT AS delta_rt,
-                                   PRECURSOR.LIBRARY_RT AS assay_RT,
-                                   FEATURE.NORM_RT - PRECURSOR.LIBRARY_RT AS delta_RT,
+                                   PRECURSOR.LIBRARY_RT AS assay_iRT,
+                                   FEATURE.NORM_RT - PRECURSOR.LIBRARY_RT AS delta_iRT,
                                    FEATURE.ID AS id,
                                    COMPOUND.SUM_FORMULA AS sum_formula,
                                    COMPOUND.COMPOUND_NAME AS compound_name,
@@ -139,9 +143,10 @@ def export_compound_tsv(infile, outfile, format, outcsv, max_rs_peakgroup_qvalue
                                WHERE SCORE_MS2.QVALUE < %s
                                ORDER BY transition_group_id,
                                         peak_group_rank;
-                               """ % max_rs_peakgroup_qvalue, con)
+                               """ % max_rs_peakgroup_qvalue).df()
 
     con.close()
+    condb.close()
     
     if outcsv: 
         sep = ","
