@@ -4,6 +4,7 @@ import scipy as sp
 import sqlite3
 import sys
 import click
+import time
 
 from scipy.stats import rankdata
 from .data_handling import check_sqlite_table
@@ -262,19 +263,67 @@ def prepare_precursor_bm(data):
     return(precursor_bm_data)
 
 
-def prepare_transition_bm(data):
+# def prepare_transition_bm(data):
+#     # peptide_id = -1 indicates h0, i.e. the peak group is wrong!
+#     # initialize priors
+#     data.loc[data.peptide_id != -1, 'prior'] = (1-data.loc[data.peptide_id != -1, 'precursor_peakgroup_pep']) / data.loc[data.peptide_id != -1, 'num_peptidoforms'] # potential peptidoforms
+#     data.loc[data.peptide_id == -1, 'prior'] = data.loc[data.peptide_id == -1, 'precursor_peakgroup_pep'] # h0
+
+#     # set evidence
+#     data.loc[data.bmask == 1, 'evidence'] = (1-data.loc[data.bmask == 1, 'pep']) # we have evidence FOR this peptidoform or h0
+#     data.loc[data.bmask == 0, 'evidence'] = data.loc[data.bmask == 0, 'pep'] # we have evidence AGAINST this peptidoform or h0
+
+#     data = data[['feature_id','num_peptidoforms','prior','evidence','peptide_id']]
+#     data = data.rename(columns=lambda x: x.replace('peptide_id', 'hypothesis'))
+
+#     return data
+
+
+def transfer_confident_evidence_across_runs(df1, across_run_confidence_threshold):
+    feature_ids = np.unique(df1['feature_id'])
+    df_list = []
+    for feature_id in feature_ids:
+        tmp_df = df1[(df1['feature_id'] == feature_id) | ((df1['feature_id'] != feature_id) & (df1['pep'] <= across_run_confidence_threshold))]
+        tmp_df['feature_id'] = feature_id
+        # feature_id  transition_id       pep  peptide_id  bmask   num_peptidoforms  alignment_group_id  precursor_peakgroup_pep
+        tmp_df = tmp_df.groupby(['feature_id', 'transition_id', 'peptide_id',  'bmask', 'num_peptidoforms',  'alignment_group_id'])[['pep', 'precursor_peakgroup_pep']].apply(min).reset_index()
+        df_list.append(tmp_df)
+
+    return df_list
+
+
+def prepare_transition_bm(data, propagate_signal_across_runs, across_run_confidence_threshold):
+    # Propagate peps <= threshold for aligned feature groups across runs
+    if propagate_signal_across_runs: 
+        ## Separate out features that need propagation and those that don't to avoid calling apply on the features that don't need propagated peps
+        non_prop_data = data.loc[ data['feature_id']==data['alignment_group_id']]
+        prop_data = data.loc[ data['feature_id']!=data['alignment_group_id']]
+  
+        start = time.time()
+        alignment_ids = prop_data['alignment_group_id'].unique()
+        data_with_confidence = []
+        for alignment_id in alignment_ids:
+            df1 = prop_data[ prop_data['alignment_group_id']==alignment_id ]
+            alignment_group_df_list = transfer_confident_evidence_across_runs(df1, across_run_confidence_threshold)
+            data_with_confidence = data_with_confidence + alignment_group_df_list
+        end = time.time()
+        click.echo(f"INFO: Elapsed time for propagating peps for aligned features across runs {end-start} seconds")
+  
+        ## Concat non prop data with prop data
+        data = pd.concat([non_prop_data]+data_with_confidence, ignore_index=True)
+  
     # peptide_id = -1 indicates h0, i.e. the peak group is wrong!
     # initialize priors
     data.loc[data.peptide_id != -1, 'prior'] = (1-data.loc[data.peptide_id != -1, 'precursor_peakgroup_pep']) / data.loc[data.peptide_id != -1, 'num_peptidoforms'] # potential peptidoforms
     data.loc[data.peptide_id == -1, 'prior'] = data.loc[data.peptide_id == -1, 'precursor_peakgroup_pep'] # h0
-
+    
     # set evidence
     data.loc[data.bmask == 1, 'evidence'] = (1-data.loc[data.bmask == 1, 'pep']) # we have evidence FOR this peptidoform or h0
     data.loc[data.bmask == 0, 'evidence'] = data.loc[data.bmask == 0, 'pep'] # we have evidence AGAINST this peptidoform or h0
-
-    data = data[['feature_id','num_peptidoforms','prior','evidence','peptide_id']]
-    data = data.rename(columns=lambda x: x.replace('peptide_id', 'hypothesis'))
-
+    
+    data = data[['feature_id', 'alignment_group_id', 'num_peptidoforms','prior','evidence','peptide_id']]
+    data = data.rename(columns=lambda x: x.replace('peptide_id','hypothesis'))
+    
     return data
 
 
@@ -335,12 +384,12 @@ def precursor_inference(data, ipf_ms1_scoring, ipf_ms2_scoring, ipf_max_precurso
     return inferred_precursors
 
 
-def peptidoform_inference(transition_table, precursor_data, ipf_grouped_fdr):
+def peptidoform_inference(transition_table, precursor_data, ipf_grouped_fdr, propagate_signal_across_runs, across_run_confidence_threshold):
     transition_table = pd.merge(transition_table, precursor_data, on='feature_id')
 
     # compute transition posterior probabilities
     click.echo("Info: Preparing peptidoform-level data.")
-    transition_data_bm = prepare_transition_bm(transition_table)
+    transition_data_bm = prepare_transition_bm(transition_table, propagate_signal_across_runs, across_run_confidence_threshold)
 
     # compute posterior peptidoform probability
     click.echo("Info: Conducting peptidoform-level inference.")
@@ -358,8 +407,31 @@ def peptidoform_inference(transition_table, precursor_data, ipf_grouped_fdr):
 
     return result
 
+def get_feature_mapping_across_runs(infile, ipf_max_alignment_pep=1):
+    click.echo("Info: Reading Across Run Feature Alignment Mapping.")
 
-def infer_peptidoforms(infile, outfile, ipf_ms1_scoring, ipf_ms2_scoring, ipf_h0, ipf_grouped_fdr, ipf_max_precursor_pep, ipf_max_peakgroup_pep, ipf_max_precursor_peakgroup_pep, ipf_max_transition_pep):
+    con = sqlite3.connect(infile)
+
+    data = pd.read_sql_query(
+        f"""SELECT  
+                DENSE_RANK() OVER (ORDER BY PRECURSOR_ID, ALIGNMENT_ID) AS ALIGNMENT_GROUP_ID,
+                ALIGNED_FEATURE_ID AS FEATURE_ID 
+                FROM (SELECT DISTINCT * FROM FEATURE_MS2_ALIGNMENT) AS FEATURE_MS2_ALIGNMENT
+                INNER JOIN 
+                (SELECT DISTINCT *, MIN(QVALUE) FROM SCORE_ALIGNMENT GROUP BY FEATURE_ID) AS SCORE_ALIGNMENT 
+                ON SCORE_ALIGNMENT.FEATURE_ID = FEATURE_MS2_ALIGNMENT.ALIGNED_FEATURE_ID
+                WHERE LABEL = 1
+                AND SCORE_ALIGNMENT.PEP < {ipf_max_alignment_pep}
+                ORDER BY ALIGNMENT_GROUP_ID""",
+        con,
+    )
+
+    data.columns = [col.lower() for col in data.columns]
+    con.close()
+
+    return data
+
+def infer_peptidoforms(infile, outfile, ipf_ms1_scoring, ipf_ms2_scoring, ipf_h0, ipf_grouped_fdr, ipf_max_precursor_pep, ipf_max_peakgroup_pep, ipf_max_precursor_peakgroup_pep, ipf_max_transition_pep, propagate_signal_across_runs, ipf_max_alignment_pep=1, across_run_confidence_threshold=0.5):
     click.echo("Info: Starting IPF (Inference of PeptidoForms).")
 
     # precursor level
@@ -368,7 +440,13 @@ def infer_peptidoforms(infile, outfile, ipf_ms1_scoring, ipf_ms2_scoring, ipf_h0
 
     # peptidoform level
     peptidoform_table = read_pyp_transition(infile, ipf_max_transition_pep, ipf_h0)
-    peptidoform_data = peptidoform_inference(peptidoform_table, precursor_data, ipf_grouped_fdr)
+    ## prepare for propagating signal across runs for aligned features
+    if propagate_signal_across_runs:
+        across_run_feature_map = get_feature_mapping_across_runs(infile, ipf_max_alignment_pep)
+        tmp = peptidoform_table.merge(across_run_feature_map, how='left', on='feature_id')
+        
+    
+    peptidoform_data = peptidoform_inference(peptidoform_table, precursor_data, ipf_grouped_fdr, propagate_signal_across_runs, across_run_confidence_threshold)
 
     # finalize results and write to table
     click.echo("Info: Storing results.")
