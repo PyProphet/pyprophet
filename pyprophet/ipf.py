@@ -443,8 +443,7 @@ def infer_peptidoforms(infile, outfile, ipf_ms1_scoring, ipf_ms2_scoring, ipf_h0
     ## prepare for propagating signal across runs for aligned features
     if propagate_signal_across_runs:
         across_run_feature_map = get_feature_mapping_across_runs(infile, ipf_max_alignment_pep)
-        tmp = peptidoform_table.merge(across_run_feature_map, how='left', on='feature_id')
-        
+        peptidoform_table = peptidoform_table.merge(across_run_feature_map, how='left', on='feature_id')
     
     peptidoform_data = peptidoform_inference(peptidoform_table, precursor_data, ipf_grouped_fdr, propagate_signal_across_runs, across_run_confidence_threshold)
 
