@@ -71,7 +71,7 @@ def calculate_params_for_d_score(classifier, experiment):
 
 class Scorer(object):
 
-    def __init__(self, classifier, score_columns, experiment, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, tric_chromprob, ss_score_filter, color_palette):
+    def __init__(self, classifier, score_columns, experiment, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, tric_chromprob, ss_score_filter, color_palette, level):
 
         self.classifier = classifier
         self.score_columns = score_columns
@@ -95,6 +95,7 @@ class Scorer(object):
         self.tric_chromprob = tric_chromprob
         self.ss_score_filter = ss_score_filter
         self.color_palette = color_palette
+        self.level = level
 
         target_scores = experiment.get_top_target_peaks()["d_score"]
         decoy_scores = experiment.get_top_decoy_peaks()["d_score"]
@@ -122,7 +123,7 @@ class Scorer(object):
 
     def score(self, table):
 
-        prepared_table, __ = prepare_data_table(table, self.ss_score_filter, tg_id_name=self.group_id, score_columns=self.score_columns)
+        prepared_table, __ = prepare_data_table(table, self.ss_score_filter, tg_id_name=self.group_id, score_columns=self.score_columns, level=self.level)
         texp = Experiment(prepared_table)
         score = self.classifier.score(texp, True)
         texp["r_score"] = score
@@ -180,7 +181,7 @@ class HolyGostQuery(object):
         See below how PyProphet parameterises this class.
     """
 
-    def __init__(self, semi_supervised_learner, classifier, ss_num_iter, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, tric_chromprob, threads, test, ss_score_filter, color_palette):
+    def __init__(self, semi_supervised_learner, classifier, ss_num_iter, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, tric_chromprob, threads, test, ss_score_filter, color_palette, level):
         assert isinstance(semi_supervised_learner,
                           AbstractSemiSupervisedLearner)
         self.semi_supervised_learner = semi_supervised_learner
@@ -203,9 +204,10 @@ class HolyGostQuery(object):
         self.test = test
         self.ss_score_filter = ss_score_filter
         self.color_palette = color_palette
+        self.level = level
 
     def _setup_experiment(self, table):
-        prepared_table, score_columns = prepare_data_table(table, self.ss_score_filter, tg_id_name=self.group_id)
+        prepared_table, score_columns = prepare_data_table(table, self.ss_score_filter, tg_id_name=self.group_id, level=self.level)
         experiment = Experiment(prepared_table)
         experiment.log_summary()
         return experiment, score_columns
@@ -339,7 +341,7 @@ class HolyGostQuery(object):
             for key, value in reversed(sorted(mapped.items(), key=operator.itemgetter(1))):
                 click.echo("Info: Importance of %s: %s" % (key, value))
 
-        scorer = Scorer(final_classifier, score_columns, experiment, self.group_id, self.parametric, self.pfdr, self.pi0_lambda, self.pi0_method, self.pi0_smooth_df, self.pi0_smooth_log_pi0, self.lfdr_truncate, self.lfdr_monotone, self.lfdr_transformation, self.lfdr_adj, self.lfdr_eps, self.tric_chromprob, self.ss_score_filter, self.color_palette)
+        scorer = Scorer(final_classifier, score_columns, experiment, self.group_id, self.parametric, self.pfdr, self.pi0_lambda, self.pi0_method, self.pi0_smooth_df, self.pi0_smooth_log_pi0, self.lfdr_truncate, self.lfdr_monotone, self.lfdr_transformation, self.lfdr_adj, self.lfdr_eps, self.tric_chromprob, self.ss_score_filter, self.color_palette, self.level)
 
         scored_table = scorer.score(table)
 
@@ -354,8 +356,8 @@ class HolyGostQuery(object):
 @profile
 def PyProphet(classifier, xgb_hyperparams, xgb_params, xgb_params_space, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, tric_chromprob, threads, test, ss_score_filter, color_palette, main_score_selection_report, outfile, level, ss_use_dynamic_main_score):
     if classifier == "LDA":
-        return HolyGostQuery(StandardSemiSupervisedLearner(LDALearner(), xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, test, main_score_selection_report, outfile, level, ss_use_dynamic_main_score), classifier, ss_num_iter, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, tric_chromprob, threads, test, ss_score_filter, color_palette)
+        return HolyGostQuery(StandardSemiSupervisedLearner(LDALearner(), xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, test, main_score_selection_report, outfile, level, ss_use_dynamic_main_score), classifier, ss_num_iter, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, tric_chromprob, threads, test, ss_score_filter, color_palette, level)
     elif classifier == "XGBoost":
-        return HolyGostQuery(StandardSemiSupervisedLearner(XGBLearner(xgb_hyperparams, xgb_params, xgb_params_space, threads), xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, test, main_score_selection_report, outfile, level, ss_use_dynamic_main_score), classifier, ss_num_iter, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, tric_chromprob, threads, test, ss_score_filter, color_palette)
+        return HolyGostQuery(StandardSemiSupervisedLearner(XGBLearner(xgb_hyperparams, xgb_params, xgb_params_space, threads), xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, test, main_score_selection_report, outfile, level, ss_use_dynamic_main_score), classifier, ss_num_iter, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, tric_chromprob, threads, test, ss_score_filter, color_palette, level)
     else:
         raise click.ClickException("Classifier not supported.")
