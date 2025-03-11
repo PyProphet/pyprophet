@@ -28,7 +28,7 @@ class PyProphetRunner(object):
     """Base class for workflow of command line tool
     """
 
-    def __init__(self, infile, outfile, classifier, xgb_hyperparams, xgb_params, xgb_params_space, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, ss_main_score, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, level, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn, tric_chromprob, threads, test, ss_score_filter, color_palette, main_score_selection_report):
+    def __init__(self, infile, outfile, classifier, xgb_hyperparams, xgb_params, xgb_params_space, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, ss_main_score, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, level, add_alignment_features, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn, tric_chromprob, threads, test, ss_score_filter, color_palette, main_score_selection_report):
         def read_tsv(infile):
             table = pd.read_csv(infile, sep="\t")
             return(table)
@@ -149,6 +149,40 @@ ORDER BY RUN_ID,
          FEATURE.EXP_RT,
          TRANSITION.ID;
 ''' % (ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn), con)
+            elif level == "alignment":
+                if not check_sqlite_table(con, "FEATURE_MS2_ALIGNMENT"):
+                    raise click.ClickException("MS2-level feature alignemnt table not present in file.")
+
+                con.executescript('''
+CREATE INDEX IF NOT EXISTS idx_precursor_precursor_id ON PRECURSOR (ID);
+CREATE INDEX IF NOT EXISTS idx_feature_precursor_id ON FEATURE (PRECURSOR_ID);
+CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
+CREATE INDEX IF NOT EXISTS idx_feature_ms2_feature_id ON FEATURE_MS2 (FEATURE_ID);
+''')
+
+                table = pd.read_sql_query('''
+                            SELECT
+                                ALIGNED_FEATURE_ID AS FEATURE_ID,
+                                XCORR_COELUTION_TO_REFERENCE AS VAR_XCORR_COELUTION_TO_REFERENCE,
+                                XCORR_SHAPE_TO_REFERENCE AS VAR_XCORR_SHAPE_TO_REFERENCE, 
+                                MI_TO_REFERENCE AS VAR_MI_TO_REFERENCE, 
+                                XCORR_COELUTION_TO_ALL AS VAR_XCORR_COELUTION_TO_ALL,  
+                                XCORR_SHAPE_TO_ALL AS VAR_XCORR_SHAPE, 
+                                MI_TO_ALL AS VAR_MI_TO_ALL, 
+                                RETENTION_TIME_DEVIATION AS VAR_RETENTION_TIME_DEVIATION, 
+                                PEAK_INTENSITY_RATIO AS VAR_PEAK_INTENSITY_RATIO,
+                                LABEL AS DECOY,
+                                ALIGNED_FILENAME || '_' || FEATURE.PRECURSOR_ID AS GROUP_ID
+                            FROM FEATURE_MS2_ALIGNMENT
+                            LEFT JOIN
+                            (SELECT RUN_ID,
+                                    ID,
+                                    PRECURSOR_ID,
+                                    EXP_RT
+                            FROM FEATURE) AS FEATURE ON REFERENCE_FEATURE_ID = FEATURE.ID
+                            ''', con)
+                # Map DECOY to 1 and -1 to 0 and 1
+                table['DECOY'] = table['DECOY'].map({1: 0, -1: 1})
             else:
                 raise click.ClickException("Unspecified data level selected.")
 
@@ -163,6 +197,72 @@ ORDER BY RUN_ID,
                 ms1_table.columns = ['FEATURE_ID'] + ["VAR_MS1_" + s.split("VAR_")[1] for s in ms1_scores]
 
                 table = pd.merge(table, ms1_table, how='left', on='FEATURE_ID')
+
+            
+            if add_alignment_features:
+                # Append MS2 alignment scores to MS2 table if selected
+                if level == "ms2" or level == "ms1ms2":
+                    if not check_sqlite_table(con, "FEATURE_MS2_ALIGNMENT"):
+                        raise click.ClickException("MS2-level feature alignment table not present in file.")
+                    
+                    if not check_sqlite_table(con, "SCORE_ALIGNMENT"):
+                        raise click.ClickException("To add MS2-level alignment features, alignment-level first needs to be performed. Please run 'pyprophet score --level=alignment' on this file first.")
+                    
+                    alignment_table = pd.read_sql_query(
+                        """SELECT 
+                                ALIGNED_FEATURE_ID AS FEATURE_ID,
+                                PRECURSOR_ID,
+                                XCORR_COELUTION_TO_REFERENCE AS VAR_XCORR_COELUTION_TO_REFERENCE,
+                                XCORR_SHAPE_TO_REFERENCE AS VAR_XCORR_SHAPE_TO_REFERENCE, 
+                                MI_TO_REFERENCE AS VAR_MI_TO_REFERENCE, 
+                                XCORR_COELUTION_TO_ALL AS VAR_XCORR_COELUTION_TO_ALL,  
+                                XCORR_SHAPE_TO_ALL AS VAR_XCORR_SHAPE_TO_ALL, 
+                                MI_TO_ALL AS VAR_MI_TO_ALL, 
+                                RETENTION_TIME_DEVIATION AS VAR_RETENTION_TIME_DEVIATION, 
+                                PEAK_INTENSITY_RATIO AS VAR_PEAK_INTENSITY_RATIO 
+                            FROM 
+                            (SELECT DISTINCT * FROM FEATURE_MS2_ALIGNMENT) AS FEATURE_MS2_ALIGNMENT
+                            INNER JOIN 
+                            (SELECT DISTINCT *, MIN(QVALUE) FROM SCORE_ALIGNMENT GROUP BY FEATURE_ID) AS SCORE_ALIGNMENT 
+                            ON SCORE_ALIGNMENT.FEATURE_ID = FEATURE_MS2_ALIGNMENT.ALIGNED_FEATURE_ID
+                            WHERE LABEL = 1""",
+                        con,
+                    )
+
+                    table = pd.merge(table, alignment_table, how='left', on='FEATURE_ID')  
+                
+                # Append TRANSITION alignment scores to TRANSITION table if selected
+                if level == "transition":
+                    if not check_sqlite_table(con, "FEATURE_TRANSITION_ALIGNMENT"):
+                        raise click.ClickException("Transition-level feature alignment table not present in file.")
+                    
+                    if not check_sqlite_table(con, "SCORE_ALIGNMENT"):
+                        raise click.ClickException("To add Transition-level alignment features, alignment-level first needs to be performed. Please run 'pyprophet score --level=alignment' on this file first.")
+                       
+                    alignment_table = pd.read_sql_query(
+                        """SELECT 
+                                FEATURE_TRANSITION_ALIGNMENT.FEATURE_ID,
+                                TRANSITION_ID,
+                                XCORR_COELUTION_TO_REFERENCE AS VAR_XCORR_COELUTION_TO_REFERENCE,
+                                XCORR_SHAPE_TO_REFERENCE AS VAR_XCORR_SHAPE_TO_REFERENCE, 
+                                MI_TO_REFERENCE AS VAR_MI_TO_REFERENCE, 
+                                XCORR_COELUTION_TO_ALL AS VAR_XCORR_COELUTION_TO_ALL,  
+                                XCORR_SHAPE_TO_ALL AS VAR_XCORR_SHAPE_TO_ALL, 
+                                MI_TO_ALL AS VAR_MI_TO_ALL, 
+                                RETENTION_TIME_DEVIATION AS VAR_RETENTION_TIME_DEVIATION, 
+                                PEAK_INTENSITY_RATIO AS VAR_PEAK_INTENSITY_RATIO
+                            FROM FEATURE_TRANSITION_ALIGNMENT
+                            INNER JOIN 
+                            (SELECT DISTINCT *, MIN(QVALUE) FROM SCORE_ALIGNMENT GROUP BY FEATURE_ID) AS SCORE_ALIGNMENT 
+                            ON SCORE_ALIGNMENT.FEATURE_ID = FEATURE_TRANSITION_ALIGNMENT.FEATURE_ID 
+                        """,
+                        con
+                    )
+                    table = pd.merge(table, alignment_table, how='left', on=['FEATURE_ID', 'TRANSITION_ID'])
+                    
+                cols = ['VAR_XCORR_COELUTION_TO_REFERENCE', 'VAR_XCORR_SHAPE_TO_REFERENCE', 'VAR_MI_TO_REFERENCE', 'VAR_XCORR_COELUTION_TO_ALL',  'VAR_XCORR_SHAPE_TO_ALL', 'VAR_MI_TO_ALL', 'VAR_RETENTION_TIME_DEVIATION', 'VAR_PEAK_INTENSITY_RATIO']    
+                # Fill in missing values for cols2 with -1
+                table[cols] = table[cols].fillna(-1)       
 
             # Format table
             table.columns = [col.lower() for col in table.columns]
@@ -184,10 +284,10 @@ ORDER BY RUN_ID,
                                                 + -0.19267813 * table['var_yseries_score']
                                                 + -0.61712054 * table['var_log_sn_score'])
             else:
-                raise click.ClickException("Main score column not present in data.")
+                raise click.ClickException(f"Main score ({ss_main_score.lower()}) column not present in data. Current columns: {table.columns}")
 
             # Enable transition count & precursor / product charge scores for XGBoost-based classifier
-            if classifier == 'XGBoost':
+            if classifier == 'XGBoost' and level!='alignment':
                 click.echo("Info: Enable number of transitions & precursor / product charge scores for XGBoost-based classifier")
                 table = table.rename(index=str, columns={'precursor_charge': 'var_precursor_charge', 'product_charge': 'var_product_charge', 'transition_count': 'var_transition_count'})
 
@@ -209,7 +309,7 @@ ORDER BY RUN_ID,
         else:
             self.mode = 'tsv'
             self.table = read_tsv(infile)    
-
+        
         self.infile = infile
         self.outfile = outfile
         self.classifier = classifier
@@ -371,6 +471,16 @@ ORDER BY RUN_ID,
             df.columns = ['FEATURE_ID','TRANSITION_ID','SCORE','RANK','PVALUE','QVALUE','PEP']
             table = "SCORE_TRANSITION"
             df.to_sql(table, con, index=False)
+        elif self.level == "alignment":
+            c = con.cursor()
+            c.execute('DROP TABLE IF EXISTS SCORE_ALIGNMENT;')
+            con.commit()
+            c.fetchall()
+
+            df = result.scored_tables[['feature_id','d_score','peak_group_rank','p_value','q_value','pep']]
+            df.columns = ['FEATURE_ID','SCORE','RANK','PVALUE','QVALUE','PEP']
+            table = "SCORE_ALIGNMENT"
+            df.to_sql(table, con, index=False)
 
         con.close()
         click.echo("Info: %s written." % self.outfile)
@@ -441,8 +551,8 @@ class PyProphetLearner(PyProphetRunner):
 
 class PyProphetWeightApplier(PyProphetRunner):
 
-    def __init__(self, infile, outfile, classifier, xgb_hyperparams, xgb_params, xgb_params_space, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, ss_main_score, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, level, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn, tric_chromprob, threads, test, apply_weights, ss_score_filter, color_palette, main_score_selection_report):
-        super(PyProphetWeightApplier, self).__init__(infile, outfile, classifier, xgb_hyperparams, xgb_params, xgb_params_space, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, ss_main_score, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, level, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn, tric_chromprob, threads, test, ss_score_filter, color_palette, main_score_selection_report)
+    def __init__(self, infile, outfile, classifier, xgb_hyperparams, xgb_params, xgb_params_space, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, ss_main_score, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, level, add_alignment_features, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn, tric_chromprob, threads, test, apply_weights, ss_score_filter, color_palette, main_score_selection_report):
+        super(PyProphetWeightApplier, self).__init__(infile, outfile, classifier, xgb_hyperparams, xgb_params, xgb_params_space, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, ss_main_score, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, level, add_alignment_features, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn, tric_chromprob, threads, test, ss_score_filter, color_palette, main_score_selection_report)
         if not os.path.exists(apply_weights):
             raise click.ClickException("Weights file %s does not exist." % apply_weights)
         if self.mode == "tsv":
