@@ -32,6 +32,7 @@ def compute_model_fdr(data_in):
 
 def read_pyp_peakgroup_precursor(path, ipf_max_peakgroup_pep, ipf_ms1_scoring, ipf_ms2_scoring):
     click.echo("Info: Reading precursor-level data ... ", nl=False)
+    # precursors are restricted according to ipf_max_peakgroup_pep to exclude very poor peak groups
     start = time.time()
     
     # Connect to DuckDB database
@@ -172,6 +173,7 @@ WHERE PRECURSOR.DECOY=0
 
 def read_pyp_transition(path, ipf_max_transition_pep, ipf_h0):
     click.echo("Info: Reading peptidoform-level data ... ", nl=False)
+     # only the evidence is restricted to ipf_max_transition_pep, the peptidoform-space is complete
     start = time.time()
     
     con = duckdb.connect(database=path, read_only=False)
