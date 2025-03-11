@@ -5,6 +5,9 @@ from pyprophet.export import check_sqlite_table
 from duckdb_extensions import extension_importer
 import re
 
+## ensure proper extension installed
+extension_importer.import_extension("sqlite_scanner")
+
 def getPeptideProteinScoreTable(conndb, level):
     if level == 'peptide':
         id = 'PEPTIDE_ID'
@@ -45,7 +48,6 @@ def export_to_parquet(infile, outfile, transitionLevel=False, onlyFeatures=False
     Return:
         None
     '''
-    extension_importer.import_extension("sqlite_scanner")
     condb = duckdb.connect(infile)
     con = sqlite3.connect(infile)
 
