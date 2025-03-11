@@ -324,7 +324,11 @@ def prepare_transition_bm(data, propagate_signal_across_runs, across_run_confide
     data.loc[data.bmask == 1, 'evidence'] = (1-data.loc[data.bmask == 1, 'pep']) # we have evidence FOR this peptidoform or h0
     data.loc[data.bmask == 0, 'evidence'] = data.loc[data.bmask == 0, 'pep'] # we have evidence AGAINST this peptidoform or h0
     
-    data = data[['feature_id', 'alignment_group_id', 'num_peptidoforms','prior','evidence','peptide_id']]
+    if propagate_signal_across_runs:
+        cols = ['feature_id', 'alignment_group_id', 'num_peptidoforms','prior','evidence','peptide_id']
+    else:
+        cols = ['feature_id', 'num_peptidoforms','prior','evidence','peptide_id']
+    data = data[cols]
     data = data.rename(columns=lambda x: x.replace('peptide_id','hypothesis'))
     
     return data
