@@ -11,6 +11,7 @@ from scipy.stats import rankdata
 from .data_handling import check_sqlite_table
 from shutil import copyfile
 
+
 def compute_model_fdr(data_in):
     data = np.asarray(data_in)
 
@@ -33,15 +34,18 @@ def read_pyp_peakgroup_precursor(path, ipf_max_peakgroup_pep, ipf_ms1_scoring, i
     click.echo("Info: Reading precursor-level data ... ", nl=False)
     start = time.time()
     
-    # precursors are restricted according to ipf_max_peakgroup_pep to exclude very poor peak groups
-    con = sqlite3.connect(path)
-
+    # Connect to DuckDB database
+    con = duckdb.connect(database=path, read_only=False)
+    
+    # Connectin with sqlite3 for checking tables
+    con_sqlite = sqlite3.connect(path)
+    
     # only use MS2 precursors
     if not ipf_ms1_scoring and ipf_ms2_scoring:
-        if not check_sqlite_table(con, "SCORE_MS2") or not check_sqlite_table(con, "SCORE_TRANSITION"):
+        if not check_sqlite_table(con_sqlite, "SCORE_MS2") or not check_sqlite_table(con_sqlite, "SCORE_TRANSITION"):
             raise click.ClickException("Apply scoring to MS2 and transition-level data before running IPF.")
 
-        con.executescript('''
+        con.execute('''
 CREATE INDEX IF NOT EXISTS idx_transition_id ON TRANSITION (ID);
 CREATE INDEX IF NOT EXISTS idx_precursor_precursor_id ON PRECURSOR (ID);
 CREATE INDEX IF NOT EXISTS idx_feature_precursor_id ON FEATURE (PRECURSOR_ID);
@@ -51,7 +55,7 @@ CREATE INDEX IF NOT EXISTS idx_score_transition_feature_id ON SCORE_TRANSITION (
 CREATE INDEX IF NOT EXISTS idx_score_transition_transition_id ON SCORE_TRANSITION (TRANSITION_ID);
 ''')
 
-        data = pd.read_sql_query('''
+        data = con.execute('''
 SELECT FEATURE.ID AS FEATURE_ID,
        SCORE_MS2.PEP AS MS2_PEAKGROUP_PEP,
        NULL AS MS1_PRECURSOR_PEP,
@@ -67,15 +71,15 @@ INNER JOIN
    WHERE TRANSITION.TYPE=''
      AND TRANSITION.DECOY=0) AS SCORE_TRANSITION ON FEATURE.ID = SCORE_TRANSITION.FEATURE_ID
 WHERE PRECURSOR.DECOY=0
-  AND SCORE_MS2.PEP < %s;
-''' % ipf_max_peakgroup_pep, con)
+  AND SCORE_MS2.PEP < ?;
+''', [ipf_max_peakgroup_pep]).df()
 
     # only use MS1 precursors
     elif ipf_ms1_scoring and not ipf_ms2_scoring:
-        if not check_sqlite_table(con, "SCORE_MS1") or not check_sqlite_table(con, "SCORE_MS2") or not check_sqlite_table(con, "SCORE_TRANSITION"):
+        if not check_sqlite_table(con_sqlite, "SCORE_MS1") or not check_sqlite_table(con_sqlite, "SCORE_MS2") or not check_sqlite_table(con_sqlite, "SCORE_TRANSITION"):
             raise click.ClickException("Apply scoring to MS1, MS2 and transition-level data before running IPF.")
 
-        con.executescript('''
+        con.execute('''
 CREATE INDEX IF NOT EXISTS idx_precursor_precursor_id ON PRECURSOR (ID);
 CREATE INDEX IF NOT EXISTS idx_feature_precursor_id ON FEATURE (PRECURSOR_ID);
 CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
@@ -83,7 +87,7 @@ CREATE INDEX IF NOT EXISTS idx_score_ms1_feature_id ON SCORE_MS1 (FEATURE_ID);
 CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);
 ''')
 
-        data = pd.read_sql_query('''
+        data = con.execute('''
 SELECT FEATURE.ID AS FEATURE_ID,
        SCORE_MS2.PEP AS MS2_PEAKGROUP_PEP,
        SCORE_MS1.PEP AS MS1_PRECURSOR_PEP,
@@ -93,15 +97,15 @@ INNER JOIN FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID
 INNER JOIN SCORE_MS1 ON FEATURE.ID = SCORE_MS1.FEATURE_ID
 INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
 WHERE PRECURSOR.DECOY=0
-  AND SCORE_MS2.PEP < %s;
-''' % ipf_max_peakgroup_pep, con)
+  AND SCORE_MS2.PEP < ?;
+''', [ipf_max_peakgroup_pep]).df()
 
     # use both MS1 and MS2 precursors
     elif ipf_ms1_scoring and ipf_ms2_scoring:
-        if not check_sqlite_table(con, "SCORE_MS1") or not check_sqlite_table(con, "SCORE_MS2") or not check_sqlite_table(con, "SCORE_TRANSITION"):
+        if not check_sqlite_table(con_sqlite, "SCORE_MS1") or not check_sqlite_table(con_sqlite, "SCORE_MS2") or not check_sqlite_table(con_sqlite, "SCORE_TRANSITION"):
             raise click.ClickException("Apply scoring to MS1, MS2 and transition-level data before running IPF.")
 
-        con.executescript('''
+        con.execute('''
 CREATE INDEX IF NOT EXISTS idx_transition_id ON TRANSITION (ID);
 CREATE INDEX IF NOT EXISTS idx_precursor_precursor_id ON PRECURSOR (ID);
 CREATE INDEX IF NOT EXISTS idx_feature_precursor_id ON FEATURE (PRECURSOR_ID);
@@ -112,7 +116,7 @@ CREATE INDEX IF NOT EXISTS idx_score_transition_feature_id ON SCORE_TRANSITION (
 CREATE INDEX IF NOT EXISTS idx_score_transition_transition_id ON SCORE_TRANSITION (TRANSITION_ID);
 ''')
 
-        data = pd.read_sql_query('''
+        data = con.execute('''
 SELECT FEATURE.ID AS FEATURE_ID,
        SCORE_MS2.PEP AS MS2_PEAKGROUP_PEP,
        SCORE_MS1.PEP AS MS1_PRECURSOR_PEP,
@@ -129,22 +133,22 @@ INNER JOIN
    WHERE TRANSITION.TYPE=''
      AND TRANSITION.DECOY=0) AS SCORE_TRANSITION ON FEATURE.ID = SCORE_TRANSITION.FEATURE_ID
 WHERE PRECURSOR.DECOY=0
-  AND SCORE_MS2.PEP < %s;
-''' % ipf_max_peakgroup_pep, con)
+  AND SCORE_MS2.PEP < ?;
+''', [ipf_max_peakgroup_pep]).df()
 
     # do not use any precursor information
     else:
-        if not check_sqlite_table(con, "SCORE_MS2") or not check_sqlite_table(con, "SCORE_TRANSITION"):
-            raise click.ClickException("Apply scoring to MS2  and transition-level data before running IPF.")
+        if not check_sqlite_table(con_sqlite, "SCORE_MS2") or not check_sqlite_table(con_sqlite, "SCORE_TRANSITION"):
+            raise click.ClickException("Apply scoring to MS2 and transition-level data before running IPF.")
 
-        con.executescript('''
+        con.execute('''
 CREATE INDEX IF NOT EXISTS idx_precursor_precursor_id ON PRECURSOR (ID);
 CREATE INDEX IF NOT EXISTS idx_feature_precursor_id ON FEATURE (PRECURSOR_ID);
 CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
 CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);
 ''')
 
-        data = pd.read_sql_query('''
+        data = con.execute('''
 SELECT FEATURE.ID AS FEATURE_ID,
        SCORE_MS2.PEP AS MS2_PEAKGROUP_PEP,
        NULL AS MS1_PRECURSOR_PEP,
@@ -153,11 +157,12 @@ FROM PRECURSOR
 INNER JOIN FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID
 INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
 WHERE PRECURSOR.DECOY=0
-  AND SCORE_MS2.PEP < %s;
-''' % ipf_max_peakgroup_pep, con)
+  AND SCORE_MS2.PEP < ?;
+''', [ipf_max_peakgroup_pep]).df()
 
     data.columns = [col.lower() for col in data.columns]
     con.close()
+    con_sqlite.close()
     
     end = time.time()
     click.echo(f"{end-start:.4f} seconds")
@@ -251,6 +256,7 @@ ORDER BY FEATURE_ID;
     
     return data
 
+
 def prepare_precursor_bm(data):
     # MS1-level precursors
     ms1_precursor_data = data[['feature_id','ms2_peakgroup_pep','ms1_precursor_pep']].dropna(axis=0, how='any')
@@ -287,6 +293,7 @@ def transfer_confident_evidence_across_runs(df1, across_run_confidence_threshold
     )[['pep', 'precursor_peakgroup_pep']].min()
     
     return df_result
+
 
 def prepare_transition_bm(data, propagate_signal_across_runs, across_run_confidence_threshold):
     # Propagate peps <= threshold for aligned feature groups across runs
@@ -416,6 +423,7 @@ def peptidoform_inference(transition_table, precursor_data, ipf_grouped_fdr, pro
 
     return result
 
+
 def get_feature_mapping_across_runs(infile, ipf_max_alignment_pep=1):
     click.echo("Info: Reading Across Run Feature Alignment Mapping ... ", nl=False)
     start = time.time()
@@ -443,6 +451,7 @@ def get_feature_mapping_across_runs(infile, ipf_max_alignment_pep=1):
     click.echo(f"{end-start:.4f} seconds")
 
     return data
+
 
 def infer_peptidoforms(infile, outfile, ipf_ms1_scoring, ipf_ms2_scoring, ipf_h0, ipf_grouped_fdr, ipf_max_precursor_pep, ipf_max_peakgroup_pep, ipf_max_precursor_peakgroup_pep, ipf_max_transition_pep, propagate_signal_across_runs, ipf_max_alignment_pep=1, across_run_confidence_threshold=0.5):
     click.echo("Info: Starting IPF (Inference of PeptidoForms).")
