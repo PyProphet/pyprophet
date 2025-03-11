@@ -27,7 +27,7 @@ def _run_cmdline(cmdline):
     return stdout
 
 
-def _run_export_parquet_single_run(temp_folder, transitionLevel=False, pd_testing_kwargs=dict(check_dtype=False, check_names=False), onlyFeatures=False):
+def _run_export_parquet_single_run(temp_folder, transitionLevel=False, pd_testing_kwargs=dict(check_dtype=False, check_names=False), onlyFeatures=False, noDecoys=False):
     os.chdir(temp_folder)
     DATA_NAME="dummyOSWScoredData.osw"
     data_path = os.path.join(DATA_FOLDER, DATA_NAME)
@@ -41,40 +41,67 @@ def _run_export_parquet_single_run(temp_folder, transitionLevel=False, pd_testin
         cmdline += " --transitionLevel"
     if onlyFeatures:
         cmdline += " --onlyFeatures"
+    if noDecoys:
+        cmdline += " --noDecoys"
 
     stdout = _run_cmdline(cmdline)
 
     ### This file was configured in a way where the following tests should work
     parquet = pd.read_parquet("dummyOSWScoredData.parquet") ## automatically with parquet ending of input file name
 
+    ### CHECK LENGTHS ###
     if transitionLevel:
         if onlyFeatures: # length of FEATURE_TRANSITION table
-            expectedLength = len(pd.read_sql("select * from feature_transition", conn)) 
+            if not noDecoys:
+                expectedLength = len(pd.read_sql("select * from feature_transition", conn)) 
+            else:
+                expectedLength = len(pd.read_sql("select * from feature_transition inner join transition on transition.id = feature_transition.transition_id where DECOY == 0", conn))
         else:
-            featureTransition = pd.read_sql("select * from feature_transition", conn)
-            precursorTransition = pd.read_sql("select * from transition_precursor_mapping", conn)
+            if not noDecoys:
+                featureTransition = pd.read_sql("select * from feature_transition", conn)
+                precursorTransition = pd.read_sql("select * from transition_precursor_mapping", conn)
+            else:
+                featureTransition = pd.read_sql("select * from feature_transition inner join transition on transition.id = feature_transition.transition_id where DECOY == 0", conn)
+                precursorTransition = pd.read_sql("select * from transition_precursor_mapping inner join transition on transition.id = transition_precursor_mapping.transition_id where DECOY=0", conn)
+
             featureTable = pd.read_sql("select * from feature", conn)
 
             numTransNoFeature = len(precursorTransition[~precursorTransition['PRECURSOR_ID'].isin(featureTable['PRECURSOR_ID'])])
 
             expectedLength = numTransNoFeature + len(featureTransition)
 
-        assert(expectedLength == len(parquet))
     else:
         if onlyFeatures: # expected length, length of feature table
-            expectedLength = len(pd.read_sql("select * from feature", conn)) 
+            if noDecoys:
+                expectedLength = len(pd.read_sql("select * from feature inner join precursor on feature.precursor_id = precursor.id where decoy = 0", conn)) 
+            else:
+                expectedLength = len(pd.read_sql("select * from feature inner join precursor on precursor.id = feature.precursor_id", conn)) 
         else:
             # Expected length is number of features + number of precursors with no feature
-            featureTable = pd.read_sql("select * from feature", conn)
-            precTable = pd.read_sql("select * from precursor", conn)
+            if noDecoys:
+                featureTable = pd.read_sql("select * from feature inner join precursor on feature.precursor_id = precursor.id where decoy = 0", conn)
+            else:
+                featureTable = pd.read_sql("select * from feature", conn)
+
+            if noDecoys:
+                precTable = pd.read_sql("select * from precursor where decoy = 0", conn)
+            else:
+                precTable = pd.read_sql("select * from precursor", conn)
 
             numPrecsNoFeature = len(precTable[~precTable['ID'].isin(featureTable['PRECURSOR_ID'])])
             expectedLength = numPrecsNoFeature + len(featureTable)
 
-        assert(expectedLength == len(parquet))
+    assert(expectedLength == len(parquet))
 
-    ########### FEATURE LEVEL TESTS ########
+
+    ########### FEATURE LEVEL VALUE TESTS ########
     # Tests that columns are equal across different sqlite3 tables to ensure joins occured correctly
+
+    # since cannot compare NAN drop rows which contain an NAN
+    na_columns = ['PRECURSOR.LIBRARY_INTENSITY'] # this is a list of columns which expect to be NAN
+    parquet = parquet.drop(columns=na_columns).dropna()
+
+    assert(len(parquet) > 0) # assert that did not just drop everything (means that missed an na column)
 
     if transitionLevel:
         ## check features and transitions joined properly for those all cases (including those with no features
@@ -83,21 +110,26 @@ def _run_export_parquet_single_run(temp_folder, transitionLevel=False, pd_testin
 
     ### Note: Current tests assume no na
     parquet = parquet.dropna()
-    proxy_feature_id = parquet['FEATURE_ID'].astype(str).apply(lambda x: x[0]).astype(int) # since id is complicated, dummy values created using a proxy id which is the first digit of the actual id
+    pseudo_feature_id = (parquet['FEATURE_ID'].astype(str).str.slice(start=0, stop=1)).astype(int)
     pd.testing.assert_series_equal(parquet['FEATURE_MS1.APEX_INTENSITY'], parquet['PRECURSOR_ID'], **pd_testing_kwargs)
     pd.testing.assert_series_equal(parquet['FEATURE_MS2.APEX_INTENSITY'],  parquet['PRECURSOR_ID'], **pd_testing_kwargs)
 
     pd.testing.assert_series_equal(parquet['FEATURE_MS1.EXP_IM'], parquet['FEATURE_MS2.EXP_IM'], **pd_testing_kwargs)
     pd.testing.assert_series_equal(parquet['FEATURE_MS2.DELTA_IM'],  parquet['FEATURE_MS1.DELTA_IM'], **pd_testing_kwargs)
 
-    pd.testing.assert_series_equal(parquet['SCORE_MS2.SCORE'],  (parquet['PRECURSOR_ID'] + 1) * parquet['FEATURE.EXP_RT'].astype(int) * (proxy_feature_id), **pd_testing_kwargs)
-    print(parquet.columns)
+    pd.testing.assert_series_equal(parquet['SCORE_MS2.SCORE'],  (parquet['PRECURSOR_ID'] + 1) * parquet['FEATURE.EXP_RT'].astype(int) * pseudo_feature_id, **pd_testing_kwargs)
     pd.testing.assert_series_equal(parquet['SCORE_PEPTIDE.SCORE_GLOBAL'],  parquet['PEPTIDE_ID'], **pd_testing_kwargs)
     pd.testing.assert_series_equal(parquet['SCORE_PROTEIN.SCORE_GLOBAL'],  parquet['PROTEIN_ID'], **pd_testing_kwargs)
 
+    # check is/no decoys
+    if noDecoys:
+         assert(parquet[parquet['DECOY'] == 1].shape[0] == 0)
+   
+
+
     ############### TRANSTION LEVEL TESTS ################
     if transitionLevel:
-        pd.testing.assert_series_equal(parquet['FEATURE_TRANSITION.AREA_INTENSITY'], parquet['TRANSITION.PRODUCT_MZ'] * (proxy_feature_id), **pd_testing_kwargs)
+        pd.testing.assert_series_equal(parquet['FEATURE_TRANSITION.AREA_INTENSITY'], parquet['TRANSITION.PRODUCT_MZ'] * pseudo_feature_id, **pd_testing_kwargs)
 	
 def test_export_parquet_single_run(tmpdir):
 	_run_export_parquet_single_run(tmpdir, transitionLevel=False)
@@ -113,3 +145,9 @@ def test_export_parquet_single_run_onlyFeatures(tmpdir):
 
 def test_export_parquet_single_run_transitionLevel_onlyFeatures(tmpdir):
 	_run_export_parquet_single_run(tmpdir, transitionLevel=True, onlyFeatures=True)
+     
+def test_export_parquet_single_run_noDecoys(tmpdir):
+    _run_export_parquet_single_run(tmpdir, noDecoys=True)
+
+def test_export_parquet_single_run_transitionLevel_noDecoys(tmpdir):
+    _run_export_parquet_single_run(tmpdir, transitionLevel=True, noDecoys=True)
