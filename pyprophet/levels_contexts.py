@@ -847,6 +847,15 @@ def merge_oswps(infiles, outfile, templatefile, same_run):
         create_scores_query = '\n'.join( ['CREATE TABLE ' + score_tbl + ' AS SELECT * FROM sdb.' + score_tbl + ' LIMIT 0;' for score_tbl in score_tables] )
     else:
         create_scores_query = ""
+        
+    ## Get Feature Alignment tables table_present
+    feature_alignment_tables = [name for name in original_tables if "ALIGNMENT" in name]
+    feature_alignment_tables_present = False
+    if len(feature_alignment_tables) > 0:
+        create_feature_alignment_query = '\n'.join( ['CREATE TABLE ' + feature_alignment_tbl + ' AS SELECT * FROM sdb.' + feature_alignment_tbl + ' LIMIT 0;' for feature_alignment_tbl in feature_alignment_tables] )
+        feature_alignment_tables_present = True
+    else:
+        create_feature_alignment_query = ""
 
     click.echo( '''First File input: %s''' %( infiles[0] ) )
 
@@ -857,6 +866,9 @@ def merge_oswps(infiles, outfile, templatefile, same_run):
     DROP TABLE IF EXISTS FEATURE_MS1;
     DROP TABLE IF EXISTS FEATURE_MS2;
     DROP TABLE IF EXISTS FEATURE_TRANSITION;
+    DROP TABLE IF EXISTS FEATURE_ALIGNMENT;
+    DROP TABLE IF EXISTS FEATURE_MS2_ALIGNMENT;
+    DROP TABLE IF EXISTS FEATURE_TRANSITION_ALIGNMENT;
     DROP TABLE IF EXISTS SCORE_MS1;
     DROP TABLE IF EXISTS SCORE_MS2;
     DROP TABLE IF EXISTS SCORE_TRANSITION;
@@ -868,10 +880,12 @@ def merge_oswps(infiles, outfile, templatefile, same_run):
     CREATE TABLE FEATURE AS SELECT * FROM sdb.FEATURE LIMIT 0;
     CREATE TABLE FEATURE_MS1 AS SELECT * FROM sdb.FEATURE_MS1 LIMIT 0;
     CREATE TABLE FEATURE_MS2 AS SELECT * FROM sdb.FEATURE_MS2 LIMIT 0;
-    CREATE TABLE FEATURE_TRANSITION AS SELECT * FROM sdb.FEATURE_TRANSITION LIMIT 0;
+    CREATE TABLE FEATURE_TRANSITION AS SELECT * FROM sdb.FEATURE_TRANSITION
+    LIMIT 0;
+    %s
     %s
     DETACH DATABASE sdb;
-    ''' % (infiles[0], create_scores_query) )
+    ''' % (infiles[0], create_feature_alignment_query, create_scores_query) )
 
     conn.commit()
     conn.close()
@@ -973,7 +987,86 @@ def merge_oswps(infiles, outfile, templatefile, same_run):
         conn.close()
 
         click.echo("Info: Merged transition features of file %s to %s." % (infile, outfile))
+        
+    if feature_alignment_tables_present:
+        for infile in infiles:
+            
+            # Check if the infile contains the feature_alignment table
+            conn = sqlite3.connect(infile)
+            feature_alignment_present = check_sqlite_table(conn, "FEATURE_ALIGNMENT")
+            conn.close()
+            
+            if feature_alignment_present:
+                conn = sqlite3.connect(outfile)
+                c = conn.cursor()
 
+                c.executescript('''
+            ATTACH DATABASE "%s" AS sdb;
+            INSERT INTO FEATURE_ALIGNMENT
+            SELECT *
+            FROM sdb.FEATURE_ALIGNMENT;
+            DETACH DATABASE sdb;
+            ''' % infile)
+                    
+                conn.commit()
+                conn.close()
+                
+                click.echo("Info: Merged feature alignment tables of file %s to %s." % (infile, outfile))
+            else:
+                click.echo("Warn: No feature alignment table found in file %s." % (infile))
+                
+        # Merge FEATURE_MS2_ALIGNMENT
+        for infile in infiles:
+
+            conn = sqlite3.connect(infile)
+            feature_ms2_alignment_present = check_sqlite_table(conn, "FEATURE_MS2_ALIGNMENT")
+            conn.close()
+            
+            if feature_ms2_alignment_present:
+                conn = sqlite3.connect(outfile)
+                c = conn.cursor()
+
+                c.executescript('''
+            ATTACH DATABASE "%s" AS sdb;
+            INSERT INTO FEATURE_MS2_ALIGNMENT
+            SELECT *
+            FROM sdb.FEATURE_MS2_ALIGNMENT;
+            DETACH DATABASE sdb;
+            ''' % infile)
+                
+                conn.commit()
+                conn.close()
+                
+                click.echo("Info: Merged feature MS2 alignment tables of file %s to %s." % (infile, outfile))
+            else:
+                click.echo("Warn: No feature MS2 alignment table found in file %s." % (infile))
+                
+        # Merge FEATURE_TRANSITION_ALIGNMENT
+        for infile in infiles:
+                
+                conn = sqlite3.connect(infile)
+                feature_transition_alignment_present = check_sqlite_table(conn, "FEATURE_TRANSITION_ALIGNMENT")
+                conn.close()
+                
+                if feature_transition_alignment_present:
+                    conn = sqlite3.connect(outfile)
+                    c = conn.cursor()
+        
+                    c.executescript('''
+                ATTACH DATABASE "%s" AS sdb;
+                INSERT INTO FEATURE_TRANSITION_ALIGNMENT
+                SELECT *
+                FROM sdb.FEATURE_TRANSITION_ALIGNMENT;
+                DETACH DATABASE sdb;
+                ''' % infile)
+                    
+                    conn.commit()
+                    conn.close()
+                    
+                    click.echo("Info: Merged feature transition alignment tables of file %s to %s." % (infile, outfile))
+                else:
+                    click.echo("Warn: No feature transition alignment table found in file %s." % (infile))
+                
 
     for infile in infiles:
         for score_tbl in score_tables:
