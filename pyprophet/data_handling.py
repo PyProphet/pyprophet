@@ -143,6 +143,7 @@ def prepare_data_table(table,
                        decoy_name="decoy",
                        main_score_name=None,
                        score_columns=None,
+                       level=None
                        ):
     N = len(table)
     if not N:
@@ -219,7 +220,7 @@ def prepare_data_table(table,
 
     tg_ids = table[tg_id_name]
 
-    if not check_for_unique_blocks(tg_ids):
+    if not check_for_unique_blocks(tg_ids) and level != 'alignment':
         raise click.ClickException("" + tg_id_name + " values do not form unique blocks in input file(s).")
 
     tg_map = dict()
@@ -285,6 +286,8 @@ def update_chosen_main_score_in_table(train, score_columns, use_as_main_score):
     train.df.insert(5, temp_col.name, temp_col)
     click.echo(f"Info: Updated main score column from {old_main_score_column} to {use_as_main_score}...")
     return train, tuple(updated_score_columns)
+
+
 class Experiment(object):
 
     @profile

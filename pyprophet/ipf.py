@@ -2,12 +2,15 @@ import pandas as pd
 import numpy as np
 import scipy as sp
 import sqlite3
+import duckdb
 import sys
 import click
+import time
 
 from scipy.stats import rankdata
 from .data_handling import check_sqlite_table
 from shutil import copyfile
+
 
 def compute_model_fdr(data_in):
     data = np.asarray(data_in)
@@ -28,16 +31,22 @@ def compute_model_fdr(data_in):
 
 
 def read_pyp_peakgroup_precursor(path, ipf_max_peakgroup_pep, ipf_ms1_scoring, ipf_ms2_scoring):
-    click.echo("Info: Reading precursor-level data.")
+    click.echo("Info: Reading precursor-level data ... ", nl=False)
     # precursors are restricted according to ipf_max_peakgroup_pep to exclude very poor peak groups
-    con = sqlite3.connect(path)
-
+    start = time.time()
+    
+    # Connect to DuckDB database
+    con = duckdb.connect(database=path, read_only=False)
+    
+    # Connectin with sqlite3 for checking tables
+    con_sqlite = sqlite3.connect(path)
+    
     # only use MS2 precursors
     if not ipf_ms1_scoring and ipf_ms2_scoring:
-        if not check_sqlite_table(con, "SCORE_MS2") or not check_sqlite_table(con, "SCORE_TRANSITION"):
+        if not check_sqlite_table(con_sqlite, "SCORE_MS2") or not check_sqlite_table(con_sqlite, "SCORE_TRANSITION"):
             raise click.ClickException("Apply scoring to MS2 and transition-level data before running IPF.")
 
-        con.executescript('''
+        con.execute('''
 CREATE INDEX IF NOT EXISTS idx_transition_id ON TRANSITION (ID);
 CREATE INDEX IF NOT EXISTS idx_precursor_precursor_id ON PRECURSOR (ID);
 CREATE INDEX IF NOT EXISTS idx_feature_precursor_id ON FEATURE (PRECURSOR_ID);
@@ -47,7 +56,7 @@ CREATE INDEX IF NOT EXISTS idx_score_transition_feature_id ON SCORE_TRANSITION (
 CREATE INDEX IF NOT EXISTS idx_score_transition_transition_id ON SCORE_TRANSITION (TRANSITION_ID);
 ''')
 
-        data = pd.read_sql_query('''
+        data = con.execute('''
 SELECT FEATURE.ID AS FEATURE_ID,
        SCORE_MS2.PEP AS MS2_PEAKGROUP_PEP,
        NULL AS MS1_PRECURSOR_PEP,
@@ -63,15 +72,15 @@ INNER JOIN
    WHERE TRANSITION.TYPE=''
      AND TRANSITION.DECOY=0) AS SCORE_TRANSITION ON FEATURE.ID = SCORE_TRANSITION.FEATURE_ID
 WHERE PRECURSOR.DECOY=0
-  AND SCORE_MS2.PEP < %s;
-''' % ipf_max_peakgroup_pep, con)
+  AND SCORE_MS2.PEP < ?;
+''', [ipf_max_peakgroup_pep]).df()
 
     # only use MS1 precursors
     elif ipf_ms1_scoring and not ipf_ms2_scoring:
-        if not check_sqlite_table(con, "SCORE_MS1") or not check_sqlite_table(con, "SCORE_MS2") or not check_sqlite_table(con, "SCORE_TRANSITION"):
+        if not check_sqlite_table(con_sqlite, "SCORE_MS1") or not check_sqlite_table(con_sqlite, "SCORE_MS2") or not check_sqlite_table(con_sqlite, "SCORE_TRANSITION"):
             raise click.ClickException("Apply scoring to MS1, MS2 and transition-level data before running IPF.")
 
-        con.executescript('''
+        con.execute('''
 CREATE INDEX IF NOT EXISTS idx_precursor_precursor_id ON PRECURSOR (ID);
 CREATE INDEX IF NOT EXISTS idx_feature_precursor_id ON FEATURE (PRECURSOR_ID);
 CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
@@ -79,7 +88,7 @@ CREATE INDEX IF NOT EXISTS idx_score_ms1_feature_id ON SCORE_MS1 (FEATURE_ID);
 CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);
 ''')
 
-        data = pd.read_sql_query('''
+        data = con.execute('''
 SELECT FEATURE.ID AS FEATURE_ID,
        SCORE_MS2.PEP AS MS2_PEAKGROUP_PEP,
        SCORE_MS1.PEP AS MS1_PRECURSOR_PEP,
@@ -89,15 +98,15 @@ INNER JOIN FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID
 INNER JOIN SCORE_MS1 ON FEATURE.ID = SCORE_MS1.FEATURE_ID
 INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
 WHERE PRECURSOR.DECOY=0
-  AND SCORE_MS2.PEP < %s;
-''' % ipf_max_peakgroup_pep, con)
+  AND SCORE_MS2.PEP < ?;
+''', [ipf_max_peakgroup_pep]).df()
 
     # use both MS1 and MS2 precursors
     elif ipf_ms1_scoring and ipf_ms2_scoring:
-        if not check_sqlite_table(con, "SCORE_MS1") or not check_sqlite_table(con, "SCORE_MS2") or not check_sqlite_table(con, "SCORE_TRANSITION"):
+        if not check_sqlite_table(con_sqlite, "SCORE_MS1") or not check_sqlite_table(con_sqlite, "SCORE_MS2") or not check_sqlite_table(con_sqlite, "SCORE_TRANSITION"):
             raise click.ClickException("Apply scoring to MS1, MS2 and transition-level data before running IPF.")
 
-        con.executescript('''
+        con.execute('''
 CREATE INDEX IF NOT EXISTS idx_transition_id ON TRANSITION (ID);
 CREATE INDEX IF NOT EXISTS idx_precursor_precursor_id ON PRECURSOR (ID);
 CREATE INDEX IF NOT EXISTS idx_feature_precursor_id ON FEATURE (PRECURSOR_ID);
@@ -108,7 +117,7 @@ CREATE INDEX IF NOT EXISTS idx_score_transition_feature_id ON SCORE_TRANSITION (
 CREATE INDEX IF NOT EXISTS idx_score_transition_transition_id ON SCORE_TRANSITION (TRANSITION_ID);
 ''')
 
-        data = pd.read_sql_query('''
+        data = con.execute('''
 SELECT FEATURE.ID AS FEATURE_ID,
        SCORE_MS2.PEP AS MS2_PEAKGROUP_PEP,
        SCORE_MS1.PEP AS MS1_PRECURSOR_PEP,
@@ -125,22 +134,22 @@ INNER JOIN
    WHERE TRANSITION.TYPE=''
      AND TRANSITION.DECOY=0) AS SCORE_TRANSITION ON FEATURE.ID = SCORE_TRANSITION.FEATURE_ID
 WHERE PRECURSOR.DECOY=0
-  AND SCORE_MS2.PEP < %s;
-''' % ipf_max_peakgroup_pep, con)
+  AND SCORE_MS2.PEP < ?;
+''', [ipf_max_peakgroup_pep]).df()
 
     # do not use any precursor information
     else:
-        if not check_sqlite_table(con, "SCORE_MS2") or not check_sqlite_table(con, "SCORE_TRANSITION"):
-            raise click.ClickException("Apply scoring to MS2  and transition-level data before running IPF.")
+        if not check_sqlite_table(con_sqlite, "SCORE_MS2") or not check_sqlite_table(con_sqlite, "SCORE_TRANSITION"):
+            raise click.ClickException("Apply scoring to MS2 and transition-level data before running IPF.")
 
-        con.executescript('''
+        con.execute('''
 CREATE INDEX IF NOT EXISTS idx_precursor_precursor_id ON PRECURSOR (ID);
 CREATE INDEX IF NOT EXISTS idx_feature_precursor_id ON FEATURE (PRECURSOR_ID);
 CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
 CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);
 ''')
 
-        data = pd.read_sql_query('''
+        data = con.execute('''
 SELECT FEATURE.ID AS FEATURE_ID,
        SCORE_MS2.PEP AS MS2_PEAKGROUP_PEP,
        NULL AS MS1_PRECURSOR_PEP,
@@ -149,95 +158,104 @@ FROM PRECURSOR
 INNER JOIN FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID
 INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
 WHERE PRECURSOR.DECOY=0
-  AND SCORE_MS2.PEP < %s;
-''' % ipf_max_peakgroup_pep, con)
+  AND SCORE_MS2.PEP < ?;
+''', [ipf_max_peakgroup_pep]).df()
 
     data.columns = [col.lower() for col in data.columns]
     con.close()
+    con_sqlite.close()
+    
+    end = time.time()
+    click.echo(f"{end-start:.4f} seconds")
 
     return data
 
 
 def read_pyp_transition(path, ipf_max_transition_pep, ipf_h0):
-    click.echo("Info: Reading peptidoform-level data.")
-    # only the evidence is restricted to ipf_max_transition_pep, the peptidoform-space is complete
-    con = sqlite3.connect(path)
-
-    con.executescript('''
+    click.echo("Info: Reading peptidoform-level data ... ", nl=False)
+     # only the evidence is restricted to ipf_max_transition_pep, the peptidoform-space is complete
+    start = time.time()
+    
+    con = duckdb.connect(database=path, read_only=False)
+    
+    con.execute('''
 CREATE INDEX IF NOT EXISTS idx_transition_peptide_mapping_transition_id ON TRANSITION_PEPTIDE_MAPPING (TRANSITION_ID);
 CREATE INDEX IF NOT EXISTS idx_transition_id ON TRANSITION (ID);
 CREATE INDEX IF NOT EXISTS idx_score_transition_feature_id ON SCORE_TRANSITION (FEATURE_ID);
 CREATE INDEX IF NOT EXISTS idx_score_transition_transition_id ON SCORE_TRANSITION (TRANSITION_ID);
 ''')
-
+    
     # transition-level evidence
-    evidence = pd.read_sql_query('''
+    evidence = con.execute('''
 SELECT FEATURE_ID,
        TRANSITION_ID,
        PEP
 FROM SCORE_TRANSITION
 INNER JOIN TRANSITION ON SCORE_TRANSITION.TRANSITION_ID = TRANSITION.ID
-WHERE TRANSITION.TYPE!=''
-  AND TRANSITION.DECOY=0
-  AND PEP < %s;
- ''' % ipf_max_transition_pep, con)
+WHERE TRANSITION.TYPE != ''
+  AND TRANSITION.DECOY = 0
+  AND PEP < ?;
+''', [ipf_max_transition_pep]).df()
     evidence.columns = [col.lower() for col in evidence.columns]
-
+    
     # transition-level bitmask
-    bitmask = pd.read_sql_query('''
+    bitmask = con.execute('''
 SELECT DISTINCT TRANSITION.ID AS TRANSITION_ID,
                 PEPTIDE_ID,
                 1 AS BMASK
 FROM SCORE_TRANSITION
 INNER JOIN TRANSITION ON SCORE_TRANSITION.TRANSITION_ID = TRANSITION.ID
 INNER JOIN TRANSITION_PEPTIDE_MAPPING ON TRANSITION.ID = TRANSITION_PEPTIDE_MAPPING.TRANSITION_ID
-WHERE TRANSITION.TYPE!=''
-  AND TRANSITION.DECOY=0;
-''', con)
+WHERE TRANSITION.TYPE != ''
+  AND TRANSITION.DECOY = 0;
+''').df()
     bitmask.columns = [col.lower() for col in bitmask.columns]
-
+    
     # potential peptidoforms per feature
-    num_peptidoforms = pd.read_sql_query('''
+    num_peptidoforms = con.execute('''
 SELECT FEATURE_ID,
        COUNT(DISTINCT PEPTIDE_ID) AS NUM_PEPTIDOFORMS
 FROM SCORE_TRANSITION
 INNER JOIN TRANSITION ON SCORE_TRANSITION.TRANSITION_ID = TRANSITION.ID
 INNER JOIN TRANSITION_PEPTIDE_MAPPING ON TRANSITION.ID = TRANSITION_PEPTIDE_MAPPING.TRANSITION_ID
-WHERE TRANSITION.TYPE!=''
-  AND TRANSITION.DECOY=0
+WHERE TRANSITION.TYPE != ''
+  AND TRANSITION.DECOY = 0
 GROUP BY FEATURE_ID
 ORDER BY FEATURE_ID;
-''', con)
+''').df()
     num_peptidoforms.columns = [col.lower() for col in num_peptidoforms.columns]
-
+    
     # peptidoform space per feature
-    peptidoforms = pd.read_sql_query('''
+    peptidoforms = con.execute('''
 SELECT DISTINCT FEATURE_ID,
                 PEPTIDE_ID
 FROM SCORE_TRANSITION
 INNER JOIN TRANSITION ON SCORE_TRANSITION.TRANSITION_ID = TRANSITION.ID
 INNER JOIN TRANSITION_PEPTIDE_MAPPING ON TRANSITION.ID = TRANSITION_PEPTIDE_MAPPING.TRANSITION_ID
-WHERE TRANSITION.TYPE!=''
-  AND TRANSITION.DECOY=0
+WHERE TRANSITION.TYPE != ''
+  AND TRANSITION.DECOY = 0
 ORDER BY FEATURE_ID;
-''', con)
+''').df()
     peptidoforms.columns = [col.lower() for col in peptidoforms.columns]
-
+    
     con.close()
-
+    
     # add h0 (peptide_id: -1) to peptidoform-space if necessary
     if ipf_h0:
         peptidoforms = pd.concat([peptidoforms, pd.DataFrame({'feature_id': peptidoforms['feature_id'].unique(), 'peptide_id': -1})])
-
+    
     # generate transition-peptidoform table
     trans_pf = pd.merge(evidence, peptidoforms, how='outer', on='feature_id')
-
+    
     # apply bitmask
-    trans_pf_bm = pd.merge(trans_pf, bitmask, how='left', on=['transition_id','peptide_id']).fillna(0)
-
+    trans_pf_bm = pd.merge(trans_pf, bitmask, how='left', on=['transition_id', 'peptide_id']).fillna(0)
+    
     # append number of peptidoforms
     data = pd.merge(trans_pf_bm, num_peptidoforms, how='inner', on='feature_id')
-
+    
+    end = time.time()
+    click.echo(f"{end-start:.4f} seconds")
+    
     return data
 
 
@@ -262,19 +280,59 @@ def prepare_precursor_bm(data):
     return(precursor_bm_data)
 
 
-def prepare_transition_bm(data):
+def transfer_confident_evidence_across_runs(df1, across_run_confidence_threshold):
+    # Apply confidence threshold filter
+    df_filtered = df1.copy()
+    df_filtered.loc[df_filtered['pep'] > across_run_confidence_threshold, 'feature_id'] = np.nan
+    
+    # Forward fill feature_id for confident PSMs
+    df_filtered['feature_id'] = df_filtered['feature_id'].ffill()
+    
+    # Group by relevant columns and apply min reduction
+    df_result = df_filtered.groupby(
+        ['feature_id', 'transition_id', 'peptide_id', 'bmask', 'num_peptidoforms', 'alignment_group_id'],
+        as_index=False
+    )[['pep', 'precursor_peakgroup_pep']].min()
+    
+    return df_result
+
+
+def prepare_transition_bm(data, propagate_signal_across_runs, across_run_confidence_threshold):
+    # Propagate peps <= threshold for aligned feature groups across runs
+    if propagate_signal_across_runs: 
+        ## Separate out features that need propagation and those that don't to avoid calling apply on the features that don't need propagated peps
+        non_prop_data = data.loc[ data['feature_id']==data['alignment_group_id']]
+        prop_data = data.loc[ data['feature_id']!=data['alignment_group_id']]
+        
+        start = time.time()
+        # Group by alignment_group_id and apply function in parallel
+        data_with_confidence = (
+            prop_data.groupby("alignment_group_id", group_keys=False)
+            .apply(lambda df: transfer_confident_evidence_across_runs(df, across_run_confidence_threshold))
+            .reset_index(drop=True)
+        )
+        end = time.time()
+        click.echo(f"\nInfo: Propagating signal for aligned features across runs ... {end-start:.4f} seconds")
+  
+        ## Concat non prop data with prop data
+        data = pd.concat([non_prop_data, data_with_confidence], ignore_index=True)
+  
     # peptide_id = -1 indicates h0, i.e. the peak group is wrong!
     # initialize priors
     data.loc[data.peptide_id != -1, 'prior'] = (1-data.loc[data.peptide_id != -1, 'precursor_peakgroup_pep']) / data.loc[data.peptide_id != -1, 'num_peptidoforms'] # potential peptidoforms
     data.loc[data.peptide_id == -1, 'prior'] = data.loc[data.peptide_id == -1, 'precursor_peakgroup_pep'] # h0
-
+    
     # set evidence
     data.loc[data.bmask == 1, 'evidence'] = (1-data.loc[data.bmask == 1, 'pep']) # we have evidence FOR this peptidoform or h0
     data.loc[data.bmask == 0, 'evidence'] = data.loc[data.bmask == 0, 'pep'] # we have evidence AGAINST this peptidoform or h0
-
-    data = data[['feature_id','num_peptidoforms','prior','evidence','peptide_id']]
-    data = data.rename(columns=lambda x: x.replace('peptide_id', 'hypothesis'))
-
+    
+    if propagate_signal_across_runs:
+        cols = ['feature_id', 'alignment_group_id', 'num_peptidoforms','prior','evidence','peptide_id']
+    else:
+        cols = ['feature_id', 'num_peptidoforms','prior','evidence','peptide_id']
+    data = data[cols]
+    data = data.rename(columns=lambda x: x.replace('peptide_id','hypothesis'))
+    
     return data
 
 
@@ -285,7 +343,7 @@ def apply_bm(data):
     pp_data.columns = ['feature_id','hypothesis','likelihood_prior']
 
     # compute likelihood sum per feature
-    pp_data['likelihood_sum'] = pp_data.groupby('feature_id')['likelihood_prior'].transform(np.sum)
+    pp_data['likelihood_sum'] = pp_data.groupby('feature_id')['likelihood_prior'].transform("sum")
 
     # compute posterior hypothesis probability
     pp_data['posterior'] = pp_data['likelihood_prior'] / pp_data['likelihood_sum']
@@ -316,15 +374,21 @@ def precursor_inference(data, ipf_ms1_scoring, ipf_ms2_scoring, ipf_max_precurso
         precursor_data = ms2_precursor_data.merge(ms1_precursor_data, on=['feature_id'], how='outer').merge(ms2_pg_data, on=['feature_id'], how='outer')
 
         # prepare precursor-level Bayesian model
-        click.echo("Info: Preparing precursor-level data.")
+        click.echo("Info: Preparing precursor-level data ... ", nl=False)
+        start = time.time()
         precursor_data_bm = prepare_precursor_bm(precursor_data)
+        end = time.time()
+        click.echo(f"{end-start:.4f} seconds")
 
         # compute posterior precursor probability
-        click.echo("Info: Conducting precursor-level inference.")
+        click.echo("Info: Conducting precursor-level inference ... ", nl=False)
+        start = time.time()
         prec_pp_data = apply_bm(precursor_data_bm)
         prec_pp_data['precursor_peakgroup_pep'] = 1 - prec_pp_data['posterior']
 
         inferred_precursors = prec_pp_data[prec_pp_data['hypothesis']][['feature_id','precursor_peakgroup_pep']]
+        end = time.time()
+        click.echo(f"{end-start:.4f} seconds")
     else:
         # no precursor-level data on MS1 and/or MS2 should be used; use peak group-level data
         click.echo("Info: Skipping precursor-level inference.")
@@ -335,15 +399,19 @@ def precursor_inference(data, ipf_ms1_scoring, ipf_ms2_scoring, ipf_max_precurso
     return inferred_precursors
 
 
-def peptidoform_inference(transition_table, precursor_data, ipf_grouped_fdr):
+def peptidoform_inference(transition_table, precursor_data, ipf_grouped_fdr, propagate_signal_across_runs, across_run_confidence_threshold):
     transition_table = pd.merge(transition_table, precursor_data, on='feature_id')
 
     # compute transition posterior probabilities
-    click.echo("Info: Preparing peptidoform-level data.")
-    transition_data_bm = prepare_transition_bm(transition_table)
+    click.echo("Info: Preparing peptidoform-level data ... ", nl=False)
+    start = time.time()
+    transition_data_bm = prepare_transition_bm(transition_table, propagate_signal_across_runs, across_run_confidence_threshold)
+    end = time.time()
+    click.echo(f"{end-start:.4f} seconds")
 
     # compute posterior peptidoform probability
-    click.echo("Info: Conducting peptidoform-level inference.")
+    click.echo("Info: Conducting peptidoform-level inference ... ", nl=False)
+    start = time.time()
     pf_pp_data = apply_bm(transition_data_bm)
     pf_pp_data['pep'] = 1 - pf_pp_data['posterior']
 
@@ -355,11 +423,43 @@ def peptidoform_inference(transition_table, precursor_data, ipf_grouped_fdr):
 
     # merge precursor-level data with UIS data
     result = pf_pp_data.merge(precursor_data[['feature_id','precursor_peakgroup_pep']].drop_duplicates(), on=['feature_id'], how='inner')
+    
+    end = time.time()
+    click.echo(f"{end-start:.4f} seconds")
 
     return result
 
 
-def infer_peptidoforms(infile, outfile, ipf_ms1_scoring, ipf_ms2_scoring, ipf_h0, ipf_grouped_fdr, ipf_max_precursor_pep, ipf_max_peakgroup_pep, ipf_max_precursor_peakgroup_pep, ipf_max_transition_pep):
+def get_feature_mapping_across_runs(infile, ipf_max_alignment_pep=1):
+    click.echo("Info: Reading Across Run Feature Alignment Mapping ... ", nl=False)
+    start = time.time()
+
+    con = sqlite3.connect(infile)
+
+    data = pd.read_sql_query(
+        f"""SELECT  
+                DENSE_RANK() OVER (ORDER BY PRECURSOR_ID, ALIGNMENT_ID) AS ALIGNMENT_GROUP_ID,
+                ALIGNED_FEATURE_ID AS FEATURE_ID 
+                FROM (SELECT DISTINCT * FROM FEATURE_MS2_ALIGNMENT) AS FEATURE_MS2_ALIGNMENT
+                INNER JOIN 
+                (SELECT DISTINCT *, MIN(QVALUE) FROM SCORE_ALIGNMENT GROUP BY FEATURE_ID) AS SCORE_ALIGNMENT 
+                ON SCORE_ALIGNMENT.FEATURE_ID = FEATURE_MS2_ALIGNMENT.ALIGNED_FEATURE_ID
+                WHERE LABEL = 1
+                AND SCORE_ALIGNMENT.PEP < {ipf_max_alignment_pep}
+                ORDER BY ALIGNMENT_GROUP_ID""",
+        con,
+    )
+
+    data.columns = [col.lower() for col in data.columns]
+    con.close()
+    
+    end = time.time()
+    click.echo(f"{end-start:.4f} seconds")
+
+    return data
+
+
+def infer_peptidoforms(infile, outfile, ipf_ms1_scoring, ipf_ms2_scoring, ipf_h0, ipf_grouped_fdr, ipf_max_precursor_pep, ipf_max_peakgroup_pep, ipf_max_precursor_peakgroup_pep, ipf_max_transition_pep, propagate_signal_across_runs, ipf_max_alignment_pep=1, across_run_confidence_threshold=0.5):
     click.echo("Info: Starting IPF (Inference of PeptidoForms).")
 
     # precursor level
@@ -368,12 +468,26 @@ def infer_peptidoforms(infile, outfile, ipf_ms1_scoring, ipf_ms2_scoring, ipf_h0
 
     # peptidoform level
     peptidoform_table = read_pyp_transition(infile, ipf_max_transition_pep, ipf_h0)
-    peptidoform_data = peptidoform_inference(peptidoform_table, precursor_data, ipf_grouped_fdr)
+    ## prepare for propagating signal across runs for aligned features
+    if propagate_signal_across_runs:
+        across_run_feature_map = get_feature_mapping_across_runs(infile, ipf_max_alignment_pep)
+        peptidoform_table = peptidoform_table.merge(across_run_feature_map, how='left', on='feature_id')
+        ## Fill missing alignment_group_id with feature_id for those that are not aligned
+        peptidoform_table["alignment_group_id"] = peptidoform_table["alignment_group_id"].astype(object)
+        mask = peptidoform_table["alignment_group_id"].isna()
+        peptidoform_table.loc[mask, "alignment_group_id"] = peptidoform_table.loc[mask, "feature_id"].astype(str)
+
+        peptidoform_table = peptidoform_table.astype({'alignment_group_id':'int64'})
+    
+    peptidoform_data = peptidoform_inference(peptidoform_table, precursor_data, ipf_grouped_fdr, propagate_signal_across_runs, across_run_confidence_threshold)
 
     # finalize results and write to table
     click.echo("Info: Storing results.")
     peptidoform_data = peptidoform_data[peptidoform_data['hypothesis']!=-1][['feature_id','hypothesis','precursor_peakgroup_pep','qvalue','pep']]
     peptidoform_data.columns = ['FEATURE_ID','PEPTIDE_ID','PRECURSOR_PEAKGROUP_PEP','QVALUE','PEP']
+    
+    # Convert feature_id to int64
+    peptidoform_data = peptidoform_data.astype({'FEATURE_ID':'int64'})
 
     if infile != outfile:
         copyfile(infile, outfile)
