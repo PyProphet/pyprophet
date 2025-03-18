@@ -281,12 +281,13 @@ def prepare_precursor_bm(data):
 
 
 def transfer_confident_evidence_across_runs(df1, across_run_confidence_threshold):
-    # Apply confidence threshold filter
-    df_filtered = df1.copy()
-    df_filtered.loc[df_filtered['pep'] > across_run_confidence_threshold, 'feature_id'] = np.nan
-    
-    # Forward fill feature_id for confident PSMs
-    df_filtered['feature_id'] = df_filtered['feature_id'].ffill()
+    feature_ids = np.unique(df1['feature_id'])
+    df_list = []
+    for feature_id in feature_ids:
+        tmp_df = df1[(df1['feature_id'] == feature_id) | ((df1['feature_id'] != feature_id) & (df1['pep'] <= across_run_confidence_threshold))]
+        tmp_df['feature_id'] = feature_id
+        df_list.append(tmp_df)
+    df_filtered = pd.concat(df_list)
     
     # Group by relevant columns and apply min reduction
     df_result = df_filtered.groupby(
@@ -312,8 +313,8 @@ def prepare_transition_bm(data, propagate_signal_across_runs, across_run_confide
             .reset_index(drop=True)
         )
         end = time.time()
-        click.echo(f"\nInfo: Propagating signal for aligned features across runs ... {end-start:.4f} seconds")
-  
+        click.echo(f"\nInfo: Propagating signal for {len(prop_data['feature_id'].unique())} aligned features of total {len(data['feature_id'].unique())} features across runs ... {end-start:.4f} seconds")
+        
         ## Concat non prop data with prop data
         data = pd.concat([non_prop_data, data_with_confidence], ignore_index=True)
   
@@ -414,7 +415,7 @@ def peptidoform_inference(transition_table, precursor_data, ipf_grouped_fdr, pro
     start = time.time()
     pf_pp_data = apply_bm(transition_data_bm)
     pf_pp_data['pep'] = 1 - pf_pp_data['posterior']
-
+    
     # compute model-based FDR
     if ipf_grouped_fdr:
         pf_pp_data['qvalue'] = pd.merge(pf_pp_data, transition_data_bm[['feature_id', 'num_peptidoforms']].drop_duplicates(), on=['feature_id'], how='inner').groupby('num_peptidoforms')['pep'].transform(compute_model_fdr)
