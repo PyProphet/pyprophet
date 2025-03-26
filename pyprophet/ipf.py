@@ -280,7 +280,7 @@ def prepare_precursor_bm(data):
     return(precursor_bm_data)
 
 
-def transfer_confident_evidence_across_runs(df1, across_run_confidence_threshold):
+def transfer_confident_evidence_across_runs(df1, across_run_confidence_threshold, group_cols=['feature_id', 'transition_id', 'peptide_id', 'bmask', 'num_peptidoforms', 'alignment_group_id'], value_cols=['pep', 'precursor_peakgroup_pep']):
     feature_ids = np.unique(df1['feature_id'])
     df_list = []
     for feature_id in feature_ids:
@@ -291,9 +291,9 @@ def transfer_confident_evidence_across_runs(df1, across_run_confidence_threshold
     
     # Group by relevant columns and apply min reduction
     df_result = df_filtered.groupby(
-        ['feature_id', 'transition_id', 'peptide_id', 'bmask', 'num_peptidoforms', 'alignment_group_id'],
+        group_cols,
         as_index=False
-    )[['pep', 'precursor_peakgroup_pep']].min()
+    )[value_cols].min()
     
     return df_result
 
