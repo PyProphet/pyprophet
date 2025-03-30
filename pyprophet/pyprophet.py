@@ -349,7 +349,13 @@ class HolyGostQuery(object):
 
         result = Result(summary_statistics, final_statistics, scored_table)
 
+        # Set feature names in XGBoost classifier
+        if self.classifier == "XGBoost":
+            classifier_table.feature_names = list(score_columns)
+            classifier_table.save_model('xgboostModel.json')
+
         click.echo("Info: Finished scoring and estimation statistics.")
+
         return result, scorer, classifier_table
 
 

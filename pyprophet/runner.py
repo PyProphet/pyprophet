@@ -13,6 +13,8 @@ from .pyprophet import PyProphet
 from .report import save_report
 from .data_handling import is_sqlite_file, check_sqlite_table
 from shutil import copyfile
+import json
+import xgboost as xgb
 
 try:
     profile
@@ -513,16 +515,29 @@ CREATE INDEX IF NOT EXISTS idx_feature_ms2_feature_id ON FEATURE_MS2 (FEATURE_ID
         elif self.classifier == "XGBoost":
             con = sqlite3.connect(self.outfile)
 
+            #### to ensure a consistent model save model as .json and then load .json and attach to sqlite
+            json_file_path = "tmp.json"
+            weights.save_model(json_file_path)
+
+            json_object = ''
+            with open(json_file_path, 'r') as json_file:
+                json_object = json.load(json_file)
+
             c = con.cursor()
             c.execute('SELECT count(name) FROM sqlite_master WHERE type="table" AND name="PYPROPHET_XGB";')
             if c.fetchone()[0] == 1:
                 c.execute('DELETE FROM PYPROPHET_XGB WHERE LEVEL =="%s"' % self.level)
             else:
-                c.execute('CREATE TABLE PYPROPHET_XGB (level TEXT, xgb BLOB)')
+                c.execute('CREATE TABLE PYPROPHET_XGB (level TEXT, xgb TEXT)')
 
-            c.execute('INSERT INTO PYPROPHET_XGB VALUES(?, ?)', [self.level, pickle.dumps(weights)])
+            c.execute('INSERT INTO PYPROPHET_XGB VALUES(?, ?)', [self.level, json.dumps(json_object)])
+
             con.commit()
             c.close()
+
+            ## delete the temporary json object 
+            if os.path.exists(json_file_path):
+                os.remove(json_file_path)
 
     def save_bin_weights(self, weights, extra_writes):
         trained_weights_path = extra_writes.get("trained_model_path_" + self.level)
@@ -591,9 +606,22 @@ class PyProphetWeightApplier(PyProphetRunner):
 
                     if not check_sqlite_table(con, "PYPROPHET_XGB"):
                         raise click.ClickException("PYPROPHET_XGB table is not present in file, cannot apply weights for XGBoost classifier! Make sure you have run the scoring on a subset of the data first, or that you supplied the right `--classifier` parameter.")
-                    data = con.execute("SELECT xgb FROM PYPROPHET_XGB WHERE LEVEL=='%s'" % self.level).fetchone()
+                    data = json.loads(con.execute("SELECT xgb FROM PYPROPHET_XGB WHERE LEVEL=='%s'" % self.level).fetchone()[0])
                     con.close()
-                    self.persisted_weights = pickle.loads(data[0])
+
+                    ## dump json to temporary file so it can be loaded proerly with xgboost
+                    json_file_path='tmp.json'
+                    with open(json_file_path, 'w') as outfile:
+                        json.dump(data, outfile)
+
+
+                    self.persisted_weights = xgb.Booster()
+                    self.persisted_weights.load_model(json_file_path)
+
+                    ## remove feature names for compatibility with other methods TODO: allow for apply weights to work with feature names
+                    self.persisted_weights.feature_names = None
+
+
                 except Exception:
                     import traceback
                     traceback.print_exc()
