@@ -8,10 +8,12 @@ import ast
 
 from .runner import PyProphetLearner, PyProphetWeightApplier
 from .ipf import infer_peptidoforms
-from .levels_contexts import infer_peptides, infer_proteins, infer_genes, subsample_osw, reduce_osw, merge_osw, backpropagate_oswr
+from .levels_contexts import infer_glycopeptides, infer_peptides, infer_proteins, infer_genes, subsample_osw, reduce_osw, merge_osw, backpropagate_oswr
+from .glyco.glycoform import infer_glycoforms
 from .split import split_osw
 from .export import export_tsv, export_score_plots
 from .export_compound import export_compound_tsv
+from .glyco.export import export_tsv as export_glyco_tsv, export_score_plots as export_glyco_score_plots
 from .filter import filter_sqmass, filter_osw
 from .data_handling import (transform_pi0_lambda, transform_threads, transform_subsample_ratio, check_sqlite_table)
 from .export_parquet import export_to_parquet
@@ -46,6 +48,7 @@ class PythonLiteralOption(click.Option):
             return ast.literal_eval(value)
         except Exception:
             raise click.BadParameter(value)
+
 
 # PyProphet semi-supervised learning and scoring
 @cli.command()
@@ -85,6 +88,10 @@ class PythonLiteralOption(click.Option):
 @click.option('--ipf_max_peakgroup_pep', default=0.7, show_default=True, type=float, help='Assess transitions only for candidate peak groups until maximum posterior error probability.')
 @click.option('--ipf_max_transition_isotope_overlap', default=0.5, show_default=True, type=float, help='Maximum isotope overlap to consider transitions in IPF.')
 @click.option('--ipf_min_transition_sn', default=0, show_default=True, type=float, help='Minimum log signal-to-noise level to consider transitions in IPF. Set -1 to disable this filter.')
+# Glyco/GproDIA Options
+@click.option('--glyco/--no-glyco', default=False, show_default=True, help='Whether glycopeptide scoring should be enabled.')
+@click.option('--density_estimator', default='gmm', show_default=True, type=click.Choice(['kde', 'gmm']), help='Either kernel density estimation ("kde") or Gaussian mixture model ("gmm") is used for score density estimation.')
+@click.option('--grid_size', default=256, show_default=True, type=int, help='Number of d-score cutoffs to build grid coordinates for local FDR calculation.')
 # TRIC
 @click.option('--tric_chromprob/--no-tric_chromprob', default=False, show_default=True, help='Whether chromatogram probabilities for TRIC should be computed.')
 # Visualization
@@ -93,7 +100,46 @@ class PythonLiteralOption(click.Option):
 # Processing
 @click.option('--threads', default=1, show_default=True, type=int, help='Number of threads used for semi-supervised learning. -1 means all available CPUs.', callback=transform_threads)
 @click.option('--test/--no-test', default=False, show_default=True, help='Run in test mode with fixed seed.')
-def score(infile, outfile, classifier, xgb_autotune, apply_weights, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, ss_main_score, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, level, add_alignment_features, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn, tric_chromprob, threads, test, ss_score_filter, color_palette, main_score_selection_report):
+def score(
+    infile,
+    outfile,
+    classifier,
+    xgb_autotune,
+    apply_weights,
+    xeval_fraction,
+    xeval_num_iter,
+    ss_initial_fdr,
+    ss_iteration_fdr,
+    ss_num_iter,
+    ss_main_score,
+    group_id,
+    parametric,
+    pfdr,
+    pi0_lambda,
+    pi0_method,
+    pi0_smooth_df,
+    pi0_smooth_log_pi0,
+    lfdr_truncate,
+    lfdr_monotone,
+    lfdr_transformation,
+    lfdr_adj,
+    lfdr_eps,
+    level,
+    add_alignment_features,
+    ipf_max_peakgroup_rank,
+    ipf_max_peakgroup_pep,
+    ipf_max_transition_isotope_overlap,
+    ipf_min_transition_sn,
+    glyco,
+    density_estimator,
+    grid_size,
+    tric_chromprob,
+    threads,
+    test,
+    ss_score_filter,
+    color_palette,
+    main_score_selection_report,
+):
     """
     Conduct semi-supervised learning and error-rate estimation for MS1, MS2 and transition-level data. 
     """
@@ -113,9 +159,9 @@ def score(infile, outfile, classifier, xgb_autotune, apply_weights, xeval_fracti
     xgb_params_space = {'eta': hp.uniform('eta', 0.0, 0.3), 'gamma': hp.uniform('gamma', 0.0, 0.5), 'max_depth': hp.quniform('max_depth', 2, 8, 1), 'min_child_weight': hp.quniform('min_child_weight', 1, 5, 1), 'subsample': 1, 'colsample_bytree': 1, 'colsample_bylevel': 1, 'colsample_bynode': 1, 'lambda': hp.uniform('lambda', 0.0, 1.0), 'alpha': hp.uniform('alpha', 0.0, 1.0), 'scale_pos_weight': 1.0, 'verbosity': 0, 'objective': 'binary:logitraw', 'nthread': 1, 'eval_metric': 'auc'}
 
     if not apply_weights:
-        PyProphetLearner(infile, outfile, classifier, xgb_hyperparams, xgb_params, xgb_params_space, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, ss_main_score, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, level, add_alignment_features, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn, tric_chromprob, threads, test, ss_score_filter, color_palette, main_score_selection_report).run()
+        PyProphetLearner(infile, outfile, classifier, xgb_hyperparams, xgb_params, xgb_params_space, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, ss_main_score, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, level, add_alignment_features, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn, glyco, density_estimator, grid_size, tric_chromprob, threads, test, ss_score_filter, color_palette, main_score_selection_report).run()
     else:
-        
+
         PyProphetWeightApplier(infile, outfile, classifier, xgb_hyperparams, xgb_params, xgb_params_space, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, ss_main_score, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, level, add_alignment_features, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn, tric_chromprob, threads, test, apply_weights, ss_score_filter, color_palette, main_score_selection_report).run()
 
 
@@ -147,6 +193,61 @@ def ipf(infile, outfile, ipf_ms1_scoring, ipf_ms2_scoring, ipf_h0, ipf_grouped_f
         outfile = outfile
 
     infer_peptidoforms(infile, outfile, ipf_ms1_scoring, ipf_ms2_scoring, ipf_h0, ipf_grouped_fdr, ipf_max_precursor_pep, ipf_max_peakgroup_pep, ipf_max_precursor_peakgroup_pep, ipf_max_transition_pep, propagate_signal_across_runs, ipf_max_alignment_pep, across_run_confidence_threshold)
+
+
+# Infer glycoforms
+@cli.command()
+@click.option('--in', 'infile', required=True, type=click.Path(exists=True), help='Input file.')
+@click.option('--out', 'outfile', type=click.Path(exists=False), help='Output file.')
+@click.option('--ms1_precursor_scoring/--no-ms1_precursor_scoring', default=True, show_default=True, help='Use MS1 precursor data for glycoform inference.')
+@click.option('--ms2_precursor_scoring/--no-ms2_precursor_scoring', default=True, show_default=True, help='Use MS2 precursor data for glycoform inference.')
+@click.option('--grouped_fdr/--no-grouped_fdr', default=False, show_default=True, help='[Experimental] Compute grouped FDR instead of pooled FDR to better support data where peak groups are evaluated to originate from very heterogeneous numbers of glycoforms.')
+@click.option('--max_precursor_pep', default=1, show_default=True, type=float, help='Maximum PEP to consider scored precursors.')
+@click.option('--max_peakgroup_pep', default=0.7, show_default=True, type=float, help='Maximum PEP to consider scored peak groups.')
+@click.option('--max_precursor_peakgroup_pep', default=1, show_default=True, type=float, help='Maximum BHM layer 1 integrated precursor peakgroup PEP to consider.')
+@click.option('--max_transition_pep', default=0.6, show_default=True, type=float, help='Maximum PEP to consider scored transitions.')
+@click.option('--use_glycan_composition/--use_glycan_struct', 'use_glycan_composition', default=True, show_default=True, help='Compute glycoform-level FDR based on glycan composition or struct.')
+@click.option('--ms1_mz_window', default=10, show_default=True, type=float, help='MS1 m/z window in Thomson or ppm.')
+@click.option('--ms1_mz_window_unit', default='ppm', show_default=True, type=click.Choice(['ppm', 'Da', 'Th']), help='MS1 m/z window unit.')
+@click.option('--propagate_signal_across_runs/--no-propagate_signal_across_runs', default=False, show_default=True, help='Propagate signal across runs (requires running alignment).')
+@click.option('--max_alignment_pep', default=1.0, show_default=True, type=float, help='Maximum PEP to consider for good alignments.')
+@click.option('--across_run_confidence_threshold', default=0.5, show_default=True, type=float, help='Maximum PEP to consider for propagating signal across runs for aligned features.')
+def glycoform(infile, outfile, 
+              ms1_precursor_scoring, ms2_precursor_scoring,
+              grouped_fdr,
+              max_precursor_pep, max_peakgroup_pep,
+              max_precursor_peakgroup_pep,
+              max_transition_pep,
+              use_glycan_composition,
+              ms1_mz_window,
+              ms1_mz_window_unit,
+              propagate_signal_across_runs,
+              max_alignment_pep,
+              across_run_confidence_threshold
+              ):
+    """
+    Infer glycoforms after scoring of MS1, MS2 and transition-level data.
+    """
+    
+    if outfile is None:
+        outfile = infile
+        
+    infer_glycoforms(
+        infile=infile, outfile=outfile, 
+        ms1_precursor_scoring=ms1_precursor_scoring,
+        ms2_precursor_scoring=ms2_precursor_scoring,
+        grouped_fdr=grouped_fdr,
+        max_precursor_pep=max_precursor_pep,
+        max_peakgroup_pep=max_peakgroup_pep,
+        max_precursor_peakgroup_pep=max_precursor_peakgroup_pep,
+        max_transition_pep=max_transition_pep,
+        use_glycan_composition=use_glycan_composition,
+        ms1_mz_window=ms1_mz_window,
+        ms1_mz_window_unit=ms1_mz_window_unit,
+        propagate_signal_across_runs=propagate_signal_across_runs,
+        max_alignment_pep=max_alignment_pep,
+        across_run_confidence_threshold=across_run_confidence_threshold
+    )
 
 
 # Peptide-level inference
@@ -182,6 +283,41 @@ def peptide(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_method, 
 
     infer_peptides(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, color_palette)
 
+
+# GlycoPeptide-level inference
+@cli.command()
+@click.option('--in', 'infile', required=True, type=click.Path(exists=True), help='Input file.')
+@click.option('--out', 'outfile', type=click.Path(exists=False), help='Output file.')
+@click.option('--context', default='run-specific', show_default=True, type=click.Choice(['run-specific', 'experiment-wide', 'global']), help='Context to estimate glycopeptide-level FDR control.')
+@click.option('--density_estimator', default='gmm', show_default=True, type=click.Choice(['kde', 'gmm']), help='Either kernel density estimation ("kde") or Gaussian mixture model ("gmm") is used for score density estimation.')
+@click.option('--grid_size', default=256, show_default=True, type=int, help='Number of d-score cutoffs to build grid coordinates for local FDR calculation.')
+@click.option('--parametric/--no-parametric', default=False, show_default=True, help='Do parametric estimation of p-values.')
+@click.option('--pfdr/--no-pfdr', default=False, show_default=True, help='Compute positive false discovery rate (pFDR) instead of FDR.')
+@click.option('--pi0_lambda', default=[0.1,0.5,0.05], show_default=True, type=(float, float, float), help='Use non-parametric estimation of p-values. Either use <START END STEPS>, e.g. 0.1, 1.0, 0.1 or set to fixed value, e.g. 0.4, 0, 0.', callback=transform_pi0_lambda)
+@click.option('--pi0_method', default='bootstrap', show_default=True, type=click.Choice(['smoother', 'bootstrap']), help='Either "smoother" or "bootstrap"; the method for automatically choosing tuning parameter in the estimation of pi_0, the proportion of true null hypotheses.')
+@click.option('--pi0_smooth_df', default=3, show_default=True, type=int, help='Number of degrees-of-freedom to use when estimating pi_0 with a smoother.')
+@click.option('--pi0_smooth_log_pi0/--no-pi0_smooth_log_pi0', default=False, show_default=True, help='If True and pi0_method = "smoother", pi0 will be estimated by applying a smoother to a scatterplot of log(pi0) estimates against the tuning parameter lambda.')
+@click.option('--lfdr_truncate/--no-lfdr_truncate', show_default=True, default=True, help='If True, local FDR values >1 are set to 1.')
+@click.option('--lfdr_monotone/--no-lfdr_monotone', show_default=True, default=True, help='If True, local FDR values are non-increasing with increasing d-scores.')
+def glycopeptide(infile, outfile, context, density_estimator, grid_size, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone):
+    """
+    Infer glycopeptides and conduct error-rate estimation in different contexts.
+    """
+    if outfile is None:
+        outfile = infile
+    
+    infer_glycopeptides(
+        infile, outfile, 
+        context=context, 
+        density_estimator=density_estimator,
+        grid_size=grid_size,
+        parametric=parametric, pfdr=pfdr, 
+        pi0_lambda=pi0_lambda, pi0_method=pi0_method, 
+        pi0_smooth_df=pi0_smooth_df, 
+        pi0_smooth_log_pi0=pi0_smooth_log_pi0, 
+        lfdr_truncate=lfdr_truncate, 
+        lfdr_monotone=lfdr_monotone
+    )
 
 # Gene-level inference
 @cli.command()
@@ -348,22 +484,75 @@ def backpropagate(infile, outfile, apply_scores):
 @click.option('--max_global_peptide_qvalue', default=0.01, show_default=True, type=float, help='[format: matrix/legacy] Filter results to maximum global peptide-level q-value.')
 @click.option('--protein/--no-protein', default=True, show_default=True, help='Append protein-level error-rate estimates if available.')
 @click.option('--max_global_protein_qvalue', default=0.01, show_default=True, type=float, help='[format: matrix/legacy] Filter results to maximum global protein-level q-value.')
-def export(infile, outfile, format, outcsv, transition_quantification, max_transition_pep, ipf, ipf_max_peptidoform_pep, max_rs_peakgroup_qvalue, peptide, max_global_peptide_qvalue, protein, max_global_protein_qvalue):
+# Glycoform
+@click.option('--glycoform/--no-glycoform', 'glycoform', default=False, show_default=True, help='[format: matrix/legacy] Export glycoform results.')
+@click.option('--glycoform_match_precursor', default='glycan_composition', show_default=True, type=click.Choice(['exact', 'glycan_composition', 'none']), help='[format: matrix/legacy] Export glycoform results with glycan matched with precursor-level results.')
+@click.option('--max_glycoform_pep', default=1, show_default=True, type=float, help='[format: matrix/legacy] Filter results to maximum glycoform PEP.')
+@click.option('--max_glycoform_qvalue', default=0.05, show_default=True, type=float, help='[format: matrix/legacy] Filter results to maximum glycoform q-value.')
+@click.option('--glycopeptide/--no-glycopeptide', default=True, show_default=True, help='Append glycopeptide-level error-rate estimates if available.')
+@click.option('--max_global_glycopeptide_qvalue', default=0.01, show_default=True, type=float, help='[format: matrix/legacy] Filter results to maximum global glycopeptide-level q-value.')
+def export(
+    infile,
+    outfile,
+    format,
+    outcsv,
+    transition_quantification,
+    max_transition_pep,
+    ipf,
+    ipf_max_peptidoform_pep,
+    max_rs_peakgroup_qvalue,
+    peptide,
+    max_global_peptide_qvalue,
+    protein,
+    max_global_protein_qvalue,
+    glycoform,
+    glycoform_match_precursor,
+    max_glycoform_pep,
+    max_glycoform_qvalue,
+    glycopeptide,
+    max_global_glycopeptide_qvalue
+):
     """
     Export TSV/CSV tables
     """
-    if format == "score_plots":
-        export_score_plots(infile)
-    else:
-        if outfile is None:
-            if outcsv:
-                outfile = infile.split(".osw")[0] + ".csv"
-            else:
-                outfile = infile.split(".osw")[0] + ".tsv"
+    if glycoform:
+        if format == "score_plots":
+            export_glyco_score_plots(infile)
         else:
-            outfile = outfile
+            if outfile is None:
+                if outcsv:
+                    outfile = infile.split(".osw")[0] + ".csv"
+                else:
+                    outfile = infile.split(".osw")[0] + ".tsv"
+            else:
+                outfile = outfile
 
-        export_tsv(infile, outfile, format, outcsv, transition_quantification, max_transition_pep, ipf, ipf_max_peptidoform_pep, max_rs_peakgroup_qvalue, peptide, max_global_peptide_qvalue, protein, max_global_protein_qvalue)
+            export_glyco_tsv(
+                infile, outfile, 
+                format=format, outcsv=outcsv, 
+                transition_quantification=transition_quantification, 
+                max_transition_pep=max_transition_pep, 
+                glycoform=glycoform, 
+                glycoform_match_precursor=glycoform_match_precursor,
+                max_glycoform_pep=max_glycoform_pep, 
+                max_glycoform_qvalue=max_glycoform_qvalue,
+                max_rs_peakgroup_qvalue=max_rs_peakgroup_qvalue, 
+                glycopeptide=glycopeptide,
+                max_global_glycopeptide_qvalue=max_global_glycopeptide_qvalue,
+            )
+    else:
+        if format == "score_plots":
+            export_score_plots(infile)
+        else:
+            if outfile is None:
+                if outcsv:
+                    outfile = infile.split(".osw")[0] + ".csv"
+                else:
+                    outfile = infile.split(".osw")[0] + ".tsv"
+            else:
+                outfile = outfile
+
+            export_tsv(infile, outfile, format, outcsv, transition_quantification, max_transition_pep, ipf, ipf_max_peptidoform_pep, max_rs_peakgroup_qvalue, peptide, max_global_peptide_qvalue, protein, max_global_protein_qvalue)
 
 
 # Export to Paruqet
