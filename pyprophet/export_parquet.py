@@ -47,7 +47,22 @@ def export_to_parquet(infile, outfile, transitionLevel=False, onlyFeatures=False
     Return:
         None
     '''
-    extension_importer.import_extension("sqlite_scanner")
+    try:
+        duckdb.execute("LOAD sqlite_scanner")
+    except Exception as e:
+        if "Extension 'sqlite_scanner' not found" in str(e):
+            try:
+                duckdb.execute("INSTALL sqlite_scanner")
+                duckdb.execute("LOAD sqlite_scanner")
+            except Exception as install_error:
+                if "already installed but the origin is different" in str(install_error):
+                    duckdb.execute("FORCE INSTALL sqlite_scanner")
+                    duckdb.execute("LOAD sqlite_scanner")
+                else:
+                    raise install_error
+        else:
+            raise e
+        
     condb = duckdb.connect(infile)
     con = sqlite3.connect(infile)
 
