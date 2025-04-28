@@ -54,8 +54,8 @@ class PythonLiteralOption(click.Option):
 # PyProphet semi-supervised learning and scoring
 @cli.command()
 # # File handling
-@click.option('--in', 'infile', required=True, type=click.Path(exists=True), help='PyProphet input file.')
-@click.option('--out', 'outfile', type=click.Path(exists=False), help='PyProphet output file.')
+@click.option('--in', 'infile', required=True, type=click.Path(exists=True), help='PyProphet input file. Valid formats are .osw, .parquet and .tsv.')
+@click.option('--out', 'outfile', type=click.Path(exists=False), help='PyProphet output file. Valid formats are .osw, .parquet and .tsv. Must be the same format as input file.')
 # Semi-supervised learning
 @click.option('--classifier', default='LDA', show_default=True, type=click.Choice(['LDA', 'XGBoost']), help='Either a "LDA" or "XGBoost" classifier is used for semi-supervised learning.')
 @click.option('--xgb_autotune/--no-xgb_autotune', default=False, show_default=True, help='XGBoost: Autotune hyperparameters.')
