@@ -24,7 +24,7 @@ def getPeptideProteinScoreTable(conndb, level):
     glob.columns = [ col.upper() + '_GLOBAL' if col != id else col for col in glob.columns ]
 
     return glob, nonGlobal
-    
+
 def getVarColumnNames(condb, tableName):
     '''
     Get all the column names that start with VAR_ from the given table
@@ -268,8 +268,8 @@ def export_to_parquet(infile, outfile, transitionLevel=False, onlyFeatures=False
         {featureLvlSuffix}
         '''
     condb.sql(query).write_parquet(outfile)
-    
-    
+
+
 def convert_osw_to_parquet(infile, outfile, compression_method='zstd', compression_level=11):
     '''
     Convert an OSW sqlite file to Parquet format
@@ -301,17 +301,15 @@ def convert_osw_to_parquet(infile, outfile, compression_method='zstd', compressi
     Return:
         None
     '''
-    
+
     conn = duckdb.connect(database=infile, read_only=True)
-    
+
     # Get Gene/Protein/Peptide/Precursor table
     query = """
     SELECT 
-        PEPTIDE_GENE_MAPPING.GENE_ID AS GENE_ID,
         PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID AS PROTEIN_ID,
         PEPTIDE.ID AS PEPTIDE_ID,
         PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID AS PRECURSOR_ID,
-        GENE.GENE_NAME AS GENE_NAME,
         PROTEIN.PROTEIN_ACCESSION AS PROTEIN_ACCESSION,
         PEPTIDE.UNMODIFIED_SEQUENCE,
         PEPTIDE.MODIFIED_SEQUENCE,
@@ -320,9 +318,9 @@ def convert_osw_to_parquet(infile, outfile, compression_method='zstd', compressi
         PRECURSOR.PRECURSOR_MZ AS PRECURSOR_MZ,
         PRECURSOR.CHARGE AS PRECURSOR_CHARGE,
         PRECURSOR.LIBRARY_INTENSITY AS PRECURSOR_LIBRARY_INTENSITY,
-        PRECURSOR.LIBRARY_RT AS PRECURSOR_LIBRARY_RT,
-        PRECURSOR.LIBRARY_DRIFT_TIME AS PRECURSOR_LIBRARY_DRIFT_TIME,
-        GENE.DECOY AS GENE_DECOY,
+        PRECURSOR.LIBRARY_RT AS PRECURSOR_LIBRARY_RT
+        {library_drift_time_field}
+        {gene_fields},
         PROTEIN.DECOY AS PROTEIN_DECOY,
         PEPTIDE.DECOY AS PEPTIDE_DECOY,
         PRECURSOR.DECOY AS PRECURSOR_DECOY
@@ -331,13 +329,43 @@ def convert_osw_to_parquet(infile, outfile, compression_method='zstd', compressi
     INNER JOIN PEPTIDE ON PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
     INNER JOIN PEPTIDE_PROTEIN_MAPPING ON PEPTIDE.ID = PEPTIDE_PROTEIN_MAPPING.PEPTIDE_ID
     INNER JOIN PROTEIN ON PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID = PROTEIN.ID
-    INNER JOIN PEPTIDE_GENE_MAPPING ON PEPTIDE.ID = PEPTIDE_GENE_MAPPING.PEPTIDE_ID
-    INNER JOIN GENE ON PEPTIDE_GENE_MAPPING.GENE_ID = GENE.ID
+    {gene_joins}
     """
+
+    # # Conditionally include fields and joins (Older OSW files may not have GENE table, and may not have ion mobility related columns)
+    gene_tables_exist = all(
+        table
+        in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        .df()["name"]
+        .values
+        for table in ["PEPTIDE_GENE_MAPPING", "GENE"]
+    )
+    precursor_columns = conn.execute("PRAGMA table_info(PRECURSOR)").df()['name'].values
+    has_library_drift_time = 'LIBRARY_DRIFT_TIME' in precursor_columns
+    
+    query = query.format(
+        library_drift_time_field=""",
+        PRECURSOR.LIBRARY_DRIFT_TIME AS PRECURSOR_LIBRARY_DRIFT_TIME""" if has_library_drift_time else """,
+        NULL AS PRECURSOR_LIBRARY_DRIFT_TIME""",
+        
+        gene_fields=""",
+        PEPTIDE_GENE_MAPPING.GENE_ID AS GENE_ID,
+        GENE.GENE_NAME AS GENE_NAME,
+        GENE.DECOY AS GENE_DECOY""" if gene_tables_exist else """,
+        NULL AS GENE_ID,
+        NULL AS GENE_NAME,
+        NULL AS GENE_DECOY""",
+        
+        gene_joins="""
+        LEFT JOIN PEPTIDE_GENE_MAPPING ON PEPTIDE.ID = PEPTIDE_GENE_MAPPING.PEPTIDE_ID
+        LEFT JOIN GENE ON PEPTIDE_GENE_MAPPING.GENE_ID = GENE.ID""" if gene_tables_exist else ""
+    )
     precursor_df = conn.execute(query).pl()
 
     # Get Transition table
-    query = """
+    transition_columns = conn.execute("PRAGMA table_info(TRANSITION)").df()['name'].values
+    has_annotation = 'ANNOTATION' in transition_columns
+    query = f"""
     SELECT 
         TRANSITION_PRECURSOR_MAPPING.PRECURSOR_ID AS PRECURSOR_ID,
         TRANSITION.ID AS TRANSITION_ID,
@@ -346,7 +374,7 @@ def convert_osw_to_parquet(infile, outfile, compression_method='zstd', compressi
         TRANSITION.CHARGE AS TRANSITION_CHARGE,
         TRANSITION.TYPE AS TRANSITION_TYPE,
         TRANSITION.ORDINAL AS TRANSITION_ORDINAL,
-        TRANSITION.ANNOTATION,
+        {'TRANSITION.ANNOTATION AS TRANSITION_ANNOTATION,' if has_annotation else 'NULL AS TRANSITION_ANNOTATION,'}
         TRANSITION.DETECTING AS TRANSITION_DETECTING,
         TRANSITION.LIBRARY_INTENSITY AS TRANSITION_LIBRARY_INTENSITY,
         TRANSITION.DECOY AS TRANSITION_DECOY
@@ -354,7 +382,30 @@ def convert_osw_to_parquet(infile, outfile, compression_method='zstd', compressi
     INNER JOIN TRANSITION_PRECURSOR_MAPPING ON TRANSITION.ID = TRANSITION_PRECURSOR_MAPPING.TRANSITION_ID
     """
     transition_df = conn.execute(query).pl()
-    
+    if not has_annotation:
+        transition_df = transition_df.with_columns(
+            pl.concat_str([
+                pl.col("TRANSITION_TYPE"),
+                pl.col("TRANSITION_ORDINAL").cast(pl.Utf8),
+                pl.lit("^"),
+                pl.col("TRANSITION_CHARGE").cast(pl.Utf8)
+            ], separator="").alias("ANNOTATION")
+        )
+
+        transition_df = transition_df.select([
+            "PRECURSOR_ID",
+            "TRANSITION_ID",
+            "TRANSITION_TRAML_ID",
+            "PRODUCT_MZ",
+            "TRANSITION_CHARGE",
+            "TRANSITION_TYPE",
+            "TRANSITION_ORDINAL",
+            "ANNOTATION",
+            "TRANSITION_DETECTING",
+            "TRANSITION_LIBRARY_INTENSITY",
+            "TRANSITION_DECOY"
+        ])
+
     # Get Transition-Peptide table
     query = """
     SELECT 
@@ -363,19 +414,21 @@ def convert_osw_to_parquet(infile, outfile, compression_method='zstd', compressi
     FROM TRANSITION_PEPTIDE_MAPPING
     """
     transition_peptide_df = conn.execute(query).pl()
-    
+
     # Merge transition_df and transition_peptide_df on TRANSITION_ID
     transition_df = transition_df.join(transition_peptide_df, on="TRANSITION_ID", how="full", coalesce=True)
 
     # Get Feature table
-    query = """
+    feature_columns = conn.execute("PRAGMA table_info(FEATURE)").df()['name'].values
+    has_im = 'EXP_IM' in feature_columns
+    query = f"""
     SELECT
     FEATURE.RUN_ID AS RUN_ID,
     RUN.FILENAME,
     FEATURE.PRECURSOR_ID AS PRECURSOR_ID,
     FEATURE.ID AS FEATURE_ID,
     FEATURE.EXP_RT,
-    FEATURE.EXP_IM,
+    {'FEATURE.EXP_IM,' if has_im else 'NULL AS EXP_IM,'}
     FEATURE.NORM_RT,
     FEATURE.DELTA_RT,
     FEATURE.LEFT_WIDTH,
