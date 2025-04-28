@@ -284,7 +284,7 @@ def convert_osw_to_parquet(infile, outfile, compression_method='zstd', compressi
         merged_osw_snappy.parquet (355M)
         merged_osw_gzip.parquet (284M)
         merged_osw_zstd.parquet (301M)
-        merged_osw_zstd_level_11_33s.parquet (289M, exported in 33.2829 seconds)
+        merged_osw_zstd_level_11_33s.parquet (289M, exported in 33.2829 seconds, 62% decrease in size)
         merged_osw_zstd_level_22_10m_51s.parquet (277M)
         merged_osw_brotli.parquet (275M)
         merged_osw_brotli_level_11_27m_45s.parquet (255M)
