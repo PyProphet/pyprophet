@@ -354,6 +354,18 @@ def convert_osw_to_parquet(infile, outfile, compression_method='zstd', compressi
     INNER JOIN TRANSITION_PRECURSOR_MAPPING ON TRANSITION.ID = TRANSITION_PRECURSOR_MAPPING.TRANSITION_ID
     """
     transition_df = conn.execute(query).pl()
+    
+    # Get Transition-Peptide table
+    query = """
+    SELECT 
+        TRANSITION_ID,
+        PEPTIDE_ID AS PEPTIDE_IPF_ID
+    FROM TRANSITION_PEPTIDE_MAPPING
+    """
+    transition_peptide_df = conn.execute(query).pl()
+    
+    # Merge transition_df and transition_peptide_df on TRANSITION_ID
+    transition_df = transition_df.join(transition_peptide_df, on="TRANSITION_ID", how="full", coalesce=True)
 
     # Get Feature table
     query = """
