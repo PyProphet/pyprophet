@@ -96,6 +96,42 @@ def check_sqlite_table(con, table):
     return(table_present)
 
 
+
+def is_parquet_file(file_path):
+    import pyarrow.parquet as pq
+    from pyarrow.lib import ArrowInvalid, ArrowIOError
+    # First check extension
+    if not os.path.splitext(file_path)[1].lower() in ('.parquet', '.pq'):
+        return False
+    
+    # Then verify it's actually a parquet file
+    try:
+        pq.read_schema(file_path)
+        return True
+    except (ArrowInvalid, ArrowIOError, OSError):
+        return False
+
+def get_parquet_column_names(file_path):
+    """
+    Retrieves column names from a Parquet file without reading the entire file.
+
+    Args:
+        file_path (str): The path to the Parquet file.
+
+    Returns:
+        list: A list of column names in the Parquet file.
+    """
+    import pyarrow.parquet as pq
+    
+    try:
+        table_schema = pq.read_schema(file_path)
+        column_names = table_schema.names
+        return column_names
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return None
+
+
 def check_for_unique_blocks(tg_ids):
     seen = set()
     last_tg_id = None
