@@ -10,6 +10,7 @@ import sqlite3
 
 import pytest
 
+
 pd.options.display.expand_frame_repr = False
 pd.options.display.precision = 4
 pd.options.display.max_columns = None
@@ -33,7 +34,7 @@ def _run_export_parquet_single_run(temp_folder, transitionLevel=False, pd_testin
     data_path = os.path.join(DATA_FOLDER, DATA_NAME)
     conn = sqlite3.connect(DATA_NAME)
     shutil.copy(data_path, temp_folder)
-
+    
     cmdline = "pyprophet export-parquet --in={}".format(DATA_NAME)
 
     # if testing transition level add --transitionLevel flag
