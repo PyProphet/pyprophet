@@ -6,6 +6,7 @@ import time
 import warnings
 import pandas as pd
 import numpy as np
+import polars as pl
 import sqlite3
 import pickle
 
@@ -14,7 +15,7 @@ from .glyco.scoring import partial_score, combined_score
 from .glyco.stats import ErrorStatisticsCalculator
 from.glyco.report import save_report as save_report_glyco
 from .report import save_report
-from .data_handling import is_sqlite_file, check_sqlite_table
+from .data_handling import is_sqlite_file, check_sqlite_table, is_parquet_file, get_parquet_column_names
 from shutil import copyfile
 
 try:
@@ -150,7 +151,7 @@ class PyProphetRunner(object):
                         raise click.ClickException("MS1-level scoring for glycoform inference requires prior MS2 or MS1MS2-level scoring. Please run 'pyprophet score --level=ms2' or 'pyprophet score --level=ms1ms2' on this file first.")
                     if not check_sqlite_table(con, "FEATURE_MS1"):
                         raise click.ClickException("MS1-level feature table not present in file.")
-                    
+
                     table = pd.read_sql_query(
                         '''
                         SELECT DECOY.*,
@@ -238,7 +239,7 @@ class PyProphetRunner(object):
                                             ''' % (ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn), con)
             elif level == "alignment":
                 if not check_sqlite_table(con, "FEATURE_MS2_ALIGNMENT"):
-                        raise click.ClickException("MS2-level feature alignemnt table not present in file.")
+                    raise click.ClickException("MS2-level feature alignemnt table not present in file.")
 
                 con.executescript('''
                                 CREATE INDEX IF NOT EXISTS idx_precursor_precursor_id ON PRECURSOR (ID);
@@ -383,6 +384,207 @@ class PyProphetRunner(object):
             con.close()
             return(table)
 
+        def read_parquet(infile, level, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn):
+            import pyarrow.parquet as pq
+
+            all_column_names = get_parquet_column_names(infile)
+
+            if level == "ms2" or level == "ms1ms2":
+                if not any([col.startswith("FEATURE_MS2_") for col in all_column_names]):
+                    raise click.ClickException("MS2-level feature columns are not present in parquet file.")
+
+                cols = [
+                    'RUN_ID',
+                    'PRECURSOR_ID',
+                    'PRECURSOR_CHARGE',
+                    'FEATURE_ID',
+                    'EXP_RT',
+                    'PRECURSOR_DECOY',
+                    'TRANSITION_DETECTING'
+                ]
+                # Filter columes names for FEATURE_MS2_
+                feature_ms2_cols = [col for col in all_column_names if col.startswith('FEATURE_MS2_')]
+                # Read the parquet file with selected columns
+                table = pl.read_parquet(infile, columns=cols + feature_ms2_cols)
+
+                # Drop rows with nulls in key columns
+                table = (
+                    table
+                    .drop_nulls(subset=['RUN_ID', 'FEATURE_ID'] + feature_ms2_cols)
+                )
+
+                # Rename columns
+                table = table.rename({
+                    'PRECURSOR_DECOY': 'DECOY',
+                    **{col: col.replace('FEATURE_MS2_', '') 
+                    for col in table.columns 
+                    if col.startswith('FEATURE_MS2_')}
+                })
+
+                # Create transition count table
+                table_transition = (
+                    table.select(['RUN_ID', 'PRECURSOR_ID', 'FEATURE_ID', 'EXP_RT', 'DECOY', 'TRANSITION_DETECTING'])
+                    .explode('TRANSITION_DETECTING')
+                    .filter(pl.col('TRANSITION_DETECTING') == 1)
+                    .group_by(['RUN_ID', 'PRECURSOR_ID', 'FEATURE_ID', 'EXP_RT', 'DECOY'])
+                    .agg(pl.count().alias('TRANSITION_COUNT'))
+                )
+
+                # Join with main table
+                table = table.join(
+                    table_transition,
+                    on=['RUN_ID', 'PRECURSOR_ID', 'FEATURE_ID', 'EXP_RT', 'DECOY'],
+                    how='left'
+                ).drop('TRANSITION_DETECTING')
+
+                # Create GROUP_ID column
+                table = table.with_columns(
+                    (pl.col('RUN_ID').cast(pl.Utf8) + '_' + pl.col('PRECURSOR_ID').cast(pl.Utf8))
+                    .alias('GROUP_ID')
+                )
+                table = table.to_pandas()
+            elif level == "ms1":
+                if not any([col.startswith("FEATURE_MS1_") for col in all_column_names]):
+                    raise click.ClickException("MS1-level feature columns are not present in parquet file.")
+
+                cols = [
+                    'RUN_ID',
+                    'PRECURSOR_ID',
+                    'PRECURSOR_CHARGE',
+                    'FEATURE_ID',
+                    'EXP_RT',
+                    'PRECURSOR_DECOY'
+                ]
+                # Filter columes names for FEATURE_MS1_
+                feature_ms1_cols = [col for col in all_column_names if col.startswith('FEATURE_MS1_')]
+                # Read the parquet file with selected columns
+                table = pl.read_parquet(infile, columns=cols + feature_ms1_cols)
+
+                # Drop rows with nulls in key columns
+                table = table.drop_nulls(subset=['RUN_ID', 'FEATURE_ID'] + feature_ms1_cols)
+
+                # Rename columns - remove 'FEATURE_MS1_' prefix and rename PRECURSOR_DECOY
+                table = table.rename({
+                    'PRECURSOR_DECOY': 'DECOY',
+                    **{col: col.replace('FEATURE_MS1_', '') 
+                    for col in table.columns 
+                    if col.startswith('FEATURE_MS1_')}
+                })
+
+                # Create GROUP_ID column by concatenating RUN_ID and PRECURSOR_ID
+                table = table.with_columns(
+                    (pl.col('RUN_ID').cast(pl.Utf8) + "_" + pl.col('PRECURSOR_ID').cast(pl.Utf8))
+                    .alias('GROUP_ID')
+                )
+                table = table.to_pandas()
+            elif level == "transition":
+                if not any([col.startswith("SCORE_MS2_") for col in all_column_names]):
+                    raise click.ClickException("Transition-level scoring for IPF requires prior MS2 or MS1MS2-level scoring. Please run 'pyprophet score --level=ms2' or 'pyprophet score --level=ms1ms2' on this file first.")
+                if not any([col.startswith("FEATURE_TRANSITION_") for col in all_column_names]):
+                    raise click.ClickException("Transition-level feature columns are not present in parquet file.")
+
+                cols = [
+                    'RUN_ID',
+                    'FEATURE_ID',
+                    'PRECURSOR_ID',
+                    'TRANSITION_ID',
+                    'PRECURSOR_DECOY',
+                    'TRANSITION_DECOY',
+                    'PRECURSOR_CHARGE',
+                    'TRANSITION_CHARGE',
+                ]
+
+                # Read only needed columns from parquet
+                feature_transition_ms2_score_cols = [col for col in all_column_names if col.startswith('SCORE_MS2_') or col.startswith('FEATURE_TRANSITION_')]
+
+                table = pl.read_parquet(
+                    infile,
+                    columns=cols + feature_transition_ms2_score_cols
+                )
+
+                # Explode list columns
+                exploding_cols = [
+                    col for col in table.columns 
+                    if col.startswith('TRANSITION_') or col.startswith('FEATURE_TRANSITION_')
+                ]
+
+                table = table.explode(exploding_cols)
+
+                # Apply filters
+                table = table.filter(
+                    (pl.col('PRECURSOR_DECOY') == 0) &
+                    (pl.col('SCORE_MS2_RANK') <= ipf_max_peakgroup_rank) &
+                    (pl.col('SCORE_MS2_PEP') <= ipf_max_peakgroup_pep) &
+                    (pl.col('FEATURE_TRANSITION_VAR_ISOTOPE_OVERLAP_SCORE') <= ipf_max_transition_isotope_overlap) &
+                    (pl.col('FEATURE_TRANSITION_VAR_LOG_SN_SCORE') > ipf_min_transition_sn)
+                )
+
+                # Drop SCORE_MS2_ columns
+                score_cols = [col for col in table.columns if col.startswith('SCORE_MS2_')]
+                table = table.drop(score_cols)
+
+                # Rename columns
+                table = table.rename({
+                    'TRANSITION_DECOY': 'DECOY',
+                    **{col: col.replace('FEATURE_TRANSITION_', '') 
+                    for col in table.columns 
+                    if col.startswith('FEATURE_TRANSITION_')}
+                })
+
+                # Create GROUP_ID column
+                table = table.with_columns(
+                    (pl.col('RUN_ID').cast(pl.Utf8) + '_' + 
+                    pl.col('FEATURE_ID').cast(pl.Utf8) + '_' + 
+                    pl.col('PRECURSOR_ID').cast(pl.Utf8) + '_' + 
+                    pl.col('TRANSITION_ID').cast(pl.Utf8)).alias('GROUP_ID')
+                )
+                table = table.to_pandas()
+            else:
+                raise click.ClickException("Unspecified data level selected.")
+
+            # Append MS1 scores to MS2 table if selected
+            if level == "ms1ms2":
+                if not any([col.startswith("FEATURE_MS1_") for col in all_column_names]):
+                    raise click.ClickException("MS1-level feature columns are not present in parquet file.")
+
+                # Filter columes names for FEATURE_MS2_
+                feature_ms1_cols = [col for col in all_column_names if col.startswith('FEATURE_MS1_VAR')]
+                # Read the parquet file
+                ms1_table = pd.read_parquet(infile, columns=['FEATURE_ID'] + feature_ms1_cols)
+                # Rename columns with 'FEATURE_MS1_VAR_' to 'VAR_MS1_'
+                ms1_table.columns = [col.replace('FEATURE_MS1_VAR_', 'VAR_MS1_') for col in ms1_table.columns]
+
+                table = pd.merge(table, ms1_table, how='left', on='FEATURE_ID')
+
+            # Format table
+            table.columns = [col.lower() for col in table.columns]
+
+            # Mark main score column
+            if ss_main_score.lower() in table.columns:
+                table = table.rename(index=str, columns={ss_main_score.lower(): "main_"+ss_main_score.lower()})
+            elif ss_main_score.lower() == "swath_pretrained":
+                # Add a pretrained main score corresponding to the original implementation in OpenSWATH
+                # This is optimized for 32-windows SCIEX TripleTOF 5600 data
+                table['main_var_pretrained'] = -( -0.19011762 * table['var_library_corr']
+                                                +  2.47298914 * table['var_library_rmsd']
+                                                +  5.63906731 * table['var_norm_rt_score']
+                                                + -0.62640133 * table['var_isotope_correlation_score']
+                                                +  0.36006925 * table['var_isotope_overlap_score']
+                                                +  0.08814003 * table['var_massdev_score']
+                                                +  0.13978311 * table['var_xcorr_coelution']
+                                                + -1.16475032 * table['var_xcorr_shape']
+                                                + -0.19267813 * table['var_yseries_score']
+                                                + -0.61712054 * table['var_log_sn_score'])
+            else:
+                raise click.ClickException(f"Main score ({ss_main_score.lower()}) column not present in data. Current columns: {table.columns}")
+
+            # Enable transition count & precursor / product charge scores for XGBoost-based classifier
+            if classifier == 'XGBoost' and level!='alignment':
+                click.echo("Info: Enable number of transitions & precursor / product charge scores for XGBoost-based classifier")
+                table = table.rename(index=str, columns={'precursor_charge': 'var_precursor_charge', 'product_charge': 'var_product_charge', 'transition_count': 'var_transition_count'})
+
+            return(table)
+
         # Check for auto main score selection
         if ss_main_score=="auto":
             # Set starting default main score
@@ -395,6 +597,9 @@ class PyProphetRunner(object):
         if is_sqlite_file(infile):
             self.mode = 'osw'
             self.table = read_osw(infile, level, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn)
+        elif is_parquet_file(infile):
+            self.mode = 'parquet'
+            self.table = read_parquet(infile, level, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn)
         else:
             self.mode = 'tsv'
             self.table = read_tsv(infile)    
@@ -453,7 +658,7 @@ class PyProphetRunner(object):
 
         if self.glyco and self.level in ["ms2", "ms1ms2"]:
             start_at = time.time()
-            
+
             start_at_peptide = time.time()
             click.echo("*" * 30 + "  Glycoform Scoring  " + "*" * 30)
             click.echo("-" * 80)
@@ -488,7 +693,7 @@ class PyProphetRunner(object):
 
             if isinstance(weights_combined, pd.DataFrame):
                 click.echo(weights_combined)
-                
+
             end_at_combined= time.time() - start_at_combined
             seconds = int(end_at_combined)
             msecs = int(1000 * (end_at_combined - seconds))
@@ -518,7 +723,7 @@ class PyProphetRunner(object):
             seconds = int(end_at_stats)
             msecs = int(1000 * (end_at_stats - seconds))
             click.echo("Info: error statistics finished: %d seconds and %d msecs" % (seconds, msecs))
-            
+
             if all((
             isinstance(w, pd.DataFrame)
             for w in [weights_peptide, weights_glycan, weights_combined]
@@ -534,7 +739,7 @@ class PyProphetRunner(object):
                 'glycan': weights_glycan,
                 'combined': weights_combined
                 }
-            
+
             needed = time.time() - start_at
         else:
             start_at = time.time()
@@ -542,7 +747,7 @@ class PyProphetRunner(object):
                 warnings.simplefilter("ignore")
                 (result, scorer, weights) = self.run_algo()
             needed = time.time() - start_at
-            
+
         self.print_summary(result)
 
         if self.mode == 'tsv':
@@ -561,6 +766,13 @@ class PyProphetRunner(object):
             else:
                 self.save_osw_results(result, extra_writes, scorer.pi0)
             self.save_osw_weights(weights)
+
+        elif self.mode == 'parquet':
+            self.save_parquet_results(result, extra_writes, scorer.pi0)
+            if self.classifier == 'LDA':
+                self.save_tsv_weights(weights, extra_writes)
+            elif self.classifier == 'XGBoost':
+                self.save_bin_weights(weights, extra_writes)
 
         seconds = int(needed)
         msecs = int(1000 * (needed - seconds))
@@ -605,7 +817,7 @@ class PyProphetRunner(object):
         weights['level'] = self.level
         trained_weights_path = extra_writes.get("trained_weights_path")
         if trained_weights_path is not None:
-            weights.to_csv(trained_weights_path, sep=",", index=False)
+            weights.to_csv(trained_weights_path, sep=",", index=False, mode='a')
             click.echo("Info: %s written." % trained_weights_path)
 
     def save_osw_results(self, result, extra_writes, pi0):
@@ -613,7 +825,7 @@ class PyProphetRunner(object):
             copyfile(self.infile, self.outfile)
 
         con = sqlite3.connect(self.outfile)
-        
+
         if self.glyco and self.level in ["ms2", "ms1ms2"]:
             if self.level == "ms2" or self.level == "ms1ms2":
                 c = con.cursor()
@@ -774,6 +986,184 @@ class PyProphetRunner(object):
             with open(trained_weights_path, 'wb') as file:
                 self.persisted_weights = pickle.dump(weights, file)
             click.echo("Info: %s written." % trained_weights_path)
+
+    def save_parquet_results(self, result, extra_writes, pi0):
+        if self.infile != self.outfile:
+            copyfile(self.infile, self.outfile)
+
+        import pickle
+        # Save result, extra_writes, and pi0 as pickles
+        with open('tmp_parquet_results.pkl', 'wb') as f:
+            pickle.dump((result, extra_writes, pi0), f)
+
+        if self.level == "ms2" or self.level == "ms1ms2":
+            # Read the parquet file
+            init_df = pl.read_parquet(self.outfile)
+
+            # Check and drop SCORE_MS2_ columns if they exist
+            score_ms2_cols = [col for col in init_df.columns if col.startswith("SCORE_MS2_")]
+            if score_ms2_cols:
+                click.echo(click.style("Warn: Dropping existing SCORE_MS2_ columns from the output file.", fg='yellow'))
+                init_df = init_df.drop(score_ms2_cols)
+
+            # Process the result scores
+            df = pl.from_pandas(result.scored_tables)
+            if 'h_score' in df.columns:
+                df = df.select([
+                    'feature_id', 'd_score', 'h_score', 'h0_score',
+                    'peak_group_rank', 'p_value', 'q_value', 'pep'
+                ])
+                df.columns = ['FEATURE_ID', 'SCORE', 'HSCORE', 'H0SCORE', 
+                            'RANK', 'PVALUE', 'QVALUE', 'PEP']
+            else:
+                df = df.select([
+                    'feature_id', 'd_score', 'peak_group_rank',
+                    'p_value', 'q_value', 'pep'
+                ])
+                df.columns = ['FEATURE_ID', 'SCORE', 'RANK', 'PVALUE', 'QVALUE', 'PEP']
+
+            # Add SCORE_MS2_ prefix to columns except FEATURE_ID
+            new_columns = ['FEATURE_ID'] + [f'SCORE_MS2_{col}' for col in df.columns[1:]]
+            df = df.rename(dict(zip(df.columns, new_columns)))
+
+            # Merge with initial dataframe
+            df = init_df.join(df, on='FEATURE_ID', how='left', coalesce=True)
+
+            # Write to parquet
+            df.write_parquet(
+                self.outfile,
+                compression="zstd",
+                compression_level=11
+            )
+        elif self.level == "ms1":
+            # Read the parquet file
+            init_df = pl.read_parquet(self.outfile)
+
+            # Check and drop SCORE_MS1_ columns if they exist
+            score_ms1_cols = [col for col in init_df.columns if col.startswith("SCORE_MS1_")]
+            if score_ms1_cols:
+                click.echo(click.style("Warn: Dropping existing SCORE_MS1_ columns from the output file.", fg='yellow'))
+                init_df = init_df.drop(score_ms1_cols)
+
+            # Process the result scores
+            df = pl.from_pandas(result.scored_tables)
+            if 'h_score' in df.columns:
+                df = df.select([
+                    'feature_id', 'd_score', 'h_score', 'h0_score',
+                    'peak_group_rank', 'p_value', 'q_value', 'pep'
+                ])
+                df = df.rename({
+                    'feature_id': 'FEATURE_ID',
+                    'd_score': 'SCORE',
+                    'h_score': 'HSCORE',
+                    'h0_score': 'H0SCORE',
+                    'peak_group_rank': 'RANK',
+                    'p_value': 'PVALUE',
+                    'q_value': 'QVALUE',
+                    'pep': 'PEP'
+                })
+            else:
+                df = df.select([
+                    'feature_id', 'd_score', 'peak_group_rank',
+                    'p_value', 'q_value', 'pep'
+                ])
+                df = df.rename({
+                    'feature_id': 'FEATURE_ID',
+                    'd_score': 'SCORE',
+                    'peak_group_rank': 'RANK',
+                    'p_value': 'PVALUE',
+                    'q_value': 'QVALUE',
+                    'pep': 'PEP'
+                })
+
+            # Add SCORE_MS1_ prefix to columns except FEATURE_ID
+            new_columns = {
+                col: f'SCORE_MS1_{col}' if col != 'FEATURE_ID' else col
+                for col in df.columns
+            }
+            df = df.rename(new_columns)
+
+            # Merge with initial dataframe
+            df = init_df.join(df, on='FEATURE_ID', how='left')
+
+            # Write to parquet
+            df.write_parquet(
+                self.outfile,
+                compression="zstd",
+                compression_level=11
+            )
+        elif self.level == "transition":
+            # Read the parquet file
+            init_df = pl.read_parquet(self.outfile)
+
+            # Check and drop SCORE_TRANSITION_ columns if they exist
+            score_transition_cols = [col for col in init_df.columns if col.startswith("SCORE_TRANSITION_")]
+            if score_transition_cols:
+                click.echo(click.style("Warn: Dropping existing SCORE_TRANSITION_ columns from the output file.", fg='yellow'))
+                init_df = init_df.drop(score_transition_cols)
+
+            # Get TRANSITION_ and FEATURE_TRANSITION_ columns and explode them
+            transition_cols = [col for col in init_df.columns if col.startswith('TRANSITION_') or col.startswith('FEATURE_TRANSITION_')]
+            init_df = init_df.explode(transition_cols)
+
+            # Process the scored tables
+            df = pl.DataFrame(result.scored_tables).select([
+                'feature_id', 'transition_id', 'd_score', 
+                'peak_group_rank', 'p_value', 'q_value', 'pep'
+            ]).rename({
+                'feature_id': 'FEATURE_ID',
+                'transition_id': 'TRANSITION_ID',
+                'd_score': 'SCORE',
+                'peak_group_rank': 'RANK',
+                'p_value': 'PVALUE',
+                'q_value': 'QVALUE',
+                'pep': 'PEP'
+            })
+
+            # Add SCORE_TRANSITION_ prefix to columns except FEATURE_ID and TRANSITION_ID
+            df = df.rename({
+                col: f'SCORE_TRANSITION_{col}' 
+                for col in df.columns 
+                if col not in ['FEATURE_ID', 'TRANSITION_ID']
+            })
+
+            # Merge with initial dataframe
+            df = init_df.join(
+                df, 
+                on=['FEATURE_ID', 'TRANSITION_ID'], 
+                how='left'
+            )
+
+            # Identify columns to group by (non-transition columns except PRODUCT_MZ and ANNOTATION)
+            collapse_columns = [
+                col for col in df.columns 
+                if not any(col.startswith(prefix) for prefix in ['TRANSITION_', 'FEATURE_TRANSITION_', 'SCORE_TRANSITION_'])
+                and col not in ['PRODUCT_MZ', 'ANNOTATION']
+            ]
+
+            # Group and aggregate
+            df = df.group_by(collapse_columns).agg(pl.all())
+
+            # Write to parquet
+            df.write_parquet(
+                self.outfile,
+                compression="zstd",
+                compression_level=11
+            )
+        
+        click.echo("Info: %s written." % self.outfile)
+        
+        if result.final_statistics is not None:
+            cutoffs = result.final_statistics["cutoff"].values
+            svalues = result.final_statistics["svalue"].values
+            qvalues = result.final_statistics["qvalue"].values
+
+            pvalues = result.scored_tables.loc[(result.scored_tables.peak_group_rank == 1) & (result.scored_tables.decoy == 0)]["p_value"].values
+            top_targets = result.scored_tables.loc[(result.scored_tables.peak_group_rank == 1) & (result.scored_tables.decoy == 0)]["d_score"].values
+            top_decoys = result.scored_tables.loc[(result.scored_tables.peak_group_rank == 1) & (result.scored_tables.decoy == 1)]["d_score"].values
+
+            save_report(os.path.join(self.prefix + "_" + self.level + "_report.pdf"), self.outfile, top_decoys, top_targets, cutoffs, svalues, qvalues, pvalues, pi0, self.color_palette)
+            click.echo("Info: %s written." % os.path.join(self.prefix + "_" + self.level + "_report.pdf"))
 
 class PyProphetLearner(PyProphetRunner):
 
