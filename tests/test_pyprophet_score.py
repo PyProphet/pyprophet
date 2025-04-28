@@ -10,7 +10,7 @@ import sqlite3
 
 import pytest
 
-from pyprophet.ipf import read_pyp_peakgroup_precursor
+from pyprophet.ipf import read_pyp_peakgroup_precursor, read_pyp_parquet_peakgroup_precursor
 
 pd.options.display.expand_frame_repr = False
 pd.options.display.precision = 4
@@ -133,6 +133,66 @@ def _run_pyprophet_osw_to_learn_model(regtest, temp_folder, dump_result_files=Fa
     table = read_pyp_peakgroup_precursor("test_data.osw", 1.0, True, True)
 
     print(table.head(100).sort_index(axis=1),file=regtest)
+    
+def _run_pyprophet_parquet_to_learn_model(regtest, temp_folder, dump_result_files=False, parametric=False, pfdr=False, pi0_lambda=False, ms1ms2=False, xgboost=False, xgboost_tune=False, score_filter=False):
+    os.chdir(temp_folder)
+    data_path = os.path.join(DATA_FOLDER, "test_data.parquet")
+    shutil.copy(data_path, temp_folder)
+
+    # MS1-level
+    cmdline = "pyprophet score --in=test_data.parquet --level=ms1 --test --ss_iteration_fdr=0.02"
+    if parametric:
+        cmdline += " --parametric"
+    if pfdr:
+        cmdline += " --pfdr"
+    if pi0_lambda is not False:
+        cmdline += " --pi0_lambda=" + pi0_lambda
+    if xgboost:
+        cmdline += " --classifier=XGBoost"
+    if xgboost_tune:
+        cmdline += " --xgb_autotune"
+    if score_filter:
+        cmdline += " --ss_score_filter var_isotope_overlap_score,var_massdev_score,var_xcorr_coelution,var_isotope_correlation_score"
+
+    # MS2-level
+    if ms1ms2:
+        cmdline += " score --in=test_data.parquet --level=ms1ms2 --test --ss_iteration_fdr=0.02"
+        if score_filter:
+            cmdline += " --ss_score_filter var_ms1_isotope_overlap_score,var_ms1_massdev_score,var_ms1_xcorr_coelution,var_ms1_isotope_correlation_score,var_isotope_overlap_score,var_isotope_correlation_score,var_intensity_score,var_massdev_score,var_library_corr,var_norm_rt_score"
+    else:
+        cmdline += " score --in=test_data.parquet --level=ms2 --test --ss_iteration_fdr=0.02"
+        if score_filter:
+            cmdline += " --ss_score_filter var_isotope_overlap_score,var_isotope_correlation_score,var_intensity_score,var_massdev_score,var_library_corr,var_norm_rt_score"
+    if parametric:
+        cmdline += " --parametric"
+    if pfdr:
+        cmdline += " --pfdr"
+    if pi0_lambda is not False:
+        cmdline += " --pi0_lambda=" + pi0_lambda
+    if xgboost:
+        cmdline += " --classifier=XGBoost"
+    if xgboost_tune:
+        cmdline += " --xgb_autotune"
+
+    # transition-level
+    cmdline += " score --in=test_data.parquet --level=transition --test --ss_iteration_fdr=0.02"
+
+    if parametric:
+        cmdline += " --parametric"
+    if pfdr:
+        cmdline += " --pfdr"
+    if pi0_lambda is not False:
+        cmdline += " --pi0_lambda=" + pi0_lambda
+    if xgboost:
+        cmdline += " --classifier=XGBoost"
+    if xgboost_tune:
+        cmdline += " --xgb_autotune"
+
+    stdout = _run_cmdline(cmdline)
+
+    table = read_pyp_parquet_peakgroup_precursor("test_data.parquet", 1.0, True, True)
+
+    print(table.head(100).sort_index(axis=1),file=regtest)
 
 def test_tsv_0(tmpdir, regtest):
     _run_pyprophet_tsv_to_learn_model(regtest, tmpdir.strpath, True)
@@ -184,7 +244,31 @@ def test_osw_9(tmpdir, regtest):
   _run_pyprophet_osw_to_learn_model_metabo(regtest, tmpdir.strpath, True, ms1ms2=False, score_filter=True)
 
 def test_osw_10(tmpdir,regtest):
-  _run_pyprophet_osw_to_learn_model_metabo(regtest, tmpdir.strpath, True, ms1ms2=True, score_filter=True)
+  _run_pyprophet_osw_to_learn_model_metabo(regtest, tmpdir.strpath, True, ms1ms2=True, score_filter=True) 
+  
+def test_parquet_0(tmpdir, regtest):
+    _run_pyprophet_parquet_to_learn_model(regtest, tmpdir.strpath, True, pi0_lambda="0 0 0")
+    
+def test_parquet_1(tmpdir, regtest):
+    _run_pyprophet_parquet_to_learn_model(regtest, tmpdir.strpath, True, True, pi0_lambda="0 0 0")
+    
+def test_parquet_2(tmpdir, regtest):
+    _run_pyprophet_parquet_to_learn_model(regtest, tmpdir.strpath, True, False, True, pi0_lambda="0 0 0")
+    
+def test_parquet_3(tmpdir, regtest):
+    _run_pyprophet_parquet_to_learn_model(regtest, tmpdir.strpath, True, False, True, pi0_lambda="0 0 0", ms1ms2=True)
+    
+# def test_parquet_4(tmpdir, regtest):
+#     _run_pyprophet_parquet_to_learn_model(regtest, tmpdir.strpath, True, False, True, pi0_lambda="0 0 0", ms1ms2=True, xgboost=True)
+    
+# def test_parquet_5(tmpdir, regtest):
+#     _run_pyprophet_parquet_to_learn_model(regtest, tmpdir.strpath, True, False, True, pi0_lambda="0 0 0", ms1ms2=True, xgboost=True, xgboost_tune=True)
+    
+def test_parquet_6(tmpdir, regtest):
+    _run_pyprophet_parquet_to_learn_model(regtest, tmpdir.strpath, True, False, True, pi0_lambda="0 0 0", score_filter=True)
+    
+def test_parquet_7(tmpdir, regtest):
+    _run_pyprophet_parquet_to_learn_model(regtest, tmpdir.strpath, True, False, True, pi0_lambda="0 0 0", ms1ms2=True, score_filter=True)
 
 def test_not_unique_tg_id_blocks(tmpdir):
 

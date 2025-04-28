@@ -5,6 +5,7 @@ import sys
 import os
 import pathlib
 import ast
+import time
 
 from .runner import PyProphetLearner, PyProphetWeightApplier
 from .ipf import infer_peptidoforms
@@ -16,7 +17,7 @@ from .export_compound import export_compound_tsv
 from .glyco.export import export_tsv as export_glyco_tsv, export_score_plots as export_glyco_score_plots
 from .filter import filter_sqmass, filter_osw
 from .data_handling import (transform_pi0_lambda, transform_threads, transform_subsample_ratio, check_sqlite_table)
-from .export_parquet import export_to_parquet
+from .export_parquet import export_to_parquet, convert_osw_to_parquet
 from functools import update_wrapper
 import sqlite3
 from tabulate import tabulate
@@ -53,8 +54,8 @@ class PythonLiteralOption(click.Option):
 # PyProphet semi-supervised learning and scoring
 @cli.command()
 # # File handling
-@click.option('--in', 'infile', required=True, type=click.Path(exists=True), help='PyProphet input file.')
-@click.option('--out', 'outfile', type=click.Path(exists=False), help='PyProphet output file.')
+@click.option('--in', 'infile', required=True, type=click.Path(exists=True), help='PyProphet input file. Valid formats are .osw, .parquet and .tsv.')
+@click.option('--out', 'outfile', type=click.Path(exists=False), help='PyProphet output file. Valid formats are .osw, .parquet and .tsv. Must be the same format as input file.')
 # Semi-supervised learning
 @click.option('--classifier', default='LDA', show_default=True, type=click.Choice(['LDA', 'XGBoost']), help='Either a "LDA" or "XGBoost" classifier is used for semi-supervised learning.')
 @click.option('--xgb_autotune/--no-xgb_autotune', default=False, show_default=True, help='XGBoost: Autotune hyperparameters.')
@@ -162,14 +163,14 @@ def score(
         PyProphetLearner(infile, outfile, classifier, xgb_hyperparams, xgb_params, xgb_params_space, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, ss_main_score, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, level, add_alignment_features, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn, glyco, density_estimator, grid_size, tric_chromprob, threads, test, ss_score_filter, color_palette, main_score_selection_report).run()
     else:
 
-        PyProphetWeightApplier(infile, outfile, classifier, xgb_hyperparams, xgb_params, xgb_params_space, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, ss_main_score, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, level, add_alignment_features, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn, tric_chromprob, threads, test, apply_weights, ss_score_filter, color_palette, main_score_selection_report).run()
+        PyProphetWeightApplier(infile, outfile, classifier, xgb_hyperparams, xgb_params, xgb_params_space, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, ss_main_score, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, level, add_alignment_features, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn, glyco, density_estimator, grid_size, tric_chromprob, threads, test, apply_weights, ss_score_filter, color_palette, main_score_selection_report).run()
 
 
 # IPF
 @cli.command()
 # File handling
-@click.option('--in', 'infile', required=True, type=click.Path(exists=True), help='PyProphet input file.')
-@click.option('--out', 'outfile', type=click.Path(exists=False), help='PyProphet output file.')
+@click.option('--in', 'infile', required=True, type=click.Path(exists=True), help='PyProphet input file. Valid formats are .osw, .parquet (produced by export_parquet with `--scoring_format`)')
+@click.option('--out', 'outfile', type=click.Path(exists=False), help='PyProphet output file. Valid formats are .osw, .parquet. Must be the same format as input file.')
 # IPF parameters
 @click.option('--ipf_ms1_scoring/--no-ipf_ms1_scoring', default=True, show_default=True, help='Use MS1 precursor data for IPF.')
 @click.option('--ipf_ms2_scoring/--no-ipf_ms2_scoring', default=True, show_default=True, help='Use MS2 precursor data for IPF.')
@@ -253,8 +254,8 @@ def glycoform(infile, outfile,
 # Peptide-level inference
 @cli.command()
 # File handling
-@click.option('--in', 'infile', required=True, type=click.Path(exists=True), help='PyProphet input file.')
-@click.option('--out', 'outfile', type=click.Path(exists=False), help='PyProphet output file.')
+@click.option('--in', 'infile', required=True, type=click.Path(exists=True), help='PyProphet input file. Valid formats are .osw, .parquet (produced by export_parquet with `--scoring_format`)')
+@click.option('--out', 'outfile', type=click.Path(exists=False), help='PyProphet output file.  Valid formats are .osw, .parquet. Must be the same format as input file.')
 # Context
 @click.option('--context', default='run-specific', show_default=True, type=click.Choice(['run-specific', 'experiment-wide', 'global']), help='Context to estimate protein-level FDR control.')
 # Statistics
@@ -322,8 +323,8 @@ def glycopeptide(infile, outfile, context, density_estimator, grid_size, paramet
 # Gene-level inference
 @cli.command()
 # File handling
-@click.option('--in', 'infile', required=True, type=click.Path(exists=True), help='PyProphet input file.')
-@click.option('--out', 'outfile', type=click.Path(exists=False), help='PyProphet output file.')
+@click.option('--in', 'infile', required=True, type=click.Path(exists=True), help='PyProphet input file.  Valid formats are .osw, .parquet (produced by export_parquet with `--scoring_format`)')
+@click.option('--out', 'outfile', type=click.Path(exists=False), help='PyProphet output file.  Valid formats are .osw, .parquet. Must be the same format as input file.')
 # Context
 @click.option('--context', default='run-specific', show_default=True, type=click.Choice(['run-specific', 'experiment-wide', 'global']), help='Context to estimate gene-level FDR control.')
 # Statistics
@@ -355,8 +356,8 @@ def gene(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_method, pi0
 # Protein-level inference
 @cli.command()
 # File handling
-@click.option('--in', 'infile', required=True, type=click.Path(exists=True), help='PyProphet input file.')
-@click.option('--out', 'outfile', type=click.Path(exists=False), help='PyProphet output file.')
+@click.option('--in', 'infile', required=True, type=click.Path(exists=True), help='PyProphet input file.  Valid formats are .osw, .parquet (produced by export_parquet with `--scoring_format`)')
+@click.option('--out', 'outfile', type=click.Path(exists=False), help='PyProphet output file.  Valid formats are .osw, .parquet. Must be the same format as input file.')
 # Context
 @click.option('--context', default='run-specific', show_default=True, type=click.Choice(['run-specific', 'experiment-wide', 'global']), help='Context to estimate protein-level FDR control.')
 # Statistics
@@ -555,27 +556,40 @@ def export(
             export_tsv(infile, outfile, format, outcsv, transition_quantification, max_transition_pep, ipf, ipf_max_peptidoform_pep, max_rs_peakgroup_qvalue, peptide, max_global_peptide_qvalue, protein, max_global_protein_qvalue)
 
 
-# Export to Paruqet
+# Export to Parquet
 @cli.command()
 @click.option('--in', 'infile', required=True, type=click.Path(exists=True), help='PyProphet input file.')
 @click.option('--out', 'outfile', required=False, type=click.Path(exists=False), help='Output parquet file.')
 @click.option('--transitionLevel', 'transitionLevel', is_flag=True, help='Whether to export transition level data as well')
 @click.option('--onlyFeatures', 'onlyFeatures', is_flag=True, help='Only include precursors that have a corresponding feature')
 @click.option('--noDecoys', 'noDecoys', is_flag=True, help='Do not include decoys in the exported data')
-def export_parquet(infile, outfile, transitionLevel, onlyFeatures, noDecoys):
+# Convert to scoring format
+@click.option('--scoring_format', 'scoring_format', is_flag=True, help='Convert to parquet format that is compatible with the scoring/inference modules')
+@click.option('--compression', 'compression', default='zstd', show_default=True, type=click.Choice(['lz4', 'uncompressed', 'snappy', 'gzip', 'lzo', 'brotli', 'zstd']), help='Compression algorithm to use for parquet file.')
+@click.option('--compression_level', 'compression_level', default=11, show_default=True, type=int, help='Compression level to use for parquet file.')
+def export_parquet(infile, outfile, transitionLevel, onlyFeatures, noDecoys, scoring_format, compression, compression_level):
     """
-    Export all transition data to parquet file
+    Export all transition data to parquet file or convert to parquet scoring format for scoring and inference.
     """
-    if transitionLevel:
-        click.echo("Info: Will export transition level data")
-    if outfile is None:
-        outfile = infile.split(".osw")[0] + ".parquet"
-    if os.path.exists(outfile):
-        overwrite = click.confirm(f"{outfile} already exists, would you like to overwrite?")
-        if not overwrite:
-            raise click.ClickException(f"Aborting: {outfile} already exists!")
-    click.echo("Info: Parquet file will be written to {}".format(outfile))
-    export_to_parquet(os.path.abspath(infile), os.path.abspath(outfile), transitionLevel, onlyFeatures, noDecoys)
+    if scoring_format:
+        click.echo("Info: Will export OSW to parquet scoring format")
+        if os.path.exists(outfile):
+            click.echo(click.style(f"Warn: {outfile} already exists, will overwrite", fg='yellow'))
+        start = time.time()
+        convert_osw_to_parquet(infile, outfile, compression_method=compression, compression_level=compression_level)
+        end = time.time()
+        click.echo(f"Info: {outfile} written in {end-start:.4f} seconds")
+    else:
+        if transitionLevel:
+            click.echo("Info: Will export transition level data")
+        if outfile is None:
+            outfile = infile.split(".osw")[0] + ".parquet"
+        if os.path.exists(outfile):
+            overwrite = click.confirm(f"{outfile} already exists, would you like to overwrite?")
+            if not overwrite:
+                raise click.ClickException(f"Aborting: {outfile} already exists!")
+        click.echo("Info: Parquet file will be written to {}".format(outfile))
+        export_to_parquet(os.path.abspath(infile), os.path.abspath(outfile), transitionLevel, onlyFeatures, noDecoys)
 
 # Export Compound TSV
 @cli.command()

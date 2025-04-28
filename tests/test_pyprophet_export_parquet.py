@@ -10,6 +10,7 @@ import sqlite3
 
 import pytest
 
+
 pd.options.display.expand_frame_repr = False
 pd.options.display.precision = 4
 pd.options.display.max_columns = None
@@ -33,7 +34,7 @@ def _run_export_parquet_single_run(temp_folder, transitionLevel=False, pd_testin
     data_path = os.path.join(DATA_FOLDER, DATA_NAME)
     conn = sqlite3.connect(DATA_NAME)
     shutil.copy(data_path, temp_folder)
-
+    
     cmdline = "pyprophet export-parquet --in={}".format(DATA_NAME)
 
     # if testing transition level add --transitionLevel flag
@@ -131,6 +132,21 @@ def _run_export_parquet_single_run(temp_folder, transitionLevel=False, pd_testin
     if transitionLevel:
         pd.testing.assert_series_equal(parquet['FEATURE_TRANSITION.AREA_INTENSITY'], parquet['TRANSITION.PRODUCT_MZ'] * pseudo_feature_id, **pd_testing_kwargs)
 	
+ 
+
+def _run_export_parquet_scoring_format(regtest, temp_folder, compression="zstd", compression_level=11):
+    os.chdir(temp_folder)
+    data_path = os.path.join(DATA_FOLDER, "test_data.osw")
+    shutil.copy(data_path, temp_folder)
+
+    # MS1-level
+    cmdline = "pyprophet export-parquet --in=test_data.osw --out=test_data.parquet --scoring_format --compression {} --compression_level {}".format(compression, compression_level)
+    
+    stdout = _run_cmdline(cmdline)
+    
+    print(pd.read_parquet("test_data.parquet", engine="pyarrow").head(100).sort_index(axis=1),file=regtest)
+ 
+ 
 def test_export_parquet_single_run(tmpdir):
 	_run_export_parquet_single_run(tmpdir, transitionLevel=False)
 
@@ -151,3 +167,15 @@ def test_export_parquet_single_run_noDecoys(tmpdir):
 
 def test_export_parquet_single_run_transitionLevel_noDecoys(tmpdir):
     _run_export_parquet_single_run(tmpdir, transitionLevel=True, noDecoys=True)
+    
+def test_osw_to_parquet_scoring_format_0(tmpdir, regtest):
+    _run_export_parquet_scoring_format(regtest, tmpdir.strpath)
+    
+def test_osw_to_parquet_scoring_format_1(tmpdir, regtest):
+    _run_export_parquet_scoring_format(regtest, tmpdir.strpath, 'snappy', 0)
+    
+def test_osw_to_parquet_scoring_format_2(tmpdir, regtest):
+    _run_export_parquet_scoring_format(regtest, tmpdir.strpath, 'brotli', 5)
+    
+def test_osw_to_parquet_scoring_format_3(tmpdir, regtest):
+    _run_export_parquet_scoring_format(regtest, tmpdir.strpath, 'gzip', 5)
