@@ -1,6 +1,8 @@
 import duckdb
 import sqlite3
+import numpy as np
 import pandas as pd
+import polars as pl
 from pyprophet.export import check_sqlite_table
 from duckdb_extensions import extension_importer
 import re
@@ -266,3 +268,228 @@ def export_to_parquet(infile, outfile, transitionLevel=False, onlyFeatures=False
         {featureLvlSuffix}
         '''
     condb.sql(query).write_parquet(outfile)
+    
+    
+def convert_osw_to_parquet(infile, outfile, compression_method='zstd', compression_level=11):
+    '''
+    Convert an OSW sqlite file to Parquet format
+    
+    Note:
+        This is different from the export_to_parquet function, this will create a parquet compatible with pyprophet scoring. The resulting parquet will have each row as a run-specific precursor feature, with transition level data collapsed into a single row as arrays. 
+        
+    Note:
+        Some notes on performance (converting a non-scored OSW file with 4,130 precursors, 114,295 features, 316,825 transitions and 6 runs):
+        
+        merged.osw (764M)
+        merged_osw_snappy.parquet (355M)
+        merged_osw_gzip.parquet (284M)
+        merged_osw_zstd.parquet (301M)
+        merged_osw_zstd_level_11_33s.parquet (289M, exported in 33.2829 seconds)
+        merged_osw_zstd_level_22_10m_51s.parquet (277M)
+        merged_osw_brotli.parquet (275M)
+        merged_osw_brotli_level_11_27m_45s.parquet (255M)
+        
+    See: [polars.DataFrame.write_parquet](https://docs.pola.rs/api/python/stable/reference/api/polars.DataFrame.write_parquet.html) for more information on compression methods and levels.
+        
+
+    Parameters:
+        infile: (str) path to osw sqlite file
+        outfile: (str) path to write out parquet file
+        compression_method: (str) compression method for parquet file (default: 'zstd')
+        compression_level: (int) compression level for parquet file (default: 11)
+    
+    Return:
+        None
+    '''
+    
+    conn = duckdb.connect(database=infile, read_only=True)
+    
+    # Get Gene/Protein/Peptide/Precursor table
+    query = """
+    SELECT 
+        PEPTIDE_GENE_MAPPING.GENE_ID AS GENE_ID,
+        PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID AS PROTEIN_ID,
+        PEPTIDE.ID AS PEPTIDE_ID,
+        PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID AS PRECURSOR_ID,
+        GENE.GENE_NAME AS GENE_NAME,
+        PROTEIN.PROTEIN_ACCESSION AS PROTEIN_ACCESSION,
+        PEPTIDE.UNMODIFIED_SEQUENCE,
+        PEPTIDE.MODIFIED_SEQUENCE,
+        PRECURSOR.TRAML_ID AS PRECURSOR_TRAML_ID,
+        PRECURSOR.GROUP_LABEL AS PRECURSOR_GROUP_LABEL,
+        PRECURSOR.PRECURSOR_MZ AS PRECURSOR_MZ,
+        PRECURSOR.CHARGE AS PRECURSOR_CHARGE,
+        PRECURSOR.LIBRARY_INTENSITY AS PRECURSOR_LIBRARY_INTENSITY,
+        PRECURSOR.LIBRARY_RT AS PRECURSOR_LIBRARY_RT,
+        PRECURSOR.LIBRARY_DRIFT_TIME AS PRECURSOR_LIBRARY_DRIFT_TIME,
+        GENE.DECOY AS GENE_DECOY,
+        PROTEIN.DECOY AS PROTEIN_DECOY,
+        PEPTIDE.DECOY AS PEPTIDE_DECOY,
+        PRECURSOR.DECOY AS PRECURSOR_DECOY
+    FROM PRECURSOR
+    INNER JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
+    INNER JOIN PEPTIDE ON PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
+    INNER JOIN PEPTIDE_PROTEIN_MAPPING ON PEPTIDE.ID = PEPTIDE_PROTEIN_MAPPING.PEPTIDE_ID
+    INNER JOIN PROTEIN ON PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID = PROTEIN.ID
+    INNER JOIN PEPTIDE_GENE_MAPPING ON PEPTIDE.ID = PEPTIDE_GENE_MAPPING.PEPTIDE_ID
+    INNER JOIN GENE ON PEPTIDE_GENE_MAPPING.GENE_ID = GENE.ID
+    """
+    precursor_df = conn.execute(query).pl()
+
+    # Get Transition table
+    query = """
+    SELECT 
+        TRANSITION_PRECURSOR_MAPPING.PRECURSOR_ID AS PRECURSOR_ID,
+        TRANSITION.ID AS TRANSITION_ID,
+        TRANSITION.TRAML_ID AS TRANSITION_TRAML_ID,
+        TRANSITION.PRODUCT_MZ,
+        TRANSITION.CHARGE AS TRANSITION_CHARGE,
+        TRANSITION.TYPE AS TRANSITION_TYPE,
+        TRANSITION.ORDINAL AS TRANSITION_ORDINAL,
+        TRANSITION.ANNOTATION,
+        TRANSITION.DETECTING AS TRANSITION_DETECTING,
+        TRANSITION.LIBRARY_INTENSITY AS TRANSITION_LIBRARY_INTENSITY,
+        TRANSITION.DECOY AS TRANSITION_DECOY
+    FROM TRANSITION
+    INNER JOIN TRANSITION_PRECURSOR_MAPPING ON TRANSITION.ID = TRANSITION_PRECURSOR_MAPPING.TRANSITION_ID
+    """
+    transition_df = conn.execute(query).pl()
+
+    # Get Feature table
+    query = """
+    SELECT
+    FEATURE.RUN_ID AS RUN_ID,
+    RUN.FILENAME,
+    FEATURE.PRECURSOR_ID AS PRECURSOR_ID,
+    FEATURE.ID AS FEATURE_ID,
+    FEATURE.EXP_RT,
+    FEATURE.EXP_IM,
+    FEATURE.NORM_RT,
+    FEATURE.DELTA_RT,
+    FEATURE.LEFT_WIDTH,
+    FEATURE.RIGHT_WIDTH
+    FROM FEATURE
+    INNER JOIN RUN ON FEATURE.RUN_ID = RUN.ID
+    """
+    feature_df = conn.execute(query).pl()
+    feature_df = feature_df[[s.name for s in feature_df if not (s.null_count() == feature_df.height)]]
+
+    # Get FEATURE_MS1
+    query = """
+    SELECT
+    *
+    FROM FEATURE_MS1
+    """
+    feature_ms1_df = conn.execute(query).pl()
+    feature_ms1_df = feature_ms1_df[[s.name for s in feature_ms1_df if not (s.null_count() == feature_ms1_df.height)]]
+    # Append "FEATURE_MS1_" to column names
+    feature_ms1_df = feature_ms1_df.rename({col: f"FEATURE_MS1_{col}" for col in feature_ms1_df.columns if col != "FEATURE_ID"})
+
+    # Get FEATURE_MS2
+    query = """
+    SELECT
+    *
+    FROM FEATURE_MS2
+    """
+    feature_ms2_df = conn.execute(query).pl()
+    feature_ms2_df = feature_ms2_df[[s.name for s in feature_ms2_df if not (s.null_count() == feature_ms2_df.height)]]
+    # Append "FEATURE_MS2_" to column names
+    feature_ms2_df = feature_ms2_df.rename({col: f"FEATURE_MS2_{col}" for col in feature_ms2_df.columns if col != "FEATURE_ID"})
+
+    # Get FEATURE_TRANSITION
+    query = """
+    SELECT
+    * FROM FEATURE_TRANSITION
+    """
+    feature_transition_df = conn.execute(query).pl()
+    feature_transition_df = feature_transition_df[[s.name for s in feature_transition_df if not (s.null_count() == feature_transition_df.height)]]
+    # Append "FEATURE_TRANSITION_" to column names
+    new_columns = {
+        col: f"FEATURE_TRANSITION_{col}" 
+        for col in feature_transition_df.columns 
+        if col not in ["FEATURE_ID", "TRANSITION_ID"]
+    }
+    feature_transition_df = feature_transition_df.rename(new_columns)
+    feature_transition_df = feature_transition_df.with_columns(pl.col("FEATURE_ID").cast(pl.Utf8))
+
+    ## Merge feature_transition_df with transition_df ON TRANSITION_ID
+    feature_transition_df = transition_df.join(feature_transition_df, on="TRANSITION_ID", how="left")
+
+    ## Patch missing FEATURE_ID in feature_transition_df where some transitions are not scored
+    feature_transition_not_scored = feature_transition_df.filter(
+        pl.col("FEATURE_ID").is_null()
+    ).select([
+        "PRECURSOR_ID", "TRANSITION_ID", "TRANSITION_TRAML_ID", "PRODUCT_MZ",
+        "TRANSITION_CHARGE", "TRANSITION_TYPE", "TRANSITION_ORDINAL",
+        "ANNOTATION", "TRANSITION_DETECTING", "TRANSITION_LIBRARY_INTENSITY",
+        "TRANSITION_DECOY"
+    ])
+
+    # Get Unique Precursor_ID, FEATURE_ID
+    precursor_feature_df = feature_transition_df.select(["PRECURSOR_ID", "FEATURE_ID"]).unique()
+
+    # merge precursor_feature_df with feature_transition_not_scored to propagate the missing FEATURE_ID
+    feature_transition_not_scored_patched = precursor_feature_df.join(
+        feature_transition_not_scored, 
+        on="PRECURSOR_ID", 
+        how="left"
+    ).filter(
+        pl.col("TRANSITION_ID").is_not_null()
+    ).with_columns(
+        pl.col("TRANSITION_ID").cast(pl.Int64)
+    )
+
+    # Remove rows where FEATURE_ID is NaN from feature_transition_df, and then merge with feature_transition_not_scored_patched
+    feature_transition_df = feature_transition_df.filter(
+        pl.col("FEATURE_ID").is_not_null()
+    ).join(
+        feature_transition_not_scored_patched,
+        on=["PRECURSOR_ID", "FEATURE_ID", "TRANSITION_ID", "TRANSITION_TRAML_ID",
+            "PRODUCT_MZ", "TRANSITION_CHARGE", "TRANSITION_TYPE",
+            "TRANSITION_ORDINAL", "ANNOTATION", "TRANSITION_DETECTING",
+            "TRANSITION_LIBRARY_INTENSITY", "TRANSITION_DECOY"],
+        how="full",
+        coalesce=True
+    )
+
+    # Collapse by grouping by PRECURSOR_ID and FEATURE_ID
+    feature_transition_df = feature_transition_df.group_by(["PRECURSOR_ID", "FEATURE_ID"]).agg(pl.all())
+
+    # Merge feature_df, feature_ms1_df, feature_ms2_df ON FEATURE_ID
+    feature_df = feature_df.join(feature_ms1_df, on="FEATURE_ID", how="left", coalesce=True)
+    feature_df = feature_df.join(feature_ms2_df, on="FEATURE_ID", how="left", coalesce=True)
+    feature_df = feature_df.with_columns(
+        pl.col("FEATURE_ID").cast(pl.Utf8),
+        pl.col("RUN_ID").cast(pl.Utf8)
+    )
+
+    # Merge collapsed transition feature data
+    feature_df = feature_df.join(
+        feature_transition_df,
+        on=["PRECURSOR_ID", "FEATURE_ID"],
+        how="left", 
+        coalesce=True
+    )
+
+    # Merge precursor data with feature data
+    master_df = precursor_df.join(
+        feature_df, 
+        on="PRECURSOR_ID", 
+        how="full",
+        coalesce=True
+    )
+    master_df = master_df.filter(
+        ~(pl.col("RUN_ID").is_null() & pl.col("FEATURE_ID").is_null())
+    )
+    master_df = master_df[[s.name for s in master_df if not (s.null_count() == master_df.height)]]
+    master_df = master_df.with_columns(
+        pl.col("RUN_ID").cast(pl.Int64),
+        pl.col("FEATURE_ID").cast(pl.Int64)
+    )
+
+    # Write to parquet
+    master_df.write_parquet(
+        outfile,
+        compression=compression_method,
+        compression_level=compression_level
+    )
