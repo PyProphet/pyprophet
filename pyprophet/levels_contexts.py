@@ -3,12 +3,13 @@ import os
 import click
 import pandas as pd
 import numpy as np
+import polars as pl
 import sqlite3
 
 from .stats import error_statistics, lookup_values_from_error_table, final_err_table, summary_err_table
 from .report import save_report
 from shutil import copyfile
-from .data_handling import check_sqlite_table
+from .data_handling import is_sqlite_file, check_sqlite_table, is_parquet_file, get_parquet_column_names
 from .glyco.stats import statistics_report as glyco_statistics_report
 
 
@@ -44,11 +45,15 @@ def statistics_report(data, outfile, context, analyte, parametric, pfdr, pi0_lam
     return(data)
 
 def infer_genes(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, color_palette):
-
-    con = sqlite3.connect(infile)
-
-    if not check_sqlite_table(con, "SCORE_MS2"):
-        raise click.ClickException("Apply scoring to MS2-level data before running gene-level scoring.")
+    
+    if is_parquet_file(infile):
+        all_column_names = get_parquet_column_names(infile)
+        if not any([col.startswith("SCORE_MS2_") for col in all_column_names]):
+            raise click.ClickException("Apply scoring to MS2-level data before running gene-level scoring.")
+    else:
+        con = sqlite3.connect(infile)
+        if not check_sqlite_table(con, "SCORE_MS2"):
+            raise click.ClickException("Apply scoring to MS2-level data before running gene-level scoring.")
 
     if context in ['global','experiment-wide','run-specific']:
         if context == 'global':
@@ -58,83 +63,160 @@ def infer_genes(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_meth
             run_id = 'RUN_ID'
             group_id = 'RUN_ID || "_" || GENE.ID'
 
-        con.executescript('''
-CREATE INDEX IF NOT EXISTS idx_peptide_gene_mapping_gene_id ON PEPTIDE_GENE_MAPPING (GENE_ID);
-CREATE INDEX IF NOT EXISTS idx_peptide_gene_mapping_peptide_id ON PEPTIDE_GENE_MAPPING (PEPTIDE_ID);
-CREATE INDEX IF NOT EXISTS idx_peptide_peptide_id ON PEPTIDE (ID);
-CREATE INDEX IF NOT EXISTS idx_precursor_peptide_mapping_peptide_id ON PRECURSOR_PEPTIDE_MAPPING (PEPTIDE_ID);
-CREATE INDEX IF NOT EXISTS idx_precursor_peptide_mapping_precursor_id ON PRECURSOR_PEPTIDE_MAPPING (PRECURSOR_ID);
-CREATE INDEX IF NOT EXISTS idx_precursor_precursor_id ON PRECURSOR (ID);
-CREATE INDEX IF NOT EXISTS idx_feature_precursor_id ON FEATURE (PRECURSOR_ID);
-CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
-CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);
-''')
+        if is_parquet_file(infile):
+            # Read necessary columns from parquet
+            cols = ['RUN_ID', 'GENE_ID', 'PRECURSOR_DECOY', 'SCORE_MS2_SCORE', 'PEPTIDE_ID']
+            data = pl.read_parquet(infile, columns=cols)
+            
+            data = (
+                data.with_columns(
+                    # Common transformations
+                    pl.col('GENE_ID').cast(pl.Utf8),
+                    pl.col('PEPTIDE_ID').cast(pl.Utf8),
+                    pl.col('PRECURSOR_DECOY').alias('DECOY')
+                )
+                .with_columns(
+                    # Conditional transformations
+                    pl.when(pl.lit(context == 'global'))
+                    .then(pl.struct([
+                        pl.lit(None).cast(pl.Int64).alias('RUN_ID_NEW'),
+                        pl.col('GENE_ID').alias('GROUP_ID')
+                    ]))
+                    .otherwise(pl.struct([
+                        pl.col('RUN_ID').cast(pl.Int64).alias('RUN_ID_NEW'),
+                        (pl.col('RUN_ID').cast(pl.Utf8) + "_" + pl.col('GENE_ID')).alias('GROUP_ID')
+                    ]))
+                    .alias('fields')
+                )
+                .unnest('fields')
+                .drop('RUN_ID')  # Drop original RUN_ID
+                .rename({'RUN_ID_NEW': 'RUN_ID'})  # Rename to original name
+                .group_by('GROUP_ID')
+                .agg(
+                    pl.col('SCORE_MS2_SCORE').max().alias('SCORE'),
+                    pl.first('RUN_ID'),
+                    pl.first('GENE_ID'),
+                    pl.first('DECOY')
+                )
+                .with_columns(
+                    pl.lit(context).cast(pl.Utf8).alias('CONTEXT')
+                )
+                .select([
+                    'RUN_ID',
+                    'GROUP_ID',
+                    'GENE_ID',
+                    'DECOY',
+                    'SCORE',
+                    'CONTEXT'
+                ])
+                .sort('SCORE', descending=True)
+                .to_pandas()
+            )
+        else:
+            con.executescript('''
+                CREATE INDEX IF NOT EXISTS idx_peptide_gene_mapping_gene_id ON PEPTIDE_GENE_MAPPING (GENE_ID);
+                CREATE INDEX IF NOT EXISTS idx_peptide_gene_mapping_peptide_id ON PEPTIDE_GENE_MAPPING (PEPTIDE_ID);
+                CREATE INDEX IF NOT EXISTS idx_peptide_peptide_id ON PEPTIDE (ID);
+                CREATE INDEX IF NOT EXISTS idx_precursor_peptide_mapping_peptide_id ON PRECURSOR_PEPTIDE_MAPPING (PEPTIDE_ID);
+                CREATE INDEX IF NOT EXISTS idx_precursor_peptide_mapping_precursor_id ON PRECURSOR_PEPTIDE_MAPPING (PRECURSOR_ID);
+                CREATE INDEX IF NOT EXISTS idx_precursor_precursor_id ON PRECURSOR (ID);
+                CREATE INDEX IF NOT EXISTS idx_feature_precursor_id ON FEATURE (PRECURSOR_ID);
+                CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
+                CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);
+            ''')
 
-        data = pd.read_sql_query('''
-SELECT %s AS RUN_ID,
-       %s AS GROUP_ID,
-       GENE.ID AS GENE_ID,
-       PRECURSOR.DECOY AS DECOY,
-       SCORE,
-       "%s" AS CONTEXT
-FROM GENE
-INNER JOIN
-  (SELECT PEPTIDE_GENE_MAPPING.PEPTIDE_ID AS PEPTIDE_ID,
-          GENE_ID
-   FROM
-     (SELECT PEPTIDE_ID,
-             COUNT(*) AS NUM_GENES
-      FROM PEPTIDE_GENE_MAPPING
-      GROUP BY PEPTIDE_ID) AS GENES_PER_PEPTIDE
-   INNER JOIN PEPTIDE_GENE_MAPPING ON GENES_PER_PEPTIDE.PEPTIDE_ID = PEPTIDE_GENE_MAPPING.PEPTIDE_ID
-   WHERE NUM_GENES == 1) AS PEPTIDE_GENE_MAPPING ON GENE.ID = PEPTIDE_GENE_MAPPING.GENE_ID
-INNER JOIN PEPTIDE ON PEPTIDE_GENE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
-INNER JOIN PRECURSOR_PEPTIDE_MAPPING ON PEPTIDE.ID = PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID
-INNER JOIN PRECURSOR ON PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID = PRECURSOR.ID
-INNER JOIN FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID
-INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
-GROUP BY GROUP_ID
-HAVING MAX(SCORE)
-ORDER BY SCORE DESC
-''' % (run_id, group_id, context), con)
+            data = pd.read_sql_query('''
+                SELECT %s AS RUN_ID,
+                       %s AS GROUP_ID,
+                       GENE.ID AS GENE_ID,
+                       PRECURSOR.DECOY AS DECOY,
+                       SCORE,
+                       "%s" AS CONTEXT
+                FROM GENE
+                INNER JOIN
+                  (SELECT PEPTIDE_GENE_MAPPING.PEPTIDE_ID AS PEPTIDE_ID,
+                          GENE_ID
+                   FROM
+                     (SELECT PEPTIDE_ID,
+                             COUNT(*) AS NUM_GENES
+                      FROM PEPTIDE_GENE_MAPPING
+                      GROUP BY PEPTIDE_ID) AS GENES_PER_PEPTIDE
+                   INNER JOIN PEPTIDE_GENE_MAPPING ON GENES_PER_PEPTIDE.PEPTIDE_ID = PEPTIDE_GENE_MAPPING.PEPTIDE_ID
+                   WHERE NUM_GENES == 1) AS PEPTIDE_GENE_MAPPING ON GENE.ID = PEPTIDE_GENE_MAPPING.GENE_ID
+                INNER JOIN PEPTIDE ON PEPTIDE_GENE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
+                INNER JOIN PRECURSOR_PEPTIDE_MAPPING ON PEPTIDE.ID = PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID
+                INNER JOIN PRECURSOR ON PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID = PRECURSOR.ID
+                INNER JOIN FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID
+                INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
+                GROUP BY GROUP_ID
+                HAVING MAX(SCORE)
+                ORDER BY SCORE DESC
+                ''' % (run_id, group_id, context), con)
     else:
         raise click.ClickException("Unspecified context selected.")
 
     data.columns = [col.lower() for col in data.columns]
-    con.close()
+    
+    if is_sqlite_file(infile):
+        con.close()
 
     if context == 'run-specific':
-        data = data.groupby('run_id').apply(statistics_report, outfile, context, "gene", parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, color_palette).reset_index()
-
+        data = data.groupby('run_id').apply(statistics_report, outfile, context, "gene", parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, color_palette)
     elif context in ['global', 'experiment-wide']:
         data = statistics_report(data, outfile, context, "gene", parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, color_palette)
 
-    # store data in table
+    # Store results
     if infile != outfile:
         copyfile(infile, outfile)
 
-    con = sqlite3.connect(outfile)
+    if is_parquet_file(infile):
+        init_df = pl.read_parquet(outfile)
+        if context == 'global':
+            df = data[['gene_id','score','p_value','q_value','pep']]
+            df.columns = ['GENE_ID','SCORE','PVALUE','QVALUE','PEP']
+            df = df.rename(columns=lambda x: f'SCORE_GENE_{context.upper().replace("-", "_")}_{x}' if x not in ['GENE_ID'] else x)
+            df = init_df.join(pl.from_pandas(df).with_columns(pl.col('GENE_ID').cast(pl.Int64)), on=['GENE_ID'], how='left', coalesce=True)
+        else:
+            df = data[['run_id', 'gene_id','score','p_value','q_value','pep']]
+            df.columns = ['RUN_ID', 'GENE_ID','SCORE','PVALUE','QVALUE','PEP']
+            df = df.rename(columns=lambda x: f'SCORE_GENE_{context.upper().replace("-", "_")}_{x}' if x not in ['RUN_ID', 'GENE_ID'] else x)
+            df = init_df.join(
+                pl.from_pandas(df).with_columns(pl.col('GENE_ID').cast(pl.Int64)), 
+                on=['RUN_ID', 'GENE_ID'], 
+                how='left', 
+                coalesce=True
+            )
+        df.write_parquet(
+            outfile,
+            compression="zstd",
+            compression_level=11
+        )
+    else:
+        con = sqlite3.connect(outfile)
+        c = con.cursor()
+        c.execute('SELECT count(name) FROM sqlite_master WHERE type="table" AND name="SCORE_GENE"')
+        if c.fetchone()[0] == 1:
+            c.execute('DELETE FROM SCORE_GENE WHERE CONTEXT =="%s"' % context)
+        c.fetchall()
 
-    c = con.cursor()
-    c.execute('SELECT count(name) FROM sqlite_master WHERE type="table" AND name="SCORE_GENE"')
-    if c.fetchone()[0] == 1:
-        c.execute('DELETE FROM SCORE_GENE WHERE CONTEXT =="%s"' % context)
-    c.fetchall()
+        df = data[['context','run_id','gene_id','score','p_value','q_value','pep']]
+        df.columns = ['CONTEXT','RUN_ID','GENE_ID','SCORE','PVALUE','QVALUE','PEP']
+        table = "SCORE_GENE"
+        df.to_sql(table, con, index=False, dtype={"RUN_ID": "INTEGER"}, if_exists='append')
 
-    df = data[['context','run_id','gene_id','score','p_value','q_value','pep']]
-    df.columns = ['CONTEXT','RUN_ID','GENE_ID','SCORE','PVALUE','QVALUE','PEP']
-    table = "SCORE_GENE"
-    df.to_sql(table, con, index=False, dtype={"RUN_ID": "INTEGER"}, if_exists='append')
-
-    con.close()
+        con.close()
 
 
 def infer_proteins(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, color_palette):
-
-    con = sqlite3.connect(infile)
-
-    if not check_sqlite_table(con, "SCORE_MS2"):
-        raise click.ClickException("Apply scoring to MS2-level data before running protein-level scoring.")
+    
+    if is_parquet_file(infile):
+        all_column_names = get_parquet_column_names(infile)
+        if not any([col.startswith("SCORE_MS2_") for col in all_column_names]):
+            raise click.ClickException("Apply scoring to MS2-level data before running protein-level scoring.")
+    else:
+        con = sqlite3.connect(infile)
+        if not check_sqlite_table(con, "SCORE_MS2"):
+            raise click.ClickException("Apply scoring to MS2-level data before running protein-level scoring.")
 
     if context in ['global','experiment-wide','run-specific']:
         if context == 'global':
@@ -144,83 +226,161 @@ def infer_proteins(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_m
             run_id = 'RUN_ID'
             group_id = 'RUN_ID || "_" || PROTEIN.ID'
 
-        con.executescript('''
-CREATE INDEX IF NOT EXISTS idx_peptide_protein_mapping_protein_id ON PEPTIDE_PROTEIN_MAPPING (PROTEIN_ID);
-CREATE INDEX IF NOT EXISTS idx_peptide_protein_mapping_peptide_id ON PEPTIDE_PROTEIN_MAPPING (PEPTIDE_ID);
-CREATE INDEX IF NOT EXISTS idx_peptide_peptide_id ON PEPTIDE (ID);
-CREATE INDEX IF NOT EXISTS idx_precursor_peptide_mapping_peptide_id ON PRECURSOR_PEPTIDE_MAPPING (PEPTIDE_ID);
-CREATE INDEX IF NOT EXISTS idx_precursor_peptide_mapping_precursor_id ON PRECURSOR_PEPTIDE_MAPPING (PRECURSOR_ID);
-CREATE INDEX IF NOT EXISTS idx_precursor_precursor_id ON PRECURSOR (ID);
-CREATE INDEX IF NOT EXISTS idx_feature_precursor_id ON FEATURE (PRECURSOR_ID);
-CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
-CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);
-''')
+        if is_parquet_file(infile):
+            # Read necessary columns from parquet
+            cols = ['RUN_ID', 'PROTEIN_ID', 'PRECURSOR_DECOY', 'SCORE_MS2_SCORE', 'PEPTIDE_ID']
+            data = pl.read_parquet(infile, columns=cols)
+            
+            data = (
+                data.with_columns(
+                    # Common transformations
+                    pl.col('PROTEIN_ID').cast(pl.Utf8),
+                    pl.col('PEPTIDE_ID').cast(pl.Utf8),
+                    pl.col('PRECURSOR_DECOY').alias('DECOY')
+                )
+                .with_columns(
+                    # Conditional transformations
+                    pl.when(pl.lit(context == 'global'))
+                    .then(pl.struct([
+                        pl.lit(None).cast(pl.Int64).alias('RUN_ID_NEW'),
+                        pl.col('PROTEIN_ID').alias('GROUP_ID')
+                    ]))
+                    .otherwise(pl.struct([
+                        pl.col('RUN_ID').cast(pl.Int64).alias('RUN_ID_NEW'),
+                        (pl.col('RUN_ID').cast(pl.Utf8) + "_" + pl.col('PROTEIN_ID')).alias('GROUP_ID')
+                    ]))
+                    .alias('fields')
+                )
+                .unnest('fields')
+                .drop('RUN_ID')  # Drop original RUN_ID
+                .rename({'RUN_ID_NEW': 'RUN_ID'})  # Rename to original name
+                .group_by('GROUP_ID')
+                .agg(
+                    pl.col('SCORE_MS2_SCORE').max().alias('SCORE'),
+                    pl.first('RUN_ID'),
+                    pl.first('PROTEIN_ID'),
+                    pl.first('DECOY')
+                )
+                .with_columns(
+                    pl.lit(context).cast(pl.Utf8).alias('CONTEXT')
+                )
+                .select([
+                    'RUN_ID',
+                    'GROUP_ID',
+                    'PROTEIN_ID',
+                    'DECOY',
+                    'SCORE',
+                    'CONTEXT'
+                ])
+                .sort('SCORE', descending=True)
+                .to_pandas()
+            )
+        else:
+            con.executescript('''
+                CREATE INDEX IF NOT EXISTS idx_peptide_protein_mapping_protein_id ON PEPTIDE_PROTEIN_MAPPING (PROTEIN_ID);
+                CREATE INDEX IF NOT EXISTS idx_peptide_protein_mapping_peptide_id ON PEPTIDE_PROTEIN_MAPPING (PEPTIDE_ID);
+                CREATE INDEX IF NOT EXISTS idx_peptide_peptide_id ON PEPTIDE (ID);
+                CREATE INDEX IF NOT EXISTS idx_precursor_peptide_mapping_peptide_id ON PRECURSOR_PEPTIDE_MAPPING (PEPTIDE_ID);
+                CREATE INDEX IF NOT EXISTS idx_precursor_peptide_mapping_precursor_id ON PRECURSOR_PEPTIDE_MAPPING (PRECURSOR_ID);
+                CREATE INDEX IF NOT EXISTS idx_precursor_precursor_id ON PRECURSOR (ID);
+                CREATE INDEX IF NOT EXISTS idx_feature_precursor_id ON FEATURE (PRECURSOR_ID);
+                CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
+                CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);
+            ''')
 
-        data = pd.read_sql_query('''
-SELECT %s AS RUN_ID,
-       %s AS GROUP_ID,
-       PROTEIN.ID AS PROTEIN_ID,
-       PRECURSOR.DECOY AS DECOY,
-       SCORE,
-       "%s" AS CONTEXT
-FROM PROTEIN
-INNER JOIN
-  (SELECT PEPTIDE_PROTEIN_MAPPING.PEPTIDE_ID AS PEPTIDE_ID,
-          PROTEIN_ID
-   FROM
-     (SELECT PEPTIDE_ID,
-             COUNT(*) AS NUM_PROTEINS
-      FROM PEPTIDE_PROTEIN_MAPPING
-      GROUP BY PEPTIDE_ID) AS PROTEINS_PER_PEPTIDE
-   INNER JOIN PEPTIDE_PROTEIN_MAPPING ON PROTEINS_PER_PEPTIDE.PEPTIDE_ID = PEPTIDE_PROTEIN_MAPPING.PEPTIDE_ID
-   WHERE NUM_PROTEINS == 1) AS PEPTIDE_PROTEIN_MAPPING ON PROTEIN.ID = PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID
-INNER JOIN PEPTIDE ON PEPTIDE_PROTEIN_MAPPING.PEPTIDE_ID = PEPTIDE.ID
-INNER JOIN PRECURSOR_PEPTIDE_MAPPING ON PEPTIDE.ID = PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID
-INNER JOIN PRECURSOR ON PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID = PRECURSOR.ID
-INNER JOIN FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID
-INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
-GROUP BY GROUP_ID
-HAVING MAX(SCORE)
-ORDER BY SCORE DESC
-''' % (run_id, group_id, context), con)
+            data = pd.read_sql_query('''
+                SELECT %s AS RUN_ID,
+                       %s AS GROUP_ID,
+                       PROTEIN.ID AS PROTEIN_ID,
+                       PRECURSOR.DECOY AS DECOY,
+                       SCORE,
+                       "%s" AS CONTEXT
+                FROM PROTEIN
+                INNER JOIN
+                  (SELECT PEPTIDE_PROTEIN_MAPPING.PEPTIDE_ID AS PEPTIDE_ID,
+                          PROTEIN_ID
+                   FROM
+                     (SELECT PEPTIDE_ID,
+                             COUNT(*) AS NUM_PROTEINS
+                      FROM PEPTIDE_PROTEIN_MAPPING
+                      GROUP BY PEPTIDE_ID) AS PROTEINS_PER_PEPTIDE
+                   INNER JOIN PEPTIDE_PROTEIN_MAPPING ON PROTEINS_PER_PEPTIDE.PEPTIDE_ID = PEPTIDE_PROTEIN_MAPPING.PEPTIDE_ID
+                   WHERE NUM_PROTEINS == 1) AS PEPTIDE_PROTEIN_MAPPING ON PROTEIN.ID = PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID
+                INNER JOIN PEPTIDE ON PEPTIDE_PROTEIN_MAPPING.PEPTIDE_ID = PEPTIDE.ID
+                INNER JOIN PRECURSOR_PEPTIDE_MAPPING ON PEPTIDE.ID = PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID
+                INNER JOIN PRECURSOR ON PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID = PRECURSOR.ID
+                INNER JOIN FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID
+                INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
+                GROUP BY GROUP_ID
+                HAVING MAX(SCORE)
+                ORDER BY SCORE DESC
+                ''' % (run_id, group_id, context), con)
     else:
         raise click.ClickException("Unspecified context selected.")
 
     data.columns = [col.lower() for col in data.columns]
-    con.close()
+    
+    if is_sqlite_file(infile):
+        con.close()
 
     if context == 'run-specific':
         data = data.groupby('run_id').apply(statistics_report, outfile, context, "protein", parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, color_palette)
-
     elif context in ['global', 'experiment-wide']:
         data = statistics_report(data, outfile, context, "protein", parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, color_palette)
 
-    # store data in table
+    # Store results
     if infile != outfile:
         copyfile(infile, outfile)
 
-    con = sqlite3.connect(outfile)
+    if is_parquet_file(infile):
+        init_df = pl.read_parquet(outfile)
+        if context == 'global':
+            df = data[['protein_id','score','p_value','q_value','pep']]
+            df.columns = ['PROTEIN_ID','SCORE','PVALUE','QVALUE','PEP']
+            df = df.rename(columns=lambda x: f'SCORE_PROTEIN_{context.upper().replace("-", "_")}_{x}' if x not in ['PROTEIN_ID'] else x)
+            df = init_df.join(pl.from_pandas(df).with_columns(pl.col('PROTEIN_ID').cast(pl.Int64)), on=['PROTEIN_ID'], how='left', coalesce=True)
+        else:
+            df = data[['run_id', 'protein_id','score','p_value','q_value','pep']]
+            df.columns = ['RUN_ID', 'PROTEIN_ID','SCORE','PVALUE','QVALUE','PEP']
+            df = df.rename(columns=lambda x: f'SCORE_PROTEIN_{context.upper().replace("-", "_")}_{x}' if x not in ['RUN_ID', 'PROTEIN_ID'] else x)
+            df = init_df.join(
+                pl.from_pandas(df).with_columns(pl.col('PROTEIN_ID').cast(pl.Int64)), 
+                on=['RUN_ID', 'PROTEIN_ID'], 
+                how='left', 
+                coalesce=True
+            )
+        df.write_parquet(
+            outfile,
+            compression="zstd",
+            compression_level=11
+        )
+    else:
+        con = sqlite3.connect(outfile)
+        c = con.cursor()
+        c.execute('SELECT count(name) FROM sqlite_master WHERE type="table" AND name="SCORE_PROTEIN"')
+        if c.fetchone()[0] == 1:
+            c.execute('DELETE FROM SCORE_PROTEIN WHERE CONTEXT =="%s"' % context)
+        c.fetchall()
 
-    c = con.cursor()
-    c.execute('SELECT count(name) FROM sqlite_master WHERE type="table" AND name="SCORE_PROTEIN"')
-    if c.fetchone()[0] == 1:
-        c.execute('DELETE FROM SCORE_PROTEIN WHERE CONTEXT =="%s"' % context)
-    c.fetchall()
+        df = data[['context','run_id','protein_id','score','p_value','q_value','pep']]
+        df.columns = ['CONTEXT','RUN_ID','PROTEIN_ID','SCORE','PVALUE','QVALUE','PEP']
+        table = "SCORE_PROTEIN"
+        df.to_sql(table, con, index=False, dtype={"RUN_ID": "INTEGER"}, if_exists='append')
 
-    df = data[['context','run_id','protein_id','score','p_value','q_value','pep']]
-    df.columns = ['CONTEXT','RUN_ID','PROTEIN_ID','SCORE','PVALUE','QVALUE','PEP']
-    table = "SCORE_PROTEIN"
-    df.to_sql(table, con, index=False, dtype={"RUN_ID": "INTEGER"}, if_exists='append')
-
-    con.close()
+        con.close()
 
 
 def infer_peptides(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, color_palette):
 
-    con = sqlite3.connect(infile)
+    if is_parquet_file(infile):
+        all_column_names = get_parquet_column_names(infile)
+        if not any([col.startswith("SCORE_MS2_") for col in all_column_names]):
+            raise click.ClickException("Apply scoring to MS2-level data before running peptide-level scoring.")
+    else:
+        con = sqlite3.connect(infile)
 
-    if not check_sqlite_table(con, "SCORE_MS2"):
-        raise click.ClickException("Apply scoring to MS2-level data before running peptide-level scoring.")
+        if not check_sqlite_table(con, "SCORE_MS2"):
+            raise click.ClickException("Apply scoring to MS2-level data before running peptide-level scoring.")
 
     if context in ['global','experiment-wide','run-specific']:
         if context == 'global':
@@ -229,38 +389,88 @@ def infer_peptides(infile, outfile, context, parametric, pfdr, pi0_lambda, pi0_m
         else:
             run_id = 'RUN_ID'
             group_id = 'RUN_ID || "_" || PEPTIDE.ID'
+    
+        if is_parquet_file(infile):
+            cols = ['RUN_ID', 'PEPTIDE_ID', 'PRECURSOR_DECOY', 'SCORE_MS2_SCORE']
+            data = pl.read_parquet(infile, columns=cols)
+            data = (
+                data.with_columns(
+                    # Common transformations
+                    pl.col('PEPTIDE_ID').cast(pl.Utf8),
+                    pl.col('PRECURSOR_DECOY').alias('DECOY')
+                )
+                .with_columns(
+                    # Conditional transformations - use different names for struct fields
+                    pl.when(pl.lit(context == 'global'))
+                    .then(pl.struct([
+                        pl.lit(None).cast(pl.Int64).alias('RUN_ID_NEW'),  # Changed name
+                        pl.col('PEPTIDE_ID').alias('GROUP_ID')
+                    ]))
+                    .otherwise(pl.struct([
+                        pl.col('RUN_ID').cast(pl.Int64).alias('RUN_ID_NEW'),  # Changed name
+                        (pl.col('RUN_ID').cast(pl.Utf8) + "_" + pl.col('PEPTIDE_ID')).alias('GROUP_ID')
+                    ]))
+                    .alias('fields')
+                )
+                .unnest('fields')
+                .drop('RUN_ID')  # Drop the original RUN_ID column
+                .rename({'RUN_ID_NEW': 'RUN_ID'})  # Rename back to RUN_ID
+                .group_by('GROUP_ID')
+                .agg(
+                    pl.col('SCORE_MS2_SCORE').max().alias('SCORE'),
+                    pl.first('RUN_ID'),
+                    pl.first('PEPTIDE_ID'),
+                    pl.first('DECOY')
+                )
+                .with_columns(
+                    pl.lit(context).cast(pl.Utf8).alias('CONTEXT')
+                )
+                .select([
+                    'RUN_ID',
+                    'GROUP_ID',
+                    'PEPTIDE_ID',
+                    'DECOY',
+                    'SCORE',
+                    'CONTEXT'
+                ])
+                .sort('SCORE', descending=True)
+                .to_pandas()
+            )
+        else:
 
-        con.executescript('''
-CREATE INDEX IF NOT EXISTS idx_peptide_peptide_id ON PEPTIDE (ID);
-CREATE INDEX IF NOT EXISTS idx_precursor_peptide_mapping_peptide_id ON PRECURSOR_PEPTIDE_MAPPING (PEPTIDE_ID);
-CREATE INDEX IF NOT EXISTS idx_precursor_peptide_mapping_precursor_id ON PRECURSOR_PEPTIDE_MAPPING (PRECURSOR_ID);
-CREATE INDEX IF NOT EXISTS idx_precursor_precursor_id ON PRECURSOR (ID);
-CREATE INDEX IF NOT EXISTS idx_feature_precursor_id ON FEATURE (PRECURSOR_ID);
-CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
-CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);
-''')
+            con.executescript('''
+        CREATE INDEX IF NOT EXISTS idx_peptide_peptide_id ON PEPTIDE (ID);
+        CREATE INDEX IF NOT EXISTS idx_precursor_peptide_mapping_peptide_id ON PRECURSOR_PEPTIDE_MAPPING (PEPTIDE_ID);
+        CREATE INDEX IF NOT EXISTS idx_precursor_peptide_mapping_precursor_id ON PRECURSOR_PEPTIDE_MAPPING (PRECURSOR_ID);
+        CREATE INDEX IF NOT EXISTS idx_precursor_precursor_id ON PRECURSOR (ID);
+        CREATE INDEX IF NOT EXISTS idx_feature_precursor_id ON FEATURE (PRECURSOR_ID);
+        CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
+        CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);
+        ''')
 
-        data = pd.read_sql_query('''
-SELECT %s AS RUN_ID,
-       %s AS GROUP_ID,
-       PEPTIDE.ID AS PEPTIDE_ID,
-       PRECURSOR.DECOY,
-       SCORE,
-       "%s" AS CONTEXT
-FROM PEPTIDE
-INNER JOIN PRECURSOR_PEPTIDE_MAPPING ON PEPTIDE.ID = PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID
-INNER JOIN PRECURSOR ON PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID = PRECURSOR.ID
-INNER JOIN FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID
-INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
-GROUP BY GROUP_ID
-HAVING MAX(SCORE)
-ORDER BY SCORE DESC
-''' % (run_id, group_id, context), con)
+            data = pd.read_sql_query('''
+        SELECT %s AS RUN_ID,
+            %s AS GROUP_ID,
+            PEPTIDE.ID AS PEPTIDE_ID,
+            PRECURSOR.DECOY,
+            SCORE,
+            "%s" AS CONTEXT
+        FROM PEPTIDE
+        INNER JOIN PRECURSOR_PEPTIDE_MAPPING ON PEPTIDE.ID = PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID
+        INNER JOIN PRECURSOR ON PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID = PRECURSOR.ID
+        INNER JOIN FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID
+        INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
+        GROUP BY GROUP_ID
+        HAVING MAX(SCORE)
+        ORDER BY SCORE DESC
+        ''' % (run_id, group_id, context), con)
     else:
         raise click.ClickException("Unspecified context selected.")
 
     data.columns = [col.lower() for col in data.columns]
-    con.close()
+    
+    if is_sqlite_file(infile):
+        con.close()
 
     if context == 'run-specific':
         data = data.groupby('run_id').apply(statistics_report, outfile, context, "peptide", parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, color_palette)
@@ -272,20 +482,38 @@ ORDER BY SCORE DESC
     if infile != outfile:
         copyfile(infile, outfile)
     
-    con = sqlite3.connect(outfile)
+    if is_parquet_file(infile):
+        init_df = pl.read_parquet(outfile)
+        if context == 'global':
+            df = data[['peptide_id','score','p_value','q_value','pep']]
+            df.columns = ['PEPTIDE_ID','SCORE','PVALUE','QVALUE','PEP']
+            df = df.rename(columns=lambda x: f'SCORE_PEPTIDE_{context.upper().replace("-", "_")}_{x}' if x not in ['PEPTIDE_ID'] else x)
+            df = init_df.join(pl.from_pandas(df).with_columns(pl.col('PEPTIDE_ID').cast(pl.Int64)), on=['PEPTIDE_ID'], how='left', coalesce=True)
+        else:
+            df = data[['run_id', 'peptide_id','score','p_value','q_value','pep']]
+            df.columns = ['RUN_ID', 'PEPTIDE_ID','SCORE','PVALUE','QVALUE','PEP']
+            df = df.rename(columns=lambda x: f'SCORE_PEPTIDE_{context.upper().replace("-", "_")}_{x}' if x not in ['RUN_ID', 'PEPTIDE_ID'] else x)
+            df = init_df.join(pl.from_pandas(df).with_columns(pl.col('PEPTIDE_ID').cast(pl.Int64)), on=['RUN_ID', 'PEPTIDE_ID'], how='left', coalesce=True)
+        df.write_parquet(
+            outfile,
+            compression="zstd",
+            compression_level=11
+        )
+    else:
+        con = sqlite3.connect(outfile)
 
-    c = con.cursor()
-    c.execute('SELECT count(name) FROM sqlite_master WHERE type="table" AND name="SCORE_PEPTIDE"')
-    if c.fetchone()[0] == 1:
-        c.execute('DELETE FROM SCORE_PEPTIDE WHERE CONTEXT =="%s"' % context)
-    c.fetchall()
+        c = con.cursor()
+        c.execute('SELECT count(name) FROM sqlite_master WHERE type="table" AND name="SCORE_PEPTIDE"')
+        if c.fetchone()[0] == 1:
+            c.execute('DELETE FROM SCORE_PEPTIDE WHERE CONTEXT =="%s"' % context)
+        c.fetchall()
 
-    df = data[['context','run_id','peptide_id','score','p_value','q_value','pep']]
-    df.columns = ['CONTEXT','RUN_ID','PEPTIDE_ID','SCORE','PVALUE','QVALUE','PEP']
-    table = "SCORE_PEPTIDE"
-    df.to_sql(table, con, index=False, dtype={"RUN_ID": "INTEGER"}, if_exists='append')
+        df = data[['context','run_id','peptide_id','score','p_value','q_value','pep']]
+        df.columns = ['CONTEXT','RUN_ID','PEPTIDE_ID','SCORE','PVALUE','QVALUE','PEP']
+        table = "SCORE_PEPTIDE"
+        df.to_sql(table, con, index=False, dtype={"RUN_ID": "INTEGER"}, if_exists='append')
 
-    con.close()
+        con.close()
 
 
 def infer_glycopeptides(infile, outfile, context,
