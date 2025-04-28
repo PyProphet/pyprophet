@@ -991,11 +991,6 @@ class PyProphetRunner(object):
         if self.infile != self.outfile:
             copyfile(self.infile, self.outfile)
 
-        import pickle
-        # Save result, extra_writes, and pi0 as pickles
-        with open('tmp_parquet_results.pkl', 'wb') as f:
-            pickle.dump((result, extra_writes, pi0), f)
-
         if self.level == "ms2" or self.level == "ms1ms2":
             # Read the parquet file
             init_df = pl.read_parquet(self.outfile)
@@ -1104,7 +1099,14 @@ class PyProphetRunner(object):
 
             # Get TRANSITION_ and FEATURE_TRANSITION_ columns and explode them
             transition_cols = [col for col in init_df.columns if col.startswith('TRANSITION_') or col.startswith('FEATURE_TRANSITION_')]
-            init_df = init_df.explode(transition_cols)
+            transition_cols+=['PRODUCT_MZ', 'ANNOTATION', 'PEPTIDE_IPF_ID']
+            
+            # Create sub_init_df with only the transition columns to explode
+            sub_init_df = init_df.select(['PRECURSOR_ID', 'FEATURE_ID']+transition_cols)
+            sub_init_df = sub_init_df.explode(transition_cols)
+            
+            # Drop transition_cols from init_df
+            init_df = init_df.drop(transition_cols)
 
             # Process the scored tables
             df = pl.DataFrame(result.scored_tables).select([
@@ -1128,21 +1130,34 @@ class PyProphetRunner(object):
             })
 
             # Merge with initial dataframe
-            df = init_df.join(
+            df = sub_init_df.join(
                 df, 
                 on=['FEATURE_ID', 'TRANSITION_ID'], 
-                how='left'
+                how='left',
+                coalesce=True
             )
+            
+            del sub_init_df
 
             # Identify columns to group by (non-transition columns except PRODUCT_MZ and ANNOTATION)
             collapse_columns = [
                 col for col in df.columns 
                 if not any(col.startswith(prefix) for prefix in ['TRANSITION_', 'FEATURE_TRANSITION_', 'SCORE_TRANSITION_'])
-                and col not in ['PRODUCT_MZ', 'ANNOTATION']
+                and col not in ['PRODUCT_MZ', 'ANNOTATION', 'PEPTIDE_IPF_ID']
             ]
 
             # Group and aggregate
             df = df.group_by(collapse_columns).agg(pl.all())
+            
+            # Merge with init_df
+            df = init_df.join(
+                df, 
+                on=['PRECURSOR_ID', 'FEATURE_ID'], 
+                how='left',
+                coalesce=True
+            )
+            
+            del init_df
 
             # Write to parquet
             df.write_parquet(
