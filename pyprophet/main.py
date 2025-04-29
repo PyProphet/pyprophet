@@ -594,7 +594,7 @@ def export_parquet(infile, outfile, oswfile, transitionLevel, onlyFeatures, noDe
             click.echo("Info: Parquet file will be written to {}".format(outfile))
             export_to_parquet(os.path.abspath(infile), os.path.abspath(outfile), transitionLevel, onlyFeatures, noDecoys)
     elif infile.endswith('.sqmass') or infile.endswith('.sqMass'):
-        click.echo("Info: Will export sqMass to parquet scoring format")
+        click.echo("Info: Will export sqMass to parquet")
         if os.path.exists(outfile):
             click.echo(click.style(f"Warn: {outfile} already exists, will overwrite", fg='yellow'))
         start = time.time()
