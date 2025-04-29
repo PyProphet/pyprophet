@@ -357,7 +357,7 @@ def convert_osw_to_parquet(infile, outfile, compression_method='zstd', compressi
     )
     precursor_columns = conn.execute("PRAGMA table_info(PRECURSOR)").df()['name'].values
     has_library_drift_time = 'LIBRARY_DRIFT_TIME' in precursor_columns
-    
+
     query = query.format(
         library_drift_time_field=""",
         PRECURSOR.LIBRARY_DRIFT_TIME AS PRECURSOR_LIBRARY_DRIFT_TIME""" if has_library_drift_time else """,
@@ -567,9 +567,141 @@ def convert_osw_to_parquet(infile, outfile, compression_method='zstd', compressi
         pl.col("FEATURE_ID").cast(pl.Int64)
     )
 
+    conn.close()
+
     # Write to parquet
     master_df.write_parquet(
         outfile,
         compression=compression_method,
         compression_level=compression_level
+    )
+
+
+def convert_sqmass_to_parquet(
+    infile, outfile, oswfile, compression_method="zstd", compression_level=11
+):
+    '''
+    Convert a SQMass sqlite file to Parquet format
+    '''
+    xic_conn = duckdb.connect(database=infile, read_only=True)
+    osw_conn = duckdb.connect(database=oswfile, read_only=True)
+
+    query = """
+    SELECT
+    PRECURSOR.ID AS PRECURSOR_ID,
+    TRANSITION.ID AS TRANSITION_ID,
+    PEPTIDE.MODIFIED_SEQUENCE,
+    PRECURSOR.CHARGE AS PRECURSOR_CHARGE,
+    TRANSITION.CHARGE AS PRODUCT_CHARGE,
+    PRECURSOR.DECOY AS PRECURSOR_DECOY,
+    TRANSITION.DECOY AS PRODUCT_DECOY,
+    FROM PRECURSOR
+    INNER JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
+    INNER JOIN PEPTIDE ON PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
+    INNER JOIN TRANSITION_PRECURSOR_MAPPING ON PRECURSOR.ID = TRANSITION_PRECURSOR_MAPPING.PRECURSOR_ID
+    INNER JOIN TRANSITION ON TRANSITION_PRECURSOR_MAPPING.TRANSITION_ID = TRANSITION.ID
+    """
+    osw_df = osw_conn.execute(query).pl()
+
+    query = """
+    SELECT
+    CHROMATOGRAM.NATIVE_ID,
+    DATA.COMPRESSION,
+    DATA.DATA_TYPE,
+    DATA.DATA
+    FROM CHROMATOGRAM
+    INNER JOIN DATA ON DATA.CHROMATOGRAM_ID = CHROMATOGRAM.ID
+    """
+    chrom_df = xic_conn.execute(query).pl()
+    
+    xic_conn.close()
+    osw_conn.close()
+
+    chrom_df_prec = (
+        chrom_df.filter(chrom_df["NATIVE_ID"].str.contains("_Precursor_i\\d+"))
+        # Add column with just the precursor id - now operating on the filtered DataFrame
+        .with_columns(
+            pl.col("NATIVE_ID")
+            .str.extract(r"(\d+)_Precursor_i\d+")
+            .alias("PRECURSOR_ID")
+            .cast(pl.Int64)
+        )
+    )
+
+    chrom_df_trans = (
+        chrom_df.filter(~chrom_df["NATIVE_ID"].str.contains("_Precursor_i\\d+"))
+        # Add column with just the transition id - now operating on the filtered DataFrame
+        .with_columns(pl.col("NATIVE_ID").alias("TRANSITION_ID").cast(pl.Int64))
+    )
+
+    # Join osw_df and chrom_df_prec on PRECURSOR_ID
+    chrom_df_prec_m = (
+        osw_df.select(
+            ["PRECURSOR_ID", "MODIFIED_SEQUENCE", "PRECURSOR_CHARGE", "PRECURSOR_DECOY"]
+        )
+        .unique()
+        .with_columns(
+            pl.lit(None).cast(pl.Int64).alias("TRANSITION_ID"),
+            pl.lit(None).cast(pl.Int64).alias("PRODUCT_CHARGE"),
+            pl.lit(None).cast(pl.Int64).alias("PRODUCT_DECOY"),
+        )
+        .select(
+            [
+                "PRECURSOR_ID",
+                "TRANSITION_ID",
+                "MODIFIED_SEQUENCE",
+                "PRECURSOR_CHARGE",
+                "PRODUCT_CHARGE",
+                "PRECURSOR_DECOY",
+                "PRODUCT_DECOY",
+            ]
+        )
+        .join(
+            chrom_df_prec,
+            left_on="PRECURSOR_ID",
+            right_on="PRECURSOR_ID",
+            how="inner",
+            coalesce=True,
+        )
+    )
+
+    chrom_df_trans_m = osw_df.join(
+        chrom_df_trans,
+        left_on="TRANSITION_ID",
+        right_on="TRANSITION_ID",
+        how="inner",
+        coalesce=True,
+    )
+
+    chrom_df_m = chrom_df_prec_m.vstack(chrom_df_trans_m).sort(by=["PRECURSOR_ID"])
+
+    chrom_df_restructured = chrom_df_m.pivot(
+        values=["DATA", "COMPRESSION"],
+        index=[
+            "PRECURSOR_ID",
+            "TRANSITION_ID",
+            "MODIFIED_SEQUENCE",
+            "PRECURSOR_CHARGE",
+            "PRODUCT_CHARGE",
+            "PRECURSOR_DECOY",
+            "PRODUCT_DECOY",
+            "NATIVE_ID",
+        ],
+        on="DATA_TYPE",
+        aggregate_function="first",
+    )
+
+    chrom_df_restructured = chrom_df_restructured.rename(
+        {
+            "DATA_1": "INTENSITY_DATA",
+            "DATA_2": "RT_DATA",
+            "COMPRESSION_1": "INTENSITY_COMPRESSION",
+            "COMPRESSION_2": "RT_COMPRESSION",
+        }
+    )
+    
+    chrom_df_restructured.write_parquet(
+        outfile,
+        compression=compression_method,
+        compression_level=compression_level,
     )
