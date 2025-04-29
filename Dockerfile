@@ -4,6 +4,10 @@ FROM python:3.9.1
 # install numpy & cython
 RUN pip install numpy cython
 
+# install duckdb and its extensions before pyprophet
+RUN pip install duckdb
+RUN python -c "import duckdb; conn = duckdb.connect(); conn.execute(\"INSTALL 'sqlite_scanner'\"); conn.execute(\"LOAD 'sqlite_scanner'\");"
+
 # install PyProphet and dependencies
 ADD . /pyprophet
 WORKDIR /pyprophet
