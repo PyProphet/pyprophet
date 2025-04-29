@@ -7,6 +7,26 @@ from pyprophet.export import check_sqlite_table
 from duckdb_extensions import extension_importer
 import re
 
+def load_sqlite_scanner():
+    """
+    Ensures the `sqlite_scanner` extension is installed and loaded in DuckDB.
+    """
+    try:
+        duckdb.execute("LOAD sqlite_scanner")
+    except Exception as e:
+        if "Extension 'sqlite_scanner' not found" in str(e):
+            try:
+                duckdb.execute("INSTALL sqlite_scanner")
+                duckdb.execute("LOAD sqlite_scanner")
+            except Exception as install_error:
+                if "already installed but the origin is different" in str(install_error):
+                    duckdb.execute("FORCE INSTALL sqlite_scanner")
+                    duckdb.execute("LOAD sqlite_scanner")
+                else:
+                    raise install_error
+        else:
+            raise e
+
 def getPeptideProteinScoreTable(conndb, level):
     if level == 'peptide':
         id = 'PEPTIDE_ID'
@@ -47,21 +67,7 @@ def export_to_parquet(infile, outfile, transitionLevel=False, onlyFeatures=False
     Return:
         None
     '''
-    try:
-        duckdb.execute("LOAD sqlite_scanner")
-    except Exception as e:
-        if "Extension 'sqlite_scanner' not found" in str(e):
-            try:
-                duckdb.execute("INSTALL sqlite_scanner")
-                duckdb.execute("LOAD sqlite_scanner")
-            except Exception as install_error:
-                if "already installed but the origin is different" in str(install_error):
-                    duckdb.execute("FORCE INSTALL sqlite_scanner")
-                    duckdb.execute("LOAD sqlite_scanner")
-                else:
-                    raise install_error
-        else:
-            raise e
+    load_sqlite_scanner()
         
     condb = duckdb.connect(infile)
     con = sqlite3.connect(infile)
@@ -317,6 +323,7 @@ def convert_osw_to_parquet(infile, outfile, compression_method='zstd', compressi
         None
     '''
 
+    load_sqlite_scanner()
     conn = duckdb.connect(database=infile, read_only=True)
 
     # Get Gene/Protein/Peptide/Precursor table
@@ -583,6 +590,7 @@ def convert_sqmass_to_parquet(
     '''
     Convert a SQMass sqlite file to Parquet format
     '''
+    load_sqlite_scanner()
     xic_conn = duckdb.connect(database=infile, read_only=True)
     osw_conn = duckdb.connect(database=oswfile, read_only=True)
 
