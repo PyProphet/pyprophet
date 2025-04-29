@@ -9,7 +9,7 @@ import click
 import time
 
 from scipy.stats import rankdata
-from .data_handling import check_sqlite_table, is_parquet_file, get_parquet_column_names
+from .data_handling import check_sqlite_table, create_index_if_not_exists, is_parquet_file, get_parquet_column_names
 from shutil import copyfile
 
 
@@ -47,15 +47,13 @@ def read_pyp_peakgroup_precursor(path, ipf_max_peakgroup_pep, ipf_ms1_scoring, i
         if not check_sqlite_table(con_sqlite, "SCORE_MS2") or not check_sqlite_table(con_sqlite, "SCORE_TRANSITION"):
             raise click.ClickException("Apply scoring to MS2 and transition-level data before running IPF.")
 
-        con.execute('''
-CREATE INDEX IF NOT EXISTS idx_transition_id ON TRANSITION (ID);
-CREATE INDEX IF NOT EXISTS idx_precursor_precursor_id ON PRECURSOR (ID);
-CREATE INDEX IF NOT EXISTS idx_feature_precursor_id ON FEATURE (PRECURSOR_ID);
-CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
-CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);
-CREATE INDEX IF NOT EXISTS idx_score_transition_feature_id ON SCORE_TRANSITION (FEATURE_ID);
-CREATE INDEX IF NOT EXISTS idx_score_transition_transition_id ON SCORE_TRANSITION (TRANSITION_ID);
-''')
+        create_index_if_not_exists(con, 'idx_transition_id', 'TRANSITION', 'ID')
+        create_index_if_not_exists(con, 'idx_precursor_precursor_id', 'PRECURSOR', 'ID')
+        create_index_if_not_exists(con, 'idx_feature_precursor_id', 'FEATURE', 'PRECURSOR_ID')
+        create_index_if_not_exists(con, 'idx_feature_feature_id', 'FEATURE', 'ID')
+        create_index_if_not_exists(con, 'idx_score_ms2_feature_id', 'SCORE_MS2', 'FEATURE_ID')
+        create_index_if_not_exists(con, 'idx_score_transition_feature_id', 'SCORE_TRANSITION', 'FEATURE_ID')
+        create_index_if_not_exists(con, 'idx_score_transition_transition_id', 'SCORE_TRANSITION', 'TRANSITION_ID')
 
         data = con.execute('''
 SELECT FEATURE.ID AS FEATURE_ID,
@@ -81,13 +79,11 @@ WHERE PRECURSOR.DECOY=0
         if not check_sqlite_table(con_sqlite, "SCORE_MS1") or not check_sqlite_table(con_sqlite, "SCORE_MS2") or not check_sqlite_table(con_sqlite, "SCORE_TRANSITION"):
             raise click.ClickException("Apply scoring to MS1, MS2 and transition-level data before running IPF.")
 
-        con.execute('''
-CREATE INDEX IF NOT EXISTS idx_precursor_precursor_id ON PRECURSOR (ID);
-CREATE INDEX IF NOT EXISTS idx_feature_precursor_id ON FEATURE (PRECURSOR_ID);
-CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
-CREATE INDEX IF NOT EXISTS idx_score_ms1_feature_id ON SCORE_MS1 (FEATURE_ID);
-CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);
-''')
+        create_index_if_not_exists(con, 'idx_precursor_precursor_id', 'PRECURSOR', 'ID')
+        create_index_if_not_exists(con, 'idx_feature_precursor_id', 'FEATURE', 'PRECURSOR_ID')
+        create_index_if_not_exists(con, 'idx_feature_feature_id', 'FEATURE', 'ID')
+        create_index_if_not_exists(con, 'idx_score_ms1_feature_id', 'SCORE_MS1', 'FEATURE_ID')
+        create_index_if_not_exists(con, 'idx_score_ms2_feature_id', 'SCORE_MS2', 'FEATURE_ID')
 
         data = con.execute('''
 SELECT FEATURE.ID AS FEATURE_ID,
@@ -107,16 +103,14 @@ WHERE PRECURSOR.DECOY=0
         if not check_sqlite_table(con_sqlite, "SCORE_MS1") or not check_sqlite_table(con_sqlite, "SCORE_MS2") or not check_sqlite_table(con_sqlite, "SCORE_TRANSITION"):
             raise click.ClickException("Apply scoring to MS1, MS2 and transition-level data before running IPF.")
 
-        con.execute('''
-CREATE INDEX IF NOT EXISTS idx_transition_id ON TRANSITION (ID);
-CREATE INDEX IF NOT EXISTS idx_precursor_precursor_id ON PRECURSOR (ID);
-CREATE INDEX IF NOT EXISTS idx_feature_precursor_id ON FEATURE (PRECURSOR_ID);
-CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
-CREATE INDEX IF NOT EXISTS idx_score_ms1_feature_id ON SCORE_MS1 (FEATURE_ID);
-CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);
-CREATE INDEX IF NOT EXISTS idx_score_transition_feature_id ON SCORE_TRANSITION (FEATURE_ID);
-CREATE INDEX IF NOT EXISTS idx_score_transition_transition_id ON SCORE_TRANSITION (TRANSITION_ID);
-''')
+        create_index_if_not_exists(con, 'idx_transition_id', 'TRANSITION', 'ID')
+        create_index_if_not_exists(con, 'idx_precursor_precursor_id', 'PRECURSOR', 'ID')
+        create_index_if_not_exists(con, 'idx_feature_precursor_id', 'FEATURE', 'PRECURSOR_ID')
+        create_index_if_not_exists(con, 'idx_feature_feature_id', 'FEATURE', 'ID')
+        create_index_if_not_exists(con, 'idx_score_ms1_feature_id', 'SCORE_MS1', 'FEATURE_ID')
+        create_index_if_not_exists(con, 'idx_score_ms2_feature_id', 'SCORE_MS2', 'FEATURE_ID')
+        create_index_if_not_exists(con, 'idx_score_transition_feature_id', 'SCORE_TRANSITION', 'FEATURE_ID')
+        create_index_if_not_exists(con, 'idx_score_transition_transition_id', 'SCORE_TRANSITION', 'TRANSITION_ID')
 
         data = con.execute('''
 SELECT FEATURE.ID AS FEATURE_ID,
@@ -143,12 +137,10 @@ WHERE PRECURSOR.DECOY=0
         if not check_sqlite_table(con_sqlite, "SCORE_MS2") or not check_sqlite_table(con_sqlite, "SCORE_TRANSITION"):
             raise click.ClickException("Apply scoring to MS2 and transition-level data before running IPF.")
 
-        con.execute('''
-CREATE INDEX IF NOT EXISTS idx_precursor_precursor_id ON PRECURSOR (ID);
-CREATE INDEX IF NOT EXISTS idx_feature_precursor_id ON FEATURE (PRECURSOR_ID);
-CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
-CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);
-''')
+        create_index_if_not_exists(con, 'idx_precursor_precursor_id', 'PRECURSOR', 'ID')
+        create_index_if_not_exists(con, 'idx_feature_precursor_id', 'FEATURE', 'PRECURSOR_ID')
+        create_index_if_not_exists(con, 'idx_feature_feature_id', 'FEATURE', 'ID')
+        create_index_if_not_exists(con, 'idx_score_ms2_feature_id', 'SCORE_MS2', 'FEATURE_ID')
 
         data = con.execute('''
 SELECT FEATURE.ID AS FEATURE_ID,
@@ -179,12 +171,10 @@ def read_pyp_transition(path, ipf_max_transition_pep, ipf_h0):
     
     con = duckdb.connect(database=path, read_only=False)
     
-    con.execute('''
-CREATE INDEX IF NOT EXISTS idx_transition_peptide_mapping_transition_id ON TRANSITION_PEPTIDE_MAPPING (TRANSITION_ID);
-CREATE INDEX IF NOT EXISTS idx_transition_id ON TRANSITION (ID);
-CREATE INDEX IF NOT EXISTS idx_score_transition_feature_id ON SCORE_TRANSITION (FEATURE_ID);
-CREATE INDEX IF NOT EXISTS idx_score_transition_transition_id ON SCORE_TRANSITION (TRANSITION_ID);
-''')
+    create_index_if_not_exists(con, 'idx_transition_peptide_mapping_transition_id', 'TRANSITION_PEPTIDE_MAPPING', 'TRANSITION_ID')
+    create_index_if_not_exists(con, 'idx_transition_id', 'TRANSITION', 'ID')
+    create_index_if_not_exists(con, 'idx_score_transition_feature_id', 'SCORE_TRANSITION', 'FEATURE_ID')
+    create_index_if_not_exists(con, 'idx_score_transition_transition_id', 'SCORE_TRANSITION', 'TRANSITION_ID')
     
     # transition-level evidence
     evidence = con.execute('''

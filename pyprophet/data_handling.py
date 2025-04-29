@@ -95,6 +95,20 @@ def check_sqlite_table(con, table):
 
     return(table_present)
 
+def create_index_if_not_exists(con, index_name, table_name, column_name):
+    '''
+    Create an index on a table if it does not already exist. For duckdb connections to sqlite files
+    '''
+    res = con.execute(f"""
+        SELECT count(*) 
+        FROM duckdb_indexes() 
+        WHERE index_name = '{index_name}' 
+        AND table_name = '{table_name}'
+    """).fetchone()
+    
+    if res[0] == 0:
+        con.execute(f"CREATE INDEX {index_name} ON {table_name} ({column_name})")
+
 
 
 def is_parquet_file(file_path):
