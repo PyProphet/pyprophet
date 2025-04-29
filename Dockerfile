@@ -7,7 +7,8 @@ RUN pip install numpy cython
 # install PyProphet and dependencies
 ADD . /pyprophet
 WORKDIR /pyprophet
-RUN python setup.py install
+# RUN python setup.py install
+RUN pip install .
 WORKDIR /
 RUN rm -rf /pyprophet
 
