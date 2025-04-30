@@ -601,6 +601,7 @@ def convert_sqmass_to_parquet(
     PEPTIDE.MODIFIED_SEQUENCE,
     PRECURSOR.CHARGE AS PRECURSOR_CHARGE,
     TRANSITION.CHARGE AS PRODUCT_CHARGE,
+    TRANSITION.DETECTING AS DETECTING_TRANSITION,
     PRECURSOR.DECOY AS PRECURSOR_DECOY,
     TRANSITION.DECOY AS PRODUCT_DECOY,
     FROM PRECURSOR
@@ -651,6 +652,7 @@ def convert_sqmass_to_parquet(
         .with_columns(
             pl.lit(None).cast(pl.Int64).alias("TRANSITION_ID"),
             pl.lit(None).cast(pl.Int64).alias("PRODUCT_CHARGE"),
+            pl.lit(1).cast(pl.Int64).alias("DETECTING_TRANSITION"),
             pl.lit(None).cast(pl.Int64).alias("PRODUCT_DECOY"),
         )
         .select(
@@ -660,6 +662,7 @@ def convert_sqmass_to_parquet(
                 "MODIFIED_SEQUENCE",
                 "PRECURSOR_CHARGE",
                 "PRODUCT_CHARGE",
+                "DETECTING_TRANSITION",
                 "PRECURSOR_DECOY",
                 "PRODUCT_DECOY",
             ]
@@ -691,6 +694,7 @@ def convert_sqmass_to_parquet(
             "MODIFIED_SEQUENCE",
             "PRECURSOR_CHARGE",
             "PRODUCT_CHARGE",
+            "DETECTING_TRANSITION",
             "PRECURSOR_DECOY",
             "PRODUCT_DECOY",
             "NATIVE_ID",
