@@ -396,7 +396,7 @@ def convert_osw_to_parquet(infile, outfile, compression_method='zstd', compressi
         TRANSITION.CHARGE AS TRANSITION_CHARGE,
         TRANSITION.TYPE AS TRANSITION_TYPE,
         TRANSITION.ORDINAL AS TRANSITION_ORDINAL,
-        {'TRANSITION.ANNOTATION AS TRANSITION_ANNOTATION,' if has_annotation else 'NULL AS TRANSITION_ANNOTATION,'}
+        {'TRANSITION.ANNOTATION AS ANNOTATION,' if has_annotation else 'NULL AS ANNOTATION,'}
         TRANSITION.DETECTING AS TRANSITION_DETECTING,
         TRANSITION.LIBRARY_INTENSITY AS TRANSITION_LIBRARY_INTENSITY,
         TRANSITION.DECOY AS TRANSITION_DECOY
@@ -405,6 +405,7 @@ def convert_osw_to_parquet(infile, outfile, compression_method='zstd', compressi
     """
     transition_df = conn.execute(query).pl()
     if not has_annotation:
+        print(transition_df.select("TRANSITION_ID", "TRANSITION_TYPE", "TRANSITION_ORDINAL", "TRANSITION_CHARGE"))
         transition_df = transition_df.with_columns(
             pl.concat_str([
                 pl.col("TRANSITION_TYPE"),
