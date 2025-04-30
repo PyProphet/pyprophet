@@ -560,17 +560,17 @@ def export(
 @cli.command()
 @click.option('--in', 'infile', required=True, type=click.Path(exists=True), help='PyProphet OSW or sqMass input file.')
 @click.option('--out', 'outfile', required=False, type=click.Path(exists=False), help='Output parquet file.')
-@click.option('--oswfile', 'oswfile', required=False, type=click.Path(exists=False), help='OSW file.')
+@click.option('--oswfile', 'oswfile', required=False, type=click.Path(exists=False), help='PyProphet OSW file. Only required when converting sqMass to parquet.')
 @click.option('--transitionLevel', 'transitionLevel', is_flag=True, help='Whether to export transition level data as well')
 @click.option('--onlyFeatures', 'onlyFeatures', is_flag=True, help='Only include precursors that have a corresponding feature')
 @click.option('--noDecoys', 'noDecoys', is_flag=True, help='Do not include decoys in the exported data')
 # Convert to scoring format
-@click.option('--scoring_format', 'scoring_format', is_flag=True, help='Convert to parquet format that is compatible with the scoring/inference modules')
+@click.option('--scoring_format', 'scoring_format', is_flag=True, help='Convert OSW to parquet format that is compatible with the scoring/inference modules')
 @click.option('--compression', 'compression', default='zstd', show_default=True, type=click.Choice(['lz4', 'uncompressed', 'snappy', 'gzip', 'lzo', 'brotli', 'zstd']), help='Compression algorithm to use for parquet file.')
 @click.option('--compression_level', 'compression_level', default=11, show_default=True, type=int, help='Compression level to use for parquet file.')
 def export_parquet(infile, outfile, oswfile, transitionLevel, onlyFeatures, noDecoys, scoring_format, compression, compression_level):
     """
-    Export all transition data to parquet file or convert to parquet scoring format for scoring and inference.
+    Export OSW or sqMass to parquet format
     """
     # Check if the input file has an .osw extension
     if infile.endswith('.osw'):
