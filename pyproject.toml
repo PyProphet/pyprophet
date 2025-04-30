@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyprophet"
-version = "2.3.2"
+version = "2.3.3"
 description = "PyProphet: Semi-supervised learning and scoring of OpenSWATH results."
 readme = { file = "README.md", content-type = "text/markdown" }
 license = { text = "BSD" }
@@ -26,7 +26,7 @@ dependencies = [
     "duckdb",
     "duckdb-extensions",
     "duckdb-extension-sqlite-scanner",
-    "numpy >= 2.0",
+    "numpy >= 1.26.4",
     "scipy",
     "pandas >= 2.0",
     "polars >= 1.28.1",
