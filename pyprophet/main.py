@@ -420,6 +420,9 @@ def reduce(infile, outfile):
     else:
         outfile = outfile
 
+    if os.path.exists(outfile):
+        click.echo(click.style(f"Warn: {outfile} already exists, will overwrite", fg='yellow'))
+
     reduce_osw(infile, outfile)
 
 
