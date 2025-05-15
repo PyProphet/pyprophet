@@ -565,9 +565,6 @@ def export(
 
             export_tsv(infile, outfile, format, outcsv, transition_quantification, max_transition_pep, ipf, ipf_max_peptidoform_pep, max_rs_peakgroup_qvalue, peptide, max_global_peptide_qvalue, protein, max_global_protein_qvalue)
 
-
-from memory_profiler import profile
-
 # Export to Parquet
 @cli.command()
 @click.option('--in', 'infile', required=True, type=click.Path(exists=True), help='PyProphet OSW or sqMass input file.')
@@ -581,7 +578,6 @@ from memory_profiler import profile
 @click.option('--split_transition_data/--no-split_transition_data', 'split_transition_data', default=False, show_default=True, help='Split transition data into a separate parquet (default: True).')
 @click.option('--compression', 'compression', default='zstd', show_default=True, type=click.Choice(['lz4', 'uncompressed', 'snappy', 'gzip', 'lzo', 'brotli', 'zstd']), help='Compression algorithm to use for parquet file.')
 @click.option('--compression_level', 'compression_level', default=11, show_default=True, type=int, help='Compression level to use for parquet file.')
-@profile
 def export_parquet(infile, outfile, oswfile, transitionLevel, onlyFeatures, noDecoys, scoring_format, split_transition_data, compression, compression_level):
     """
     Export OSW or sqMass to parquet format
@@ -601,7 +597,7 @@ def export_parquet(infile, outfile, oswfile, transitionLevel, onlyFeatures, noDe
             end = time.time()
             mem_after = process.memory_info().rss
             mem_used = mem_after - mem_before
-            click.echo(f"Info: {outfile} written in {end-start:.4f} seconds. Memory used: {format_bytes(mem_used)}")
+            click.echo(f"Info: {outfile} written in {end-start:.4f} seconds. Approx. memory used: {format_bytes(mem_used)}")
         else:
             if transitionLevel:
                 click.echo("Info: Will export transition level data")
@@ -618,9 +614,13 @@ def export_parquet(infile, outfile, oswfile, transitionLevel, onlyFeatures, noDe
         if os.path.exists(outfile):
             click.echo(click.style(f"Warn: {outfile} already exists, will overwrite", fg='yellow'))
         start = time.time()
+        process = psutil.Process(os.getpid())
+        mem_before = process.memory_info().rss
         convert_sqmass_to_parquet(infile, outfile, oswfile, compression_method=compression, compression_level=compression_level)
         end = time.time()
-        click.echo(f"Info: {outfile} written in {end-start:.4f} seconds")
+        mem_after = process.memory_info().rss
+        mem_used = mem_after - mem_before
+        click.echo(f"Info: {outfile} written in {end-start:.4f} seconds. Approx. memory used: {format_bytes(mem_used)}")
     else:
         raise click.ClickException("Input file must be of type .osw or .sqmass/.sqMass")
 
