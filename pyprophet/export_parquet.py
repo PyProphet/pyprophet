@@ -7,6 +7,7 @@ import polars as pl
 from pyprophet.export import check_sqlite_table
 from duckdb_extensions import extension_importer
 import re
+import click
 
 def load_sqlite_scanner():
     """
@@ -346,6 +347,7 @@ def convert_osw_to_parquet(infile, outfile, compression_method='zstd', compressi
     has_annotation = 'ANNOTATION' in transition_columns
     has_im = 'EXP_IM' in feature_columns
 
+    click.echo("Info:  Extracting precursor data...")
     query = f"""
     SELECT 
         PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID AS PROTEIN_ID,
@@ -376,6 +378,7 @@ def convert_osw_to_parquet(infile, outfile, compression_method='zstd', compressi
     """
     precursor_df = conn.execute(query).pl()
 
+    click.echo("Info:  Extracting transition data...")
     query = f"""
     SELECT 
         TRANSITION_PRECURSOR_MAPPING.PRECURSOR_ID AS PRECURSOR_ID,
@@ -407,6 +410,7 @@ def convert_osw_to_parquet(infile, outfile, compression_method='zstd', compressi
     transition_peptide_df = conn.execute("SELECT TRANSITION_ID, PEPTIDE_ID AS PEPTIDE_IPF_ID FROM TRANSITION_PEPTIDE_MAPPING").pl()
     transition_df = transition_df.join(transition_peptide_df, on="TRANSITION_ID", how="full")
 
+    click.echo("Info:  Extracting precursor feature data...")
     feature_df = conn.execute(f"""
     SELECT
         FEATURE.RUN_ID AS RUN_ID,
@@ -431,6 +435,7 @@ def convert_osw_to_parquet(infile, outfile, compression_method='zstd', compressi
     feature_ms2_df = feature_ms2_df[[col.name for col in feature_ms2_df if not col.null_count() == feature_ms2_df.height]]
     feature_ms2_df = feature_ms2_df.rename({col: f"FEATURE_MS2_{col}" for col in feature_ms2_df.columns if col != "FEATURE_ID"})
 
+    click.echo("Info:  Extracting feature transition data...")
     feature_transition_df = conn.execute("SELECT * FROM FEATURE_TRANSITION").pl()
     feature_transition_df = feature_transition_df[[col.name for col in feature_transition_df if not col.null_count() == feature_transition_df.height]]
     feature_transition_df = feature_transition_df.rename({col: f"FEATURE_TRANSITION_{col}" for col in feature_transition_df.columns if col not in ["FEATURE_ID", "TRANSITION_ID"]})
@@ -453,10 +458,13 @@ def convert_osw_to_parquet(infile, outfile, compression_method='zstd', compressi
 
     if split_transition_data:
         os.makedirs(outfile, exist_ok=True)
+        click.echo(f"Info: Joining precursor and feature data...")
         master_df = precursor_df.join(feature_df, on="PRECURSOR_ID", how="full")
         master_df = master_df.filter(~(pl.col("RUN_ID").is_null() & pl.col("FEATURE_ID").is_null()))
         master_df = master_df.with_columns(pl.col("RUN_ID").cast(pl.Int64), pl.col("FEATURE_ID").cast(pl.Int64))
+        click.echo(f"Info: Writing out {os.path.join(outfile, 'precursors_features.parquet')}")
         master_df.write_parquet(os.path.join(outfile, "precursors_features.parquet"), compression=compression_method, compression_level=compression_level)
+        click.echo(f"Info: Writing out {os.path.join(outfile, 'transition_features.parquet')}")
         feature_transition_df.write_parquet(os.path.join(outfile, "transition_features.parquet"), compression=compression_method, compression_level=compression_level)
     else:
         feature_df = feature_df.join(feature_transition_df, on=["PRECURSOR_ID", "FEATURE_ID"], how="left")
