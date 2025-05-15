@@ -441,16 +441,25 @@ def convert_osw_to_parquet(infile, outfile, compression_method='zstd', compressi
     feature_transition_df = feature_transition_df.rename({col: f"FEATURE_TRANSITION_{col}" for col in feature_transition_df.columns if col not in ["FEATURE_ID", "TRANSITION_ID"]})
     feature_transition_df = feature_transition_df.with_columns(pl.col("FEATURE_ID").cast(pl.Utf8))
 
-    feature_transition_df = transition_df.join(feature_transition_df, on="TRANSITION_ID", how="left")
-    
-    # Drop TRANSITION_ID_right column
-    feature_transition_df = feature_transition_df.drop("TRANSITION_ID_right")
+    # Filter out rows with null FEATURE_ID early to reduce join size
+    feature_transition_df = feature_transition_df.filter(pl.col("FEATURE_ID").is_not_null())
 
+    # Perform a minimal join keeping only necessary columns
+    feature_transition_df = feature_transition_df.join(
+        transition_df.select([
+            "TRANSITION_ID", "PRECURSOR_ID", "TRANSITION_TRAML_ID", "PRODUCT_MZ", "TRANSITION_CHARGE",
+            "TRANSITION_TYPE", "TRANSITION_ORDINAL", "ANNOTATION", "TRANSITION_DETECTING",
+            "TRANSITION_LIBRARY_INTENSITY", "TRANSITION_DECOY", "PEPTIDE_IPF_ID"
+        ]),
+        on="TRANSITION_ID",
+        how="inner"  # inner is sufficient now since we filtered null FEATURE_IDs
+    )
+
+    # Reduce memory pressure by projecting only needed columns
     group_cols = ["PRECURSOR_ID", "FEATURE_ID"]
     array_cols = [c for c in feature_transition_df.columns if c not in group_cols]
-    feature_transition_df = feature_transition_df.group_by(group_cols).agg(
-        [pl.col(c).alias(c) for c in array_cols]  # No need for .list() here
-    )
+    feature_transition_df = feature_transition_df.group_by(group_cols).agg([pl.col(c) for c in array_cols])
+
 
     feature_df = feature_df.join(feature_ms1_df, on="FEATURE_ID", how="left")
     feature_df = feature_df.join(feature_ms2_df, on="FEATURE_ID", how="left")
