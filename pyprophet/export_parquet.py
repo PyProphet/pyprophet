@@ -1,9 +1,11 @@
 import os
+import time
 import duckdb
 import sqlite3
 import numpy as np
 import pandas as pd
 import polars as pl
+import psutil
 from pyprophet.export import check_sqlite_table
 from duckdb_extensions import extension_importer
 import re
@@ -435,31 +437,68 @@ def convert_osw_to_parquet(infile, outfile, compression_method='zstd', compressi
     feature_ms2_df = feature_ms2_df[[col.name for col in feature_ms2_df if not col.null_count() == feature_ms2_df.height]]
     feature_ms2_df = feature_ms2_df.rename({col: f"FEATURE_MS2_{col}" for col in feature_ms2_df.columns if col != "FEATURE_ID"})
 
-    click.echo("Info:  Extracting feature transition data...")
-    feature_transition_df = conn.execute("SELECT * FROM FEATURE_TRANSITION").pl()
-    feature_transition_df = feature_transition_df[[col.name for col in feature_transition_df if not col.null_count() == feature_transition_df.height]]
-    feature_transition_df = feature_transition_df.rename({col: f"FEATURE_TRANSITION_{col}" for col in feature_transition_df.columns if col not in ["FEATURE_ID", "TRANSITION_ID"]})
-    feature_transition_df = feature_transition_df.with_columns(pl.col("FEATURE_ID").cast(pl.Utf8))
+    click.echo("Info:  Extracting feature transition data (chunked)...")
 
-    # Filter out rows with null FEATURE_ID early to reduce join size
-    feature_transition_df = feature_transition_df.filter(pl.col("FEATURE_ID").is_not_null())
+    process = psutil.Process(os.getpid())
+    transition_ids = conn.execute("SELECT DISTINCT TRANSITION_ID FROM FEATURE_TRANSITION").pl()["TRANSITION_ID"].to_list()
+    chunk_size = 500_000
+    feature_transition_chunks = []
 
-    # Perform a minimal join keeping only necessary columns
-    feature_transition_df = feature_transition_df.join(
-        transition_df.select([
-            "TRANSITION_ID", "PRECURSOR_ID", "TRANSITION_TRAML_ID", "PRODUCT_MZ", "TRANSITION_CHARGE",
-            "TRANSITION_TYPE", "TRANSITION_ORDINAL", "ANNOTATION", "TRANSITION_DETECTING",
-            "TRANSITION_LIBRARY_INTENSITY", "TRANSITION_DECOY", "PEPTIDE_IPF_ID"
-        ]),
-        on="TRANSITION_ID",
-        how="inner"  # inner is sufficient now since we filtered null FEATURE_IDs
-    )
+    total_mem_used = 0
+    max_mem_used = 0
+    start_time = time.time()
 
-    # Reduce memory pressure by projecting only needed columns
+    for i in range(0, len(transition_ids), chunk_size):
+        chunk_start = time.time()
+        mem_before = process.memory_info().rss
+
+        chunk_ids = transition_ids[i:i + chunk_size]
+        id_list_sql = "(" + ",".join(map(str, chunk_ids)) + ")"
+        chunk_query = f"SELECT * FROM FEATURE_TRANSITION WHERE TRANSITION_ID IN {id_list_sql}"
+        chunk_df = conn.execute(chunk_query).pl()
+
+        chunk_df = chunk_df[[col.name for col in chunk_df if not col.null_count() == chunk_df.height]]
+        chunk_df = chunk_df.rename({
+            col: f"FEATURE_TRANSITION_{col}" for col in chunk_df.columns if col not in ["FEATURE_ID", "TRANSITION_ID"]
+        }).with_columns(pl.col("FEATURE_ID").cast(pl.Utf8))
+        chunk_df = chunk_df.filter(pl.col("FEATURE_ID").is_not_null())
+
+        joined = chunk_df.join(
+            transition_df.select([
+                "TRANSITION_ID", "PRECURSOR_ID", "TRANSITION_TRAML_ID", "PRODUCT_MZ", "TRANSITION_CHARGE",
+                "TRANSITION_TYPE", "TRANSITION_ORDINAL", "ANNOTATION", "TRANSITION_DETECTING",
+                "TRANSITION_LIBRARY_INTENSITY", "TRANSITION_DECOY", "PEPTIDE_IPF_ID"
+            ]),
+            on="TRANSITION_ID",
+            how="inner"
+        )
+
+        feature_transition_chunks.append(joined)
+
+        mem_after = process.memory_info().rss
+        mem_used = mem_after - mem_before
+        total_mem_used += mem_used
+        max_mem_used = max(max_mem_used, mem_used)
+        chunk_time = time.time() - chunk_start
+
+        click.echo(f"  - Processed chunk {i//chunk_size + 1}/{(len(transition_ids)-1)//chunk_size + 1} "
+                f"in {chunk_time:.2f}s, memory used: {mem_used / (1024**2):.2f} MB")
+
+    # Concatenate all
+    concat_start = time.time()
+    feature_transition_df = pl.concat(feature_transition_chunks, how="vertical")
+    concat_time = time.time() - concat_start
+
+    # Aggregate
     group_cols = ["PRECURSOR_ID", "FEATURE_ID"]
     array_cols = [c for c in feature_transition_df.columns if c not in group_cols]
     feature_transition_df = feature_transition_df.group_by(group_cols).agg([pl.col(c) for c in array_cols])
 
+    total_time = time.time() - start_time
+    click.echo(f"Info: Feature transition extraction complete in {total_time:.2f}s")
+    click.echo(f"Info: Total memory used across chunks: {total_mem_used / (1024**2):.2f} MB")
+    click.echo(f"Info: Peak memory used in a single chunk: {max_mem_used / (1024**2):.2f} MB")
+    click.echo(f"Info: Grouping took {concat_time:.2f}s")
 
     feature_df = feature_df.join(feature_ms1_df, on="FEATURE_ID", how="left")
     feature_df = feature_df.join(feature_ms2_df, on="FEATURE_ID", how="left")
@@ -467,7 +506,7 @@ def convert_osw_to_parquet(infile, outfile, compression_method='zstd', compressi
 
     if split_transition_data:
         os.makedirs(outfile, exist_ok=True)
-        click.echo(f"Info: Joining precursor and feature data...")
+        click.echo("Info: Joining precursor and feature data...")
         master_df = precursor_df.join(feature_df, on="PRECURSOR_ID", how="full")
         master_df = master_df.filter(~(pl.col("RUN_ID").is_null() & pl.col("FEATURE_ID").is_null()))
         master_df = master_df.with_columns(pl.col("RUN_ID").cast(pl.Int64), pl.col("FEATURE_ID").cast(pl.Int64))
