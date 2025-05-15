@@ -1,3 +1,4 @@
+import os
 import duckdb
 import sqlite3
 import numpy as np
@@ -291,7 +292,7 @@ def export_to_parquet(infile, outfile, transitionLevel=False, onlyFeatures=False
     condb.sql(query).write_parquet(outfile)
 
 
-def convert_osw_to_parquet(infile, outfile, compression_method='zstd', compression_level=11):
+def convert_osw_to_parquet(infile, outfile, compression_method='zstd', compression_level=11, split_transition_data=True):
     '''
     Convert an OSW sqlite file to Parquet format
     
@@ -550,39 +551,79 @@ def convert_osw_to_parquet(infile, outfile, compression_method='zstd', compressi
         pl.col("FEATURE_ID").cast(pl.Utf8),
         pl.col("RUN_ID").cast(pl.Utf8)
     )
+    
+    if  split_transition_data:
+        os.makedirs(outfile, exist_ok=True)
+        
+        # Merge precursor data with feature data
+        master_df = precursor_df.join(
+            feature_df, 
+            on="PRECURSOR_ID", 
+            how="full",
+            coalesce=True
+        )
+        master_df = master_df.filter(
+            ~(pl.col("RUN_ID").is_null() & pl.col("FEATURE_ID").is_null())
+        )
+        master_df = master_df[[s.name for s in master_df if not (s.null_count() == master_df.height)]]
+        master_df = master_df.with_columns(
+            pl.col("RUN_ID").cast(pl.Int64),
+            pl.col("FEATURE_ID").cast(pl.Int64)
+        )
+        
+        # Write precursor/feature-level data
+        master_df.write_parquet(
+            os.path.join(outfile, "precursors_features.parquet"),
+            compression=compression_method,
+            compression_level=compression_level
+        )
+        
+        # Write transition-level data (after collapsing)
+        feature_transition_df.write_parquet(
+            os.path.join(outfile, "transition_features.parquet"),
+            compression=compression_method,
+            compression_level=compression_level
+        )
+    else:
+        # Merge collapsed transition feature data
+        feature_df = feature_df.join(
+            feature_transition_df,
+            on=["PRECURSOR_ID", "FEATURE_ID"],
+            how="left", 
+            coalesce=True
+        )
 
-    # Merge collapsed transition feature data
-    feature_df = feature_df.join(
-        feature_transition_df,
-        on=["PRECURSOR_ID", "FEATURE_ID"],
-        how="left", 
-        coalesce=True
-    )
+        # Merge precursor data with feature data
+        master_df = precursor_df.join(
+            feature_df, 
+            on="PRECURSOR_ID", 
+            how="full",
+            coalesce=True
+        )
+        master_df = master_df.filter(
+            ~(pl.col("RUN_ID").is_null() & pl.col("FEATURE_ID").is_null())
+        )
+        master_df = master_df[[s.name for s in master_df if not (s.null_count() == master_df.height)]]
+        master_df = master_df.with_columns(
+            pl.col("RUN_ID").cast(pl.Int64),
+            pl.col("FEATURE_ID").cast(pl.Int64)
+        )
 
-    # Merge precursor data with feature data
-    master_df = precursor_df.join(
-        feature_df, 
-        on="PRECURSOR_ID", 
-        how="full",
-        coalesce=True
-    )
-    master_df = master_df.filter(
-        ~(pl.col("RUN_ID").is_null() & pl.col("FEATURE_ID").is_null())
-    )
-    master_df = master_df[[s.name for s in master_df if not (s.null_count() == master_df.height)]]
-    master_df = master_df.with_columns(
-        pl.col("RUN_ID").cast(pl.Int64),
-        pl.col("FEATURE_ID").cast(pl.Int64)
-    )
+        conn.close()
+    
+        # Merge collapsed transition data back into the master
+        master_df = master_df.join(
+            feature_transition_df,
+            on=["PRECURSOR_ID", "FEATURE_ID"],
+            how="left",
+            coalesce=True
+        )
+        master_df.write_parquet(
+            os.path.join(outfile),
+            compression=compression_method,
+            compression_level=compression_level
+        )
 
-    conn.close()
-
-    # Write to parquet
-    master_df.write_parquet(
-        outfile,
-        compression=compression_method,
-        compression_level=compression_level
-    )
 
 
 def convert_sqmass_to_parquet(

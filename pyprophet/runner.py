@@ -8,6 +8,7 @@ import pandas as pd
 import numpy as np
 import polars as pl
 import sqlite3
+import duckdb
 import pickle
 
 from .pyprophet import PyProphet
@@ -991,194 +992,125 @@ class PyProphetRunner(object):
         if self.infile != self.outfile:
             copyfile(self.infile, self.outfile)
 
-        if self.level == "ms2" or self.level == "ms1ms2":
-            # Read the parquet file
-            init_df = pl.read_parquet(self.outfile)
+        con = duckdb.connect()
+        con.execute(f"INSTALL parquet; LOAD parquet;")
+        con.execute(f"CREATE TABLE raw_data AS SELECT * FROM parquet_scan('{self.outfile}')")
 
-            # Check and drop SCORE_MS2_ columns if they exist
-            score_ms2_cols = [col for col in init_df.columns if col.startswith("SCORE_MS2_")]
-            if score_ms2_cols:
-                click.echo(click.style("Warn: Dropping existing SCORE_MS2_ columns from the output file.", fg='yellow'))
-                init_df = init_df.drop(score_ms2_cols)
+        score_df = result.scored_tables.copy()
+        score_df.columns = [c.lower() for c in score_df.columns]
 
-            # Process the result scores
-            df = pl.from_pandas(result.scored_tables)
-            if 'h_score' in df.columns:
-                df = df.select([
-                    'feature_id', 'd_score', 'h_score', 'h0_score',
-                    'peak_group_rank', 'p_value', 'q_value', 'pep'
-                ])
-                df.columns = ['FEATURE_ID', 'SCORE', 'HSCORE', 'H0SCORE', 
-                            'RANK', 'PVALUE', 'QVALUE', 'PEP']
-            else:
-                df = df.select([
-                    'feature_id', 'd_score', 'peak_group_rank',
-                    'p_value', 'q_value', 'pep'
-                ])
-                df.columns = ['FEATURE_ID', 'SCORE', 'RANK', 'PVALUE', 'QVALUE', 'PEP']
+        con.register("scores", score_df)
 
-            # Add SCORE_MS2_ prefix to columns except FEATURE_ID
-            new_columns = ['FEATURE_ID'] + [f'SCORE_MS2_{col}' for col in df.columns[1:]]
-            df = df.rename(dict(zip(df.columns, new_columns)))
+        if self.level in ("ms2", "ms1ms2"):
+            level_prefix = "score_ms2"
+            base_cols = ['feature_id', 'd_score', 'peak_group_rank', 'p_value', 'q_value', 'pep']
+            if 'h_score' in score_df.columns:
+                base_cols += ['h_score', 'h0_score']
+            score_cols = [f"{level_prefix}_{col.upper()}" for col in base_cols if col != 'feature_id']
 
-            # Merge with initial dataframe
-            df = init_df.join(df, on='FEATURE_ID', how='left', coalesce=True)
+            con.execute(f"""
+                CREATE OR REPLACE TABLE merged AS
+                SELECT
+                    r.*,
+                    s.d_score AS {level_prefix}_score,
+                    s.peak_group_rank AS {level_prefix}_rank,
+                    s.p_value AS {level_prefix}_pvalue,
+                    s.q_value AS {level_prefix}_qvalue,
+                    s.pep AS {level_prefix}_pep
+                    {", s.h_score AS " + level_prefix + "_hscore" if 'h_score' in score_df.columns else ""}
+                    {", s.h0_score AS " + level_prefix + "_h0score" if 'h0_score' in score_df.columns else ""}
+                FROM raw_data r
+                LEFT JOIN scores s ON r.feature_id = s.feature_id
+            """)
 
-            # Write to parquet
-            df.write_parquet(
-                self.outfile,
-                compression="zstd",
-                compression_level=11
-            )
         elif self.level == "ms1":
-            # Read the parquet file
-            init_df = pl.read_parquet(self.outfile)
+            level_prefix = "score_ms1"
+            base_cols = ['feature_id', 'd_score', 'peak_group_rank', 'p_value', 'q_value', 'pep']
+            if 'h_score' in score_df.columns:
+                base_cols += ['h_score', 'h0_score']
+            score_cols = [f"{level_prefix}_{col.upper()}" for col in base_cols if col != 'feature_id']
 
-            # Check and drop SCORE_MS1_ columns if they exist
-            score_ms1_cols = [col for col in init_df.columns if col.startswith("SCORE_MS1_")]
-            if score_ms1_cols:
-                click.echo(click.style("Warn: Dropping existing SCORE_MS1_ columns from the output file.", fg='yellow'))
-                init_df = init_df.drop(score_ms1_cols)
+            con.execute(f"""
+                CREATE OR REPLACE TABLE merged AS
+                SELECT
+                    r.*,
+                    s.d_score AS {level_prefix}_score,
+                    s.peak_group_rank AS {level_prefix}_rank,
+                    s.p_value AS {level_prefix}_pvalue,
+                    s.q_value AS {level_prefix}_qvalue,
+                    s.pep AS {level_prefix}_pep
+                    {", s.h_score AS " + level_prefix + "_hscore" if 'h_score' in score_df.columns else ""}
+                    {", s.h0_score AS " + level_prefix + "_h0score" if 'h0_score' in score_df.columns else ""}
+                FROM raw_data r
+                LEFT JOIN scores s ON r.feature_id = s.feature_id
+            """)
 
-            # Process the result scores
-            df = pl.from_pandas(result.scored_tables)
-            if 'h_score' in df.columns:
-                df = df.select([
-                    'feature_id', 'd_score', 'h_score', 'h0_score',
-                    'peak_group_rank', 'p_value', 'q_value', 'pep'
-                ])
-                df = df.rename({
-                    'feature_id': 'FEATURE_ID',
-                    'd_score': 'SCORE',
-                    'h_score': 'HSCORE',
-                    'h0_score': 'H0SCORE',
-                    'peak_group_rank': 'RANK',
-                    'p_value': 'PVALUE',
-                    'q_value': 'QVALUE',
-                    'pep': 'PEP'
-                })
-            else:
-                df = df.select([
-                    'feature_id', 'd_score', 'peak_group_rank',
-                    'p_value', 'q_value', 'pep'
-                ])
-                df = df.rename({
-                    'feature_id': 'FEATURE_ID',
-                    'd_score': 'SCORE',
-                    'peak_group_rank': 'RANK',
-                    'p_value': 'PVALUE',
-                    'q_value': 'QVALUE',
-                    'pep': 'PEP'
-                })
-
-            # Add SCORE_MS1_ prefix to columns except FEATURE_ID
-            new_columns = {
-                col: f'SCORE_MS1_{col}' if col != 'FEATURE_ID' else col
-                for col in df.columns
-            }
-            df = df.rename(new_columns)
-
-            # Merge with initial dataframe
-            df = init_df.join(df, on='FEATURE_ID', how='left')
-
-            # Write to parquet
-            df.write_parquet(
-                self.outfile,
-                compression="zstd",
-                compression_level=11
-            )
         elif self.level == "transition":
-            # Read the parquet file
-            init_df = pl.read_parquet(self.outfile)
+            level_prefix = "score_transition"
+            con.execute("""
+                CREATE OR REPLACE TABLE exploded AS
+                SELECT
+                    feature_id,
+                    unnest(transition_id) AS transition_id,
+                    *
+                FROM raw_data
+            """)
 
-            # Check and drop SCORE_TRANSITION_ columns if they exist
-            score_transition_cols = [col for col in init_df.columns if col.startswith("SCORE_TRANSITION_")]
-            if score_transition_cols:
-                click.echo(click.style("Warn: Dropping existing SCORE_TRANSITION_ columns from the output file.", fg='yellow'))
-                init_df = init_df.drop(score_transition_cols)
+            con.execute(f"""
+                CREATE OR REPLACE TABLE merged_exploded AS
+                SELECT
+                    e.*,
+                    s.d_score AS {level_prefix}_score,
+                    s.peak_group_rank AS {level_prefix}_rank,
+                    s.p_value AS {level_prefix}_pvalue,
+                    s.q_value AS {level_prefix}_qvalue,
+                    s.pep AS {level_prefix}_pep
+                FROM exploded e
+                LEFT JOIN scores s
+                ON e.feature_id = s.feature_id AND e.transition_id = s.transition_id
+            """)
 
-            # Get TRANSITION_ and FEATURE_TRANSITION_ columns and explode them
-            transition_cols = [col for col in init_df.columns if col.startswith('TRANSITION_') or col.startswith('FEATURE_TRANSITION_')]
-            transition_cols+=['PRODUCT_MZ', 'ANNOTATION', 'PEPTIDE_IPF_ID']
-            
-            # Create sub_init_df with only the transition columns to explode
-            sub_init_df = init_df.select(['PRECURSOR_ID', 'FEATURE_ID']+transition_cols)
-            sub_init_df = sub_init_df.explode(transition_cols)
-            
-            # Drop transition_cols from init_df
-            init_df = init_df.drop(transition_cols)
+            con.execute("""
+                CREATE OR REPLACE TABLE merged AS
+                SELECT * FROM merged_exploded
+            """)
 
-            # Process the scored tables
-            df = pl.DataFrame(result.scored_tables).select([
-                'feature_id', 'transition_id', 'd_score', 
-                'peak_group_rank', 'p_value', 'q_value', 'pep'
-            ]).rename({
-                'feature_id': 'FEATURE_ID',
-                'transition_id': 'TRANSITION_ID',
-                'd_score': 'SCORE',
-                'peak_group_rank': 'RANK',
-                'p_value': 'PVALUE',
-                'q_value': 'QVALUE',
-                'pep': 'PEP'
-            })
+        # Write to parquet
+        con.execute(f"""
+            COPY merged TO '{self.outfile}' (FORMAT 'parquet', COMPRESSION 'zstd')
+        """)
+        con.close()
 
-            # Add SCORE_TRANSITION_ prefix to columns except FEATURE_ID and TRANSITION_ID
-            df = df.rename({
-                col: f'SCORE_TRANSITION_{col}' 
-                for col in df.columns 
-                if col not in ['FEATURE_ID', 'TRANSITION_ID']
-            })
+        click.echo(f"Info: {self.outfile} written.")
 
-            # Merge with initial dataframe
-            df = sub_init_df.join(
-                df, 
-                on=['FEATURE_ID', 'TRANSITION_ID'], 
-                how='left',
-                coalesce=True
-            )
-            
-            del sub_init_df
-
-            # Identify columns to group by (non-transition columns except PRODUCT_MZ and ANNOTATION)
-            collapse_columns = [
-                col for col in df.columns 
-                if not any(col.startswith(prefix) for prefix in ['TRANSITION_', 'FEATURE_TRANSITION_', 'SCORE_TRANSITION_'])
-                and col not in ['PRODUCT_MZ', 'ANNOTATION', 'PEPTIDE_IPF_ID']
-            ]
-
-            # Group and aggregate
-            df = df.group_by(collapse_columns).agg(pl.all())
-            
-            # Merge with init_df
-            df = init_df.join(
-                df, 
-                on=['PRECURSOR_ID', 'FEATURE_ID'], 
-                how='left',
-                coalesce=True
-            )
-            
-            del init_df
-
-            # Write to parquet
-            df.write_parquet(
-                self.outfile,
-                compression="zstd",
-                compression_level=11
-            )
-        
-        click.echo("Info: %s written." % self.outfile)
-        
         if result.final_statistics is not None:
             cutoffs = result.final_statistics["cutoff"].values
             svalues = result.final_statistics["svalue"].values
             qvalues = result.final_statistics["qvalue"].values
 
-            pvalues = result.scored_tables.loc[(result.scored_tables.peak_group_rank == 1) & (result.scored_tables.decoy == 0)]["p_value"].values
-            top_targets = result.scored_tables.loc[(result.scored_tables.peak_group_rank == 1) & (result.scored_tables.decoy == 0)]["d_score"].values
-            top_decoys = result.scored_tables.loc[(result.scored_tables.peak_group_rank == 1) & (result.scored_tables.decoy == 1)]["d_score"].values
+            pvalues = result.scored_tables.loc[
+                (result.scored_tables.peak_group_rank == 1) & (result.scored_tables.decoy == 0)
+            ]["p_value"].values
+            top_targets = result.scored_tables.loc[
+                (result.scored_tables.peak_group_rank == 1) & (result.scored_tables.decoy == 0)
+            ]["d_score"].values
+            top_decoys = result.scored_tables.loc[
+                (result.scored_tables.peak_group_rank == 1) & (result.scored_tables.decoy == 1)
+            ]["d_score"].values
 
-            save_report(os.path.join(self.prefix + "_" + self.level + "_report.pdf"), self.outfile, top_decoys, top_targets, cutoffs, svalues, qvalues, pvalues, pi0, self.color_palette)
-            click.echo("Info: %s written." % os.path.join(self.prefix + "_" + self.level + "_report.pdf"))
+            save_report(
+                os.path.join(f"{self.prefix}_{self.level}_report.pdf"),
+                self.outfile,
+                top_decoys,
+                top_targets,
+                cutoffs,
+                svalues,
+                qvalues,
+                pvalues,
+                pi0,
+                self.color_palette,
+            )
+            click.echo(f"Info: {self.prefix}_{self.level}_report.pdf written.")
 
 class PyProphetLearner(PyProphetRunner):
 
