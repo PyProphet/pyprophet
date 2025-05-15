@@ -3,6 +3,7 @@ import numpy as np
 import click
 import sys
 import os
+import psutil
 import pathlib
 import ast
 import time
@@ -29,6 +30,15 @@ try:
 except NameError:
     def profile(fun):
         return fun
+
+
+
+def format_bytes(size):
+    for unit in ['B', 'KB', 'MB', 'GB']:
+        if size < 1024.0:
+            return f"{size:.2f} {unit}"
+        size /= 1024.0
+    return f"{size:.2f} TB"
 
 
 @click.group(chain=True)
@@ -556,6 +566,8 @@ def export(
             export_tsv(infile, outfile, format, outcsv, transition_quantification, max_transition_pep, ipf, ipf_max_peptidoform_pep, max_rs_peakgroup_qvalue, peptide, max_global_peptide_qvalue, protein, max_global_protein_qvalue)
 
 
+from memory_profiler import profile
+
 # Export to Parquet
 @cli.command()
 @click.option('--in', 'infile', required=True, type=click.Path(exists=True), help='PyProphet OSW or sqMass input file.')
@@ -566,9 +578,11 @@ def export(
 @click.option('--noDecoys', 'noDecoys', is_flag=True, help='Do not include decoys in the exported data')
 # Convert to scoring format
 @click.option('--scoring_format', 'scoring_format', is_flag=True, help='Convert OSW to parquet format that is compatible with the scoring/inference modules')
+@click.option('--split_transition_data/--no-split_transition_data', 'split_transition_data', default=False, show_default=True, help='Split transition data into a separate parquet (default: True).')
 @click.option('--compression', 'compression', default='zstd', show_default=True, type=click.Choice(['lz4', 'uncompressed', 'snappy', 'gzip', 'lzo', 'brotli', 'zstd']), help='Compression algorithm to use for parquet file.')
 @click.option('--compression_level', 'compression_level', default=11, show_default=True, type=int, help='Compression level to use for parquet file.')
-def export_parquet(infile, outfile, oswfile, transitionLevel, onlyFeatures, noDecoys, scoring_format, compression, compression_level):
+@profile
+def export_parquet(infile, outfile, oswfile, transitionLevel, onlyFeatures, noDecoys, scoring_format, split_transition_data, compression, compression_level):
     """
     Export OSW or sqMass to parquet format
     """
@@ -578,10 +592,16 @@ def export_parquet(infile, outfile, oswfile, transitionLevel, onlyFeatures, noDe
             click.echo("Info: Will export OSW to parquet scoring format")
             if os.path.exists(outfile):
                 click.echo(click.style(f"Warn: {outfile} already exists, will overwrite", fg='yellow'))
+            if split_transition_data:
+                click.echo(f"Info: {outfile} will be a directory containing a separate precursors_features.parquet and a transition_features.parquet")
             start = time.time()
-            convert_osw_to_parquet(infile, outfile, compression_method=compression, compression_level=compression_level)
+            process = psutil.Process(os.getpid())
+            mem_before = process.memory_info().rss
+            convert_osw_to_parquet(infile, outfile, compression_method=compression, compression_level=compression_level, split_transition_data=split_transition_data)
             end = time.time()
-            click.echo(f"Info: {outfile} written in {end-start:.4f} seconds")
+            mem_after = process.memory_info().rss
+            mem_used = mem_after - mem_before
+            click.echo(f"Info: {outfile} written in {end-start:.4f} seconds. Memory used: {format_bytes(mem_used)}")
         else:
             if transitionLevel:
                 click.echo("Info: Will export transition level data")
