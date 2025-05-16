@@ -1,3 +1,4 @@
+import gc
 import os
 import time
 import duckdb
@@ -12,6 +13,7 @@ from pyprophet.export import check_sqlite_table
 from duckdb_extensions import extension_importer
 import re
 import click
+from pyprophet.data_handling import format_bytes
 
 def load_sqlite_scanner():
     """
@@ -74,7 +76,7 @@ def export_to_parquet(infile, outfile, transitionLevel=False, onlyFeatures=False
         None
     '''
     load_sqlite_scanner()
-        
+
     condb = duckdb.connect(infile)
     con = sqlite3.connect(infile)
 
@@ -102,22 +104,20 @@ def export_to_parquet(infile, outfile, transitionLevel=False, onlyFeatures=False
     '''
 
     if check_sqlite_table(con, "FEATURE_MS1"):
-      idx_query += "CREATE INDEX IF NOT EXISTS idx_feature_ms1_feature_id ON FEATURE_MS1 (FEATURE_ID);"
+        idx_query += "CREATE INDEX IF NOT EXISTS idx_feature_ms1_feature_id ON FEATURE_MS1 (FEATURE_ID);"
     if check_sqlite_table(con, "FEATURE_MS2"):
-      idx_query += "CREATE INDEX IF NOT EXISTS idx_feature_ms2_feature_id ON FEATURE_MS2 (FEATURE_ID);"
+        idx_query += "CREATE INDEX IF NOT EXISTS idx_feature_ms2_feature_id ON FEATURE_MS2 (FEATURE_ID);"
     if check_sqlite_table(con, "SCORE_MS2"):
-      idx_query += "CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);"
+        idx_query += "CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);"
     if check_sqlite_table(con, "SCORE_PEPTIDE"):
-      idx_query += "CREATE INDEX IF NOT EXISTS idx_score_peptide_peptide_id ON SCORE_PEPTIDE (PEPTIDE_ID);"
-      idx_query += "CREATE INDEX IF NOT EXISTS idx_score_peptide_run_id ON SCORE_PEPTIDE (RUN_ID);"
+        idx_query += "CREATE INDEX IF NOT EXISTS idx_score_peptide_peptide_id ON SCORE_PEPTIDE (PEPTIDE_ID);"
+        idx_query += "CREATE INDEX IF NOT EXISTS idx_score_peptide_run_id ON SCORE_PEPTIDE (RUN_ID);"
     if check_sqlite_table(con, "SCORE_PROTEIN"):
-      idx_query += "CREATE INDEX IF NOT EXISTS idx_score_protein_protein_id ON SCORE_PROTEIN (PROTEIN_ID);"
-      idx_query += "CREATE INDEX IF NOT EXISTS idx_score_protein_run_id ON SCORE_PROTEIN (RUN_ID);"
+        idx_query += "CREATE INDEX IF NOT EXISTS idx_score_protein_protein_id ON SCORE_PROTEIN (PROTEIN_ID);"
+        idx_query += "CREATE INDEX IF NOT EXISTS idx_score_protein_run_id ON SCORE_PROTEIN (RUN_ID);"
     if check_sqlite_table(con, "SCORE_GENE"):
-      idx_query += "CREATE INDEX IF NOT EXISTS idx_score_gene_gene_id ON SCORE_GENE (GENE_ID);"
-      idx_query += "CREATE INDEX IF NOT EXISTS idx_score_gene_run_id ON SCORE_GENE (RUN_ID);"
-    
-
+        idx_query += "CREATE INDEX IF NOT EXISTS idx_score_gene_gene_id ON SCORE_GENE (GENE_ID);"
+        idx_query += "CREATE INDEX IF NOT EXISTS idx_score_gene_run_id ON SCORE_GENE (RUN_ID);"
 
     con.executescript(idx_query) # Add indices
 
@@ -131,7 +131,6 @@ def export_to_parquet(infile, outfile, transitionLevel=False, onlyFeatures=False
 
         con.executescript(idx_transition_query)
 
- 
     ## Check if Gene tables are present
     if check_sqlite_table(con, "GENE"):
         gene_table_joins = '''
@@ -140,20 +139,18 @@ def export_to_parquet(infile, outfile, transitionLevel=False, onlyFeatures=False
         '''
     else:
         gene_table_joins = ''
-    
 
-  
     # check if IM columns exist
     query = con.execute("select count(*) as cntrec from pragma_table_info('feature_MS2') where name='EXP_IM'")
     hasIm = query.fetchone()[0] > 0
-  
+
     # since do not want all of the columns (some columns are twice per table) manually select the columns want in a list, (note do not want decoy)
     # note TRAML_ID for precursor and transition are not the same
     columns = {}
     gene_table_joins = ''
     pepJoin = ''
     protJoin = ''
-    ## library 
+    ## library
     columns['PRECURSOR'] = ['TRAML_ID', 'GROUP_LABEL', 'PRECURSOR_MZ', 'CHARGE', 'LIBRARY_INTENSITY', 'LIBRARY_RT', 'DECOY']
     if hasIm:
         columns['PRECURSOR'].append("LIBRARY_DRIFT_TIME")
@@ -178,7 +175,7 @@ def export_to_parquet(infile, outfile, transitionLevel=False, onlyFeatures=False
         columns['FEATURE_MS2'] = columns['FEATURE_MS2'] + imColumns
         columns['FEATURE_MS1'] = columns['FEATURE_MS1'] + imColumns
 
-    ### pyprophet scores 
+    ### pyprophet scores
     columns['SCORE_MS2'] = ["SCORE", "RANK", "PVALUE", "QVALUE", "PEP"]
 
     # Check for Peptide/Protein scores Context Scores
@@ -189,7 +186,6 @@ def export_to_parquet(infile, outfile, transitionLevel=False, onlyFeatures=False
         columns['pepTable_nonGlobal'] = list(set(pepTable_nonGlobal.columns).difference(set(['PEPTIDE_ID', 'RUN_ID']))) # all columns except PEPTIDE_ID and RUN_ID
         columns['pepTable_global'] = list(set(pepTable_global.columns).difference(set(['PEPTIDE_ID']))) # all columns except PEPTIDE_ID and RUN_ID
 
-
     if check_sqlite_table(con, "SCORE_PROTEIN"):
         protTable_global, protTable_nonGlobal = getPeptideProteinScoreTable(condb, "protein")
         protJoin = '''LEFT JOIN protTable_nonGlobal ON protTable_nonGlobal.PROTEIN_ID = PROTEIN.ID and protTable_nonGlobal.RUN_ID = RUN.ID
@@ -199,7 +195,6 @@ def export_to_parquet(infile, outfile, transitionLevel=False, onlyFeatures=False
 
     ## other
     columns['RUN'] = ['FILENAME']
-
 
     ## mappings
     columns['PRECURSOR_PEPTIDE_MAPPING'] = ['PEPTIDE_ID', 'PRECURSOR_ID']
@@ -213,9 +208,9 @@ def export_to_parquet(infile, outfile, transitionLevel=False, onlyFeatures=False
         columns['TRANSITION'] = ['TRAML_ID', 'PRODUCT_MZ', 'CHARGE', 'TYPE', 'ORDINAL', 'DETECTING', 'IDENTIFYING', 'QUANTIFYING', 'LIBRARY_INTENSITY']
         columns['TRANSITION_PRECURSOR_MAPPING'] = ['TRANSITION_ID']
 
-    ### rename column names that are in common 
+    ### rename column names that are in common
     whitelist = set(['PEPTIDE_ID', 'FEATURE_ID', 'TRANSITION_ID', 'PRECURSOR_ID', 'PROTEIN_ID', 'GENE_ID', 'DECOY', 'RUN_ID'])  # these columns should not be renamed
-    
+
     for table in columns.keys(): # iterate through all tables
         ## rename pepTable and protTable to be inline with sql scheme
         if table in ['pepTable_nonGlobal','pepTable_global']:
@@ -230,10 +225,9 @@ def export_to_parquet(infile, outfile, transitionLevel=False, onlyFeatures=False
             else:
                 columns[table][c_idx] = f"{table}.{c} AS '{renamed_table}.{c}'"
 
-
     # create a list of all the columns
     columns_list = [col for c in columns.values() for col in c]
-    
+
     # create a list of just aliases for groupby
     pattern = re.compile(r"(.*)\sAS")
     alias_list = [ pattern.search(col).group(1) for c in columns.values() for col in c]
@@ -297,16 +291,23 @@ def export_to_parquet(infile, outfile, transitionLevel=False, onlyFeatures=False
     condb.sql(query).write_parquet(outfile)
 
 
-def convert_osw_to_parquet(infile, outfile, compression_method='zstd', compression_level=11, split_transition_data=True, chunk_size=500_000):
-    '''
+def convert_osw_to_parquet(
+    infile,
+    outfile,
+    compression_method="zstd",
+    compression_level=11,
+    split_transition_data=True,
+    batch_size=500_000,
+):
+    """
     Convert an OSW sqlite file to Parquet format
-    
+
     Note:
-        This is different from the export_to_parquet function, this will create a parquet compatible with pyprophet scoring. The resulting parquet will have each row as a run-specific precursor feature, with transition level data collapsed into a single row as arrays. 
-        
+        This is different from the export_to_parquet function, this will create a parquet compatible with pyprophet scoring. The resulting parquet will have each row as a run-specific precursor feature, with transition level data collapsed into a single row as arrays.
+
     Note:
         Some notes on performance (converting a non-scored OSW file with 4,130 precursors, 114,295 features, 316,825 transitions and 6 runs):
-        
+
         merged.osw (764M)
         merged_osw_snappy.parquet (355M)
         merged_osw_gzip.parquet (284M)
@@ -315,35 +316,37 @@ def convert_osw_to_parquet(infile, outfile, compression_method='zstd', compressi
         merged_osw_zstd_level_22_10m_51s.parquet (277M)
         merged_osw_brotli.parquet (275M)
         merged_osw_brotli_level_11_27m_45s.parquet (255M)
-        
+
     See: [polars.DataFrame.write_parquet](https://docs.pola.rs/api/python/stable/reference/api/polars.DataFrame.write_parquet.html) for more information on compression methods and levels.
-        
-    Note: 
+
+    Note:
         If `split_transition_data` is set to True, the output will be a directory with two parquet files: `precursors_features.parquet` and `transition_features.parquet`. If set to False, the output will be a single parquet file with all data combined.
-    
+
     Parameters:
         infile: (str) path to osw sqlite file
         outfile: (str) path to write out parquet file
         compression_method: (str) compression method for parquet file (default: 'zstd')
         compression_level: (int) compression level for parquet file (default: 11)
         split_transition_data: (bool) if True, will split the transition data into a separate file. If False, will combine the transition data with the precursor data. (default: True)
-    
+
     Return:
         None
-    '''
-    
+    """
+
     def get_table_columns(sqlite_file, table):
         with sqlite3.connect(sqlite_file) as conn:
-            return [row[1] for row in conn.execute(f"PRAGMA table_info({table})")]  
+            return [row[1] for row in conn.execute(f"PRAGMA table_info({table})")]
 
-    def write_parquet_batches(df: pl.DataFrame, path: str, row_group_size: int = 100_000):
+    def write_parquet_batches(
+        df: pl.DataFrame, path: str, row_group_size: int = 100_000
+    ):
         table = df.to_arrow()
         writer = pq.ParquetWriter(
             path,
             table.schema,
             compression=compression_method,
             use_dictionary=True,
-            compression_level=compression_level
+            compression_level=compression_level,
         )
         total_rows = df.height
         process = psutil.Process(os.getpid())
@@ -352,23 +355,31 @@ def convert_osw_to_parquet(infile, outfile, compression_method='zstd', compressi
             batch = table.slice(start, end - start)
             mem_before_batch = process.memory_info().rss
             writer.write_table(batch)
+            gc.collect()
             mem_after_batch = process.memory_info().rss
-            click.echo(f"  - Wrote rows {start}–{end}, memory delta: {(mem_after_batch - mem_before_batch) / (1024**2):.2f} MB")
+            click.echo(
+                f"  - [{ round(start/row_group_size)+1 } / {round(total_rows/row_group_size)+1}] Wrote rows {start}–{end}, memory delta: { format_bytes(max(0, (mem_after_batch - mem_before_batch))) }"
+            )
         writer.close()
 
     load_sqlite_scanner()
     conn = duckdb.connect(database=infile, read_only=True)
 
     with sqlite3.connect(infile) as sql_conn:
-        table_names = set(row[0] for row in sql_conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall())
+        table_names = set(
+            row[0]
+            for row in sql_conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()
+        )
         gene_tables_exist = {"PEPTIDE_GENE_MAPPING", "GENE"}.issubset(table_names)
         precursor_columns = get_table_columns(infile, "PRECURSOR")
         transition_columns = get_table_columns(infile, "TRANSITION")
         feature_columns = get_table_columns(infile, "FEATURE")
 
-    has_library_drift_time = 'LIBRARY_DRIFT_TIME' in precursor_columns
-    has_annotation = 'ANNOTATION' in transition_columns
-    has_im = 'EXP_IM' in feature_columns
+    has_library_drift_time = "LIBRARY_DRIFT_TIME" in precursor_columns
+    has_annotation = "ANNOTATION" in transition_columns
+    has_im = "EXP_IM" in feature_columns
 
     click.echo("Info: Extracting precursor data...")
     precursor_query = f"""
@@ -425,19 +436,27 @@ def convert_osw_to_parquet(infile, outfile, compression_method='zstd', compressi
 
     if not has_annotation:
         transition_df = transition_df.with_columns(
-            pl.concat_str([
-                pl.col("TRANSITION_TYPE"),
-                pl.col("TRANSITION_ORDINAL").cast(pl.Utf8),
-                pl.lit("^"),
-                pl.col("TRANSITION_CHARGE").cast(pl.Utf8)
-            ], separator="").alias("ANNOTATION")
+            pl.concat_str(
+                [
+                    pl.col("TRANSITION_TYPE"),
+                    pl.col("TRANSITION_ORDINAL").cast(pl.Utf8),
+                    pl.lit("^"),
+                    pl.col("TRANSITION_CHARGE").cast(pl.Utf8),
+                ],
+                separator="",
+            ).alias("ANNOTATION")
         )
 
-    transition_peptide_df = conn.execute("SELECT TRANSITION_ID, PEPTIDE_ID AS PEPTIDE_IPF_ID FROM TRANSITION_PEPTIDE_MAPPING").pl()
-    transition_df = transition_df.join(transition_peptide_df, on="TRANSITION_ID", how="full")
+    transition_peptide_df = conn.execute(
+        "SELECT TRANSITION_ID, PEPTIDE_ID AS PEPTIDE_IPF_ID FROM TRANSITION_PEPTIDE_MAPPING"
+    ).pl()
+    transition_df = transition_df.join(
+        transition_peptide_df, on="TRANSITION_ID", how="full"
+    )
 
     click.echo("Info: Extracting precursor feature data...")
-    feature_df = conn.execute(f"""
+    feature_df = conn.execute(
+        f"""
     SELECT
         FEATURE.RUN_ID AS RUN_ID,
         RUN.FILENAME,
@@ -451,93 +470,158 @@ def convert_osw_to_parquet(infile, outfile, compression_method='zstd', compressi
         FEATURE.RIGHT_WIDTH
     FROM FEATURE
     INNER JOIN RUN ON FEATURE.RUN_ID = RUN.ID
-    """).pl()
+    """
+    ).pl()
 
     feature_ms1_df = conn.execute("SELECT * FROM FEATURE_MS1").pl()
-    feature_ms1_df = feature_ms1_df[[col.name for col in feature_ms1_df if not col.null_count() == feature_ms1_df.height]]
-    feature_ms1_df = feature_ms1_df.rename({col: f"FEATURE_MS1_{col}" for col in feature_ms1_df.columns if col != "FEATURE_ID"})
+    feature_ms1_df = feature_ms1_df[
+        [
+            col.name
+            for col in feature_ms1_df
+            if not col.null_count() == feature_ms1_df.height
+        ]
+    ]
+    feature_ms1_df = feature_ms1_df.rename(
+        {
+            col: f"FEATURE_MS1_{col}"
+            for col in feature_ms1_df.columns
+            if col != "FEATURE_ID"
+        }
+    )
 
     feature_ms2_df = conn.execute("SELECT * FROM FEATURE_MS2").pl()
-    feature_ms2_df = feature_ms2_df[[col.name for col in feature_ms2_df if not col.null_count() == feature_ms2_df.height]]
-    feature_ms2_df = feature_ms2_df.rename({col: f"FEATURE_MS2_{col}" for col in feature_ms2_df.columns if col != "FEATURE_ID"})
+    feature_ms2_df = feature_ms2_df[
+        [
+            col.name
+            for col in feature_ms2_df
+            if not col.null_count() == feature_ms2_df.height
+        ]
+    ]
+    feature_ms2_df = feature_ms2_df.rename(
+        {
+            col: f"FEATURE_MS2_{col}"
+            for col in feature_ms2_df.columns
+            if col != "FEATURE_ID"
+        }
+    )
 
     feature_df = feature_df.join(feature_ms1_df, on="FEATURE_ID", how="left")
     feature_df = feature_df.join(feature_ms2_df, on="FEATURE_ID", how="left")
-    feature_df = feature_df.with_columns(pl.col("FEATURE_ID").cast(pl.Utf8), pl.col("RUN_ID").cast(pl.Utf8))
+    feature_df = feature_df.with_columns(
+        pl.col("FEATURE_ID").cast(pl.Utf8), pl.col("RUN_ID").cast(pl.Utf8)
+    )
 
     mem_after = process.memory_info().rss
-    click.echo(f"Info: Memory used after extraction: {(mem_after - mem_before) / (1024**2):.2f} MB")
+    click.echo(
+        f"Info: Memory used after extraction: {format_bytes((mem_after - mem_before))}"
+    )
 
     process = psutil.Process(os.getpid())
 
+    chunk_size = 500_000
     if split_transition_data:
         os.makedirs(outfile, exist_ok=True)
         click.echo("Info: Writing precursor features in batches...")
         master_df = precursor_df.join(feature_df, on="PRECURSOR_ID", how="full")
-        master_df = master_df.filter(~(pl.col("RUN_ID").is_null() & pl.col("FEATURE_ID").is_null()))
-        master_df = master_df.with_columns(pl.col("RUN_ID").cast(pl.Int64), pl.col("FEATURE_ID").cast(pl.Int64))
-        write_parquet_batches(master_df, os.path.join(outfile, "precursors_features.parquet"), chunk_size)
+        master_df = master_df.filter(
+            ~(pl.col("RUN_ID").is_null() & pl.col("FEATURE_ID").is_null())
+        )
+        master_df = master_df.with_columns(
+            pl.col("RUN_ID").cast(pl.Int64), pl.col("FEATURE_ID").cast(pl.Int64)
+        )
+        write_parquet_batches(
+            master_df, os.path.join(outfile, "precursors_features.parquet"), batch_size
+        )
 
-        click.echo("Info: Writing transition features in chunks with streaming writer...")
+        click.echo(
+            "Info: Writing transition features in chunks with streaming writer..."
+        )
         path = os.path.join(outfile, "transition_features.parquet")
-        writer = None
 
-        transition_ids = conn.execute("SELECT DISTINCT TRANSITION_ID FROM FEATURE_TRANSITION").pl()["TRANSITION_ID"].to_list()
+        transition_ids = (
+            conn.execute("SELECT DISTINCT TRANSITION_ID FROM FEATURE_TRANSITION")
+            .pl()["TRANSITION_ID"]
+            .to_list()
+        )
 
         for i in range(0, len(transition_ids), chunk_size):
-            chunk_ids = transition_ids[i:i + chunk_size]
+            chunk_ids = transition_ids[i : i + chunk_size]
             id_list_sql = "(" + ",".join(map(str, chunk_ids)) + ")"
-            chunk_query = f"SELECT * FROM FEATURE_TRANSITION WHERE TRANSITION_ID IN {id_list_sql}"
+            chunk_query = (
+                f"SELECT * FROM FEATURE_TRANSITION WHERE TRANSITION_ID IN {id_list_sql}"
+            )
             chunk_df = conn.execute(chunk_query).pl()
-            chunk_df = chunk_df[[col.name for col in chunk_df if not col.null_count() == chunk_df.height]]
-            chunk_df = chunk_df.rename({
-                col: f"FEATURE_TRANSITION_{col}" for col in chunk_df.columns if col not in ["FEATURE_ID", "TRANSITION_ID"]
-            }).with_columns(pl.col("FEATURE_ID").cast(pl.Utf8))
+            chunk_df = chunk_df[
+                [
+                    col.name
+                    for col in chunk_df
+                    if not col.null_count() == chunk_df.height
+                ]
+            ]
+            chunk_df = chunk_df.rename(
+                {
+                    col: f"FEATURE_TRANSITION_{col}"
+                    for col in chunk_df.columns
+                    if col not in ["FEATURE_ID", "TRANSITION_ID"]
+                }
+            ).with_columns(pl.col("FEATURE_ID").cast(pl.Utf8))
             chunk_df = chunk_df.filter(pl.col("FEATURE_ID").is_not_null())
             chunk_df = transition_df.join(chunk_df, on="TRANSITION_ID", how="inner")
             # Drop TRANSITION_ID_right
             chunk_df = chunk_df.drop("TRANSITION_ID_right")
-
-            arrow_table = chunk_df.to_arrow()
-            mem_before = process.memory_info().rss
-            if writer is None:
-                schema = arrow_table.schema
-                writer = pq.ParquetWriter(path, schema, compression=compression_method, compression_level=compression_level)
-            writer.write_table(arrow_table)
-            mem_after = process.memory_info().rss
-            click.echo(f"  - Wrote transition chunk {i // chunk_size + 1}, memory delta: {(mem_after - mem_before) / (1024**2):.2f} MB")
-
-        if writer:
-            writer.close()
+            write_parquet_batches(chunk_df, path, batch_size)
 
     else:
-        click.echo("Info: Writing both preducture and transition data to a single parquet file...")
+        click.echo(
+            "Info: Writing both preducture and transition data to a single parquet file..."
+        )
 
         print("Info: Writing full master data in batches...")
-        transition_ids = conn.execute("SELECT DISTINCT TRANSITION_ID FROM FEATURE_TRANSITION").pl()["TRANSITION_ID"].to_list()
+        transition_ids = (
+            conn.execute("SELECT DISTINCT TRANSITION_ID FROM FEATURE_TRANSITION")
+            .pl()["TRANSITION_ID"]
+            .to_list()
+        )
 
         for i in range(0, len(transition_ids), chunk_size):
-            chunk_ids = transition_ids[i:i + chunk_size]
+            chunk_ids = transition_ids[i : i + chunk_size]
             id_list_sql = "(" + ",".join(map(str, chunk_ids)) + ")"
-            chunk_query = f"SELECT * FROM FEATURE_TRANSITION WHERE TRANSITION_ID IN {id_list_sql}"
+            chunk_query = (
+                f"SELECT * FROM FEATURE_TRANSITION WHERE TRANSITION_ID IN {id_list_sql}"
+            )
             chunk_df = conn.execute(chunk_query).pl()
-            chunk_df = chunk_df.rename({col: f"FEATURE_TRANSITION_{col}" for col in chunk_df.columns if col not in ["FEATURE_ID", "TRANSITION_ID"]})
+            chunk_df = chunk_df.rename(
+                {
+                    col: f"FEATURE_TRANSITION_{col}"
+                    for col in chunk_df.columns
+                    if col not in ["FEATURE_ID", "TRANSITION_ID"]
+                }
+            )
             chunk_df = chunk_df.with_columns(pl.col("FEATURE_ID").cast(pl.Utf8))
             chunk_df = chunk_df.filter(pl.col("FEATURE_ID").is_not_null())
-            chunk_df = transition_df.join(chunk_df, on="TRANSITION_ID", how="inner").drop("TRANSITION_ID_right")
+            chunk_df = transition_df.join(
+                chunk_df, on="TRANSITION_ID", how="inner"
+            ).drop("TRANSITION_ID_right")
 
-            master_df = precursor_df.join(feature_df, on="PRECURSOR_ID", how="full", coalesce=True)
-            master_df = master_df.join(chunk_df, on=["PRECURSOR_ID", "FEATURE_ID"], how="full", coalesce=True)
-            master_df = master_df.filter(~(pl.col("RUN_ID").is_null() & pl.col("FEATURE_ID").is_null()))
-            master_df = master_df[[s.name for s in master_df if not (s.null_count() == master_df.height)]]
-            master_df = master_df.with_columns(pl.col("RUN_ID").cast(pl.Int64), pl.col("FEATURE_ID").cast(pl.Int64))
-            write_parquet_batches(master_df, outfile, chunk_size)
+            master_df = precursor_df.join(
+                feature_df, on="PRECURSOR_ID", how="full", coalesce=True
+            )
+            master_df = master_df.join(
+                chunk_df, on=["PRECURSOR_ID", "FEATURE_ID"], how="full", coalesce=True
+            )
+            master_df = master_df.filter(
+                ~(pl.col("RUN_ID").is_null() & pl.col("FEATURE_ID").is_null())
+            )
+            master_df = master_df[
+                [s.name for s in master_df if not (s.null_count() == master_df.height)]
+            ]
+            master_df = master_df.with_columns(
+                pl.col("RUN_ID").cast(pl.Int64), pl.col("FEATURE_ID").cast(pl.Int64)
+            )
+            write_parquet_batches(master_df, outfile, batch_size)
 
     conn.close()
-
-
-
-
+    
 
 def convert_sqmass_to_parquet(
     infile, outfile, oswfile, compression_method="zstd", compression_level=11

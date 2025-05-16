@@ -15,6 +15,13 @@ except NameError:
     def profile(fun):
         return fun
 
+def format_bytes(size):
+    for unit in ['B', 'KB', 'MB', 'GB']:
+        if size < 1024.0:
+            return f"{size:.2f} {unit}"
+        size /= 1024.0
+    return f"{size:.2f} TB"
+
 # selection of scores with low cross-correlation for metabolomics scoring
 def use_metabolomics_scores():
     return [
