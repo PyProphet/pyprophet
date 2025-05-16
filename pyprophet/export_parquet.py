@@ -5,6 +5,8 @@ import sqlite3
 import numpy as np
 import pandas as pd
 import polars as pl
+import pyarrow as pa
+import pyarrow.parquet as pq
 import psutil
 from pyprophet.export import check_sqlite_table
 from duckdb_extensions import extension_importer
@@ -295,7 +297,7 @@ def export_to_parquet(infile, outfile, transitionLevel=False, onlyFeatures=False
     condb.sql(query).write_parquet(outfile)
 
 
-def convert_osw_to_parquet(infile, outfile, compression_method='zstd', compression_level=11, split_transition_data=True):
+def convert_osw_to_parquet(infile, outfile, compression_method='zstd', compression_level=11, split_transition_data=True, chunk_size=500_000):
     '''
     Convert an OSW sqlite file to Parquet format
     
@@ -334,10 +336,29 @@ def convert_osw_to_parquet(infile, outfile, compression_method='zstd', compressi
         with sqlite3.connect(sqlite_file) as conn:
             return [row[1] for row in conn.execute(f"PRAGMA table_info({table})")]  
 
+    def write_parquet_batches(df: pl.DataFrame, path: str, row_group_size: int = 100_000):
+        table = df.to_arrow()
+        writer = pq.ParquetWriter(
+            path,
+            table.schema,
+            compression=compression_method,
+            use_dictionary=True,
+            compression_level=compression_level
+        )
+        total_rows = df.height
+        process = psutil.Process(os.getpid())
+        for start in range(0, total_rows, row_group_size):
+            end = min(start + row_group_size, total_rows)
+            batch = table.slice(start, end - start)
+            mem_before_batch = process.memory_info().rss
+            writer.write_table(batch)
+            mem_after_batch = process.memory_info().rss
+            click.echo(f"  - Wrote rows {start}–{end}, memory delta: {(mem_after_batch - mem_before_batch) / (1024**2):.2f} MB")
+        writer.close()
+
     load_sqlite_scanner()
     conn = duckdb.connect(database=infile, read_only=True)
 
-    # Check for gene tables using sqlite (avoids large duckdb introspection)
     with sqlite3.connect(infile) as sql_conn:
         table_names = set(row[0] for row in sql_conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall())
         gene_tables_exist = {"PEPTIDE_GENE_MAPPING", "GENE"}.issubset(table_names)
@@ -349,8 +370,8 @@ def convert_osw_to_parquet(infile, outfile, compression_method='zstd', compressi
     has_annotation = 'ANNOTATION' in transition_columns
     has_im = 'EXP_IM' in feature_columns
 
-    click.echo("Info:  Extracting precursor data...")
-    query = f"""
+    click.echo("Info: Extracting precursor data...")
+    precursor_query = f"""
     SELECT 
         PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID AS PROTEIN_ID,
         PEPTIDE.ID AS PEPTIDE_ID,
@@ -378,10 +399,13 @@ def convert_osw_to_parquet(infile, outfile, compression_method='zstd', compressi
     INNER JOIN PROTEIN ON PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID = PROTEIN.ID
     {"LEFT JOIN PEPTIDE_GENE_MAPPING ON PEPTIDE.ID = PEPTIDE_GENE_MAPPING.PEPTIDE_ID LEFT JOIN GENE ON PEPTIDE_GENE_MAPPING.GENE_ID = GENE.ID" if gene_tables_exist else ""}
     """
-    precursor_df = conn.execute(query).pl()
+    precursor_df = conn.execute(precursor_query).pl()
 
-    click.echo("Info:  Extracting transition data...")
-    query = f"""
+    process = psutil.Process(os.getpid())
+    mem_before = process.memory_info().rss
+
+    click.echo("Info: Extracting transition data...")
+    transition_query = f"""
     SELECT 
         TRANSITION_PRECURSOR_MAPPING.PRECURSOR_ID AS PRECURSOR_ID,
         TRANSITION.ID AS TRANSITION_ID,
@@ -397,7 +421,7 @@ def convert_osw_to_parquet(infile, outfile, compression_method='zstd', compressi
     FROM TRANSITION
     INNER JOIN TRANSITION_PRECURSOR_MAPPING ON TRANSITION.ID = TRANSITION_PRECURSOR_MAPPING.TRANSITION_ID
     """
-    transition_df = conn.execute(query).pl()
+    transition_df = conn.execute(transition_query).pl()
 
     if not has_annotation:
         transition_df = transition_df.with_columns(
@@ -412,7 +436,7 @@ def convert_osw_to_parquet(infile, outfile, compression_method='zstd', compressi
     transition_peptide_df = conn.execute("SELECT TRANSITION_ID, PEPTIDE_ID AS PEPTIDE_IPF_ID FROM TRANSITION_PEPTIDE_MAPPING").pl()
     transition_df = transition_df.join(transition_peptide_df, on="TRANSITION_ID", how="full")
 
-    click.echo("Info:  Extracting precursor feature data...")
+    click.echo("Info: Extracting precursor feature data...")
     feature_df = conn.execute(f"""
     SELECT
         FEATURE.RUN_ID AS RUN_ID,
@@ -437,89 +461,77 @@ def convert_osw_to_parquet(infile, outfile, compression_method='zstd', compressi
     feature_ms2_df = feature_ms2_df[[col.name for col in feature_ms2_df if not col.null_count() == feature_ms2_df.height]]
     feature_ms2_df = feature_ms2_df.rename({col: f"FEATURE_MS2_{col}" for col in feature_ms2_df.columns if col != "FEATURE_ID"})
 
-    click.echo("Info:  Extracting feature transition data (chunked)...")
-
-    process = psutil.Process(os.getpid())
-    transition_ids = conn.execute("SELECT DISTINCT TRANSITION_ID FROM FEATURE_TRANSITION").pl()["TRANSITION_ID"].to_list()
-    chunk_size = 500_000
-    feature_transition_chunks = []
-
-    total_mem_used = 0
-    max_mem_used = 0
-    start_time = time.time()
-
-    for i in range(0, len(transition_ids), chunk_size):
-        chunk_start = time.time()
-        mem_before = process.memory_info().rss
-
-        chunk_ids = transition_ids[i:i + chunk_size]
-        id_list_sql = "(" + ",".join(map(str, chunk_ids)) + ")"
-        chunk_query = f"SELECT * FROM FEATURE_TRANSITION WHERE TRANSITION_ID IN {id_list_sql}"
-        chunk_df = conn.execute(chunk_query).pl()
-
-        chunk_df = chunk_df[[col.name for col in chunk_df if not col.null_count() == chunk_df.height]]
-        chunk_df = chunk_df.rename({
-            col: f"FEATURE_TRANSITION_{col}" for col in chunk_df.columns if col not in ["FEATURE_ID", "TRANSITION_ID"]
-        }).with_columns(pl.col("FEATURE_ID").cast(pl.Utf8))
-        chunk_df = chunk_df.filter(pl.col("FEATURE_ID").is_not_null())
-
-        joined = chunk_df.join(
-            transition_df.select([
-                "TRANSITION_ID", "PRECURSOR_ID", "TRANSITION_TRAML_ID", "PRODUCT_MZ", "TRANSITION_CHARGE",
-                "TRANSITION_TYPE", "TRANSITION_ORDINAL", "ANNOTATION", "TRANSITION_DETECTING",
-                "TRANSITION_LIBRARY_INTENSITY", "TRANSITION_DECOY", "PEPTIDE_IPF_ID"
-            ]),
-            on="TRANSITION_ID",
-            how="inner"
-        )
-
-        feature_transition_chunks.append(joined)
-
-        mem_after = process.memory_info().rss
-        mem_used = mem_after - mem_before
-        total_mem_used += mem_used
-        max_mem_used = max(max_mem_used, mem_used)
-        chunk_time = time.time() - chunk_start
-
-        click.echo(f"  - Processed chunk {i//chunk_size + 1}/{(len(transition_ids)-1)//chunk_size + 1} "
-                f"in {chunk_time:.2f}s, memory used: {mem_used / (1024**2):.2f} MB")
-
-    # Concatenate all
-    concat_start = time.time()
-    feature_transition_df = pl.concat(feature_transition_chunks, how="vertical")
-    concat_time = time.time() - concat_start
-
-    # Aggregate
-    group_cols = ["PRECURSOR_ID", "FEATURE_ID"]
-    array_cols = [c for c in feature_transition_df.columns if c not in group_cols]
-    feature_transition_df = feature_transition_df.group_by(group_cols).agg([pl.col(c) for c in array_cols])
-
-    total_time = time.time() - start_time
-    click.echo(f"Info: Feature transition extraction complete in {total_time:.2f}s")
-    click.echo(f"Info: Total memory used across chunks: {total_mem_used / (1024**2):.2f} MB")
-    click.echo(f"Info: Peak memory used in a single chunk: {max_mem_used / (1024**2):.2f} MB")
-    click.echo(f"Info: Grouping took {concat_time:.2f}s")
-
     feature_df = feature_df.join(feature_ms1_df, on="FEATURE_ID", how="left")
     feature_df = feature_df.join(feature_ms2_df, on="FEATURE_ID", how="left")
     feature_df = feature_df.with_columns(pl.col("FEATURE_ID").cast(pl.Utf8), pl.col("RUN_ID").cast(pl.Utf8))
 
+    mem_after = process.memory_info().rss
+    click.echo(f"Info: Memory used after extraction: {(mem_after - mem_before) / (1024**2):.2f} MB")
+
+    process = psutil.Process(os.getpid())
+
     if split_transition_data:
         os.makedirs(outfile, exist_ok=True)
-        click.echo("Info: Joining precursor and feature data...")
+        click.echo("Info: Writing precursor features in batches...")
         master_df = precursor_df.join(feature_df, on="PRECURSOR_ID", how="full")
         master_df = master_df.filter(~(pl.col("RUN_ID").is_null() & pl.col("FEATURE_ID").is_null()))
         master_df = master_df.with_columns(pl.col("RUN_ID").cast(pl.Int64), pl.col("FEATURE_ID").cast(pl.Int64))
-        click.echo(f"Info: Writing out {os.path.join(outfile, 'precursors_features.parquet')}")
-        master_df.write_parquet(os.path.join(outfile, "precursors_features.parquet"), compression=compression_method, compression_level=compression_level)
-        click.echo(f"Info: Writing out {os.path.join(outfile, 'transition_features.parquet')}")
-        feature_transition_df.write_parquet(os.path.join(outfile, "transition_features.parquet"), compression=compression_method, compression_level=compression_level)
+        write_parquet_batches(master_df, os.path.join(outfile, "precursors_features.parquet"), chunk_size)
+
+        click.echo("Info: Writing transition features in chunks with streaming writer...")
+        path = os.path.join(outfile, "transition_features.parquet")
+        writer = None
+
+        transition_ids = conn.execute("SELECT DISTINCT TRANSITION_ID FROM FEATURE_TRANSITION").pl()["TRANSITION_ID"].to_list()
+
+        for i in range(0, len(transition_ids), chunk_size):
+            chunk_ids = transition_ids[i:i + chunk_size]
+            id_list_sql = "(" + ",".join(map(str, chunk_ids)) + ")"
+            chunk_query = f"SELECT * FROM FEATURE_TRANSITION WHERE TRANSITION_ID IN {id_list_sql}"
+            chunk_df = conn.execute(chunk_query).pl()
+            chunk_df = chunk_df[[col.name for col in chunk_df if not col.null_count() == chunk_df.height]]
+            chunk_df = chunk_df.rename({
+                col: f"FEATURE_TRANSITION_{col}" for col in chunk_df.columns if col not in ["FEATURE_ID", "TRANSITION_ID"]
+            }).with_columns(pl.col("FEATURE_ID").cast(pl.Utf8))
+            chunk_df = chunk_df.filter(pl.col("FEATURE_ID").is_not_null())
+            chunk_df = transition_df.join(chunk_df, on="TRANSITION_ID", how="inner")
+            # Drop TRANSITION_ID_right
+            chunk_df = chunk_df.drop("TRANSITION_ID_right")
+
+            arrow_table = chunk_df.to_arrow()
+            mem_before = process.memory_info().rss
+            if writer is None:
+                schema = arrow_table.schema
+                writer = pq.ParquetWriter(path, schema, compression=compression_method, compression_level=compression_level)
+            writer.write_table(arrow_table)
+            mem_after = process.memory_info().rss
+            click.echo(f"  - Wrote transition chunk {i // chunk_size + 1}, memory delta: {(mem_after - mem_before) / (1024**2):.2f} MB")
+
+        if writer:
+            writer.close()
+
     else:
-        feature_df = feature_df.join(feature_transition_df, on=["PRECURSOR_ID", "FEATURE_ID"], how="left")
-        master_df = precursor_df.join(feature_df, on="PRECURSOR_ID", how="full")
-        master_df = master_df.filter(~(pl.col("RUN_ID").is_null() & pl.col("FEATURE_ID").is_null()))
-        master_df = master_df.with_columns(pl.col("RUN_ID").cast(pl.Int64), pl.col("FEATURE_ID").cast(pl.Int64))
-        master_df.write_parquet(outfile, compression=compression_method, compression_level=compression_level)
+        click.echo("Info: Writing both preducture and transition data to a single parquet file...")
+
+        print("Info: Writing full master data in batches...")
+        transition_ids = conn.execute("SELECT DISTINCT TRANSITION_ID FROM FEATURE_TRANSITION").pl()["TRANSITION_ID"].to_list()
+
+        for i in range(0, len(transition_ids), chunk_size):
+            chunk_ids = transition_ids[i:i + chunk_size]
+            id_list_sql = "(" + ",".join(map(str, chunk_ids)) + ")"
+            chunk_query = f"SELECT * FROM FEATURE_TRANSITION WHERE TRANSITION_ID IN {id_list_sql}"
+            chunk_df = conn.execute(chunk_query).pl()
+            chunk_df = chunk_df.rename({col: f"FEATURE_TRANSITION_{col}" for col in chunk_df.columns if col not in ["FEATURE_ID", "TRANSITION_ID"]})
+            chunk_df = chunk_df.with_columns(pl.col("FEATURE_ID").cast(pl.Utf8))
+            chunk_df = chunk_df.filter(pl.col("FEATURE_ID").is_not_null())
+            chunk_df = transition_df.join(chunk_df, on="TRANSITION_ID", how="inner").drop("TRANSITION_ID_right")
+
+            master_df = precursor_df.join(feature_df, on="PRECURSOR_ID", how="full", coalesce=True)
+            master_df = master_df.join(chunk_df, on=["PRECURSOR_ID", "FEATURE_ID"], how="full", coalesce=True)
+            master_df = master_df.filter(~(pl.col("RUN_ID").is_null() & pl.col("FEATURE_ID").is_null()))
+            master_df = master_df[[s.name for s in master_df if not (s.null_count() == master_df.height)]]
+            master_df = master_df.with_columns(pl.col("RUN_ID").cast(pl.Int64), pl.col("FEATURE_ID").cast(pl.Int64))
+            write_parquet_batches(master_df, outfile, chunk_size)
 
     conn.close()
 
