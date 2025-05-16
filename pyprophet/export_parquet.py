@@ -340,6 +340,7 @@ def convert_osw_to_parquet(
     def write_parquet_batches(
         df: pl.DataFrame, path: str, row_group_size: int = 100_000
     ):
+        print(f"Info: number of rows: {df.height} and number of columns: {df.width}")
         table = df.to_arrow()
         writer = pq.ParquetWriter(
             path,
@@ -472,7 +473,7 @@ def convert_osw_to_parquet(
     INNER JOIN RUN ON FEATURE.RUN_ID = RUN.ID
     """
     ).pl()
-
+    
     feature_ms1_df = conn.execute("SELECT * FROM FEATURE_MS1").pl()
     feature_ms1_df = feature_ms1_df[
         [
@@ -505,8 +506,8 @@ def convert_osw_to_parquet(
         }
     )
 
-    feature_df = feature_df.join(feature_ms1_df, on="FEATURE_ID", how="left")
-    feature_df = feature_df.join(feature_ms2_df, on="FEATURE_ID", how="left")
+    feature_df = feature_df.join(feature_ms1_df, on="FEATURE_ID", how="left", coalesce=True)
+    feature_df = feature_df.join(feature_ms2_df, on="FEATURE_ID", how="left", coalesce=True)
     feature_df = feature_df.with_columns(
         pl.col("FEATURE_ID").cast(pl.Utf8), pl.col("RUN_ID").cast(pl.Utf8)
     )
@@ -522,12 +523,13 @@ def convert_osw_to_parquet(
     if split_transition_data:
         os.makedirs(outfile, exist_ok=True)
         click.echo("Info: Writing precursor features in batches...")
-        master_df = precursor_df.join(feature_df, on="PRECURSOR_ID", how="full")
+        master_df = precursor_df.join(feature_df, on="PRECURSOR_ID", how="full", coalesce=True)
+        
         master_df = master_df.filter(
             ~(pl.col("RUN_ID").is_null() & pl.col("FEATURE_ID").is_null())
         )
         master_df = master_df.with_columns(
-            pl.col("RUN_ID").cast(pl.Int64), pl.col("FEATURE_ID").cast(pl.Int64)
+            pl.col("RUN_ID").cast(pl.Int64).alias("RUN_ID"), pl.col("FEATURE_ID").cast(pl.Int64).alias("FEATURE_ID")
         )
         write_parquet_batches(
             master_df, os.path.join(outfile, "precursors_features.parquet"), batch_size
@@ -539,7 +541,7 @@ def convert_osw_to_parquet(
         path = os.path.join(outfile, "transition_features.parquet")
 
         transition_ids = (
-            conn.execute("SELECT DISTINCT TRANSITION_ID FROM FEATURE_TRANSITION")
+            conn.execute("SELECT DISTINCT ID AS TRANSITION_ID FROM TRANSITION")
             .pl()["TRANSITION_ID"]
             .to_list()
         )
@@ -547,29 +549,55 @@ def convert_osw_to_parquet(
         for i in range(0, len(transition_ids), chunk_size):
             chunk_ids = transition_ids[i : i + chunk_size]
             id_list_sql = "(" + ",".join(map(str, chunk_ids)) + ")"
-            chunk_query = (
-                f"SELECT * FROM FEATURE_TRANSITION WHERE TRANSITION_ID IN {id_list_sql}"
-            )
+            chunk_query = f"SELECT * FROM FEATURE_TRANSITION WHERE TRANSITION_ID IN {id_list_sql}"
             chunk_df = conn.execute(chunk_query).pl()
+
             chunk_df = chunk_df[
-                [
-                    col.name
-                    for col in chunk_df
-                    if not col.null_count() == chunk_df.height
-                ]
+                [col.name for col in chunk_df if not col.null_count() == chunk_df.height]
             ]
-            chunk_df = chunk_df.rename(
-                {
-                    col: f"FEATURE_TRANSITION_{col}"
-                    for col in chunk_df.columns
-                    if col not in ["FEATURE_ID", "TRANSITION_ID"]
-                }
-            ).with_columns(pl.col("FEATURE_ID").cast(pl.Utf8))
-            chunk_df = chunk_df.filter(pl.col("FEATURE_ID").is_not_null())
-            chunk_df = transition_df.join(chunk_df, on="TRANSITION_ID", how="inner")
-            # Drop TRANSITION_ID_right
-            chunk_df = chunk_df.drop("TRANSITION_ID_right")
-            write_parquet_batches(chunk_df, path, batch_size)
+            chunk_df = chunk_df.rename({
+                col: f"FEATURE_TRANSITION_{col}"
+                for col in chunk_df.columns
+                if col not in ["FEATURE_ID", "TRANSITION_ID"]
+            }).with_columns(pl.col("FEATURE_ID").cast(pl.Utf8))
+
+            # Join with transition_df
+            chunk_df = transition_df.join(chunk_df, on="TRANSITION_ID", how="left", coalesce=True)
+
+            # Drop TRANSITION_ID_right if exists
+            if "TRANSITION_ID_right" in chunk_df.columns:
+                chunk_df = chunk_df.drop("TRANSITION_ID_right")
+
+            # Patch missing FEATURE_IDs
+            not_scored = chunk_df.filter(pl.col("FEATURE_ID").is_null()).select([
+                "PRECURSOR_ID", "TRANSITION_ID", "TRANSITION_TRAML_ID", "PRODUCT_MZ",
+                "TRANSITION_CHARGE", "TRANSITION_TYPE", "TRANSITION_ORDINAL",
+                "ANNOTATION", "TRANSITION_DETECTING", "TRANSITION_LIBRARY_INTENSITY",
+                "TRANSITION_DECOY"
+            ])
+            precursor_feature_df = chunk_df.select(["PRECURSOR_ID", "FEATURE_ID"]).unique()
+            patched = precursor_feature_df.join(
+                not_scored,
+                on="PRECURSOR_ID",
+                how="left"
+            ).filter(pl.col("TRANSITION_ID").is_not_null()).with_columns(
+                pl.col("TRANSITION_ID").cast(pl.Int64)
+            )
+
+            chunk_df = chunk_df.filter(pl.col("FEATURE_ID").is_not_null()).join(
+                patched.unique(),
+                on=[
+                    "PRECURSOR_ID", "FEATURE_ID", "TRANSITION_ID", "TRANSITION_TRAML_ID",
+                    "PRODUCT_MZ", "TRANSITION_CHARGE", "TRANSITION_TYPE",
+                    "TRANSITION_ORDINAL", "ANNOTATION", "TRANSITION_DETECTING",
+                    "TRANSITION_LIBRARY_INTENSITY", "TRANSITION_DECOY"
+                ],
+                how="full",
+                coalesce=True
+            )
+
+            write_parquet_batches(chunk_df.unique(), path, batch_size)
+
 
     else:
         click.echo(
@@ -578,7 +606,7 @@ def convert_osw_to_parquet(
 
         print("Info: Writing full master data in batches...")
         transition_ids = (
-            conn.execute("SELECT DISTINCT TRANSITION_ID FROM FEATURE_TRANSITION")
+            conn.execute("SELECT DISTINCT ID AS TRANSITION_ID FROM TRANSITION")
             .pl()["TRANSITION_ID"]
             .to_list()
         )
