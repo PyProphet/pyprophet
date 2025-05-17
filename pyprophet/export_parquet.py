@@ -492,6 +492,7 @@ def convert_osw_to_parquet(
 
         transition_template = """
         SELECT 
+            FEATURE.RUN_ID AS RUN_ID,
             TRANSITION_PEPTIDE_MAPPING.PEPTIDE_ID AS IPF_PEPTIDE_ID,
             TRANSITION_PRECURSOR_MAPPING.PRECURSOR_ID AS PRECURSOR_ID,
             TRANSITION.ID AS TRANSITION_ID,
@@ -512,6 +513,11 @@ def convert_osw_to_parquet(
             ON TRANSITION.ID = TRANSITION_PEPTIDE_MAPPING.TRANSITION_ID
         FULL JOIN sqlite_scan('{infile}', 'FEATURE_TRANSITION') AS FEATURE_TRANSITION 
             ON TRANSITION.ID = FEATURE_TRANSITION.TRANSITION_ID
+        FULL JOIN (
+            SELECT ID, RUN_ID
+            FROM sqlite_scan('{infile}', 'FEATURE')
+        ) AS FEATURE
+            ON FEATURE_TRANSITION.FEATURE_ID = FEATURE.ID
         """
 
         transition_query = transition_template.format(
