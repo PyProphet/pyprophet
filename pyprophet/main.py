@@ -571,7 +571,6 @@ def export(
 @click.option('--split_transition_data/--no-split_transition_data', 'split_transition_data', default=False, show_default=True, help='Split transition data into a separate parquet (default: True).')
 @click.option('--compression', 'compression', default='zstd', show_default=True, type=click.Choice(['lz4', 'uncompressed', 'snappy', 'gzip', 'lzo', 'brotli', 'zstd']), help='Compression algorithm to use for parquet file.')
 @click.option('--compression_level', 'compression_level', default=11, show_default=True, type=int, help='Compression level to use for parquet file.')
-@click.option('--batch_size', 'batch_size', default=500_000, show_default=True, type=int, help='Batch size to write N row chunks of data to the parquet file.')
 def export_parquet(
     infile,
     outfile,
@@ -582,8 +581,7 @@ def export_parquet(
     scoring_format,
     split_transition_data,
     compression,
-    compression_level,
-    batch_size,
+    compression_level
 ):
     """
     Export OSW or sqMass to parquet format
@@ -620,8 +618,7 @@ def export_parquet(
                 outfile,
                 compression_method=compression,
                 compression_level=compression_level,
-                split_transition_data=split_transition_data,
-                batch_size=batch_size,
+                split_transition_data=split_transition_data
             )
             end = time.time()
             mem_after = process.memory_info().rss
