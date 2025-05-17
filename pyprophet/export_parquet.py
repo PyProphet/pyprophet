@@ -400,7 +400,7 @@ def convert_osw_to_parquet(
     feature_transition_cols = get_table_columns(infile, "FEATURE_TRANSITION")
     feature_transition_cols.remove("FEATURE_ID")
     feature_transition_cols.remove("TRANSITION_ID")
-    feature_transition_cols = [f"{col} AS FEATURE_TRANSITION_{col}" for col in feature_transition_cols]
+    feature_transition_cols = ["FEATURE_ID"] + [f"{col} AS FEATURE_TRANSITION_{col}" for col in feature_transition_cols]
     feature_transition_cols_sql = ', '.join([f"FEATURE_TRANSITION.{col}" for col in feature_transition_cols])
         
     if split_transition_data:
