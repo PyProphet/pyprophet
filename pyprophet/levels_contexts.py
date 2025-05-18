@@ -648,15 +648,15 @@ ORDER BY d_score_combined DESC
 
 
 def subsample_osw(infile, outfile, subsample_ratio, test):
+    if os.path.exists(outfile):
+        click.echo("Warning: Output file %s already exists. It will be overwritten." % outfile)
+        os.remove(outfile)
+
     conn = sqlite3.connect(infile)
     ms1_present = check_sqlite_table(conn, "FEATURE_MS1")
     ms2_present = check_sqlite_table(conn, "FEATURE_MS2")
     transition_present = check_sqlite_table(conn, "FEATURE_TRANSITION")
-    ## Check if infile contains multiple entries for run table, if only 1 entry, then infile is a single run, else infile contains multiples run
-    n_runs = conn.cursor().execute("SELECT COUNT(*) AS NUMBER_OF_RUNS FROM RUN").fetchall()[0][0]
-    multiple_runs = True if n_runs > 1 else False
-    if multiple_runs: 
-        click.echo("Warn: There are %s runs in %s" %(n_runs, infile))
+
     conn.close()
     
     conn = sqlite3.connect(outfile)
@@ -770,22 +770,27 @@ DETACH DATABASE sdb;
         click.echo("Info: Subsampled MS2 features of file %s to %s." % (infile, outfile))
 
     if transition_present:
+        input_conn = sqlite3.connect(infile)
+        columns = [i[1] for i in input_conn.execute("pragma table_info(FEATURE_TRANSITION)").fetchall()]
+        columns_to_select = ['FEATURE_ID', 'TRANSITION_ID', 'AREA_INTENSITY', 'APEX_INTENSITY'] + [ col for col in columns if 'VAR' in col]
+        columns_to_select = ', '.join(columns_to_select)
+        input_conn.close()
         if subsample_ratio >= 1.0:
-            c.executescript('''
+            c.executescript(f'''
 ATTACH DATABASE "%s" AS sdb;
 
 CREATE TABLE FEATURE_TRANSITION AS 
-SELECT *
+SELECT {columns_to_select}
 FROM sdb.FEATURE_TRANSITION;
 
 DETACH DATABASE sdb;
 ''' % infile)
         else:
-            c.executescript('''
+            c.executescript(f'''
 ATTACH DATABASE "%s" AS sdb;
 
 CREATE TABLE FEATURE_TRANSITION AS 
-SELECT *
+SELECT {columns_to_select}
 FROM sdb.FEATURE_TRANSITION
 WHERE sdb.FEATURE_TRANSITION.FEATURE_ID IN
     (SELECT ID
@@ -795,8 +800,7 @@ DETACH DATABASE sdb;
 ''' % infile)
         click.echo("Info: Subsampled transition features of file %s to %s." % (infile, outfile))
 
-    if multiple_runs:
-        c.executescript('''
+    c.executescript('''
 PRAGMA synchronous = OFF;
 
 ATTACH DATABASE "%s" AS sdb;
@@ -810,9 +814,9 @@ WHERE sdb.PRECURSOR.ID IN
 
 DETACH DATABASE sdb;
 ''' % infile)
-        click.echo("Info: Subsampled precursor table of file %s to %s. For scoring merged subsampled file." % (infile, outfile))
+    click.echo("Info: Subsampled precursor table of file %s to %s. For scoring merged subsampled file." % (infile, outfile))
 
-        c.executescript('''
+    c.executescript('''
 PRAGMA synchronous = OFF;
 
 ATTACH DATABASE "%s" AS sdb;
@@ -826,10 +830,10 @@ WHERE sdb.TRANSITION_PRECURSOR_MAPPING.PRECURSOR_ID IN
 
 DETACH DATABASE sdb;
 ''' % infile)
-        click.echo("Info: Subsampled transition_precursor_mapping table of file %s to %s. For scoring merged subsampled file." % (infile, outfile)) 
+    click.echo("Info: Subsampled transition_precursor_mapping table of file %s to %s. For scoring merged subsampled file." % (infile, outfile)) 
 
 
-        c.executescript('''
+    c.executescript('''
 PRAGMA synchronous = OFF;
 
 ATTACH DATABASE "%s" AS sdb;
@@ -843,7 +847,7 @@ WHERE sdb.TRANSITION.ID IN
 
 DETACH DATABASE sdb;
 ''' % infile)
-        click.echo("Info: Subsampled transition table of file %s to %s. For scoring merged subsampled file." % (infile, outfile)) 
+    click.echo("Info: Subsampled transition table of file %s to %s. For scoring merged subsampled file." % (infile, outfile)) 
 
     conn.commit()
     conn.close()
@@ -852,6 +856,9 @@ DETACH DATABASE sdb;
 
 
 def reduce_osw(infile, outfile):
+    if os.path.exists(outfile):
+        click.echo("Warning: Output file %s already exists. It will be overwritten." % outfile)
+        os.remove(outfile)
     conn = sqlite3.connect(infile)
     if not check_sqlite_table(conn, "SCORE_MS2"):
         raise click.ClickException("Apply scoring to MS2 data before reducing file for multi-run scoring.")
