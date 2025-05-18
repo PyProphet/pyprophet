@@ -379,6 +379,7 @@ def convert_osw_to_parquet(
         precursor_columns = get_table_columns(infile, "PRECURSOR")
         transition_columns = get_table_columns(infile, "TRANSITION")
         feature_columns = get_table_columns(infile, "FEATURE")
+        feature_ms2_alignment_table_exists = check_sqlite_table(sql_conn, "FEATURE_MS2_ALIGNMENT")
 
     has_library_drift_time = "LIBRARY_DRIFT_TIME" in precursor_columns
     has_annotation = "ANNOTATION" in transition_columns
@@ -533,6 +534,38 @@ def convert_osw_to_parquet(
         copy_transition_query = f"COPY ({transition_query}) TO '{path}' (FORMAT 'parquet', COMPRESSION '{compression_method}', COMPRESSION_LEVEL {compression_level});"
 
         conn.execute(copy_transition_query)
+        
+        if feature_ms2_alignment_table_exists:
+            click.echo(
+                "Info: Writing feature alignment data..."
+            )
+            
+            path = os.path.join(outfile, "feature_alignment.parquet")
+            
+            query = f'''
+            SELECT
+                ALIGNMENT_ID,
+                RUN_ID,
+                PRECURSOR_ID,
+                ALIGNED_FEATURE_ID AS FEATURE_ID,
+                REFERENCE_FEATURE_ID,
+                ALIGNED_RT,
+                REFERENCE_RT,
+                XCORR_COELUTION_TO_REFERENCE AS VAR_XCORR_COELUTION_TO_REFERENCE,
+                XCORR_SHAPE_TO_REFERENCE AS VAR_XCORR_SHAPE_TO_REFERENCE, 
+                MI_TO_REFERENCE AS VAR_MI_TO_REFERENCE, 
+                XCORR_COELUTION_TO_ALL AS VAR_XCORR_COELUTION_TO_ALL,  
+                XCORR_SHAPE_TO_ALL AS VAR_XCORR_SHAPE, 
+                MI_TO_ALL AS VAR_MI_TO_ALL, 
+                RETENTION_TIME_DEVIATION AS VAR_RETENTION_TIME_DEVIATION, 
+                PEAK_INTENSITY_RATIO AS VAR_PEAK_INTENSITY_RATIO,
+                LABEL AS DECOY
+            FROM sqlite_scan('{infile}', 'FEATURE_MS2_ALIGNMENT') AS FEATURE_MS2_ALIGNMENT
+            '''
+            
+            copy_query = f"COPY ({query}) TO '{path}' (FORMAT 'parquet', COMPRESSION '{compression_method}', COMPRESSION_LEVEL {compression_level});"
+            
+            conn.execute(copy_query)
 
 
     else:
@@ -642,6 +675,40 @@ def convert_osw_to_parquet(
         copy_query = f"COPY ({query}) TO '{outfile}' (FORMAT 'parquet', COMPRESSION '{compression_method}', COMPRESSION_LEVEL {compression_level});"
 
         conn.execute(copy_query)
+        
+        if feature_ms2_alignment_table_exists:
+            click.echo(
+                "Info: Writing feature alignment data..."
+            )
+            
+            # Get outfile without any extensions
+            outfile = os.path.splitext(outfile)[0]
+            outfile = outfile + "_feature_alignment.parquet"
+            
+            query = f'''
+            SELECT
+                ALIGNMENT_ID,
+                RUN_ID,
+                PRECURSOR_ID,
+                ALIGNED_FEATURE_ID AS FEATURE_ID,
+                REFERENCE_FEATURE_ID,
+                ALIGNED_RT,
+                REFERENCE_RT,
+                XCORR_COELUTION_TO_REFERENCE AS VAR_XCORR_COELUTION_TO_REFERENCE,
+                XCORR_SHAPE_TO_REFERENCE AS VAR_XCORR_SHAPE_TO_REFERENCE, 
+                MI_TO_REFERENCE AS VAR_MI_TO_REFERENCE, 
+                XCORR_COELUTION_TO_ALL AS VAR_XCORR_COELUTION_TO_ALL,  
+                XCORR_SHAPE_TO_ALL AS VAR_XCORR_SHAPE, 
+                MI_TO_ALL AS VAR_MI_TO_ALL, 
+                RETENTION_TIME_DEVIATION AS VAR_RETENTION_TIME_DEVIATION, 
+                PEAK_INTENSITY_RATIO AS VAR_PEAK_INTENSITY_RATIO,
+                LABEL AS DECOY
+            FROM sqlite_scan('{infile}', 'FEATURE_MS2_ALIGNMENT') AS FEATURE_MS2_ALIGNMENT
+            '''
+            
+            copy_query = f"COPY ({query}) TO '{outfile}' (FORMAT 'parquet', COMPRESSION '{compression_method}', COMPRESSION_LEVEL {compression_level});"
+            
+            conn.execute(copy_query)
 
     conn.close()
     

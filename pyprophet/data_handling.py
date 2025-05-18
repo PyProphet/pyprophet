@@ -119,8 +119,12 @@ def create_index_if_not_exists(con, index_name, table_name, column_name):
 
 
 def is_parquet_file(file_path):
+    '''
+    Check if the file is a valid Parquet file.
+    '''
     import pyarrow.parquet as pq
     from pyarrow.lib import ArrowInvalid, ArrowIOError
+    
     # First check extension
     if not os.path.splitext(file_path)[1].lower() in ('.parquet', '.pq'):
         return False
@@ -131,6 +135,29 @@ def is_parquet_file(file_path):
         return True
     except (ArrowInvalid, ArrowIOError, OSError):
         return False
+    
+def is_valid_split_parquet_dir(path):
+    '''
+    Checks if the directory contains both required parquet files
+    and that each is a valid Parquet file.
+    '''
+    if not os.path.isdir(path):
+        return False
+
+    required_files = [
+        "precursors_features.parquet",
+        "transition_features.parquet"
+    ]
+    
+    for filename in required_files:
+        full_path = os.path.join(path, filename)
+        if not os.path.isfile(full_path):
+            return False
+        if not is_parquet_file(full_path):
+            return False
+
+    return True
+
 
 def get_parquet_column_names(file_path):
     """
