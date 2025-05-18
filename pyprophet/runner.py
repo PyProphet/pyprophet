@@ -8,6 +8,7 @@ import pandas as pd
 import numpy as np
 import polars as pl
 import sqlite3
+import duckdb
 import pickle
 
 from .pyprophet import PyProphet
@@ -15,7 +16,8 @@ from .glyco.scoring import partial_score, combined_score
 from .glyco.stats import ErrorStatisticsCalculator
 from.glyco.report import save_report as save_report_glyco
 from .report import save_report
-from .data_handling import is_sqlite_file, check_sqlite_table, is_parquet_file, get_parquet_column_names
+from .data_handling import is_sqlite_file, check_sqlite_table, is_parquet_file, get_parquet_column_names, is_valid_split_parquet_dir
+from .reader import read_parquet_dir
 from shutil import copyfile
 
 try:
@@ -547,7 +549,7 @@ class PyProphetRunner(object):
                 if not any([col.startswith("FEATURE_MS1_") for col in all_column_names]):
                     raise click.ClickException("MS1-level feature columns are not present in parquet file.")
 
-                # Filter columes names for FEATURE_MS2_
+                # Filter columes names for FEATURE_MS1_
                 feature_ms1_cols = [col for col in all_column_names if col.startswith('FEATURE_MS1_VAR')]
                 # Read the parquet file
                 ms1_table = pd.read_parquet(infile, columns=['FEATURE_ID'] + feature_ms1_cols)
@@ -600,6 +602,9 @@ class PyProphetRunner(object):
         elif is_parquet_file(infile):
             self.mode = 'parquet'
             self.table = read_parquet(infile, level, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn)
+        elif is_valid_split_parquet_dir(infile):
+            self.mode = 'parquet_split'
+            self.table = read_parquet_dir(infile, level, classifier, ss_main_score, ipf_max_peakgroup_rank, ipf_max_peakgroup_pep, ipf_max_transition_isotope_overlap, ipf_min_transition_sn)
         else:
             self.mode = 'tsv'
             self.table = read_tsv(infile)    
@@ -769,6 +774,13 @@ class PyProphetRunner(object):
 
         elif self.mode == 'parquet':
             self.save_parquet_results(result, extra_writes, scorer.pi0)
+            if self.classifier == 'LDA':
+                self.save_tsv_weights(weights, extra_writes)
+            elif self.classifier == 'XGBoost':
+                self.save_bin_weights(weights, extra_writes)
+
+        elif self.mode == 'parquet_split':
+            self.save_parquet_split_results(result, extra_writes, scorer.pi0)
             if self.classifier == 'LDA':
                 self.save_tsv_weights(weights, extra_writes)
             elif self.classifier == 'XGBoost':
@@ -1100,11 +1112,11 @@ class PyProphetRunner(object):
             # Get TRANSITION_ and FEATURE_TRANSITION_ columns and explode them
             transition_cols = [col for col in init_df.columns if col.startswith('TRANSITION_') or col.startswith('FEATURE_TRANSITION_')]
             transition_cols+=['PRODUCT_MZ', 'ANNOTATION', 'PEPTIDE_IPF_ID']
-            
+
             # Create sub_init_df with only the transition columns to explode
             sub_init_df = init_df.select(['PRECURSOR_ID', 'FEATURE_ID']+transition_cols)
             sub_init_df = sub_init_df.explode(transition_cols)
-            
+
             # Drop transition_cols from init_df
             init_df = init_df.drop(transition_cols)
 
@@ -1136,7 +1148,7 @@ class PyProphetRunner(object):
                 how='left',
                 coalesce=True
             )
-            
+
             del sub_init_df
 
             # Identify columns to group by (non-transition columns except PRODUCT_MZ and ANNOTATION)
@@ -1148,7 +1160,7 @@ class PyProphetRunner(object):
 
             # Group and aggregate
             df = df.group_by(collapse_columns).agg(pl.all())
-            
+
             # Merge with init_df
             df = init_df.join(
                 df, 
@@ -1156,7 +1168,7 @@ class PyProphetRunner(object):
                 how='left',
                 coalesce=True
             )
-            
+
             del init_df
 
             # Write to parquet
@@ -1165,9 +1177,275 @@ class PyProphetRunner(object):
                 compression="zstd",
                 compression_level=11
             )
-        
+
         click.echo("Info: %s written." % self.outfile)
-        
+
+        if result.final_statistics is not None:
+            cutoffs = result.final_statistics["cutoff"].values
+            svalues = result.final_statistics["svalue"].values
+            qvalues = result.final_statistics["qvalue"].values
+
+            pvalues = result.scored_tables.loc[(result.scored_tables.peak_group_rank == 1) & (result.scored_tables.decoy == 0)]["p_value"].values
+            top_targets = result.scored_tables.loc[(result.scored_tables.peak_group_rank == 1) & (result.scored_tables.decoy == 0)]["d_score"].values
+            top_decoys = result.scored_tables.loc[(result.scored_tables.peak_group_rank == 1) & (result.scored_tables.decoy == 1)]["d_score"].values
+
+            save_report(os.path.join(self.prefix + "_" + self.level + "_report.pdf"), self.outfile, top_decoys, top_targets, cutoffs, svalues, qvalues, pvalues, pi0, self.color_palette)
+            click.echo("Info: %s written." % os.path.join(self.prefix + "_" + self.level + "_report.pdf"))
+
+    def save_parquet_split_results(self, result, extra_writes, pi0):
+        if self.infile != self.outfile:
+            copyfile(self.infile, self.outfile)
+
+        if self.level == "ms2" or self.level == "ms1ms2":
+            precursor_file = os.path.join(self.outfile, "precursors_features.parquet")
+
+            # Process the result scores
+            df = pl.from_pandas(result.scored_tables)
+            if 'h_score' in df.columns:
+                df = df.select([
+                    'feature_id', 'd_score', 'h_score', 'h0_score',
+                    'peak_group_rank', 'p_value', 'q_value', 'pep'
+                ])
+                df.columns = ['FEATURE_ID', 'SCORE', 'HSCORE', 'H0SCORE', 
+                            'RANK', 'PVALUE', 'QVALUE', 'PEP']
+            else:
+                df = df.select([
+                    'feature_id', 'd_score', 'peak_group_rank',
+                    'p_value', 'q_value', 'pep'
+                ])
+                df.columns = ['FEATURE_ID', 'SCORE', 'RANK', 'PVALUE', 'QVALUE', 'PEP']
+
+            # Add SCORE_MS2_ prefix to columns except FEATURE_ID
+            new_columns = ['FEATURE_ID'] + [f'SCORE_MS2_{col}' for col in df.columns[1:]]
+            df = df.rename(dict(zip(df.columns, new_columns)))
+
+            # Check and drop SCORE_MS2_ columns if they exist
+            existing_cols = get_parquet_column_names(precursor_file)
+            score_ms2_cols = [col for col in existing_cols if col.startswith("SCORE_MS2_")]
+            if score_ms2_cols:
+                click.echo(click.style("Warn: There are existing SCORE_MS2_ columns, these will be dropped.", fg='yellow'))
+
+            # Build the SELECT p.col list excluding old score columns
+            columns_to_keep = [col for col in existing_cols if not col.startswith("SCORE_MS2_")]
+            column_list_sql = ", ".join([f"p.{col}" for col in columns_to_keep])
+
+            # Build the SELECT s.col list for the new score columns, we don't need to include FEATURE_ID form s since it's already in p
+            new_score_columns = [col for col in df.columns if col != 'FEATURE_ID']
+            new_score_columns_sql = ", ".join([f"s.{col}" for col in new_score_columns])
+
+            # Register the score table with DuckDB
+            arrow_table = df.to_arrow()            
+            con = duckdb.connect()
+            con.register("scores", arrow_table)
+
+            # Write the new scores to the parquet file
+            con.execute(f"""
+            COPY (
+                SELECT {column_list_sql}, {new_score_columns_sql}
+                FROM read_parquet('{precursor_file}') p
+                LEFT JOIN scores s
+                ON p.FEATURE_ID = s.FEATURE_ID
+            ) TO '{precursor_file}'
+            (FORMAT 'parquet', COMPRESSION 'ZSTD', COMPRESSION_LEVEL 11);
+            """)
+
+            click.echo("Info: %s written." % precursor_file)
+
+        elif self.level == "ms1":
+            precursor_file = os.path.join(self.outfile, "precursors_features.parquet")
+
+            # Process the result scores
+            df = pl.from_pandas(result.scored_tables)
+            if 'h_score' in df.columns:
+                df = df.select([
+                    'feature_id', 'd_score', 'h_score', 'h0_score',
+                    'peak_group_rank', 'p_value', 'q_value', 'pep'
+                ])
+                df = df.rename({
+                    'feature_id': 'FEATURE_ID',
+                    'd_score': 'SCORE',
+                    'h_score': 'HSCORE',
+                    'h0_score': 'H0SCORE',
+                    'peak_group_rank': 'RANK',
+                    'p_value': 'PVALUE',
+                    'q_value': 'QVALUE',
+                    'pep': 'PEP'
+                })
+            else:
+                df = df.select([
+                    'feature_id', 'd_score', 'peak_group_rank',
+                    'p_value', 'q_value', 'pep'
+                ])
+                df = df.rename({
+                    'feature_id': 'FEATURE_ID',
+                    'd_score': 'SCORE',
+                    'peak_group_rank': 'RANK',
+                    'p_value': 'PVALUE',
+                    'q_value': 'QVALUE',
+                    'pep': 'PEP'
+                })
+
+            # Add SCORE_MS1_ prefix to columns except FEATURE_ID
+            new_columns = {
+                col: f'SCORE_MS1_{col}' if col != 'FEATURE_ID' else col
+                for col in df.columns
+            }
+            df = df.rename(new_columns)
+
+            # Check and drop SCORE_MS1_ columns if they exist
+            existing_cols = get_parquet_column_names(precursor_file)
+            score_ms1_cols = [col for col in existing_cols if col.startswith("SCORE_MS1_")]
+            if score_ms1_cols:
+                click.echo(click.style("Warn: There are existing SCORE_MS1_ columns, these will be dropped.", fg='yellow'))
+
+            # Build the SELECT p.col list excluding old score columns
+            columns_to_keep = [col for col in existing_cols if not col.startswith("SCORE_MS1_")]
+            column_list_sql = ", ".join([f"p.{col}" for col in columns_to_keep])
+
+            # Build the SELECT s.col list for the new score columns, we don't need to include FEATURE_ID form s since it's already in p
+            new_score_columns = [col for col in df.columns if col != 'FEATURE_ID']
+            new_score_columns_sql = ", ".join([f"s.{col}" for col in new_score_columns])
+
+            # Register the score table with DuckDB
+            arrow_table = df.to_arrow()
+            con = duckdb.connect()
+            con.register("scores", arrow_table)
+
+            # Write the new scores to the parquet file
+            con.execute(f"""
+            COPY (
+                SELECT {column_list_sql}, {new_score_columns_sql}
+                FROM read_parquet('{precursor_file}') p
+                LEFT JOIN scores s
+                ON p.FEATURE_ID = s.FEATURE_ID
+            ) TO '{precursor_file}'
+            (FORMAT 'parquet', COMPRESSION 'ZSTD', COMPRESSION_LEVEL 11);
+            """)
+            click.echo("Info: %s written." % precursor_file)
+
+        elif self.level == "transition":
+            transition_file = os.path.join(self.outfile, "transition_features.parquet")
+
+            # Process the scored tables
+            df = pl.DataFrame(result.scored_tables).select([
+                'feature_id', 'transition_id', 'd_score', 
+                'peak_group_rank', 'p_value', 'q_value', 'pep'
+            ]).rename({
+                'feature_id': 'FEATURE_ID',
+                'transition_id': 'TRANSITION_ID',
+                'd_score': 'SCORE',
+                'peak_group_rank': 'RANK',
+                'p_value': 'PVALUE',
+                'q_value': 'QVALUE',
+                'pep': 'PEP'
+            })
+
+            # Add SCORE_TRANSITION_ prefix to columns except FEATURE_ID and TRANSITION_ID
+            df = df.rename({
+                col: f'SCORE_TRANSITION_{col}' 
+                for col in df.columns 
+                if col not in ['FEATURE_ID', 'TRANSITION_ID']
+            })
+
+            # Check for existing SCORE_TRANSITION_ columns
+            existing_cols = get_parquet_column_names(transition_file)
+            score_transition_cols = [col for col in existing_cols if col.startswith("SCORE_TRANSITION_")]
+            if score_transition_cols:
+                click.echo(click.style("Warn: There are existing SCORE_TRANSITION_ columns, these will be dropped.", fg='yellow'))
+
+            # Build the SELECT p.col list excluding old score columns
+            columns_to_keep = [col for col in existing_cols if not col.startswith("SCORE_TRANSITION_")]
+            column_list_sql = ", ".join([f"t.{col}" for col in columns_to_keep])
+            # Build the SELECT s.col list for the new score columns, we don't need to include FEATURE_ID form s since it's already in p
+            new_score_columns = [col for col in df.columns if col not in ['FEATURE_ID', 'TRANSITION_ID']]
+            new_score_columns_sql = ", ".join([f"s.{col}" for col in new_score_columns])
+
+            # Register the score table with DuckDB
+            arrow_table = df.to_arrow()
+            con = duckdb.connect()
+            con.register("scores", arrow_table)
+
+            # Write the new scores to the parquet file
+            con.execute(f"""
+            COPY (
+                SELECT {column_list_sql}, {new_score_columns_sql}
+                FROM read_parquet('{transition_file}') t
+                LEFT JOIN scores s
+                ON t.FEATURE_ID = s.FEATURE_ID and t.TRANSITION_ID = s.TRANSITION_ID
+            ) TO '{transition_file}'
+            (FORMAT 'parquet', COMPRESSION 'ZSTD', COMPRESSION_LEVEL 11);
+            """)
+
+            click.echo("Info: %s written." % transition_file)
+
+        elif self.level == "alignment":
+            alignment_file = os.path.join(self.outfile, "feature_alignment.parquet")
+
+            # Process the scored tables
+            df = (
+                pl.DataFrame(result.scored_tables)
+                .filter(pl.col("decoy") == 0) # Filter out decoy rows
+                .select(
+                    [
+                        "feature_id",
+                        "d_score",
+                        "peak_group_rank",
+                        "p_value",
+                        "q_value",
+                        "pep",
+                    ]
+                )
+                .rename(
+                    {
+                        "feature_id": "FEATURE_ID",
+                        "d_score": "SCORE",
+                        "peak_group_rank": "RANK",
+                        "p_value": "PVALUE",
+                        "q_value": "QVALUE",
+                        "pep": "PEP",
+                    }
+                )
+            )
+
+            # Add SCORE_ALIGNMENT_ prefix to columns except FEATURE_ID
+            df = df.rename({
+                col: f'SCORE_ALIGNMENT_{col}' 
+                for col in df.columns 
+                if col != 'FEATURE_ID'
+            })
+
+            # Check for existing SCORE_ALIGNMENT_ columns
+            existing_cols = get_parquet_column_names(alignment_file)
+            score_alignment_cols = [col for col in existing_cols if col.startswith("SCORE_ALIGNMENT_")]
+            if score_alignment_cols:
+                click.echo(click.style("Warn: There are existing SCORE_ALIGNMENT_ columns, these will be dropped.", fg='yellow'))
+
+            # Build the SELECT p.col list excluding old score columns
+            columns_to_keep = [col for col in existing_cols if not col.startswith("SCORE_ALIGNMENT_")]
+            column_list_sql = ", ".join([f"a.{col}" for col in columns_to_keep])
+
+            # Build the SELECT s.col list for the new score columns, we don't need to include FEATURE_ID form s since it's already in p
+            new_score_columns = [col for col in df.columns if col != 'FEATURE_ID']
+            new_score_columns_sql = ", ".join([f"s.{col}" for col in new_score_columns])
+
+            # Register the score table with DuckDB
+            arrow_table = df.to_arrow()
+            con = duckdb.connect()
+            con.register("scores", arrow_table)
+
+            # Write the new scores to the parquet file
+            con.execute(f"""
+            COPY (
+                SELECT {column_list_sql}, {new_score_columns_sql}
+                FROM read_parquet('{alignment_file}') a
+                LEFT JOIN scores s
+                ON a.FEATURE_ID = s.FEATURE_ID
+            ) TO '{alignment_file}'
+            (FORMAT 'parquet', COMPRESSION 'ZSTD', COMPRESSION_LEVEL 11);
+            """)
+
+            click.echo("Info: %s written." % alignment_file)
+
         if result.final_statistics is not None:
             cutoffs = result.final_statistics["cutoff"].values
             svalues = result.final_statistics["svalue"].values

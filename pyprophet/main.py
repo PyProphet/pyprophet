@@ -4,6 +4,7 @@ import click
 import sys
 import os
 import pathlib
+import shutil
 import ast
 import time
 
@@ -566,41 +567,100 @@ def export(
 @click.option('--noDecoys', 'noDecoys', is_flag=True, help='Do not include decoys in the exported data')
 # Convert to scoring format
 @click.option('--scoring_format', 'scoring_format', is_flag=True, help='Convert OSW to parquet format that is compatible with the scoring/inference modules')
+@click.option('--split_transition_data/--no-split_transition_data', 'split_transition_data', default=False, show_default=True, help='Split transition data into a separate parquet (default: True).')
 @click.option('--compression', 'compression', default='zstd', show_default=True, type=click.Choice(['lz4', 'uncompressed', 'snappy', 'gzip', 'lzo', 'brotli', 'zstd']), help='Compression algorithm to use for parquet file.')
 @click.option('--compression_level', 'compression_level', default=11, show_default=True, type=int, help='Compression level to use for parquet file.')
-def export_parquet(infile, outfile, oswfile, transitionLevel, onlyFeatures, noDecoys, scoring_format, compression, compression_level):
+def export_parquet(
+    infile,
+    outfile,
+    oswfile,
+    transitionLevel,
+    onlyFeatures,
+    noDecoys,
+    scoring_format,
+    split_transition_data,
+    compression,
+    compression_level
+):
     """
     Export OSW or sqMass to parquet format
     """
     # Check if the input file has an .osw extension
-    if infile.endswith('.osw'):
+    if infile.endswith(".osw"):
         if scoring_format:
             click.echo("Info: Will export OSW to parquet scoring format")
             if os.path.exists(outfile):
-                click.echo(click.style(f"Warn: {outfile} already exists, will overwrite", fg='yellow'))
+                click.echo(
+                    click.style(
+                        f"Warn: {outfile} already exists, will overwrite/delete",
+                        fg="yellow",
+                    )
+                )
+
+                time.sleep(10)
+
+                if os.path.isdir(outfile):
+                    shutil.rmtree(outfile)
+                else:
+                    os.remove(outfile)
+
+            if split_transition_data:
+                click.echo(
+                    f"Info: {outfile} will be a directory containing a separate precursors_features.parquet and a transition_features.parquet"
+                )
+
             start = time.time()
-            convert_osw_to_parquet(infile, outfile, compression_method=compression, compression_level=compression_level)
+            convert_osw_to_parquet(
+                infile,
+                outfile,
+                compression_method=compression,
+                compression_level=compression_level,
+                split_transition_data=split_transition_data
+            )
             end = time.time()
-            click.echo(f"Info: {outfile} written in {end-start:.4f} seconds")
+            click.echo(
+                f"Info: {outfile} written in {end-start:.4f} seconds."
+            )
+
         else:
             if transitionLevel:
                 click.echo("Info: Will export transition level data")
             if outfile is None:
                 outfile = infile.split(".osw")[0] + ".parquet"
             if os.path.exists(outfile):
-                overwrite = click.confirm(f"{outfile} already exists, would you like to overwrite?")
+                overwrite = click.confirm(
+                    f"{outfile} already exists, would you like to overwrite?"
+                )
                 if not overwrite:
                     raise click.ClickException(f"Aborting: {outfile} already exists!")
             click.echo("Info: Parquet file will be written to {}".format(outfile))
-            export_to_parquet(os.path.abspath(infile), os.path.abspath(outfile), transitionLevel, onlyFeatures, noDecoys)
-    elif infile.endswith('.sqmass') or infile.endswith('.sqMass'):
+            export_to_parquet(
+                os.path.abspath(infile),
+                os.path.abspath(outfile),
+                transitionLevel,
+                onlyFeatures,
+                noDecoys,
+            )
+    elif infile.endswith(".sqmass") or infile.endswith(".sqMass"):
         click.echo("Info: Will export sqMass to parquet")
         if os.path.exists(outfile):
-            click.echo(click.style(f"Warn: {outfile} already exists, will overwrite", fg='yellow'))
+            click.echo(
+                click.style(
+                    f"Warn: {outfile} already exists, will overwrite", fg="yellow"
+                )
+            )
         start = time.time()
-        convert_sqmass_to_parquet(infile, outfile, oswfile, compression_method=compression, compression_level=compression_level)
+        convert_sqmass_to_parquet(
+            infile,
+            outfile,
+            oswfile,
+            compression_method=compression,
+            compression_level=compression_level,
+        )
         end = time.time()
-        click.echo(f"Info: {outfile} written in {end-start:.4f} seconds")
+        click.echo(
+            f"Info: {outfile} written in {end-start:.4f} seconds."
+        )
     else:
         raise click.ClickException("Input file must be of type .osw or .sqmass/.sqMass")
 
