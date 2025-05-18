@@ -3,7 +3,6 @@ import numpy as np
 import click
 import sys
 import os
-import psutil
 import pathlib
 import shutil
 import ast
@@ -18,7 +17,7 @@ from .export import export_tsv, export_score_plots
 from .export_compound import export_compound_tsv
 from .glyco.export import export_tsv as export_glyco_tsv, export_score_plots as export_glyco_score_plots
 from .filter import filter_sqmass, filter_osw
-from .data_handling import (format_bytes, transform_pi0_lambda, transform_threads, transform_subsample_ratio, check_sqlite_table)
+from .data_handling import (transform_pi0_lambda, transform_threads, transform_subsample_ratio, check_sqlite_table)
 from .export_parquet import export_to_parquet, convert_osw_to_parquet, convert_sqmass_to_parquet
 from functools import update_wrapper
 import sqlite3
@@ -611,8 +610,6 @@ def export_parquet(
                 )
 
             start = time.time()
-            process = psutil.Process(os.getpid())
-            mem_before = process.memory_info().rss
             convert_osw_to_parquet(
                 infile,
                 outfile,
@@ -621,10 +618,8 @@ def export_parquet(
                 split_transition_data=split_transition_data
             )
             end = time.time()
-            mem_after = process.memory_info().rss
-            mem_used = mem_after - mem_before
             click.echo(
-                f"Info: {outfile} written in {end-start:.4f} seconds. Approx. memory used: {format_bytes(mem_used)}"
+                f"Info: {outfile} written in {end-start:.4f} seconds."
             )
 
         else:
@@ -655,8 +650,6 @@ def export_parquet(
                 )
             )
         start = time.time()
-        process = psutil.Process(os.getpid())
-        mem_before = process.memory_info().rss
         convert_sqmass_to_parquet(
             infile,
             outfile,
@@ -665,10 +658,8 @@ def export_parquet(
             compression_level=compression_level,
         )
         end = time.time()
-        mem_after = process.memory_info().rss
-        mem_used = mem_after - mem_before
         click.echo(
-            f"Info: {outfile} written in {end-start:.4f} seconds. Approx. memory used: {format_bytes(mem_used)}"
+            f"Info: {outfile} written in {end-start:.4f} seconds."
         )
     else:
         raise click.ClickException("Input file must be of type .osw or .sqmass/.sqMass")

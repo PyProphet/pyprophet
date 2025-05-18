@@ -8,7 +8,6 @@ import pandas as pd
 import polars as pl
 import pyarrow as pa
 import pyarrow.parquet as pq
-import psutil
 from pyprophet.export import check_sqlite_table
 from duckdb_extensions import extension_importer
 import re
@@ -38,35 +37,6 @@ def load_sqlite_scanner(conn: duckdb.DuckDBPyConnection):
 def get_table_columns(sqlite_file: str, table: str) -> list:
     with sqlite3.connect(sqlite_file) as conn:
         return [row[1] for row in conn.execute(f"PRAGMA table_info({table})")]
-
-def write_parquet_batches(
-    df: pl.DataFrame, path: str, 
-    row_group_size: int = 100_000,
-    compression_method: str = "zstd",
-    compression_level: int = 11,
-):
-    print(f"Info: number of rows: {df.height} and number of columns: {df.width}")
-    table = df.to_arrow()
-    writer = pq.ParquetWriter(
-        path,
-        table.schema,
-        compression=compression_method,
-        use_dictionary=True,
-        compression_level=compression_level,
-    )
-    total_rows = df.height
-    process = psutil.Process(os.getpid())
-    for start in range(0, total_rows, row_group_size):
-        end = min(start + row_group_size, total_rows)
-        batch = table.slice(start, end - start)
-        mem_before_batch = process.memory_info().rss
-        writer.write_table(batch)
-        gc.collect()
-        mem_after_batch = process.memory_info().rss
-        click.echo(
-            f"  - [{ round(start/row_group_size)+1 } / {round(total_rows/row_group_size)+1}] Wrote rows {start}–{end}, memory delta: { format_bytes(max(0, (mem_after_batch - mem_before_batch))) }"
-        )
-    writer.close()
 
 def getPeptideProteinScoreTable(conndb, level):
     if level == 'peptide':
