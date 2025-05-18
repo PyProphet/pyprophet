@@ -7,9 +7,10 @@ import duckdb
 import sys
 import click
 import time
+import os
 
 from scipy.stats import rankdata
-from .data_handling import check_sqlite_table, create_index_if_not_exists, is_parquet_file, get_parquet_column_names
+from .data_handling import check_sqlite_table, create_index_if_not_exists, is_parquet_file, get_parquet_column_names, is_valid_split_parquet_dir
 from shutil import copyfile
 
 
@@ -522,6 +523,204 @@ def read_pyp_parquet_transition(path, ipf_max_transition_pep, ipf_h0):
     return data
 
 
+def read_pyp_parquet_dir_peakgroup_precursor(path, ipf_max_peakgroup_pep, ipf_ms1_scoring, ipf_ms2_scoring):
+    click.echo("Info: Reading precursor-level data ... ", nl=False)
+    # precursors are restricted according to ipf_max_peakgroup_pep to exclude very poor peak groups
+    start = time.time()
+    
+    precursor_file = os.path.join(path, "precursors_features.parquet")
+    transition_file = os.path.join(path, "transition_features.parquet")
+
+    all_precursor_column_names = get_parquet_column_names(precursor_file)
+    all_transition_column_names = get_parquet_column_names(transition_file)
+    
+    con = duckdb.connect()
+    con.execute(
+        f"CREATE VIEW precursors AS SELECT * FROM read_parquet('{precursor_file}')"
+    )
+    
+    con.execute(
+        f"CREATE VIEW transitions AS SELECT * FROM read_parquet('{transition_file}')"
+    )
+    
+    # only use MS2 precursors
+    if not ipf_ms1_scoring and ipf_ms2_scoring:
+        if not any([col.startswith("SCORE_MS2_") for col in all_precursor_column_names]) or not any([col.startswith("SCORE_TRANSITION_") for col in all_transition_column_names]):
+            raise click.ClickException("Apply scoring to MS2 and transition-level data before running IPF.")
+
+        query = f"""
+        SELECT
+            p.FEATURE_ID,
+            p.SCORE_MS2_PEP AS MS2_PEAKGROUP_PEP,
+            NULL AS MS1_PRECURSOR_PEP,
+            t.SCORE_TRANSITION_PEP AS MS2_PRECURSOR_PEP
+        FROM precursors AS p
+        INNER JOIN 
+            (
+                SELECT 
+                    t.FEATURE_ID,
+                    t.SCORE_TRANSITION_PEP
+                FROM transitions AS t
+                WHERE t.TRANSITION_TYPE = ''
+                AND t.TRANSITION_DECOY = 0
+            ) AS t ON p.FEATURE_ID = t.FEATURE_ID
+        WHERE p.PRECURSOR_DECOY = 0
+        AND p.SCORE_MS2_PEP < {ipf_max_peakgroup_pep};"""
+        data = con.execute(query).df()
+    
+    # only use MS1 precursors
+    elif ipf_ms1_scoring and not ipf_ms2_scoring:
+        if not any([col.startswith("SCORE_MS1_") for col in all_precursor_column_names]) or not any([col.startswith("SCORE_MS2_") for col in all_precursor_column_names]):
+            raise click.ClickException("Apply scoring to MS1, MS2 and transition-level data before running IPF.")
+
+        query = f"""
+        SELECT
+            p.FEATURE_ID,
+            p.SCORE_MS2_PEP AS MS2_PEAKGROUP_PEP,
+            p.SCORE_MS1_PEP AS MS1_PRECURSOR_PEP,
+            NULL AS MS2_PRECURSOR_PEP
+        FROM precursors AS p
+        WHERE p.PRECURSOR_DECOY = 0
+        AND p.SCORE_MS2_PEP < {ipf_max_peakgroup_pep};"""
+        data = con.execute(query).df()
+        
+    # use both MS1 and MS2 precursors
+    elif ipf_ms1_scoring and ipf_ms2_scoring:
+        if not any([col.startswith("SCORE_MS1_") for col in all_precursor_column_names]) or not any([col.startswith("SCORE_MS2_") for col in all_precursor_column_names]) or not any([col.startswith("SCORE_TRANSITION_") for col in all_transition_column_names]):
+            raise click.ClickException("Apply scoring to MS1, MS2 and transition-level data before running IPF.")
+
+        query = f"""
+        SELECT
+            p.FEATURE_ID,
+            p.SCORE_MS2_PEP AS MS2_PEAKGROUP_PEP,
+            p.SCORE_MS1_PEP AS MS1_PRECURSOR_PEP,
+            t.SCORE_TRANSITION_PEP AS MS2_PRECURSOR_PEP
+        FROM precursors AS p
+        INNER JOIN 
+            (
+                SELECT 
+                    t.FEATURE_ID,
+                    t.SCORE_TRANSITION_PEP
+                FROM transitions AS t
+                WHERE t.TRANSITION_TYPE = ''
+                AND t.TRANSITION_DECOY = 0
+            ) AS t ON p.FEATURE_ID = t.FEATURE_ID
+        WHERE p.PRECURSOR_DECOY = 0
+        AND p.SCORE_MS2_PEP < {ipf_max_peakgroup_pep};"""
+        data = con.execute(query).df()
+        
+    # do not use any precursor information
+    else:
+        if not any([col.startswith("SCORE_MS2_") for col in all_precursor_column_names]) or not any([col.startswith("SCORE_TRANSITION_") for col in all_transition_column_names]):
+            raise click.ClickException("Apply scoring to MS2 and transition-level data before running IPF.")
+
+        query = f"""
+        SELECT
+            p.FEATURE_ID,
+            p.SCORE_MS2_PEP AS MS2_PEAKGROUP_PEP,
+            NULL AS MS1_PRECURSOR_PEP,
+            NULL AS MS2_PRECURSOR_PEP
+        FROM precursors AS p
+        WHERE p.PRECURSOR_DECOY = 0
+        AND p.SCORE_MS2_PEP < {ipf_max_peakgroup_pep};"""
+        data = con.execute(query).df()
+        
+    data.columns = [col.lower() for col in data.columns]
+    con.close()
+    end = time.time()
+    click.echo(f"{end-start:.4f} seconds")
+    
+    return data
+    
+def read_pyp_parquet_dir_transition(path, ipf_max_transition_pep, ipf_h0):
+    click.echo("Info: Reading peptidoform-level data ... ", nl=False)
+     # only the evidence is restricted to ipf_max_transition_pep, the peptidoform-space is complete
+    start = time.time()
+    
+    transition_file = os.path.join(path, "transition_features.parquet")
+
+    all_transition_column_names = get_parquet_column_names(transition_file)
+    
+    con = duckdb.connect()
+    con.execute(
+        f"CREATE VIEW transitions AS SELECT * FROM read_parquet('{transition_file}')"
+    )
+    
+    # transition-level evidence
+    query = f"""
+    SELECT
+        t.FEATURE_ID,
+        t.TRANSITION_ID,
+        t.SCORE_TRANSITION_PEP AS PEP
+    FROM transitions AS t
+    WHERE t.TRANSITION_TYPE != ''
+    AND t.TRANSITION_DECOY = 0
+    AND t.SCORE_TRANSITION_PEP < {ipf_max_transition_pep};"""
+    evidence = con.execute(query).df()
+    evidence.columns = [col.lower() for col in evidence.columns]
+    
+    # transition-level bitmask
+    query = """
+    SELECT DISTINCT
+        t.TRANSITION_ID,
+        t.IPF_PEPTIDE_ID AS PEPTIDE_ID,
+        1 AS BMASK
+    FROM transitions AS t
+    WHERE t.TRANSITION_TYPE != ''
+    AND t.TRANSITION_DECOY = 0
+    AND t.IPF_PEPTIDE_ID IS NOT NULL;"""
+    bitmask = con.execute(query).df()
+    bitmask.columns = [col.lower() for col in bitmask.columns]
+    
+    # potential peptidoforms per feature
+    query = """
+    SELECT
+        t.FEATURE_ID,
+        COUNT(DISTINCT t.IPF_PEPTIDE_ID) AS NUM_PEPTIDOFORMS
+    FROM transitions AS t
+    WHERE t.TRANSITION_TYPE != ''
+    AND t.TRANSITION_DECOY = 0
+    AND t.IPF_PEPTIDE_ID IS NOT NULL
+    GROUP BY t.FEATURE_ID
+    ORDER BY t.FEATURE_ID;"""
+    num_peptidoforms = con.execute(query).df()
+    num_peptidoforms.columns = [col.lower() for col in num_peptidoforms.columns]
+    
+    # peptidoform space per feature
+    query = """
+    SELECT DISTINCT
+        t.FEATURE_ID,
+        t.IPF_PEPTIDE_ID AS PEPTIDE_ID
+    FROM transitions AS t
+    WHERE t.TRANSITION_TYPE != ''
+    AND t.TRANSITION_DECOY = 0
+    AND t.IPF_PEPTIDE_ID IS NOT NULL
+    ORDER BY t.FEATURE_ID;"""
+    peptidoforms = con.execute(query).df()
+    peptidoforms.columns = [col.lower() for col in peptidoforms.columns]
+    
+    con.close()
+    
+    # add h0 (peptide_id: -1) to peptidoform-space if necessary
+    if ipf_h0:
+        peptidoforms = pd.concat([peptidoforms, pd.DataFrame({'feature_id': peptidoforms['feature_id'].unique(), 'peptide_id': -1})])
+        
+    # generate transition-peptidoform table
+    trans_pf = pd.merge(evidence, peptidoforms, how='outer', on='feature_id')
+    
+    # apply bitmask
+    trans_pf_bm = pd.merge(trans_pf, bitmask, how='left', on=['transition_id', 'peptide_id']).fillna(0)
+    
+    # append number of peptidoforms
+    data = pd.merge(trans_pf_bm, num_peptidoforms, how='inner', on='feature_id')
+    
+    end = time.time()
+    click.echo(f"{end-start:.4f} seconds")
+    
+    return data      
+        
+
+
 def prepare_precursor_bm(data):
     # MS1-level precursors
     ms1_precursor_data = data[['feature_id','ms2_peakgroup_pep','ms1_precursor_pep']].dropna(axis=0, how='any')
@@ -722,6 +921,34 @@ def get_feature_mapping_across_runs(infile, ipf_max_alignment_pep=1):
 
     return data
 
+def get_feature_mapping_across_runs_parquet(infile, ipf_max_alignment_pep=1):
+    click.echo("Info: Reading Across Run Feature Alignment Mapping ... ", nl=False)
+    start = time.time()
+
+    alignment_file = os.path.join(infile, "feature_alignment.parquet")
+    
+    con = duckdb.connect()
+    con.execute(
+            f"CREATE VIEW alignment_features AS SELECT * FROM read_parquet('{alignment_file}')"
+        )
+    
+    query = f"""
+    SELECT
+        DENSE_RANK() OVER (ORDER BY a.PRECURSOR_ID, a.ALIGNMENT_ID) AS ALIGNMENT_GROUP_ID,
+        a.FEATURE_ID AS FEATURE_ID
+    FROM alignment_features AS a
+    WHERE DECOY = 1
+    AND a.SCORE_ALIGNMENT_PEP < {ipf_max_alignment_pep}
+    ORDER BY ALIGNMENT_GROUP_ID;"""
+    data = con.execute(query).df()
+    data.columns = [col.lower() for col in data.columns]
+    con.close()
+    
+    end = time.time()
+    click.echo(f"{end-start:.4f} seconds")
+    
+    return data
+    
 
 def infer_peptidoforms(infile, outfile, ipf_ms1_scoring, ipf_ms2_scoring, ipf_h0, ipf_grouped_fdr, ipf_max_precursor_pep, ipf_max_peakgroup_pep, ipf_max_precursor_peakgroup_pep, ipf_max_transition_pep, propagate_signal_across_runs, ipf_max_alignment_pep=1, across_run_confidence_threshold=0.5):
     click.echo("Info: Starting IPF (Inference of PeptidoForms).")
@@ -729,6 +956,8 @@ def infer_peptidoforms(infile, outfile, ipf_ms1_scoring, ipf_ms2_scoring, ipf_h0
     # precursor level
     if is_parquet_file(infile):
         precursor_table = read_pyp_parquet_peakgroup_precursor(infile, ipf_max_peakgroup_pep, ipf_ms1_scoring, ipf_ms2_scoring)
+    elif is_valid_split_parquet_dir(infile):
+        precursor_table = read_pyp_parquet_dir_peakgroup_precursor(infile, ipf_max_peakgroup_pep, ipf_ms1_scoring, ipf_ms2_scoring)
     else:
         precursor_table = read_pyp_peakgroup_precursor(infile, ipf_max_peakgroup_pep, ipf_ms1_scoring, ipf_ms2_scoring)
     precursor_data = precursor_inference(precursor_table, ipf_ms1_scoring, ipf_ms2_scoring, ipf_max_precursor_pep, ipf_max_precursor_peakgroup_pep)
@@ -736,11 +965,16 @@ def infer_peptidoforms(infile, outfile, ipf_ms1_scoring, ipf_ms2_scoring, ipf_h0
     # peptidoform level
     if is_parquet_file(infile):
         peptidoform_table = read_pyp_parquet_transition(infile, ipf_max_transition_pep, ipf_h0)
+    elif is_valid_split_parquet_dir(infile):
+        peptidoform_table = read_pyp_parquet_dir_transition(infile, ipf_max_transition_pep, ipf_h0)
     else:
         peptidoform_table = read_pyp_transition(infile, ipf_max_transition_pep, ipf_h0)
     ## prepare for propagating signal across runs for aligned features
     if propagate_signal_across_runs:
-        across_run_feature_map = get_feature_mapping_across_runs(infile, ipf_max_alignment_pep)
+        if is_valid_split_parquet_dir(infile):
+            across_run_feature_map = get_feature_mapping_across_runs_parquet(infile, ipf_max_alignment_pep)
+        else:
+            across_run_feature_map = get_feature_mapping_across_runs(infile, ipf_max_alignment_pep)
         peptidoform_table = peptidoform_table.merge(across_run_feature_map, how='left', on='feature_id')
         ## Fill missing alignment_group_id with feature_id for those that are not aligned
         peptidoform_table["alignment_group_id"] = peptidoform_table["alignment_group_id"].astype(object)
@@ -811,6 +1045,49 @@ def infer_peptidoforms(infile, outfile, ipf_ms1_scoring, ipf_ms2_scoring, ipf_h0
             compression="zstd",
             compression_level=11
         )
+    elif is_valid_split_parquet_dir(infile):
+        precursor_file = os.path.join(infile, "precursors_features.parquet")
+        
+        # Rename score columnes wiht SCORE_IPF_
+        peptidoform_data = peptidoform_data.rename(columns={
+            'PRECURSOR_PEAKGROUP_PEP': 'SCORE_IPF_PRECURSOR_PEAKGROUP_PEP',
+            'QVALUE': 'SCORE_IPF_QVALUE',
+            'PEP': 'SCORE_IPF_PEP'
+        })
+        
+        
+        # Register the score table with DuckDB
+        arrow_table = pl.from_pandas(peptidoform_data).to_arrow()
+        con = duckdb.connect()
+        con.register("scores", arrow_table)
+        
+        # Check and drop SCORE_IPF_ columns if they exist
+        existing_cols = get_parquet_column_names(precursor_file)
+        score_ipf_cols = [col for col in existing_cols if col.startswith("SCORE_IPF")]
+        if score_ipf_cols:
+            click.echo(click.style("Warn: There are existing SCORE_IPF_ columns, these will be dropped.", fg='yellow'))
+            
+        # Build the SELECT p.col list excluding old score columns
+        columns_to_keep = [col for col in existing_cols if not col.startswith("SCORE_IPF_")]
+        column_list_sql = ", ".join([f"p.{col}" for col in columns_to_keep])
+        
+        # Write the new scores to the parquet file
+        con.execute(f"""
+            COPY (
+                SELECT 
+                    {column_list_sql},
+                    s.SCORE_IPF_PRECURSOR_PEAKGROUP_PEP,
+                    s.SCORE_IPF_QVALUE,
+                    s.SCORE_IPF_PEP
+                FROM read_parquet('{precursor_file}') p
+                LEFT JOIN scores s
+                    ON p.FEATURE_ID = s.FEATURE_ID 
+                AND p.IPF_PEPTIDE_ID = s.PEPTIDE_ID
+            ) TO '{precursor_file}'
+            (FORMAT 'parquet', COMPRESSION 'ZSTD', COMPRESSION_LEVEL 11);
+        """)
+
+        click.echo(f"Info: {precursor_file} written.")
     else:
         if infile != outfile:
             copyfile(infile, outfile)
