@@ -412,9 +412,37 @@ def convert_osw_to_parquet(
         path = os.path.join(outfile, "precursors_features.parquet")
         
         precursor_template = """
+        WITH normalized_peptides AS (
+            SELECT 
+                ID AS PEPTIDE_ID,
+                REPLACE(
+                    REPLACE(
+                        REPLACE(
+                            REPLACE(MODIFIED_SEQUENCE, '(UniMod:1)', '(Acetyl)'),
+                        '(UniMod:35)', '(Oxidation)'),
+                    '(UniMod:21)', '(Phospho)'),
+                '(UniMod:4)', '(Carbamidomethyl)') AS NORMALIZED_SEQUENCE
+            FROM sqlite_scan('{infile}', 'PEPTIDE')
+        ),
+        ipf_groups AS (
+            SELECT 
+                NORMALIZED_SEQUENCE,
+                MIN(PEPTIDE_ID) AS IPF_PEPTIDE_ID
+            FROM normalized_peptides
+            GROUP BY NORMALIZED_SEQUENCE
+        ),
+        peptide_ipf_map AS (
+            SELECT 
+                np.PEPTIDE_ID,
+                g.IPF_PEPTIDE_ID
+            FROM normalized_peptides np
+            JOIN ipf_groups g USING (NORMALIZED_SEQUENCE)
+        )
+
         SELECT 
             PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID AS PROTEIN_ID,
             PEPTIDE.ID AS PEPTIDE_ID,
+            pipf.IPF_PEPTIDE_ID AS IPF_PEPTIDE_ID,
             PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID AS PRECURSOR_ID,
             PROTEIN.PROTEIN_ACCESSION AS PROTEIN_ACCESSION,
             PEPTIDE.UNMODIFIED_SEQUENCE,
@@ -448,6 +476,8 @@ def convert_osw_to_parquet(
             ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
         INNER JOIN sqlite_scan('{infile}', 'PEPTIDE') AS PEPTIDE 
             ON PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
+        INNER JOIN peptide_ipf_map AS pipf
+            ON PEPTIDE.ID = pipf.PEPTIDE_ID
         INNER JOIN sqlite_scan('{infile}', 'PEPTIDE_PROTEIN_MAPPING') AS PEPTIDE_PROTEIN_MAPPING 
             ON PEPTIDE.ID = PEPTIDE_PROTEIN_MAPPING.PEPTIDE_ID
         INNER JOIN sqlite_scan('{infile}', 'PROTEIN') AS PROTEIN 
@@ -462,6 +492,7 @@ def convert_osw_to_parquet(
         INNER JOIN sqlite_scan('{infile}', 'RUN') AS RUN 
             ON FEATURE.RUN_ID = RUN.ID
         """
+
 
         precursor_query = precursor_template.format(
             infile=infile,
