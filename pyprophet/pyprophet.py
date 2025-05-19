@@ -1,25 +1,32 @@
 from __future__ import division
 
-import pandas as pd
-import numpy as np
-import multiprocessing
-import sys
 import time
-import click
 import operator
-
-from .stats import (lookup_values_from_error_table, error_statistics,
-                   mean_and_std_dev, final_err_table, summary_err_table,
-                   posterior_chromatogram_hypotheses_fast)
-from .data_handling import (prepare_data_table, Experiment)
-from .classifiers import (LDALearner, XGBLearner)
-from .semi_supervised import (AbstractSemiSupervisedLearner, StandardSemiSupervisedLearner)
+import multiprocessing
 from collections import namedtuple
 from contextlib import contextmanager
+import pandas as pd
+import numpy as np
+import click
+
+from .io._config import RunnerIOConfig, ErrorEstimationConfig
+from .stats import (
+    lookup_values_from_error_table,
+    error_statistics,
+    mean_and_std_dev,
+    final_err_table,
+    summary_err_table,
+    posterior_chromatogram_hypotheses_fast,
+)
+from .data_handling import prepare_data_table, Experiment
+from .classifiers import LDALearner, XGBLearner
+from .semi_supervised import StandardSemiSupervisedLearner
+
 
 try:
     profile
 except NameError:
+
     def profile(fun):
         return fun
 
@@ -38,7 +45,9 @@ def timer(name=""):
     needed -= minutes * 60
 
     if name:
-        click.echo("Info: Time needed for %s: %02d:%02d:%.1f" % (name, hours, minutes, needed))
+        click.echo(
+            "Info: Time needed for %s: %02d:%02d:%.1f" % (name, hours, minutes, needed)
+        )
     else:
         click.echo("Info: Time needed: %02d:%02d:%.1f" % (hours, minutes, needed))
 
@@ -47,12 +56,12 @@ Result = namedtuple("Result", "summary_statistics final_statistics scored_tables
 
 
 def unwrap_self_for_multiprocessing(arg):
-    """ You can not call methods with multiprocessing, but free functions,
-        If you want to call  inst.method(arg0, arg1),
+    """You can not call methods with multiprocessing, but free functions,
+    If you want to call  inst.method(arg0, arg1),
 
-            unwrap_self_for_multiprocessing(inst, "method", (arg0, arg1))
+        unwrap_self_for_multiprocessing(inst, "method", (arg0, arg1))
 
-        does the trick.
+    does the trick.
     """
     (inst, method_name, args) = arg
     return getattr(inst, method_name)(*args)
@@ -71,7 +80,18 @@ def calculate_params_for_d_score(classifier, experiment):
 
 class Scorer(object):
 
-    def __init__(self, classifier, score_columns, experiment, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, tric_chromprob, ss_score_filter, color_palette, level):
+    def __init__(
+        self,
+        classifier,
+        score_columns,
+        experiment,
+        group_id,
+        error_estimation_config: ErrorEstimationConfig,
+        tric_chromprob,
+        ss_score_filter,
+        color_palette,
+        level,
+    ):
 
         self.classifier = classifier
         self.score_columns = score_columns
@@ -81,17 +101,7 @@ class Scorer(object):
         experiment["d_score"] = (final_score - self.mu) / self.nu
 
         self.group_id = group_id
-        self.parametric = parametric
-        self.pfdr = pfdr
-        self.pi0_lambda = pi0_lambda
-        self.pi0_method = pi0_method
-        self.pi0_smooth_df = pi0_smooth_df
-        self.pi0_smooth_log_pi0 = pi0_smooth_log_pi0
-        self.lfdr_truncate = lfdr_truncate
-        self.lfdr_monotone = lfdr_monotone
-        self.lfdr_transformation = lfdr_transformation
-        self.lfdr_adj = lfdr_adj
-        self.lfdr_eps = lfdr_eps
+        self.error_estimation_config = error_estimation_config
         self.tric_chromprob = tric_chromprob
         self.ss_score_filter = ss_score_filter
         self.color_palette = color_palette
@@ -100,20 +110,22 @@ class Scorer(object):
         target_scores = experiment.get_top_target_peaks()["d_score"]
         decoy_scores = experiment.get_top_decoy_peaks()["d_score"]
 
-        self.error_stat, self.pi0 = error_statistics(target_scores,
-                                                     decoy_scores,
-                                                     self.parametric,
-                                                     self.pfdr,
-                                                     self.pi0_lambda,
-                                                     self.pi0_method, 
-                                                     self.pi0_smooth_df, 
-                                                     self.pi0_smooth_log_pi0, 
-                                                     True, # compute_lfdr
-                                                     self.lfdr_truncate,
-                                                     self.lfdr_monotone,
-                                                     self.lfdr_transformation,
-                                                     self.lfdr_adj,
-                                                     self.lfdr_eps)
+        self.error_stat, self.pi0 = error_statistics(
+            target_scores,
+            decoy_scores,
+            error_estimation_config.parametric,
+            error_estimation_config.pfdr,
+            error_estimation_config.pi0_lambda,
+            error_estimation_config.pi0_method,
+            error_estimation_config.pi0_smooth_df,
+            error_estimation_config.pi0_smooth_log_pi0,
+            True,  # compute_lfdr
+            error_estimation_config.lfdr_truncate,
+            error_estimation_config.lfdr_monotone,
+            error_estimation_config.lfdr_transformation,
+            error_estimation_config.lfdr_adj,
+            error_estimation_config.lfdr_eps,
+        )
 
         self.number_target_pg = len(experiment.df[experiment.df.is_decoy.eq(False)])
         self.number_target_peaks = len(experiment.get_top_target_peaks().df)
@@ -123,26 +135,39 @@ class Scorer(object):
 
     def score(self, table):
 
-        prepared_table, __ = prepare_data_table(table, self.ss_score_filter, tg_id_name=self.group_id, score_columns=self.score_columns, level=self.level)
+        prepared_table, __ = prepare_data_table(
+            table,
+            self.ss_score_filter,
+            tg_id_name=self.group_id,
+            score_columns=self.score_columns,
+            level=self.level,
+        )
         texp = Experiment(prepared_table)
         score = self.classifier.score(texp, True)
         texp["r_score"] = score
         texp["d_score"] = (score - self.mu) / self.nu
 
-        p_values, s_values, peps, q_values = lookup_values_from_error_table(texp["d_score"].values,
-                                                                    self.error_stat)
+        p_values, s_values, peps, q_values = lookup_values_from_error_table(
+            texp["d_score"].values, self.error_stat
+        )
 
         texp["pep"] = peps
         texp["q_value"] = q_values
         texp["s_value"] = s_values
         texp["p_value"] = p_values
-        click.echo("Info: Mean qvalue = %e, std_dev qvalue = %e" % (np.mean(q_values),
-                                                                  np.std(q_values, ddof=1)))
-        click.echo("Info: Mean svalue = %e, std_dev svalue = %e" % (np.mean(s_values),
-                                                                  np.std(s_values, ddof=1)))
+        click.echo(
+            "Info: Mean qvalue = %e, std_dev qvalue = %e"
+            % (np.mean(q_values), np.std(q_values, ddof=1))
+        )
+        click.echo(
+            "Info: Mean svalue = %e, std_dev svalue = %e"
+            % (np.mean(s_values), np.std(s_values, ddof=1))
+        )
         texp.add_peak_group_rank()
 
-        df = table.join(texp[["r_score", "d_score", "p_value", "q_value", "pep", "peak_group_rank"]])
+        df = table.join(
+            texp[["r_score", "d_score", "p_value", "q_value", "pep", "peak_group_rank"]]
+        )
 
         if self.tric_chromprob:
             df = self.add_chromatogram_probabilities(df, texp)
@@ -150,7 +175,9 @@ class Scorer(object):
         return df
 
     def add_chromatogram_probabilities(self, scored_table, texp):
-        allhypothesis, h0 = posterior_chromatogram_hypotheses_fast(texp, self.pi0['pi0'])
+        allhypothesis, h0 = posterior_chromatogram_hypotheses_fast(
+            texp, self.pi0["pi0"]
+        )
         texp.df["h_score"] = allhypothesis
         texp.df["h0_score"] = h0
         scored_table = scored_table.join(texp[["h_score", "h0_score"]])
@@ -161,8 +188,11 @@ class Scorer(object):
         return final_err_table(self.error_stat), summary_err_table(self.error_stat)
 
     def minimal_error_stat(self):
-        minimal_err_stat = ErrorStatistics(self.error_stat.df.loc[:, ["svalue", "qvalue", "pvalue", "pep", "cutoff"]],
-                                           self.error_stat.num_null, self.error_stat.num_total)
+        minimal_err_stat = ErrorStatistics(
+            self.error_stat.df.loc[:, ["svalue", "qvalue", "pvalue", "pep", "cutoff"]],
+            self.error_stat.num_null,
+            self.error_stat.num_total,
+        )
         return minimal_err_stat
 
     def __getstate__(self):
@@ -175,189 +205,164 @@ class Scorer(object):
         """when unpickling"""
         self.__dict__.update(data)
 
-class HolyGostQuery(object):
 
-    """ HolyGhostQuery assembles the unsupervised methods.
-        See below how PyProphet parameterises this class.
+class PyProphet:
+    """
+    PyProphet assembles the semi-supervised scoring workflow, including training and applying
+    statistical classifiers (e.g., LDA, XGBoost), estimating error rates, and generating scores.
     """
 
-    def __init__(self, semi_supervised_learner, classifier, ss_num_iter, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, tric_chromprob, threads, test, ss_score_filter, color_palette, level):
-        assert isinstance(semi_supervised_learner,
-                          AbstractSemiSupervisedLearner)
-        self.semi_supervised_learner = semi_supervised_learner
-        self.classifier = classifier
-        self.ss_num_iter = ss_num_iter
-        self.group_id = group_id
-        self.parametric = parametric
-        self.pfdr = pfdr
-        self.pi0_lambda = pi0_lambda
-        self.pi0_method = pi0_method
-        self.pi0_smooth_df = pi0_smooth_df
-        self.pi0_smooth_log_pi0 = pi0_smooth_log_pi0
-        self.lfdr_truncate = lfdr_truncate
-        self.lfdr_monotone = lfdr_monotone
-        self.lfdr_transformation = lfdr_transformation
-        self.lfdr_adj = lfdr_adj
-        self.lfdr_eps = lfdr_eps
-        self.tric_chromprob = tric_chromprob
-        self.threads = threads
-        self.test = test
-        self.ss_score_filter = ss_score_filter
-        self.color_palette = color_palette
-        self.level = level
+    def __init__(self, config: RunnerIOConfig):
+        self.config = config
+        self.rc = config.runner
+
+        # Instantiate base learner
+        if self.rc.classifier == "LDA":
+            base_learner = LDALearner()
+        elif self.rc.classifier == "XGBoost":
+            base_learner = XGBLearner(
+                self.rc.xgb_hyperparams,
+                self.rc.xgb_params,
+                self.rc.xgb_params_space,
+                self.rc.threads,
+            )
+        else:
+            raise click.ClickException(
+                f"Classifier {self.rc.classifier} not supported."
+            )
+
+        # Build semi-supervised learner
+        self.semi_supervised_learner = StandardSemiSupervisedLearner.from_config(
+            config, base_learner
+        )
 
     def _setup_experiment(self, table):
-        prepared_table, score_columns = prepare_data_table(table, self.ss_score_filter, tg_id_name=self.group_id, level=self.level)
+        prepared_table, score_columns = prepare_data_table(
+            table,
+            self.rc.ss_score_filter,
+            tg_id_name=self.rc.group_id,
+            level=self.config.level,
+        )
         experiment = Experiment(prepared_table)
         experiment.log_summary()
         return experiment, score_columns
 
     def apply_weights(self, table, loaded_weights):
-        with timer():
-            click.echo("Info: Applying weights.")
-            result, scorer, trained_weights = self._apply_weights(table, loaded_weights)
-            click.echo("Info: Finished processing of input data.")
-        return result, scorer, trained_weights
+        with timer("Apply Weights"):
+            experiment, score_columns = self._setup_experiment(table)
 
-    def _apply_weights(self, table, loaded_weights):
+            if self.rc.classifier == "LDA":
+                if np.all(score_columns == loaded_weights["score"].values):
+                    weights = loaded_weights["weight"].values
+                else:
+                    raise click.ClickException(
+                        "Scores in weights file do not match data."
+                    )
+            elif self.rc.classifier == "XGBoost":
+                weights = loaded_weights
 
-        experiment, score_columns = self._setup_experiment(table)
+            final_classifier = self._apply_weights_on_exp(experiment, weights)
+            return self._build_result(
+                table, final_classifier, score_columns, experiment
+            )
 
-        if self.classifier == "LDA":
-            if np.all(score_columns == loaded_weights['score'].values):
-                weights = loaded_weights['weight'].values
-            else:
-                raise click.ClickException("Scores in weights file do not match data.")
-        elif self.classifier == "XGBoost":
-            weights = loaded_weights
-
-        final_classifier = self._apply_weights_on_exp(experiment, weights)
-
-        return self._build_result(table, final_classifier, score_columns, experiment)
-
-    def _apply_weights_on_exp(self, experiment, loaded_weights):
-
+    def _apply_weights_on_exp(self, experiment, weights):
         learner = self.semi_supervised_learner
+        click.echo("Info: Applying pretrained weights.")
 
-        click.echo("Info: Start application of pretrained weights.")
-        clf_scores = learner.score(experiment, loaded_weights)
+        clf_scores = learner.score(experiment, weights)
         experiment.set_and_rerank("classifier_score", clf_scores)
 
-        click.echo("Info: Finished pretrained scoring.")
-
-        if self.classifier == "LDA":
-            ws = [loaded_weights.flatten()]
-            final_classifier = self.semi_supervised_learner.averaged_learner(ws)
-        elif self.classifier == "XGBoost":
-            final_classifier = self.semi_supervised_learner.set_learner(loaded_weights)
-
-        return final_classifier
+        if self.rc.classifier == "LDA":
+            ws = [weights.flatten()]
+            return learner.averaged_learner(ws)
+        else:  # XGBoost
+            return learner.set_learner(weights)
 
     @profile
     def learn_and_apply(self, table):
-        with timer():
-
-            click.echo("Info: Learn and apply classifier from input data.")
-            result, scorer, trained_weights = self._learn_and_apply(table)
-            click.echo("Info: Processing input data finished.")
-
-        return result, scorer, trained_weights
-
-    def _learn_and_apply(self, table):
-
-        experiment, score_columns = self._setup_experiment(table)
-        final_classifier = self._learn(experiment, score_columns)
-
-        return self._build_result(table, final_classifier, score_columns, experiment)
+        with timer("Learn and Apply"):
+            experiment, score_columns = self._setup_experiment(table)
+            final_classifier = self._learn(experiment, score_columns)
+            return self._build_result(
+                table, final_classifier, score_columns, experiment
+            )
 
     def _learn(self, experiment, score_columns):
-        if self.test:  # for reliable results
-            experiment.df.sort_values("tg_id", ascending=True, inplace=True)
-
         learner = self.semi_supervised_learner
+        neval = self.rc.ss_num_iter
+        ttt, ttd, ws = [], [], []
 
-        ws = [] # weights/models
-        ttt = [] # top test targets
-        ttd = [] # top test decoys
+        click.echo(f"Info: Learning on {neval} folds with {self.rc.threads} threads.")
 
-        neval = self.ss_num_iter
-
-        click.echo("Info: Semi-supervised learning of weights:")
-        click.echo("Info: Start learning on %d folds using %d processes." % (neval, self.threads))
-
-        if self.threads == 1:
-            for k in range(neval):
-                (ttt_scores, ttd_scores, w) = learner.learn_randomized(experiment, score_columns, 1)
+        if self.rc.threads == 1:
+            for _ in range(neval):
+                ttt_scores, ttd_scores, w = learner.learn_randomized(
+                    experiment, score_columns, 1
+                )
                 ttt.append(ttt_scores)
                 ttd.append(ttd_scores)
                 ws.append(w)
         else:
-            pool = multiprocessing.Pool(processes=self.threads)
+            pool = multiprocessing.Pool(processes=self.rc.threads)
             while neval:
-                remaining = max(0, neval - self.threads)
-                todo = neval - remaining
-                neval -= todo
-                # args = ((learner, "learn_randomized", (experiment, score_columns, )), ) * todo
-                # Add individual worker ids
-                args = []
-                for thread_num in range(1, todo+1):
-                    args.append((learner, "learn_randomized", (experiment, score_columns, thread_num, )))
-                args = tuple(args)
+                todo = min(neval, self.rc.threads)
+                args = tuple(
+                    (learner, "learn_randomized", (experiment, score_columns, tid))
+                    for tid in range(1, todo + 1)
+                )
                 res = pool.map(unwrap_self_for_multiprocessing, args)
-                ttt_scores = [r[0] for r in res]
-                ttd_scores = [r[1] for r in res]
-                ttt.extend(ttt_scores)
-                ttd.extend(ttd_scores)
-                ws.extend([r[2] for r in res])
-        click.echo("Info: Finished learning.")
+                ttt += [r[0] for r in res]
+                ttd += [r[1] for r in res]
+                ws += [r[2] for r in res]
+                neval -= todo
 
-        if self.classifier == "LDA":
-            final_classifier = self.semi_supervised_learner.averaged_learner(ws)
-        elif self.classifier == "XGBoost":
-            # Generate average scores over all folds
-            ttt_avg = pd.concat(ttt, axis=1).mean(axis=1)
-            ttd_avg = pd.concat(ttd, axis=1).mean(axis=1)
-            integrated_scores = pd.concat([ttt_avg, ttd_avg], axis=0)
+        if self.rc.classifier == "LDA":
+            return learner.averaged_learner(ws)
 
-            experiment.set_and_rerank("classifier_score", integrated_scores)
+        # XGBoost - integrate cross-validation scores and train final model
+        ttt_avg = pd.concat(ttt, axis=1).mean(axis=1)
+        ttd_avg = pd.concat(ttd, axis=1).mean(axis=1)
+        integrated_scores = pd.concat([ttt_avg, ttd_avg], axis=0)
+        experiment.set_and_rerank("classifier_score", integrated_scores)
 
-            # Learn final model
-            model = learner.learn_final(experiment)
-            final_classifier = learner.set_learner(model)
-
-        return final_classifier
+        model = learner.learn_final(experiment)
+        return learner.set_learner(model)
 
     def _build_result(self, table, final_classifier, score_columns, experiment):
-
-        if self.classifier == "LDA":
+        # Collect weights
+        if self.rc.classifier == "LDA":
             weights = final_classifier.get_parameters()
-            classifier_table = pd.DataFrame({'score': score_columns, 'weight': weights})
-        elif self.classifier == "XGBoost":
+            classifier_table = pd.DataFrame({"score": score_columns, "weight": weights})
+        else:
             classifier_table = final_classifier.get_parameters()
+            mapped = {
+                f: v
+                for f, v in zip(
+                    score_columns, classifier_table.get("importance", {}).values()
+                )
+            }
+            for feat, importance in sorted(
+                mapped.items(), key=operator.itemgetter(1), reverse=True
+            ):
+                click.echo(f"Info: Importance of {feat}: {importance}")
 
-            mapper = {'f{0}'.format(i): v for i, v in enumerate(score_columns)}
-            mapped = {mapper[k]: v for k, v in final_classifier.importance.items()}
-
-            for key, value in reversed(sorted(mapped.items(), key=operator.itemgetter(1))):
-                click.echo("Info: Importance of %s: %s" % (key, value))
-
-        scorer = Scorer(final_classifier, score_columns, experiment, self.group_id, self.parametric, self.pfdr, self.pi0_lambda, self.pi0_method, self.pi0_smooth_df, self.pi0_smooth_log_pi0, self.lfdr_truncate, self.lfdr_monotone, self.lfdr_transformation, self.lfdr_adj, self.lfdr_eps, self.tric_chromprob, self.ss_score_filter, self.color_palette, self.level)
+        # Score the table
+        scorer = Scorer(
+            classifier=final_classifier,
+            score_columns=score_columns,
+            experiment=experiment,
+            group_id=self.rc.group_id,
+            error_estimation_config=self.rc.error_estimation_config,
+            tric_chromprob=self.rc.tric_chromprob,
+            ss_score_filter=self.rc.ss_score_filter,
+            color_palette=self.rc.color_palette,
+            level=self.config.level,
+        )
 
         scored_table = scorer.score(table)
+        final_stats, summary_stats = scorer.get_error_stats()
+        result = Result(summary_stats, final_stats, scored_table)
 
-        final_statistics, summary_statistics = scorer.get_error_stats()
-
-        result = Result(summary_statistics, final_statistics, scored_table)
-
-        click.echo("Info: Finished scoring and estimation statistics.")
+        click.echo("Info: Scoring and statistics complete.")
         return result, scorer, classifier_table
-
-
-@profile
-def PyProphet(classifier, xgb_hyperparams, xgb_params, xgb_params_space, xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, ss_num_iter, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, tric_chromprob, threads, test, ss_score_filter, color_palette, main_score_selection_report, outfile, level, ss_use_dynamic_main_score):
-    if classifier == "LDA":
-        return HolyGostQuery(StandardSemiSupervisedLearner(LDALearner(), xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, test, main_score_selection_report, outfile, level, ss_use_dynamic_main_score), classifier, ss_num_iter, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, tric_chromprob, threads, test, ss_score_filter, color_palette, level)
-    elif classifier == "XGBoost":
-        return HolyGostQuery(StandardSemiSupervisedLearner(XGBLearner(xgb_hyperparams, xgb_params, xgb_params_space, threads), xeval_fraction, xeval_num_iter, ss_initial_fdr, ss_iteration_fdr, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, test, main_score_selection_report, outfile, level, ss_use_dynamic_main_score), classifier, ss_num_iter, group_id, parametric, pfdr, pi0_lambda, pi0_method, pi0_smooth_df, pi0_smooth_log_pi0, lfdr_truncate, lfdr_monotone, lfdr_transformation, lfdr_adj, lfdr_eps, tric_chromprob, threads, test, ss_score_filter, color_palette, level)
-    else:
-        raise click.ClickException("Classifier not supported.")
