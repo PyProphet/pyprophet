@@ -8,6 +8,23 @@ from ._base import BaseIOConfig
 
 @dataclass
 class ErrorEstimationConfig:
+    """
+    Configuration for global and local FDR (false discovery rate) estimation.
+
+    Attributes:
+        parametric (bool): Whether to use parametric estimation of p-values.
+        pfdr (bool): Whether to compute positive FDR (pFDR) instead of traditional FDR.
+        pi0_lambda (Any): Lambda range or fixed value for pi0 estimation (e.g., [0.1, 0.5, 0.05] or [0.4, 0.0, 0.0]).
+        pi0_method (str): Method to estimate pi0; either 'smoother' or 'bootstrap'.
+        pi0_smooth_df (int): Degrees of freedom for smoothing function in pi0 estimation.
+        pi0_smooth_log_pi0 (bool): Whether to apply smoothing on log(pi0) estimates.
+        lfdr_truncate (bool): If True, truncate local FDR values above 1 to 1.
+        lfdr_monotone (bool): If True, enforce monotonic increase of local FDR values.
+        lfdr_transformation (str): Transformation of p-values; either 'probit' or 'logit'.
+        lfdr_adj (float): Smoothing bandwidth adjustment factor in local FDR estimation.
+        lfdr_eps (float): Threshold for trimming empirical p-value distribution tails.
+    """
+
     # Global FDR & pi0
     parametric: bool
     pfdr: bool
@@ -26,6 +43,46 @@ class ErrorEstimationConfig:
 
 @dataclass
 class RunnerConfig:
+    """
+    Configuration for scoring, classifier setup, learning parameters, and optional features.
+
+    Attributes:
+        classifier (str): Classifier type used for semi-supervised learning ('LDA' or 'XGBoost').
+        ss_main_score (str): Starting main score for semi-supervised learning (can be 'auto').
+        main_score_selection_report (bool): Whether to generate a report for main score selection.
+
+        xgb_hyperparams (bool): Whether to autotune XGBoost hyperparameters.
+        xgb_params (dict): Default XGBoost parameters for training.
+        xgb_params_space (dict): Search space for XGBoost hyperparameter optimization.
+
+        xeval_fraction (float): Fraction of data used in each cross-validation iteration.
+        xeval_num_iter (int): Number of cross-validation iterations.
+
+        ss_initial_fdr (float): Initial FDR threshold for target selection.
+        ss_iteration_fdr (float): FDR threshold used in subsequent learning iterations.
+        ss_num_iter (int): Number of semi-supervised training iterations.
+        ss_score_filter (bool): Whether to filter features based on score set or profile.
+        ss_use_dynamic_main_score (bool): Automatically determined during `__post_init__`.
+
+        group_id (str): Column used to group PSMs for learning and statistics.
+        error_estimation_config (ErrorEstimationConfig): Settings for global and local error estimation.
+
+        ipf_max_peakgroup_rank (int): Max rank of peak groups considered in IPF.
+        ipf_max_peakgroup_pep (float): Max PEP for peak group consideration in IPF.
+        ipf_max_transition_isotope_overlap (float): Max isotope overlap for transition selection in IPF.
+        ipf_min_transition_sn (float): Min log S/N for transition selection in IPF.
+
+        glyco (bool): Whether glycopeptide-specific scoring is enabled.
+        density_estimator (str): Score density estimation method ('kde' or 'gmm').
+        grid_size (int): Number of grid cutoffs used for local FDR calculation.
+
+        add_alignment_features (bool): Whether to add chromatographic alignment features.
+        tric_chromprob (bool): Whether to compute chromatogram probabilities (for TRIC).
+        threads (int): Number of CPU threads to use; -1 means all CPUs.
+        test (bool): Whether to enable test mode with deterministic behavior.
+        color_palette (str): Color palette used in PDF report rendering.
+    """
+
     # Scoring / classifier options
     classifier: str
     ss_main_score: str
@@ -81,6 +138,19 @@ class RunnerConfig:
 
 @dataclass
 class RunnerIOConfig(BaseIOConfig):
+    """
+    Wrapper configuration class for I/O and runner parameters.
+
+    Attributes:
+        infile (str): Input file path (.osw, .parquet, or .tsv).
+        outfile (str): Output file path (same format as input).
+        level (str): Scoring level ('ms1', 'ms2', 'ms1ms2', 'transition', or 'alignment').
+        context (str): Optional scoring context (e.g. 'experiment-wide', not commonly used).
+        prefix (str): Derived from `outfile`, used as prefix for output artifacts.
+        runner (RunnerConfig): All scoring and learning configuration settings.
+        extra_writes (dict): Dictionary of named output paths (e.g., report, weights, summary).
+    """
+
     runner: RunnerConfig
     extra_writes: dict = field(init=False)
 
@@ -138,6 +208,9 @@ class RunnerIOConfig(BaseIOConfig):
         color_palette,
         main_score_selection_report,
     ):
+        """
+        Creates a configuration object from command-line arguments.
+        """
         xgb_hyperparams = {
             "autotune": xgb_autotune,
             "autotune_num_rounds": 10,
