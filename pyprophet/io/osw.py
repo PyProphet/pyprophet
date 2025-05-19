@@ -1,11 +1,11 @@
 import os
-import pandas as pd
-import sqlite3
-import click
 import pickle
 from shutil import copyfile
+import sqlite3
+import pandas as pd
+import click
 from ._base import BaseReader, BaseWriter, BaseIOConfig
-from ._config import RunnerIOConfig, IPFIOConfig, LevelContextIOConfig
+from .._config import RunnerIOConfig, IPFIOConfig, LevelContextIOConfig
 from ..data_handling import check_sqlite_table
 from ..report import save_report
 from ..glyco.report import save_report as save_report_glyco

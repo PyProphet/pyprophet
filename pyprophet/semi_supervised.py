@@ -1,7 +1,7 @@
 import numpy as np
 import click
 
-from .io._config import RunnerIOConfig
+from ._config import RunnerIOConfig
 from .data_handling import Experiment, update_chosen_main_score_in_table
 from .classifiers import AbstractLearner, XGBLearner
 from .stats import find_cutoff

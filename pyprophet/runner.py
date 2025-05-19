@@ -12,7 +12,7 @@ import duckdb
 import pickle
 
 
-from .io._config import RunnerIOConfig
+from ._config import RunnerIOConfig
 from .io.osw import OSWReader, OSWWriter
 from .io.parquet import ParquetReader, ParquetWriter
 from .io.split_parquet import SplitParquetReader, SplitParquetWriter

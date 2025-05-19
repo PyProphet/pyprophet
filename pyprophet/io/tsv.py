@@ -1,8 +1,7 @@
 import pandas as pd
-import sqlite3
 import click
 from ._base import BaseReader, BaseWriter, BaseIOConfig
-from ._config import RunnerIOConfig, IPFIOConfig, LevelContextIOConfig
+from .._config import RunnerIOConfig, IPFIOConfig, LevelContextIOConfig
 from ..report import save_report
 
 

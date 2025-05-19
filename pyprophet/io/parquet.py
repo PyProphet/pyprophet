@@ -1,11 +1,11 @@
+import pickle
+from shutil import copyfile
 import pandas as pd
 import polars as pl
 import pyarrow.parquet as pq
 import click
-import pickle
-from shutil import copyfile
 from ._base import BaseReader, BaseWriter, BaseIOConfig
-from ._config import RunnerIOConfig, IPFIOConfig, LevelContextIOConfig
+from .._config import RunnerIOConfig, IPFIOConfig, LevelContextIOConfig
 from ..data_handling import get_parquet_column_names
 from ..report import save_report
 from ..glyco.report import save_report as save_report_glyco

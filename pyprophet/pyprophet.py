@@ -9,7 +9,7 @@ import pandas as pd
 import numpy as np
 import click
 
-from .io._config import RunnerIOConfig, ErrorEstimationConfig
+from ._config import RunnerIOConfig, ErrorEstimationConfig
 from .stats import (
     lookup_values_from_error_table,
     error_statistics,

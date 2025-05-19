@@ -1,12 +1,13 @@
 import os
+from shutil import copyfile
+import pickle
 import pandas as pd
 import pyarrow as pa
 import duckdb
 import click
-import pickle
-from shutil import copyfile
+
 from ._base import BaseReader, BaseWriter, BaseIOConfig
-from ._config import RunnerIOConfig, IPFIOConfig, LevelContextIOConfig
+from .._config import RunnerIOConfig, IPFIOConfig, LevelContextIOConfig
 from ..data_handling import get_parquet_column_names
 from ..report import save_report
 
