@@ -17,7 +17,12 @@ from .io.osw import OSWReader, OSWWriter
 from .io.parquet import ParquetReader, ParquetWriter
 from .io.split_parquet import SplitParquetReader, SplitParquetWriter
 from .io.tsv import TSVReader, TSVWriter
-from .data_handling import is_sqlite_file, is_parquet_file, is_valid_split_parquet_dir
+from .data_handling import (
+    is_sqlite_file,
+    is_parquet_file,
+    is_valid_split_parquet_dir,
+    check_sqlite_table,
+)
 from .pyprophet import PyProphet
 from .glyco.scoring import partial_score, combined_score
 from .glyco.stats import ErrorStatisticsCalculator
@@ -77,13 +82,21 @@ class PyProphetRunner(object):
     def glyco(self):
         return self.config.runner.glyco
 
+    @property
+    def runner_config(self):
+        return self.config.runner
+
+    @property
+    def error_estimation_config(self):
+        return self.config.runner.error_estimation_config
+
     @abc.abstractmethod
     def run_algo(self, part=None):
         pass
 
     def run(self):
 
-        self.check_cols = [self.config.runner.group_id, "run_id", "decoy"]
+        self.check_cols = [self.runner_config.group_id, "run_id", "decoy"]
 
         if self.glyco and self.level in ["ms2", "ms1ms2"]:
             start_at = time.time()
@@ -124,7 +137,7 @@ class PyProphetRunner(object):
             click.echo("-" * 80)
             click.echo("Info: Calculating combined scores")
             (result_combined, weights_combined) = combined_score(
-                self.config.runner.group_id, result_peptide, result_glycan
+                self.runner_config.group_id, result_peptide, result_glycan
             )
 
             if isinstance(weights_combined, pd.DataFrame):
@@ -143,20 +156,20 @@ class PyProphetRunner(object):
             click.echo("Info: Calculating error statistics")
             error_stat = ErrorStatisticsCalculator(
                 result_combined,
-                density_estimator=self.config.runner.density_estimator,
-                grid_size=self.config.runner.grid_size,
-                parametric=self.config.runner.parametric,
-                pfdr=self.config.runner.pfdr,
-                pi0_lambda=self.config.runner.pi0_lambda,
-                pi0_method=self.config.runner.pi0_method,
-                pi0_smooth_df=self.config.runner.pi0_smooth_df,
-                pi0_smooth_log_pi0=self.config.runner.pi0_smooth_log_pi0,
-                lfdr_truncate=self.config.runner.lfdr_truncate,
-                lfdr_monotone=self.config.runner.lfdr_monotone,
-                lfdr_transformation=self.config.runner.lfdr_transformation,
-                lfdr_adj=self.config.runner.lfdr_adj,
-                lfdr_eps=self.config.runner.lfdr_eps,
-                tric_chromprob=self.config.runner.tric_chromprob,
+                density_estimator=self.runner_config.density_estimator,
+                grid_size=self.runner_config.grid_size,
+                parametric=self.error_estimation_config.parametric,
+                pfdr=self.error_estimation_config.pfdr,
+                pi0_lambda=self.error_estimation_config.pi0_lambda,
+                pi0_method=self.error_estimation_config.pi0_method,
+                pi0_smooth_df=self.error_estimation_config.pi0_smooth_df,
+                pi0_smooth_log_pi0=self.error_estimation_config.pi0_smooth_log_pi0,
+                lfdr_truncate=self.error_estimation_config.lfdr_truncate,
+                lfdr_monotone=self.error_estimation_config.lfdr_monotone,
+                lfdr_transformation=self.error_estimation_config.lfdr_transformation,
+                lfdr_adj=self.error_estimation_config.lfdr_adj,
+                lfdr_eps=self.error_estimation_config.lfdr_eps,
+                tric_chromprob=self.runner_config.tric_chromprob,
             )
             result, pi0 = error_stat.error_statistics()
 
@@ -265,14 +278,14 @@ class PyProphetLearner(PyProphetRunner):
 
 class PyProphetWeightApplier(PyProphetRunner):
 
-    def __init__(self, config: RunnerIOConfig):
+    def __init__(self, apply_weights: str, config: RunnerIOConfig):
         super(PyProphetWeightApplier, self).__init__(self.config)
 
         if not os.path.exists(apply_weights):
             raise click.ClickException(
                 "Weights file %s does not exist." % apply_weights
             )
-        if self.mode == "tsv":
+        if self.mode in ("tsv", "parquet", "parquet_split"):
             if self.classifier == "LDA":
                 try:
                     self.persisted_weights = pd.read_csv(apply_weights, sep=",")
@@ -330,42 +343,7 @@ class PyProphetWeightApplier(PyProphetRunner):
                     raise
 
     def run_algo(self):
-        (result, scorer, weights) = PyProphet(
-            self.classifier,
-            self.xgb_hyperparams,
-            self.xgb_params,
-            self.xgb_params_space,
-            self.xeval_fraction,
-            self.xeval_num_iter,
-            self.ss_initial_fdr,
-            self.ss_iteration_fdr,
-            self.ss_num_iter,
-            self.group_id,
-            self.parametric,
-            self.pfdr,
-            self.pi0_lambda,
-            self.pi0_method,
-            self.pi0_smooth_df,
-            self.pi0_smooth_log_pi0,
-            self.lfdr_truncate,
-            self.lfdr_monotone,
-            self.lfdr_transformation,
-            self.lfdr_adj,
-            self.lfdr_eps,
-            self.tric_chromprob,
-            self.threads,
-            self.test,
-            self.ss_score_filter,
-            self.color_palette,
-            self.main_score_selection_report,
-            self.outfile,
-            self.level,
-            self.ss_use_dynamic_main_score,
-        ).apply_weights(self.table, self.persisted_weights)
+        (result, scorer, weights) = PyProphet(self.config).apply_weights(
+            self.table, self.persisted_weights
+        )
         return (result, scorer, weights)
-
-    def extra_writes(self):
-        yield "output_path", os.path.join(self.prefix + "_scored.tsv")
-        yield "summ_stat_path", os.path.join(self.prefix + "_summary_stat.csv")
-        yield "full_stat_path", os.path.join(self.prefix + "_full_stat.csv")
-        yield "report_path", os.path.join(self.prefix + "_report.pdf")
