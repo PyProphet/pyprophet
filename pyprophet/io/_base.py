@@ -1,6 +1,8 @@
 from dataclasses import dataclass, field
 from abc import ABC, abstractmethod
 import os
+import click
+import pickle
 
 
 @dataclass
@@ -41,6 +43,26 @@ class BaseReader(ABC):
         """
         self.config = config
 
+    @property
+    def infile(self):
+        return self.config.infile
+
+    @property
+    def outfile(self):
+        return self.config.outfile
+
+    @property
+    def classifier(self):
+        return self.config.runner.classifier
+
+    @property
+    def level(self):
+        return self.config.level
+
+    @property
+    def glyco(self):
+        return self.config.glyco
+
     @abstractmethod
     def read(self):
         """
@@ -63,6 +85,26 @@ class BaseWriter(ABC):
         """
         self.config = config
 
+    @property
+    def infile(self):
+        return self.config.infile
+
+    @property
+    def outfile(self):
+        return self.config.outfile
+
+    @property
+    def classifier(self):
+        return self.config.runner.classifier
+
+    @property
+    def level(self):
+        return self.config.level
+
+    @property
+    def glyco(self):
+        return self.config.glyco
+
     @abstractmethod
     def save_results(self, result, pi0):
         """
@@ -74,7 +116,6 @@ class BaseWriter(ABC):
         """
         raise NotImplementedError("Subclasses must implement 'save_results'.")
 
-    @abstractmethod
     def save_weights(self, weights):
         """
         Abstract method to save model weights (e.g., LDA coefficients, XGBoost model).
@@ -82,4 +123,37 @@ class BaseWriter(ABC):
         Args:
             weights: Model weights or trained object.
         """
-        raise NotImplementedError("Subclasses must implement 'save_weights'.")
+        if self.classifier == "LDA":
+            self._save_tsv_weights(weights)
+        elif self.classifier == "XGBoost":
+            self._save_bin_weights(weights)
+        else:
+            raise NotImplementedError(
+                f"Classifier {self.classifier} not supported for saving weights."
+            )
+
+    def _save_tsv_weights(self, weights):
+        """
+        Save the model weights to a TSV file.
+
+        Args:
+            weights: Model weights or trained object.
+        """
+        weights["level"] = self.level
+        trained_weights_path = self.config.extra_writes.get("trained_weights_path")
+        if trained_weights_path is not None:
+            weights.to_csv(trained_weights_path, sep=",", index=False, mode="a")
+            click.echo("Info: %s written." % trained_weights_path)
+
+    def _save_bin_weights(self, weights):
+        """
+        Save the model weights to a binary file.
+
+        Args:
+            weights: Model weights or trained object.
+        """
+        trained_weights_path = self.config.extra_writes.get("trained_model_path")
+        if trained_weights_path is not None:
+            with open(trained_weights_path, "wb") as file:
+                self.persisted_weights = pickle.dump(weights, file)
+            click.echo("Info: %s written." % trained_weights_path)
