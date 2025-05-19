@@ -5,6 +5,24 @@ from ._base import BaseIOConfig
 
 
 @dataclass
+class ErrorEstimationConfig:
+    # Global FDR & pi0
+    parametric: bool
+    pfdr: bool
+    pi0_lambda: Any  # Could be float or List[float]
+    pi0_method: str
+    pi0_smooth_df: int
+    pi0_smooth_log_pi0: bool
+
+    # Local FDR
+    lfdr_truncate: bool
+    lfdr_monotone: bool
+    lfdr_transformation: str
+    lfdr_adj: bool
+    lfdr_eps: float
+
+
+@dataclass
 class RunnerConfig:
     # Scoring / classifier options
     classifier: str
@@ -29,28 +47,13 @@ class RunnerConfig:
 
     # Grouping & statistical options
     group_id: str
-    parametric: bool
-    pfdr: bool
-
-    # Pi0 estimation
-    pi0_lambda: Any  # Typically float or List[float]
-    pi0_method: str
-    pi0_smooth_df: int
-    pi0_smooth_log_pi0: bool
-
-    # Local FDR config
-    lfdr_truncate: bool
-    lfdr_monotone: bool
-    lfdr_transformation: str
-    lfdr_adj: bool
-    lfdr_eps: float
+    error_estimation_config: ErrorEstimationConfig
 
     # IPF options
     ipf_max_peakgroup_rank: int
     ipf_max_peakgroup_pep: float
     ipf_max_transition_isotope_overlap: float
     ipf_min_transition_sn: float
-    add_alignment_features: bool
 
     # Glyco options
     glyco: bool
@@ -58,6 +61,7 @@ class RunnerConfig:
     grid_size: int
 
     # Miscellaneous
+    add_alignment_features: bool
     tric_chromprob: bool
     threads: int
     test: bool
@@ -76,6 +80,10 @@ class RunnerConfig:
 @dataclass
 class RunnerIOConfig(BaseIOConfig):
     runner: RunnerConfig
+    extra_writes: dict = field(init=False)
+
+    def _post_init_(self):
+        self.extra_writes = dict(self._extra_writes())
 
     def to_kwargs(self) -> Dict[str, Any]:
         return {
@@ -86,7 +94,7 @@ class RunnerIOConfig(BaseIOConfig):
             **vars(self.runner),
         }
 
-    def extra_writes(self):
+    def _extra_writes(self):
         """
         Generates paths for various output files based on the prefix provided.
 
