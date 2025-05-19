@@ -527,7 +527,7 @@ class Experiment(object):
         mu, nu = mean_and_std_dev(td_scores)
 
         if nu == 0:
-            raise Exception(
+            raise ValueError(
                 "Warning: Standard deviation of decoy scores is zero. Cannot normalize scores."
             )
 
@@ -540,13 +540,7 @@ class Experiment(object):
     def add_peak_group_rank(self):
         ids = self.df.tg_num_id.values
         scores = self.df.d_score.values
-        print(f"ids: {ids}")
-        print(f"ids shape: {ids.shape}")
-        print(f"scores: {scores}")
-        print(f"scores shape: {scores.shape}")
         peak_group_ranks = rank(ids, scores.astype(np.float32, copy=False))
-        print(f"peak_group_ranks: {peak_group_ranks}")
-        print(f"peak_group_ranks shape: {peak_group_ranks.shape}")
         self.df["peak_group_rank"] = peak_group_ranks
 
     @profile
