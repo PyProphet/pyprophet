@@ -131,9 +131,9 @@ class RunnerConfig:
         if self.ss_main_score == "auto":
             # Set starting default main score
             self.ss_main_score = "var_xcorr_shape"
-            self.use_dynamic_main_score = True
+            self.ss_use_dynamic_main_score = True
         else:
-            self.use_dynamic_main_score = False
+            self.ss_use_dynamic_main_score = False
 
 
 @dataclass
