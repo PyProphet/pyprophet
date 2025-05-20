@@ -4,7 +4,7 @@ import sqlite3
 import click
 import os
 
-from .data_handling import check_sqlite_table
+from .io.util import check_sqlite_table
 from .data_handling import write_scores_sql_command
 from .report import plot_scores
 

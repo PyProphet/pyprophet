@@ -1,31 +1,43 @@
 import pandas as pd
 import sqlite3
 
-from .data_handling import check_sqlite_table
+from .io.util import check_sqlite_table
 from .data_handling import write_scores_sql_command
 from .report import plot_scores
+
 
 def export_compound_tsv(infile, outfile, format, outcsv, max_rs_peakgroup_qvalue):
     con = sqlite3.connect(infile)
 
-
-    # output for merged but not scored pyprophet input     
-    if (check_sqlite_table(con, "SCORE_MS1") is False and check_sqlite_table(con, "SCORE_MS2") is False): # No scoring performend
+    # output for merged but not scored pyprophet input
+    if (
+        check_sqlite_table(con, "SCORE_MS1") is False
+        and check_sqlite_table(con, "SCORE_MS2") is False
+    ):  # No scoring performend
 
         score_sql = ""
 
-        if (check_sqlite_table(con, "FEATURE_MS1")):
-            score_sql = write_scores_sql_command(con, score_sql, "FEATURE_MS1", "var_ms1_")
-      
-        if (check_sqlite_table(con, "FEATURE_MS2")):
-            score_sql = write_scores_sql_command(con, score_sql, "FEATURE_MS2", "var_ms2_")
+        if check_sqlite_table(con, "FEATURE_MS1"):
+            score_sql = write_scores_sql_command(
+                con, score_sql, "FEATURE_MS1", "var_ms1_"
+            )
+
+        if check_sqlite_table(con, "FEATURE_MS2"):
+            score_sql = write_scores_sql_command(
+                con, score_sql, "FEATURE_MS2", "var_ms2_"
+            )
 
         # remove last comma from sql statement, since a "FROM" is following
-        if (len(score_sql) > 0):
-            score_sql = ", " + score_sql # add comma at the beginning to fit to statement
-            score_sql = score_sql[:-2] # remove additional space and comma from the end of the string
-            
-        data = pd.read_sql_query("""
+        if len(score_sql) > 0:
+            score_sql = (
+                ", " + score_sql
+            )  # add comma at the beginning to fit to statement
+            score_sql = score_sql[
+                :-2
+            ]  # remove additional space and comma from the end of the string
+
+        data = pd.read_sql_query(
+            """
                     SELECT
                         RUN.ID AS id_run,
                         COMPOUND.ID AS id_compound,
@@ -58,10 +70,14 @@ def export_compound_tsv(infile, outfile, format, outcsv, max_rs_peakgroup_qvalue
                     LEFT JOIN FEATURE_MS1 ON FEATURE_MS1.FEATURE_ID = FEATURE.ID
                     LEFT JOIN FEATURE_MS2 ON FEATURE_MS2.FEATURE_ID = FEATURE.ID
                     ORDER BY transition_group_id
-                    """ % score_sql, con)
+                    """
+            % score_sql,
+            con,
+        )
 
-    elif check_sqlite_table(con, "SCORE_MS1"): # MS1 scoring performend
-        data = pd.read_sql_query("""
+    elif check_sqlite_table(con, "SCORE_MS1"):  # MS1 scoring performend
+        data = pd.read_sql_query(
+            """
                                SELECT
                                    RUN.ID AS id_run,
                                    COMPOUND.ID AS id_compound,
@@ -99,9 +115,13 @@ def export_compound_tsv(infile, outfile, format, outcsv, max_rs_peakgroup_qvalue
                                WHERE SCORE_MS1.QVALUE < %s
                                ORDER BY transition_group_id,
                                         peak_group_rank;
-                               """ % max_rs_peakgroup_qvalue, con)
-    else: # MS2 or MS1MS2 scoring performend
-        data = pd.read_sql_query("""
+                               """
+            % max_rs_peakgroup_qvalue,
+            con,
+        )
+    else:  # MS2 or MS1MS2 scoring performend
+        data = pd.read_sql_query(
+            """
                                SELECT
                                    RUN.ID AS id_run,
                                    COMPOUND.ID AS id_compound,
@@ -139,22 +159,44 @@ def export_compound_tsv(infile, outfile, format, outcsv, max_rs_peakgroup_qvalue
                                WHERE SCORE_MS2.QVALUE < %s
                                ORDER BY transition_group_id,
                                         peak_group_rank;
-                               """ % max_rs_peakgroup_qvalue, con)
+                               """
+            % max_rs_peakgroup_qvalue,
+            con,
+        )
 
     con.close()
-    
-    if outcsv: 
+
+    if outcsv:
         sep = ","
     else:
         sep = "\t"
-    
+
     # select top ranking peak group
     if format == "legacy_merged":
-        data.drop(['id_run','id_compound'], axis=1).to_csv(outfile, sep=sep, index=False)
+        data.drop(["id_run", "id_compound"], axis=1).to_csv(
+            outfile, sep=sep, index=False
+        )
     elif format == "matrix":
         # select top ranking peak group only
-        data = data.iloc[data.groupby(['run_id','transition_group_id']).apply(lambda x: x['m_score'].idxmin())]
+        data = data.iloc[
+            data.groupby(["run_id", "transition_group_id"]).apply(
+                lambda x: x["m_score"].idxmin()
+            )
+        ]
         # restructure dataframe to matrix
-        data = data[['transition_group_id','sum_formula','compound_name', 'Adducts','filename','Intensity']]
-        data = data.pivot_table(index=['transition_group_id','sum_formula','compound_name','Adducts'], columns='filename', values='Intensity')
+        data = data[
+            [
+                "transition_group_id",
+                "sum_formula",
+                "compound_name",
+                "Adducts",
+                "filename",
+                "Intensity",
+            ]
+        ]
+        data = data.pivot_table(
+            index=["transition_group_id", "sum_formula", "compound_name", "Adducts"],
+            columns="filename",
+            values="Intensity",
+        )
         data.to_csv(outfile, sep=sep, index=True)

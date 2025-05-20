@@ -14,6 +14,7 @@ from tabulate import tabulate
 from hyperopt import hp
 
 from ._config import RunnerIOConfig
+from .io.util import check_sqlite_table
 from .runner import PyProphetLearner, PyProphetWeightApplier
 from .ipf import infer_peptidoforms
 from .levels_contexts import (
@@ -39,7 +40,6 @@ from .data_handling import (
     transform_pi0_lambda,
     transform_threads,
     transform_subsample_ratio,
-    check_sqlite_table,
 )
 from .export_parquet import (
     export_to_parquet,

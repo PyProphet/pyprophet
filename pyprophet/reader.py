@@ -3,7 +3,7 @@ import click
 import polars as pl
 import pandas as pd
 import duckdb
-from .data_handling import get_parquet_column_names
+from .io.util import get_parquet_column_names
 
 
 def read_parquet_dir(
@@ -16,9 +16,9 @@ def read_parquet_dir(
     ipf_max_transition_isotope_overlap,
     ipf_min_transition_sn,
 ):
-    '''
+    """
     Read the parquet files from the input directory and return a pandas dataframe.
-    '''
+    """
 
     precursor_file = os.path.join(infile, "precursors_features.parquet")
     transition_file = os.path.join(infile, "transition_features.parquet")
@@ -28,15 +28,16 @@ def read_parquet_dir(
     all_transition_column_names = get_parquet_column_names(transition_file)
 
     if level == "alignment":
-        if  os.path.exists(alignment_file):
+        if os.path.exists(alignment_file):
             all_alignment_column_names = get_parquet_column_names(alignment_file)
         else:
             click.echo(click.style(f"Error: Couldn't find: {alignment_file}", fg="red"))
             raise click.ClickException(
                 click.style(
-                "Alignment-level features are not present in the input parquet directory. Please run ARYCAL first to perform alignment of features. https://github.com/singjc/arycal", fg="red")
+                    "Alignment-level features are not present in the input parquet directory. Please run ARYCAL first to perform alignment of features. https://github.com/singjc/arycal",
+                    fg="red",
+                )
             )
-        
 
     con = duckdb.connect()
     con.execute(
@@ -49,7 +50,7 @@ def read_parquet_dir(
         con.execute(
             f"CREATE VIEW transitions AS SELECT * FROM read_parquet('{transition_file}')"
         )
-        
+
     if (
         os.path.exists(alignment_file)
         and os.path.basename(alignment_file) == "feature_alignment.parquet"
@@ -217,10 +218,8 @@ def read_parquet_dir(
         table = table.to_pandas()
 
     elif level == "alignment":
-        feature_alignment_cols =[
-            col
-            for col in all_alignment_column_names
-            if col.startswith("VAR_")
+        feature_alignment_cols = [
+            col for col in all_alignment_column_names if col.startswith("VAR_")
         ]
         # Prepare alignment query
         feature_alignment_cols_sql = ", ".join(
@@ -244,7 +243,7 @@ def read_parquet_dir(
 
         table = table.to_pandas()
         #  Map DECOY to 1 and -1 to 0 and 1
-        table['DECOY'] = table['DECOY'].map({1: 0, -1: 1})
+        table["DECOY"] = table["DECOY"].map({1: 0, -1: 1})
 
     else:
         raise click.ClickException("Unspecified data level selected.")
