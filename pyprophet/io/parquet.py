@@ -1,13 +1,11 @@
-import pickle
 from shutil import copyfile
 import pandas as pd
-import polars as pl
-import pyarrow.parquet as pq
+import pyarrow as pa
+import duckdb
 import click
 from ._base import BaseReader, BaseWriter, BaseIOConfig
+from .util import get_parquet_column_names
 from .._config import RunnerIOConfig, IPFIOConfig, LevelContextIOConfig
-from ..data_handling import get_parquet_column_names
-from ..report import save_report
 from ..glyco.report import save_report as save_report_glyco
 
 
@@ -47,293 +45,139 @@ class ParquetReader(BaseReader):
             )
 
     def _read_for_semi_supervised(self) -> pd.DataFrame:
+        con = duckdb.connect()
+        self._init_duckdb_views(con)
+
         ss_main_score = self.config.runner.ss_main_score
+        feature_table = self._fetch_feature_table(con)
 
-        all_column_names = get_parquet_column_names(self.infile)
+        if self.level == "ms1ms2":
+            ms1_cols = self._get_columns_by_prefix(self.infile, "FEATURE_MS1_VAR")
+            feature_table = self._merge_ms1ms2_features(con, feature_table, ms1_cols)
 
+        return self._finalize_feature_table(feature_table, ss_main_score)
+
+    def _init_duckdb_views(self, con):
+        con.execute(f"CREATE VIEW data AS SELECT * FROM read_parquet('{self.infile}')")
+
+    def _get_columns_by_prefix(self, parquet_file, prefix):
+        cols = get_parquet_column_names(parquet_file)
+        return [c for c in cols if c.startswith(prefix)]
+
+    def _fetch_feature_table(self, con):
         if self.level in ("ms2", "ms1ms2"):
-            if not any([col.startswith("FEATURE_MS2_") for col in all_column_names]):
-                raise click.ClickException(
-                    "MS2-level feature columns are not present in parquet file."
-                )
-
-            cols = [
-                "RUN_ID",
-                "PRECURSOR_ID",
-                "PRECURSOR_CHARGE",
-                "FEATURE_ID",
-                "EXP_RT",
-                "PRECURSOR_DECOY",
-                "TRANSITION_DETECTING",
-            ]
-            # Filter columes names for FEATURE_MS2_
-            feature_ms2_cols = [
-                col for col in all_column_names if col.startswith("FEATURE_MS2_")
-            ]
-            # Read the parquet file with selected columns
-            table = pl.read_parquet(self.infile, columns=cols + feature_ms2_cols)
-
-            # Drop rows with nulls in key columns
-            table = table.drop_nulls(subset=["RUN_ID", "FEATURE_ID"] + feature_ms2_cols)
-
-            # Rename columns
-            table = table.rename(
-                {
-                    "PRECURSOR_DECOY": "DECOY",
-                    **{
-                        col: col.replace("FEATURE_MS2_", "")
-                        for col in table.columns
-                        if col.startswith("FEATURE_MS2_")
-                    },
-                }
+            return self._fetch_ms2_features(
+                con,
+                self._get_columns_by_prefix(self.infile, "FEATURE_MS2_"),
             )
-
-            # Create transition count table
-            table_transition = (
-                table.select(
-                    [
-                        "RUN_ID",
-                        "PRECURSOR_ID",
-                        "FEATURE_ID",
-                        "EXP_RT",
-                        "DECOY",
-                        "TRANSITION_DETECTING",
-                    ]
-                )
-                .explode("TRANSITION_DETECTING")
-                .filter(pl.col("TRANSITION_DETECTING") == 1)
-                .group_by(["RUN_ID", "PRECURSOR_ID", "FEATURE_ID", "EXP_RT", "DECOY"])
-                .agg(pl.count().alias("TRANSITION_COUNT"))
-            )
-
-            # Join with main table
-            table = table.join(
-                table_transition,
-                on=["RUN_ID", "PRECURSOR_ID", "FEATURE_ID", "EXP_RT", "DECOY"],
-                how="left",
-            ).drop("TRANSITION_DETECTING")
-
-            # Create GROUP_ID column
-            table = table.with_columns(
-                (
-                    pl.col("RUN_ID").cast(pl.Utf8)
-                    + "_"
-                    + pl.col("PRECURSOR_ID").cast(pl.Utf8)
-                ).alias("GROUP_ID")
-            )
-            table = table.to_pandas()
         elif self.level == "ms1":
-            if not any([col.startswith("FEATURE_MS1_") for col in all_column_names]):
-                raise click.ClickException(
-                    "MS1-level feature columns are not present in parquet file."
-                )
-
-            cols = [
-                "RUN_ID",
-                "PRECURSOR_ID",
-                "PRECURSOR_CHARGE",
-                "FEATURE_ID",
-                "EXP_RT",
-                "PRECURSOR_DECOY",
-            ]
-            # Filter columes names for FEATURE_MS1_
-            feature_ms1_cols = [
-                col for col in all_column_names if col.startswith("FEATURE_MS1_")
-            ]
-            # Read the parquet file with selected columns
-            table = pl.read_parquet(self.infile, columns=cols + feature_ms1_cols)
-
-            # Drop rows with nulls in key columns
-            table = table.drop_nulls(subset=["RUN_ID", "FEATURE_ID"] + feature_ms1_cols)
-
-            # Rename columns - remove 'FEATURE_MS1_' prefix and rename PRECURSOR_DECOY
-            table = table.rename(
-                {
-                    "PRECURSOR_DECOY": "DECOY",
-                    **{
-                        col: col.replace("FEATURE_MS1_", "")
-                        for col in table.columns
-                        if col.startswith("FEATURE_MS1_")
-                    },
-                }
+            return self._fetch_ms1_features(
+                con,
+                self._get_columns_by_prefix(self.infile, "FEATURE_MS1_"),
             )
-
-            # Create GROUP_ID column by concatenating RUN_ID and PRECURSOR_ID
-            table = table.with_columns(
-                (
-                    pl.col("RUN_ID").cast(pl.Utf8)
-                    + "_"
-                    + pl.col("PRECURSOR_ID").cast(pl.Utf8)
-                ).alias("GROUP_ID")
-            )
-            table = table.to_pandas()
         elif self.level == "transition":
-            if not any([col.startswith("SCORE_MS2_") for col in all_column_names]):
+            if not self._get_columns_by_prefix(self.infile, "SCORE_MS2_"):
                 raise click.ClickException(
                     "Transition-level scoring for IPF requires prior MS2 or MS1MS2-level scoring. Please run 'pyprophet score --level=ms2' or 'pyprophet score --level=ms1ms2' on this file first."
                 )
-            if not any(
-                [col.startswith("FEATURE_TRANSITION_") for col in all_column_names]
-            ):
-                raise click.ClickException(
-                    "Transition-level feature columns are not present in parquet file."
-                )
 
-            cols = [
-                "RUN_ID",
-                "FEATURE_ID",
-                "PRECURSOR_ID",
-                "TRANSITION_ID",
-                "PRECURSOR_DECOY",
-                "TRANSITION_DECOY",
-                "PRECURSOR_CHARGE",
-                "TRANSITION_CHARGE",
-            ]
-
-            # Read only needed columns from parquet
-            feature_transition_ms2_score_cols = [
-                col
-                for col in all_column_names
-                if col.startswith("SCORE_MS2_") or col.startswith("FEATURE_TRANSITION_")
-            ]
-
-            table = pl.read_parquet(
-                self.infile, columns=cols + feature_transition_ms2_score_cols
+            return self._fetch_transition_features(
+                con,
+                self._get_columns_by_prefix(self.infile, "FEATURE_TRANSITION_VAR"),
             )
-
-            # Explode list columns
-            exploding_cols = [
-                col
-                for col in table.columns
-                if col.startswith("TRANSITION_")
-                or col.startswith("FEATURE_TRANSITION_")
-            ]
-
-            table = table.explode(exploding_cols)
-
-            # Apply filters
-            table = table.filter(
-                (pl.col("PRECURSOR_DECOY") == 0)
-                & (
-                    pl.col("SCORE_MS2_RANK")
-                    <= self.config.runner.ipf_max_peakgroup_rank
-                )
-                & (pl.col("SCORE_MS2_PEP") <= self.config.runner.ipf_max_peakgroup_pep)
-                & (
-                    pl.col("FEATURE_TRANSITION_VAR_ISOTOPE_OVERLAP_SCORE")
-                    <= self.config.runner.ipf_max_transition_isotope_overlap
-                )
-                & (
-                    pl.col("FEATURE_TRANSITION_VAR_LOG_SN_SCORE")
-                    > self.config.runner.ipf_min_transition_sn
-                )
-            )
-
-            # Drop SCORE_MS2_ columns
-            score_cols = [col for col in table.columns if col.startswith("SCORE_MS2_")]
-            table = table.drop(score_cols)
-
-            # Rename columns
-            table = table.rename(
-                {
-                    "TRANSITION_DECOY": "DECOY",
-                    **{
-                        col: col.replace("FEATURE_TRANSITION_", "")
-                        for col in table.columns
-                        if col.startswith("FEATURE_TRANSITION_")
-                    },
-                }
-            )
-
-            # Create GROUP_ID column
-            table = table.with_columns(
-                (
-                    pl.col("RUN_ID").cast(pl.Utf8)
-                    + "_"
-                    + pl.col("FEATURE_ID").cast(pl.Utf8)
-                    + "_"
-                    + pl.col("PRECURSOR_ID").cast(pl.Utf8)
-                    + "_"
-                    + pl.col("TRANSITION_ID").cast(pl.Utf8)
-                ).alias("GROUP_ID")
-            )
-            table = table.to_pandas()
-        else:
-            raise click.ClickException("Unspecified data level selected.")
-
-        # Append MS1 scores to MS2 table if selected
-        if self.level == "ms1ms2":
-            if not any([col.startswith("FEATURE_MS1_") for col in all_column_names]):
-                raise click.ClickException(
-                    "MS1-level feature columns are not present in parquet file."
-                )
-
-            # Filter columes names for FEATURE_MS1_
-            feature_ms1_cols = [
-                col for col in all_column_names if col.startswith("FEATURE_MS1_VAR")
-            ]
-            # Read the parquet file
-            ms1_table = pd.read_parquet(
-                self.infile, columns=["FEATURE_ID"] + feature_ms1_cols
-            )
-            # Rename columns with 'FEATURE_MS1_VAR_' to 'VAR_MS1_'
-            ms1_table.columns = [
-                col.replace("FEATURE_MS1_VAR_", "VAR_MS1_") for col in ms1_table.columns
-            ]
-
-            table = pd.merge(table, ms1_table, how="left", on="FEATURE_ID")
-
-        # Format table
-        table.columns = [col.lower() for col in table.columns]
-
-        # Mark main score column
-        if ss_main_score.lower() in table.columns:
-            table = table.rename(
-                index=str,
-                columns={ss_main_score.lower(): "main_" + ss_main_score.lower()},
-            )
-        elif ss_main_score.lower() == "swath_pretrained":
-            # Add a pretrained main score corresponding to the original implementation in OpenSWATH
-            # This is optimized for 32-windows SCIEX TripleTOF 5600 data
-            table["main_var_pretrained"] = -(
-                -0.19011762 * table["var_library_corr"]
-                + 2.47298914 * table["var_library_rmsd"]
-                + 5.63906731 * table["var_norm_rt_score"]
-                + -0.62640133 * table["var_isotope_correlation_score"]
-                + 0.36006925 * table["var_isotope_overlap_score"]
-                + 0.08814003 * table["var_massdev_score"]
-                + 0.13978311 * table["var_xcorr_coelution"]
-                + -1.16475032 * table["var_xcorr_shape"]
-                + -0.19267813 * table["var_yseries_score"]
-                + -0.61712054 * table["var_log_sn_score"]
+        elif self.level == "alignment":
+            return self._fetch_alignment_features(
+                con, self._get_columns_by_prefix(self.infile, "VAR_")
             )
         else:
             raise click.ClickException(
-                f"Main score ({ss_main_score.lower()}) column not present in data. Current columns: {table.columns}"
+                "Unsupported level for reading semi-supervised input."
             )
 
-        # Enable transition count & precursor / product charge scores for XGBoost-based classifier
-        if self.classifier == "XGBoost" and self.level != "alignment":
-            click.echo(
-                "Info: Enable number of transitions & precursor / product charge scores for XGBoost-based classifier"
-            )
-            table = table.rename(
-                index=str,
-                columns={
-                    "precursor_charge": "var_precursor_charge",
-                    "product_charge": "var_product_charge",
-                    "transition_count": "var_transition_count",
-                },
-            )
+    def _fetch_ms2_features(self, con, feature_cols):
+        cols_sql = ", ".join([f"p.{col}" for col in feature_cols])
+        query = f"""SELECT p.RUN_ID, p.PRECURSOR_ID, p.PRECURSOR_CHARGE, p.FEATURE_ID,
+                        p.EXP_RT, p.PRECURSOR_DECOY AS DECOY, {cols_sql},
+                        COALESCE(t.TRANSITION_COUNT, 0) AS TRANSITION_COUNT,
+                        p.RUN_ID || '_' || p.PRECURSOR_ID AS GROUP_ID
+                    FROM data p
+                    LEFT JOIN (
+                        SELECT PRECURSOR_ID, COUNT(*) AS TRANSITION_COUNT
+                        FROM (
+                            SELECT DISTINCT PRECURSOR_ID, TRANSITION_ID
+                            FROM data
+                            WHERE TRANSITION_DETECTING = 1
+                        ) sub
+                        GROUP BY PRECURSOR_ID
+                    ) t ON p.PRECURSOR_ID = t.PRECURSOR_ID
+                    ORDER BY p.RUN_ID, p.PRECURSOR_ID, p.EXP_RT"""
+        df = (
+            con.execute(query)
+            .pl()
+            .rename({col: col.replace("FEATURE_MS2_", "") for col in feature_cols})
+        )
+        return df.to_pandas()
 
-        return table
+    def _fetch_ms1_features(self, con, feature_cols):
+        cols_sql = ", ".join([f"p.{col}" for col in feature_cols])
+        query = f"""SELECT p.RUN_ID, p.PRECURSOR_ID, p.PRECURSOR_CHARGE, p.FEATURE_ID,
+                        p.EXP_RT, p.PRECURSOR_DECOY AS DECOY, {cols_sql},
+                        p.RUN_ID || '_' || p.PRECURSOR_ID AS GROUP_ID
+                    FROM data p
+                    ORDER BY p.RUN_ID, p.PRECURSOR_ID, p.EXP_RT"""
+        df = (
+            con.execute(query)
+            .pl()
+            .rename({col: col.replace("FEATURE_MS1_", "") for col in feature_cols})
+        )
+        return df.to_pandas()
+
+    def _fetch_transition_features(self, con, feature_cols):
+        cols_sql = ", ".join([f"t.{col}" for col in feature_cols])
+        rc = self.config.runner
+        query = f"""SELECT t.TRANSITION_DECOY AS DECOY, t.FEATURE_ID, t.TRANSITION_ID,
+                        {cols_sql}, p.PRECURSOR_CHARGE, t.TRANSITION_CHARGE,
+                        p.RUN_ID || '_' || t.FEATURE_ID || '_' || t.TRANSITION_ID AS GROUP_ID
+                    FROM data t
+                    WHERE t.SCORE_MS2_PEAK_GROUP_RANK <= {rc.ipf_max_peakgroup_rank}
+                        AND t.SCORE_MS2_PEP <= {rc.ipf_max_peakgroup_pep}
+                        AND t.PRECURSOR_DECOY = 0
+                        AND t.FEATURE_TRANSITION_VAR_ISOTOPE_OVERLAP_SCORE <= {rc.ipf_max_transition_isotope_overlap}
+                        AND t.FEATURE_TRANSITION_VAR_LOG_SN_SCORE > {rc.ipf_min_transition_sn}
+                    ORDER BY t.RUN_ID, t.PRECURSOR_ID, t.EXP_RT, t.TRANSITION_ID"""
+        df = (
+            con.execute(query)
+            .pl()
+            .rename(
+                {col: col.replace("FEATURE_TRANSITION_", "") for col in feature_cols}
+            )
+        )
+        return df.to_pandas()
+
+    def _fetch_alignment_features(self, con, feature_cols):
+        cols_sql = ", ".join([f"a.{col}" for col in feature_cols])
+        query = f"""SELECT a.ALIGNMENT_ID, a.RUN_ID, a.PRECURSOR_ID, a.FEATURE_ID,
+                        a.ALIGNED_RT, a.DECOY, {cols_sql},
+                        a.FEATURE_ID || '_' || a.PRECURSOR_ID AS GROUP_ID
+                    FROM data a
+                    ORDER BY a.RUN_ID, a.PRECURSOR_ID, a.REFERENCE_RT"""
+        df = con.execute(query).pl().to_pandas()
+        # Map DECOY to 1 and -1 to 0 and 1
+        # arycal saves a label column to indicate 1 as target aligned peaks and -1 as the random/shuffled decoy aligned peak
+        df["DECOY"] = df["DECOY"].map({1: 0, -1: 1})
+
+        return df
+
+    def _merge_ms1ms2_features(self, con, df, feature_cols):
+        cols_sql = ", ".join([f"p.{col}" for col in feature_cols])
+        query = f"SELECT p.FEATURE_ID, {cols_sql} FROM data p"
+        ms1_df = con.execute(query).df()
+        return pd.merge(df, ms1_df, how="left", on="FEATURE_ID")
 
     def _read_for_ipf(self):
-        # implement logic from `ipf.py`
         raise NotImplementedError
 
     def _read_for_context_level(self):
-        # implement logic from `levels_context.py`
         raise NotImplementedError
 
 
@@ -369,13 +213,66 @@ class ParquetWriter(BaseWriter):
             )
 
     def _save_semi_supervised_results(self, result, pi0):
-        # extract logic from runner.py save_osw_results
-        raise NotImplementedError
+        if self.infile != self.outfile:
+            copyfile(self.infile, self.outfile)
+
+        df = result.scored_tables
+        level = self.level
+        prefix_map = {
+            "ms2": "SCORE_MS2_",
+            "ms1ms2": "SCORE_MS2_",
+            "ms1": "SCORE_MS1_",
+            "transition": "SCORE_TRANSITION_",
+            "alignment": "SCORE_ALIGNMENT_",
+        }
+        prefix = prefix_map[level]
+        target_file = self.outfile
+
+        score_df = self._prepare_score_dataframe(df, level, prefix)
+        existing_cols = get_parquet_column_names(target_file)
+        columns_to_keep = self._get_columns_to_keep(existing_cols, prefix)
+
+        self._write_parquet_with_scores(target_file, score_df, columns_to_keep)
+
+        self._write_pdf_report_if_present(result, pi0)
+
+    def _write_parquet_with_scores(self, target_file, df, keep_columns):
+        new_score_cols = [
+            col
+            for col in df.columns
+            if col not in ("FEATURE_ID", "TRANSITION_ID", "ALIGNMENT_ID", "DECOY")
+        ]
+        new_score_sql = ", ".join([f"s.{col}" for col in new_score_cols])
+
+        if self.level == "transition":
+            prefix = "t"
+            join_on = (
+                "t.FEATURE_ID = s.FEATURE_ID AND t.TRANSITION_ID = s.TRANSITION_ID"
+            )
+        elif self.level == "alignment":
+            prefix = "a"
+            join_on = "a.ALIGNMENT_ID = s.ALIGNMENT_ID AND a.FEATURE_ID = s.FEATURE_ID AND a.DECOY = s.DECOY"
+        else:
+            prefix = "p"
+            join_on = "p.FEATURE_ID = s.FEATURE_ID"
+
+        select_old = ", ".join([f"{prefix}.{col}" for col in keep_columns])
+        con = duckdb.connect()
+        con.register("scores", pa.Table.from_pandas(df))
+
+        con.execute(
+            f"""
+            COPY (
+                SELECT {select_old}, {new_score_sql}
+                FROM read_parquet('{target_file}') {prefix}
+                LEFT JOIN scores s ON {join_on}
+            ) TO '{target_file}' (FORMAT 'parquet', COMPRESSION 'ZSTD', COMPRESSION_LEVEL 11)
+            """
+        )
+        click.echo(f"Info: {target_file} written.")
 
     def _save_ipf_results(self, result):
-        # extract logic from ipf.py
         raise NotImplementedError
 
     def _save_context_level_results(self, result):
-        # extract logic from levels_context.py
         raise NotImplementedError

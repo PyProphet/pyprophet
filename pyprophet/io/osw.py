@@ -2,11 +2,12 @@ import os
 import pickle
 from shutil import copyfile
 import sqlite3
+import duckdb
 import pandas as pd
 import click
 from ._base import BaseReader, BaseWriter, BaseIOConfig
 from .._config import RunnerIOConfig, IPFIOConfig, LevelContextIOConfig
-from ..data_handling import check_sqlite_table
+from .util import check_sqlite_table, check_duckdb_table
 from ..report import save_report
 from ..glyco.report import save_report as save_report_glyco
 
@@ -45,445 +46,474 @@ class OSWReader(BaseReader):
             )
 
     def _read_for_semi_supervised(self) -> pd.DataFrame:
-        ss_main_score = self.config.runner.ss_main_score
-
-        con = sqlite3.connect(self.config.infile)
-
-        if self.level in ("ms2", "ms1ms2"):
-            if not check_sqlite_table(con, "FEATURE_MS2"):
-                raise click.ClickException(
-                    "MS2-level feature table not present in file."
+        self._create_indexes()
+        try:
+            con = duckdb.connect()
+            con.execute("INSTALL sqlite_scanner;")
+            con.execute("LOAD sqlite_scanner;")
+            con.execute(f"ATTACH DATABASE '{self.infile}' AS osw (TYPE sqlite);")
+            return self._read_using_duckdb(con)
+        except ModuleNotFoundError as e:
+            click.echo(
+                click.style(
+                    f"Warn: DuckDB sqlite_scanner failed, falling back to SQLite. Reason: {e}",
+                    fg="yellow",
                 )
+            )
+            con = sqlite3.connect(self.infile)
+            return self._read_using_sqlite(con)
 
-            con.executescript(
+    def _create_indexes(self):
+        """
+        Always use a temporary SQLite connection to create indexes directly on the .osw file,
+        since DuckDB doesn't seem to currently support creating indexes on attached SQLite databases.
+        """
+        try:
+            sqlite_con = sqlite3.connect(self.infile)
+
+            index_statements = [
+                "CREATE INDEX IF NOT EXISTS idx_precursor_id ON PRECURSOR (ID);",
+                "CREATE INDEX IF NOT EXISTS idx_feature_precursor_id ON FEATURE (PRECURSOR_ID);",
+                "CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);",
+                "CREATE INDEX IF NOT EXISTS idx_feature_ms1_feature_id ON FEATURE_MS1 (FEATURE_ID);",
+                "CREATE INDEX IF NOT EXISTS idx_feature_ms2_feature_id ON FEATURE_MS2 (FEATURE_ID);",
+                "CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);",
+                "CREATE INDEX IF NOT EXISTS idx_feature_transition_feature_id ON FEATURE_TRANSITION (FEATURE_ID);",
+                "CREATE INDEX IF NOT EXISTS idx_feature_transition_transition_id ON FEATURE_TRANSITION (TRANSITION_ID);",
+                "CREATE INDEX IF NOT EXISTS idx_transition_id ON TRANSITION (ID);",
+            ]
+
+            for stmt in index_statements:
+                try:
+                    sqlite_con.execute(stmt)
+                except sqlite3.OperationalError as e:
+                    click.echo(
+                        click.style(
+                            f"Warn: SQLite index creation failed: {e}", fg="yellow"
+                        )
+                    )
+
+            sqlite_con.commit()
+            sqlite_con.close()
+
+        except Exception as e:
+            raise click.ClickException(
+                f"Failed to create indexes via SQLite fallback: {e}"
+            )
+
+    def _read_using_duckdb(self, con):
+        level = self.level
+        if level in ("ms2", "ms1ms2"):
+            return self._fetch_ms2_features_duckdb(con)
+        elif level == "ms1":
+            return self._fetch_ms1_features_duckdb(con)
+        elif level == "transition":
+            return self._fetch_transition_features_duckdb(con)
+        elif level == "alignment":
+            return self._fetch_alignment_features_duckdb(con)
+        else:
+            raise click.ClickException(f"Unsupported level: {level}")
+
+    def _read_using_sqlite(self, con):
+        level = self.level
+        if level in ("ms2", "ms1ms2"):
+            return self._fetch_ms2_features_sqlite(con)
+        elif level == "ms1":
+            return self._fetch_ms1_features_sqlite(con)
+        elif level == "transition":
+            return self._fetch_transition_features_sqlite(con)
+        elif level == "alignment":
+            return self._fetch_alignment_features_sqlite(con)
+        else:
+            raise click.ClickException(f"Unsupported level: {level}")
+
+    # ----------------------------
+    # DuckDB Queries
+    # ----------------------------
+
+    def _fetch_ms2_features_duckdb(self, con):
+        if not check_duckdb_table(con, "osw", "FEATURE_MS2"):
+            raise click.ClickException("MS2-level feature table not present in file.")
+
+        if self.glyco:
+            con.execute(
                 """
-                CREATE INDEX IF NOT EXISTS idx_precursor_precursor_id ON PRECURSOR (ID);
-                CREATE INDEX IF NOT EXISTS idx_feature_precursor_id ON FEATURE (PRECURSOR_ID);
-                CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
-                CREATE INDEX IF NOT EXISTS idx_feature_ms2_feature_id ON FEATURE_MS2 (FEATURE_ID);
+                CREATE OR REPLACE VIEW ms2_table AS
+                SELECT
+                    fm.*,
+                    f.RUN_ID,
+                    f.PRECURSOR_ID,
+                    f.EXP_RT,
+                    p.CHARGE AS PRECURSOR_CHARGE,
+                    p.DECOY,
+                    g.DECOY_PEPTIDE,
+                    g.DECOY_GLYCAN,
+                    COALESCE(ts.TRANSITION_COUNT, 0) AS TRANSITION_COUNT,
+                    f.RUN_ID || '_' || f.PRECURSOR_ID AS GROUP_ID
+                FROM osw.FEATURE_MS2 fm
+                INNER JOIN osw.FEATURE f ON fm.FEATURE_ID = f.ID
+                INNER JOIN osw.PRECURSOR p ON f.PRECURSOR_ID = p.ID
+                INNER JOIN (
+                    SELECT
+                        pgm.PRECURSOR_ID,
+                        gp.DECOY_PEPTIDE,
+                        gp.DECOY_GLYCAN
+                    FROM osw.PRECURSOR_GLYCOPEPTIDE_MAPPING pgm
+                    INNER JOIN osw.GLYCOPEPTIDE gp ON pgm.GLYCOPEPTIDE_ID = gp.ID
+                ) g ON f.PRECURSOR_ID = g.PRECURSOR_ID
+                LEFT JOIN (
+                    SELECT
+                        tpm.PRECURSOR_ID,
+                        COUNT(*) AS TRANSITION_COUNT
+                    FROM osw.TRANSITION_PRECURSOR_MAPPING tpm
+                    INNER JOIN osw.TRANSITION t ON tpm.TRANSITION_ID = t.ID
+                    WHERE t.DETECTING = 1
+                    GROUP BY tpm.PRECURSOR_ID
+                ) ts ON f.PRECURSOR_ID = ts.PRECURSOR_ID
+                """
+            )
+        else:
+            con.execute(
+                """
+                CREATE OR REPLACE VIEW ms2_table AS
+                SELECT
+                    fm.*,
+                    f.RUN_ID,
+                    f.PRECURSOR_ID,
+                    f.EXP_RT,
+                    p.CHARGE AS PRECURSOR_CHARGE,
+                    p.DECOY,
+                    COALESCE(ts.TRANSITION_COUNT, 0) AS TRANSITION_COUNT,
+                    f.RUN_ID || '_' || f.PRECURSOR_ID AS GROUP_ID
+                FROM osw.FEATURE_MS2 fm
+                INNER JOIN osw.FEATURE f ON fm.FEATURE_ID = f.ID
+                INNER JOIN osw.PRECURSOR p ON f.PRECURSOR_ID = p.ID
+                LEFT JOIN (
+                    SELECT
+                        tpm.PRECURSOR_ID,
+                        COUNT(*) AS TRANSITION_COUNT
+                    FROM osw.TRANSITION_PRECURSOR_MAPPING tpm
+                    INNER JOIN osw.TRANSITION t ON tpm.TRANSITION_ID = t.ID
+                    WHERE t.DETECTING = 1
+                    GROUP BY tpm.PRECURSOR_ID
+                ) ts ON f.PRECURSOR_ID = ts.PRECURSOR_ID
                 """
             )
 
-            if not self.config.runner.glyco:
-                table = pd.read_sql_query(
-                    """
-                    SELECT *,
-                        RUN_ID || '_' || PRECURSOR_ID AS GROUP_ID
-                    FROM FEATURE_MS2
-                    INNER JOIN
-                    (SELECT RUN_ID,
-                            ID,
-                            PRECURSOR_ID,
-                            EXP_RT
-                    FROM FEATURE) AS FEATURE ON FEATURE_ID = FEATURE.ID
-                    INNER JOIN
-                    (SELECT ID,
-                            CHARGE AS PRECURSOR_CHARGE,
-                            DECOY
-                    FROM PRECURSOR) AS PRECURSOR ON FEATURE.PRECURSOR_ID = PRECURSOR.ID
-                    INNER JOIN
-                    (SELECT PRECURSOR_ID AS ID,
-                            COUNT(*) AS TRANSITION_COUNT
-                    FROM TRANSITION_PRECURSOR_MAPPING
-                    INNER JOIN TRANSITION ON TRANSITION_PRECURSOR_MAPPING.TRANSITION_ID = TRANSITION.ID
-                    WHERE DETECTING==1
-                    GROUP BY PRECURSOR_ID) AS VAR_TRANSITION_SCORE ON FEATURE.PRECURSOR_ID = VAR_TRANSITION_SCORE.ID
-                    ORDER BY RUN_ID,
-                            PRECURSOR.ID ASC,
-                            FEATURE.EXP_RT ASC;
-                    """,
-                    con,
-                )
-            else:
-                table = pd.read_sql_query(
-                    """
-                    SELECT *,
-                        RUN_ID || '_' || PRECURSOR_ID AS GROUP_ID
-                    FROM FEATURE_MS2
-                    INNER JOIN
-                    (SELECT RUN_ID,
-                            ID,
-                            PRECURSOR_ID,
-                            EXP_RT
-                    FROM FEATURE) AS FEATURE ON FEATURE_ID = FEATURE.ID
-                    INNER JOIN
-                    (SELECT ID,
-                            CHARGE AS PRECURSOR_CHARGE,
-                            DECOY
-                    FROM PRECURSOR) AS PRECURSOR ON FEATURE.PRECURSOR_ID = PRECURSOR.ID
-                    INNER JOIN
-                    (SELECT PRECURSOR_ID AS ID,
-                            DECOY_PEPTIDE,
-                            DECOY_GLYCAN
-                    FROM PRECURSOR_GLYCOPEPTIDE_MAPPING
-                    INNER JOIN GLYCOPEPTIDE
-                    ON PRECURSOR_GLYCOPEPTIDE_MAPPING.GLYCOPEPTIDE_ID == GLYCOPEPTIDE.ID) AS DECOY
-                    ON FEATURE.PRECURSOR_ID = DECOY.ID
-                    INNER JOIN
-                    (SELECT PRECURSOR_ID AS ID,
-                            COUNT(*) AS TRANSITION_COUNT
-                    FROM TRANSITION_PRECURSOR_MAPPING
-                    INNER JOIN TRANSITION ON TRANSITION_PRECURSOR_MAPPING.TRANSITION_ID = TRANSITION.ID
-                    WHERE DETECTING==1
-                    GROUP BY PRECURSOR_ID) AS VAR_TRANSITION_SCORE ON FEATURE.PRECURSOR_ID = VAR_TRANSITION_SCORE.ID
-                    ORDER BY RUN_ID,
-                            PRECURSOR.ID ASC,
-                            FEATURE.EXP_RT ASC;
-                    """,
-                    con,
-                )
-        elif self.level == "ms1":
-            if not check_sqlite_table(con, "FEATURE_MS1"):
-                raise click.ClickException(
-                    "MS1-level feature table not present in file."
-                )
+        df = con.execute(
+            "SELECT * FROM ms2_table ORDER BY RUN_ID, PRECURSOR_ID, EXP_RT"
+        ).fetchdf()
+        return self._finalize_feature_table(df, self.config.runner.ss_main_score)
 
-            con.executescript(
+    def _fetch_ms1_features_duckdb(self, con):
+        if not check_duckdb_table(con, "osw", "FEATURE_MS1"):
+            raise click.ClickException("MS1-level feature table not present in file.")
+
+        rc = self.config.runner
+        glyco = rc.glyco
+        ipf_max_rank = rc.ipf_max_peakgroup_rank
+
+        if not glyco:
+            con.execute(
                 """
-                CREATE INDEX IF NOT EXISTS idx_precursor_precursor_id ON PRECURSOR (ID);
-                CREATE INDEX IF NOT EXISTS idx_feature_precursor_id ON FEATURE (PRECURSOR_ID);
-                CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
-                CREATE INDEX IF NOT EXISTS idx_feature_ms1_feature_id ON FEATURE_MS1 (FEATURE_ID);
+                CREATE OR REPLACE VIEW ms1_table AS
+                SELECT fm.*, f.RUN_ID, f.PRECURSOR_ID, f.EXP_RT,
+                    p.CHARGE AS PRECURSOR_CHARGE, p.DECOY,
+                    f.RUN_ID || '_' || f.PRECURSOR_ID AS GROUP_ID
+                FROM osw.FEATURE_MS1 fm
+                INNER JOIN osw.FEATURE f ON fm.FEATURE_ID = f.ID
+                INNER JOIN osw.PRECURSOR p ON f.PRECURSOR_ID = p.ID
+                ORDER BY f.RUN_ID, p.ID, f.EXP_RT
                 """
             )
-            if not self.config.runner.glyco:
-                table = pd.read_sql_query(
-                    """
-                    SELECT *,
-                        RUN_ID || '_' || PRECURSOR_ID AS GROUP_ID
-                    FROM FEATURE_MS1
-                    INNER JOIN
-                    (SELECT RUN_ID,
-                            ID,
-                            PRECURSOR_ID,
-                            EXP_RT
-                    FROM FEATURE) AS FEATURE ON FEATURE_ID = FEATURE.ID
-                    INNER JOIN
-                    (SELECT ID,
-                            CHARGE AS PRECURSOR_CHARGE,
-                            DECOY
-                    FROM PRECURSOR) AS PRECURSOR ON FEATURE.PRECURSOR_ID = PRECURSOR.ID
-                    ORDER BY RUN_ID,
-                            PRECURSOR.ID ASC,
-                            FEATURE.EXP_RT ASC;
-                    """,
-                    con,
+        else:
+            if not check_duckdb_table(con, "osw", "SCORE_MS2"):
+                raise click.ClickException(
+                    "MS1-level scoring for glycoform inference requires prior MS2 or MS1MS2-level scoring. "
+                    "Please run 'pyprophet score --level=ms2' or 'pyprophet score --level=ms1ms2' on this file first."
                 )
-            else:
-                if not check_sqlite_table(con, "SCORE_MS2"):
-                    raise click.ClickException(
-                        "MS1-level scoring for glycoform inference requires prior MS2 or MS1MS2-level scoring. Please run 'pyprophet score --level=ms2' or 'pyprophet score --level=ms1ms2' on this file first."
-                    )
-                if not check_sqlite_table(con, "FEATURE_MS1"):
-                    raise click.ClickException(
-                        "MS1-level feature table not present in file."
-                    )
 
-                table = pd.read_sql_query(
-                    f"""
-                    SELECT DECOY.*,
-                        FEATURE_MS1.*, 
-                        FEATURE.*,
-                        PRECURSOR.*,
-                        RUN_ID || '_' || PRECURSOR_ID AS GROUP_ID
-                    FROM FEATURE_MS1
-                    INNER JOIN
-                    (SELECT RUN_ID,
-                        ID,
-                        PRECURSOR_ID,
-                        EXP_RT
-                    FROM FEATURE) AS FEATURE ON FEATURE_MS1.FEATURE_ID = FEATURE.ID
-                    
-                    INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
+            con.execute(
+                f"""
+                CREATE OR REPLACE VIEW ms1_table AS
+                SELECT g.DECOY_PEPTIDE, g.DECOY_GLYCAN,
+                    fm.*, f.*, p.*,
+                    f.RUN_ID || '_' || f.PRECURSOR_ID AS GROUP_ID
+                FROM osw.FEATURE_MS1 fm
+                INNER JOIN osw.FEATURE f ON fm.FEATURE_ID = f.ID
+                INNER JOIN osw.SCORE_MS2 s ON f.ID = s.FEATURE_ID
+                INNER JOIN osw.PRECURSOR p ON f.PRECURSOR_ID = p.ID
+                INNER JOIN (
+                    SELECT pgm.PRECURSOR_ID,
+                        gp.DECOY_PEPTIDE,
+                        gp.DECOY_GLYCAN
+                    FROM osw.PRECURSOR_GLYCOPEPTIDE_MAPPING pgm
+                    INNER JOIN osw.GLYCOPEPTIDE gp ON pgm.GLYCOPEPTIDE_ID = gp.ID
+                ) g ON f.PRECURSOR_ID = g.PRECURSOR_ID
+                WHERE s.RANK <= {ipf_max_rank}
+                ORDER BY f.RUN_ID, p.ID, f.EXP_RT
+                """
+            )
 
-                    INNER JOIN
-                    (SELECT ID,
-                        CHARGE AS PRECURSOR_CHARGE,
-                        DECOY
-                    FROM PRECURSOR) AS PRECURSOR ON FEATURE.PRECURSOR_ID = PRECURSOR.ID
-                    
-                    INNER JOIN
-                        (SELECT PRECURSOR_ID AS ID,
-                                DECOY_PEPTIDE,
-                                DECOY_GLYCAN
-                        FROM PRECURSOR_GLYCOPEPTIDE_MAPPING
-                        INNER JOIN GLYCOPEPTIDE 
-                        ON PRECURSOR_GLYCOPEPTIDE_MAPPING.GLYCOPEPTIDE_ID == GLYCOPEPTIDE.ID) AS DECOY 
-                        ON FEATURE.PRECURSOR_ID = DECOY.ID
+        df = con.execute("SELECT * FROM ms1_table").fetchdf()
+        return self._finalize_feature_table(df, rc.ss_main_score)
 
-                    WHERE RANK <= {self.config.runner.ipf_max_peakgroup_rank}
-                    ORDER BY RUN_ID,
-                        PRECURSOR.ID ASC,
-                        FEATURE.EXP_RT ASC;
-                    """,
-                    con,
-                )
-        elif self.level == "transition":
+    def _fetch_transition_features_duckdb(self, con):
+        if not check_duckdb_table(con, "osw", "SCORE_MS2"):
+            raise click.ClickException(
+                "Transition-level scoring for IPF requires prior MS2 or MS1MS2-level scoring. "
+                "Please run 'pyprophet score --level=ms2' or 'pyprophet score --level=ms1ms2' first."
+            )
+
+        if not check_duckdb_table(con, "osw", "FEATURE_TRANSITION"):
+            raise click.ClickException(
+                "Transition-level feature table not present in file."
+            )
+
+        rc = self.config.runner
+        con.execute(
+            f"""
+            CREATE OR REPLACE VIEW transition_table AS
+            SELECT 
+                ft.*,
+                t.DECOY AS DECOY,
+                f.RUN_ID,
+                f.PRECURSOR_ID,
+                f.EXP_RT,
+                p.CHARGE AS PRECURSOR_CHARGE,
+                t.PRODUCT_CHARGE,
+                f.RUN_ID || '_' || ft.FEATURE_ID || '_' || f.PRECURSOR_ID || '_' || ft.TRANSITION_ID AS GROUP_ID
+            FROM osw.FEATURE_TRANSITION ft
+            INNER JOIN osw.FEATURE f ON ft.FEATURE_ID = f.ID
+            INNER JOIN osw.SCORE_MS2 s ON f.ID = s.FEATURE_ID
+            INNER JOIN osw.PRECURSOR p ON f.PRECURSOR_ID = p.ID
+            INNER JOIN osw.TRANSITION t ON ft.TRANSITION_ID = t.ID
+            WHERE s.RANK <= {rc.ipf_max_peakgroup_rank}
+            AND s.PEP <= {rc.ipf_max_peakgroup_pep}
+            AND ft.VAR_ISOTOPE_OVERLAP_SCORE <= {rc.ipf_max_transition_isotope_overlap}
+            AND ft.VAR_LOG_SN_SCORE > {rc.ipf_min_transition_sn}
+            AND p.DECOY = 0
+            """
+        )
+        df = con.execute(
+            """
+            SELECT * 
+            FROM transition_table 
+            ORDER BY RUN_ID, PRECURSOR_ID, EXP_RT, TRANSITION_ID
+            """
+        ).fetchdf()
+
+        return self._finalize_feature_table(df, self.config.runner.ss_main_score)
+
+    def _fetch_alignment_features_duckdb(self, con):
+        if check_duckdb_table(con, "osw", "FEATURE_MS2_ALIGNMENT"):
+            raise click.ClickException(
+                "MS2-level feature alignment table not present in file."
+            )
+        con.execute(
+            """
+            CREATE OR REPLACE VIEW alignment_table AS
+            SELECT
+                fa.ALIGNED_FEATURE_ID AS FEATURE_ID,
+                f.RUN_ID, f.PRECURSOR_ID, f.EXP_RT, fa.LABEL AS DECOY,
+                fa.XCORR_COELUTION_TO_REFERENCE AS VAR_XCORR_COELUTION_TO_REFERENCE,
+                fa.XCORR_SHAPE_TO_REFERENCE AS VAR_XCORR_SHAPE_TO_REFERENCE,
+                fa.MI_TO_REFERENCE AS VAR_MI_TO_REFERENCE,
+                fa.XCORR_COELUTION_TO_ALL AS VAR_XCORR_COELUTION_TO_ALL,
+                fa.XCORR_SHAPE_TO_ALL AS VAR_XCORR_SHAPE_TO_ALL,
+                fa.MI_TO_ALL AS VAR_MI_TO_ALL,
+                fa.RETENTION_TIME_DEVIATION AS VAR_RETENTION_TIME_DEVIATION,
+                fa.PEAK_INTENSITY_RATIO AS VAR_PEAK_INTENSITY_RATIO,
+                fa.ALIGNED_FILENAME || '_' || f.PRECURSOR_ID AS GROUP_ID
+            FROM osw.FEATURE_MS2_ALIGNMENT fa
+            LEFT JOIN osw.FEATURE f ON fa.REFERENCE_FEATURE_ID = f.ID
+        """
+        )
+        df = con.execute("SELECT * FROM alignment_table").fetchdf()
+        df["DECOY"] = df["DECOY"].map({1: 0, -1: 1})
+        return self._finalize_feature_table(df, self.config.runner.ss_main_score)
+
+    # ----------------------------
+    # SQLite fallback
+    # ----------------------------
+
+    def _fetch_ms2_features_sqlite(self, con):
+        if not check_sqlite_table(con, "FEATURE_MS2"):
+            raise click.ClickException("MS2-level feature table not present in file.")
+
+        if not self.glyco:
+            query = """
+                SELECT fm.*,
+                    f.RUN_ID,
+                    f.PRECURSOR_ID,
+                    f.EXP_RT,
+                    p.CHARGE AS PRECURSOR_CHARGE,
+                    p.DECOY,
+                    COALESCE(ts.TRANSITION_COUNT, 0) AS TRANSITION_COUNT,
+                    f.RUN_ID || '_' || f.PRECURSOR_ID AS GROUP_ID
+                FROM FEATURE_MS2 fm
+                INNER JOIN FEATURE f ON fm.FEATURE_ID = f.ID
+                INNER JOIN PRECURSOR p ON f.PRECURSOR_ID = p.ID
+                LEFT JOIN (
+                    SELECT tpm.PRECURSOR_ID,
+                        COUNT(*) AS TRANSITION_COUNT
+                    FROM TRANSITION_PRECURSOR_MAPPING tpm
+                    INNER JOIN TRANSITION t ON tpm.TRANSITION_ID = t.ID
+                    WHERE t.DETECTING = 1
+                    GROUP BY tpm.PRECURSOR_ID
+                ) ts ON f.PRECURSOR_ID = ts.PRECURSOR_ID
+                ORDER BY f.RUN_ID, p.ID, f.EXP_RT
+            """
+        else:
+            query = """
+                SELECT fm.*,
+                    f.RUN_ID,
+                    f.PRECURSOR_ID,
+                    f.EXP_RT,
+                    p.CHARGE AS PRECURSOR_CHARGE,
+                    p.DECOY,
+                    g.DECOY_PEPTIDE,
+                    g.DECOY_GLYCAN,
+                    COALESCE(ts.TRANSITION_COUNT, 0) AS TRANSITION_COUNT,
+                    f.RUN_ID || '_' || f.PRECURSOR_ID AS GROUP_ID
+                FROM FEATURE_MS2 fm
+                INNER JOIN FEATURE f ON fm.FEATURE_ID = f.ID
+                INNER JOIN PRECURSOR p ON f.PRECURSOR_ID = p.ID
+                INNER JOIN (
+                    SELECT pgm.PRECURSOR_ID,
+                        gp.DECOY_PEPTIDE,
+                        gp.DECOY_GLYCAN
+                    FROM PRECURSOR_GLYCOPEPTIDE_MAPPING pgm
+                    INNER JOIN GLYCOPEPTIDE gp ON pgm.GLYCOPEPTIDE_ID = gp.ID
+                ) g ON f.PRECURSOR_ID = g.PRECURSOR_ID
+                LEFT JOIN (
+                    SELECT tpm.PRECURSOR_ID,
+                        COUNT(*) AS TRANSITION_COUNT
+                    FROM TRANSITION_PRECURSOR_MAPPING tpm
+                    INNER JOIN TRANSITION t ON tpm.TRANSITION_ID = t.ID
+                    WHERE t.DETECTING = 1
+                    GROUP BY tpm.PRECURSOR_ID
+                ) ts ON f.PRECURSOR_ID = ts.PRECURSOR_ID
+                ORDER BY f.RUN_ID, p.ID, f.EXP_RT
+            """
+
+        df = pd.read_sql_query(query, con)
+        return self._finalize_feature_table(df, self.config.runner.ss_main_score)
+
+    def _fetch_ms1_features_sqlite(self, con):
+        rc = self.config.runner
+        glyco = rc.glyco
+        ipf_max_rank = rc.ipf_max_peakgroup_rank
+
+        if not check_sqlite_table(con, "FEATURE_MS1"):
+            raise click.ClickException("MS1-level feature table not present in file.")
+
+        if not glyco:
+            query = """
+                SELECT fm.*, f.RUN_ID, f.PRECURSOR_ID, f.EXP_RT,
+                    p.CHARGE AS PRECURSOR_CHARGE, p.DECOY,
+                    f.RUN_ID || '_' || f.PRECURSOR_ID AS GROUP_ID
+                FROM FEATURE_MS1 fm
+                INNER JOIN FEATURE f ON fm.FEATURE_ID = f.ID
+                INNER JOIN PRECURSOR p ON f.PRECURSOR_ID = p.ID
+                ORDER BY f.RUN_ID, p.ID, f.EXP_RT
+            """
+        else:
             if not check_sqlite_table(con, "SCORE_MS2"):
                 raise click.ClickException(
-                    "Transition-level scoring for IPF requires prior MS2 or MS1MS2-level scoring. Please run 'pyprophet score --level=ms2' or 'pyprophet score --level=ms1ms2' on this file first."
-                )
-            if not check_sqlite_table(con, "FEATURE_TRANSITION"):
-                raise click.ClickException(
-                    "Transition-level feature table not present in file."
+                    "MS1-level scoring for glycoform inference requires prior MS2 or MS1MS2-level scoring. "
+                    "Please run 'pyprophet score --level=ms2' or 'pyprophet score --level=ms1ms2' on this file first."
                 )
 
-            con.executescript(
-                """
-                CREATE INDEX IF NOT EXISTS idx_transition_id ON TRANSITION (ID);
-                CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);
-                CREATE INDEX IF NOT EXISTS idx_precursor_precursor_id ON PRECURSOR (ID);
-                CREATE INDEX IF NOT EXISTS idx_feature_precursor_id ON FEATURE (PRECURSOR_ID);
-                CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
-                CREATE INDEX IF NOT EXISTS idx_feature_transition_feature_id ON FEATURE_TRANSITION (FEATURE_ID);
-                CREATE INDEX IF NOT EXISTS idx_feature_transition_transition_id ON FEATURE_TRANSITION (TRANSITION_ID);
-                """
-            )
+            query = f"""
+                SELECT g.DECOY_PEPTIDE, g.DECOY_GLYCAN,
+                    fm.*, f.*, p.*,
+                    f.RUN_ID || '_' || f.PRECURSOR_ID AS GROUP_ID
+                FROM FEATURE_MS1 fm
+                INNER JOIN FEATURE f ON fm.FEATURE_ID = f.ID
+                INNER JOIN SCORE_MS2 s ON f.ID = s.FEATURE_ID
+                INNER JOIN PRECURSOR p ON f.PRECURSOR_ID = p.ID
+                INNER JOIN (
+                    SELECT pgm.PRECURSOR_ID,
+                        gp.DECOY_PEPTIDE,
+                        gp.DECOY_GLYCAN
+                    FROM PRECURSOR_GLYCOPEPTIDE_MAPPING pgm
+                    INNER JOIN GLYCOPEPTIDE gp ON pgm.GLYCOPEPTIDE_ID = gp.ID
+                ) g ON f.PRECURSOR_ID = g.PRECURSOR_ID
+                WHERE s.RANK <= {ipf_max_rank}
+                ORDER BY f.RUN_ID, p.ID, f.EXP_RT
+            """
 
-            table = pd.read_sql_query(
-                f"""
-                SELECT TRANSITION.DECOY AS DECOY,
-                    FEATURE_TRANSITION.*,
-                    PRECURSOR.CHARGE AS PRECURSOR_CHARGE,
-                    TRANSITION.PRODUCT_CHARGE AS PRODUCT_CHARGE,
-                    RUN_ID || '_' || FEATURE_TRANSITION.FEATURE_ID || '_' || PRECURSOR_ID || '_' || TRANSITION_ID AS GROUP_ID
-                FROM FEATURE_TRANSITION
-                INNER JOIN
-                (SELECT RUN_ID,
-                        ID,
-                        PRECURSOR_ID,
-                        EXP_RT
-                FROM FEATURE) AS FEATURE ON FEATURE_TRANSITION.FEATURE_ID = FEATURE.ID
-                INNER JOIN PRECURSOR ON FEATURE.PRECURSOR_ID = PRECURSOR.ID
-                INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
-                INNER JOIN
-                (SELECT ID,
-                        CHARGE AS PRODUCT_CHARGE,
-                        DECOY
-                FROM TRANSITION) AS TRANSITION ON FEATURE_TRANSITION.TRANSITION_ID = TRANSITION.ID
-                WHERE RANK <= {self.config.runner.ipf_max_peakgroup_rank}
-                AND PEP <= {self.config.runner.ipf_max_peakgroup_pep}
-                AND VAR_ISOTOPE_OVERLAP_SCORE <= {self.config.runner.ipf_max_transition_isotope_overlap}
-                AND VAR_LOG_SN_SCORE > {self.config.runner.ipf_min_transition_sn}
-                AND PRECURSOR.DECOY == 0
-                ORDER BY RUN_ID,
-                        PRECURSOR.ID,
-                        FEATURE.EXP_RT,
-                        TRANSITION.ID;
-                """,
-                con,
-            )
-        elif self.level == "alignment":
-            if not check_sqlite_table(con, "FEATURE_MS2_ALIGNMENT"):
-                raise click.ClickException(
-                    "MS2-level feature alignemnt table not present in file."
-                )
+        df = pd.read_sql_query(query, con)
+        return self._finalize_feature_table(df, rc.ss_main_score)
 
-            con.executescript(
-                """
-                CREATE INDEX IF NOT EXISTS idx_precursor_precursor_id ON PRECURSOR (ID);
-                CREATE INDEX IF NOT EXISTS idx_feature_precursor_id ON FEATURE (PRECURSOR_ID);
-                CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
-                CREATE INDEX IF NOT EXISTS idx_feature_ms2_feature_id ON FEATURE_MS2 (FEATURE_ID);
-                """
-            )
+    def _fetch_transition_features_sqlite(self, con):
+        rc = self.config.runner
 
-            table = pd.read_sql_query(
-                """
-                SELECT
-                    ALIGNED_FEATURE_ID AS FEATURE_ID,
-                    XCORR_COELUTION_TO_REFERENCE AS VAR_XCORR_COELUTION_TO_REFERENCE,
-                    XCORR_SHAPE_TO_REFERENCE AS VAR_XCORR_SHAPE_TO_REFERENCE, 
-                    MI_TO_REFERENCE AS VAR_MI_TO_REFERENCE, 
-                    XCORR_COELUTION_TO_ALL AS VAR_XCORR_COELUTION_TO_ALL,  
-                    XCORR_SHAPE_TO_ALL AS VAR_XCORR_SHAPE, 
-                    MI_TO_ALL AS VAR_MI_TO_ALL, 
-                    RETENTION_TIME_DEVIATION AS VAR_RETENTION_TIME_DEVIATION, 
-                    PEAK_INTENSITY_RATIO AS VAR_PEAK_INTENSITY_RATIO,
-                    LABEL AS DECOY,
-                    ALIGNED_FILENAME || '_' || FEATURE.PRECURSOR_ID AS GROUP_ID
-                FROM FEATURE_MS2_ALIGNMENT
-                LEFT JOIN
-                (SELECT RUN_ID,
-                        ID,
-                        PRECURSOR_ID,
-                        EXP_RT
-                FROM FEATURE) AS FEATURE ON REFERENCE_FEATURE_ID = FEATURE.ID
-                """,
-                con,
-            )
-            # Map DECOY to 1 and -1 to 0 and 1
-            table["DECOY"] = table["DECOY"].map({1: 0, -1: 1})
-        else:
-            raise click.ClickException("Unspecified data level selected.")
-
-        # Append MS1 scores to MS2 table if selected
-        if self.level == "ms1ms2":
-            if not check_sqlite_table(con, "FEATURE_MS1"):
-                raise click.ClickException(
-                    "MS1-level feature table not present in file."
-                )
-            ms1_table = pd.read_sql_query("SELECT * FROM FEATURE_MS1;", con)
-
-            ms1_scores = [c for c in ms1_table.columns if c.startswith("VAR_")]
-            ms1_table = ms1_table[["FEATURE_ID"] + ms1_scores]
-            ms1_table.columns = ["FEATURE_ID"] + [
-                "VAR_MS1_" + s.split("VAR_")[1] for s in ms1_scores
-            ]
-
-            table = pd.merge(table, ms1_table, how="left", on="FEATURE_ID")
-
-        if self.config.runner.add_alignment_features:
-            # Append MS2 alignment scores to MS2 table if selected
-            if self.level in ("ms2", "ms1ms2"):
-                if not check_sqlite_table(con, "FEATURE_MS2_ALIGNMENT"):
-                    raise click.ClickException(
-                        "MS2-level feature alignment table not present in file."
-                    )
-
-                if not check_sqlite_table(con, "SCORE_ALIGNMENT"):
-                    raise click.ClickException(
-                        "To add MS2-level alignment features, alignment-level first needs to be performed. Please run 'pyprophet score --level=alignment' on this file first."
-                    )
-
-                alignment_table = pd.read_sql_query(
-                    """SELECT 
-                            ALIGNED_FEATURE_ID AS FEATURE_ID,
-                            PRECURSOR_ID,
-                            XCORR_COELUTION_TO_REFERENCE AS VAR_XCORR_COELUTION_TO_REFERENCE,
-                            XCORR_SHAPE_TO_REFERENCE AS VAR_XCORR_SHAPE_TO_REFERENCE, 
-                            MI_TO_REFERENCE AS VAR_MI_TO_REFERENCE, 
-                            XCORR_COELUTION_TO_ALL AS VAR_XCORR_COELUTION_TO_ALL,  
-                            XCORR_SHAPE_TO_ALL AS VAR_XCORR_SHAPE_TO_ALL, 
-                            MI_TO_ALL AS VAR_MI_TO_ALL, 
-                            RETENTION_TIME_DEVIATION AS VAR_RETENTION_TIME_DEVIATION, 
-                            PEAK_INTENSITY_RATIO AS VAR_PEAK_INTENSITY_RATIO 
-                        FROM 
-                        (SELECT DISTINCT * FROM FEATURE_MS2_ALIGNMENT) AS FEATURE_MS2_ALIGNMENT
-                        INNER JOIN 
-                        (SELECT DISTINCT *, MIN(QVALUE) FROM SCORE_ALIGNMENT GROUP BY FEATURE_ID) AS SCORE_ALIGNMENT 
-                        ON SCORE_ALIGNMENT.FEATURE_ID = FEATURE_MS2_ALIGNMENT.ALIGNED_FEATURE_ID
-                        WHERE LABEL = 1""",
-                    con,
-                )
-
-                if "PRECURSOR_ID" in table.columns:
-                    table = pd.merge(
-                        table,
-                        alignment_table,
-                        how="left",
-                        on=["FEATURE_ID", "PRECURSOR_ID"],
-                    )
-                else:
-                    table = pd.merge(
-                        table, alignment_table, how="left", on="FEATURE_ID"
-                    )
-
-            # Append TRANSITION alignment scores to TRANSITION table if selected
-            if self.level == "transition":
-                if not check_sqlite_table(con, "FEATURE_TRANSITION_ALIGNMENT"):
-                    raise click.ClickException(
-                        "Transition-level feature alignment table not present in file."
-                    )
-
-                if not check_sqlite_table(con, "SCORE_ALIGNMENT"):
-                    raise click.ClickException(
-                        "To add Transition-level alignment features, alignment-level first needs to be performed. Please run 'pyprophet score --level=alignment' on this file first."
-                    )
-
-                alignment_table = pd.read_sql_query(
-                    """SELECT 
-                            FEATURE_TRANSITION_ALIGNMENT.FEATURE_ID,
-                            TRANSITION_ID,
-                            XCORR_COELUTION_TO_REFERENCE AS VAR_XCORR_COELUTION_TO_REFERENCE,
-                            XCORR_SHAPE_TO_REFERENCE AS VAR_XCORR_SHAPE_TO_REFERENCE, 
-                            MI_TO_REFERENCE AS VAR_MI_TO_REFERENCE, 
-                            XCORR_COELUTION_TO_ALL AS VAR_XCORR_COELUTION_TO_ALL,  
-                            XCORR_SHAPE_TO_ALL AS VAR_XCORR_SHAPE_TO_ALL, 
-                            MI_TO_ALL AS VAR_MI_TO_ALL, 
-                            RETENTION_TIME_DEVIATION AS VAR_RETENTION_TIME_DEVIATION, 
-                            PEAK_INTENSITY_RATIO AS VAR_PEAK_INTENSITY_RATIO
-                        FROM FEATURE_TRANSITION_ALIGNMENT
-                        INNER JOIN 
-                        (SELECT DISTINCT *, MIN(QVALUE) FROM SCORE_ALIGNMENT GROUP BY FEATURE_ID) AS SCORE_ALIGNMENT 
-                        ON SCORE_ALIGNMENT.FEATURE_ID = FEATURE_TRANSITION_ALIGNMENT.FEATURE_ID 
-                    """,
-                    con,
-                )
-                table = pd.merge(
-                    table,
-                    alignment_table,
-                    how="left",
-                    on=["FEATURE_ID", "TRANSITION_ID"],
-                )
-
-            cols = [
-                "VAR_XCORR_COELUTION_TO_REFERENCE",
-                "VAR_XCORR_SHAPE_TO_REFERENCE",
-                "VAR_MI_TO_REFERENCE",
-                "VAR_XCORR_COELUTION_TO_ALL",
-                "VAR_XCORR_SHAPE_TO_ALL",
-                "VAR_MI_TO_ALL",
-                "VAR_RETENTION_TIME_DEVIATION",
-                "VAR_PEAK_INTENSITY_RATIO",
-            ]
-            # Fill in missing values for cols2 with -1
-            table[cols] = table[cols].fillna(-1)
-
-        # Format table
-        table.columns = [col.lower() for col in table.columns]
-
-        # Mark main score column
-        if ss_main_score.lower() in table.columns:
-            table = table.rename(
-                index=str,
-                columns={ss_main_score.lower(): "main_" + ss_main_score.lower()},
-            )
-        elif (
-            ss_main_score.lower() == "swath_pretrained"
-        ):  # TODO: Do we want to deprecate this?
-            # Add a pretrained main score corresponding to the original implementation in OpenSWATH
-            # This is optimized for 32-windows SCIEX TripleTOF 5600 data
-            table["main_var_pretrained"] = -(
-                -0.19011762 * table["var_library_corr"]
-                + 2.47298914 * table["var_library_rmsd"]
-                + 5.63906731 * table["var_norm_rt_score"]
-                + -0.62640133 * table["var_isotope_correlation_score"]
-                + 0.36006925 * table["var_isotope_overlap_score"]
-                + 0.08814003 * table["var_massdev_score"]
-                + 0.13978311 * table["var_xcorr_coelution"]
-                + -1.16475032 * table["var_xcorr_shape"]
-                + -0.19267813 * table["var_yseries_score"]
-                + -0.61712054 * table["var_log_sn_score"]
-            )
-        else:
+        if not check_sqlite_table(con, "SCORE_MS2"):
             raise click.ClickException(
-                f"Main score ({ss_main_score.lower()}) column not present in data. Current columns: {table.columns}"
+                "Transition-level scoring for IPF requires prior MS2 or MS1MS2-level scoring. "
+                "Please run 'pyprophet score --level=ms2' or 'pyprophet score --level=ms1ms2' first."
+            )
+        if not check_sqlite_table(con, "FEATURE_TRANSITION"):
+            raise click.ClickException(
+                "Transition-level feature table not present in file."
             )
 
-        # Enable transition count & precursor / product charge scores for XGBoost-based classifier
-        if self.config.runner.classifier == "XGBoost" and self.level != "alignment":
-            click.echo(
-                "Info: Enable number of transitions & precursor / product charge scores for XGBoost-based classifier"
-            )
-            table = table.rename(
-                index=str,
-                columns={
-                    "precursor_charge": "var_precursor_charge",
-                    "product_charge": "var_product_charge",
-                    "transition_count": "var_transition_count",
-                },
-            )
+        query = f"""
+            SELECT 
+                ft.*,
+                t.DECOY AS DECOY,
+                f.RUN_ID,
+                f.PRECURSOR_ID,
+                f.EXP_RT,
+                p.CHARGE AS PRECURSOR_CHARGE,
+                t.PRODUCT_CHARGE,
+                f.RUN_ID || '_' || ft.FEATURE_ID || '_' || f.PRECURSOR_ID || '_' || ft.TRANSITION_ID AS GROUP_ID
+            FROM FEATURE_TRANSITION ft
+            INNER JOIN FEATURE f ON ft.FEATURE_ID = f.ID
+            INNER JOIN SCORE_MS2 s ON f.ID = s.FEATURE_ID
+            INNER JOIN PRECURSOR p ON f.PRECURSOR_ID = p.ID
+            INNER JOIN TRANSITION t ON ft.TRANSITION_ID = t.ID
+            WHERE s.RANK <= {rc.ipf_max_peakgroup_rank}
+            AND s.PEP <= {rc.ipf_max_peakgroup_pep}
+            AND ft.VAR_ISOTOPE_OVERLAP_SCORE <= {rc.ipf_max_transition_isotope_overlap}
+            AND ft.VAR_LOG_SN_SCORE > {rc.ipf_min_transition_sn}
+            AND p.DECOY = 0
+            ORDER BY f.RUN_ID, f.PRECURSOR_ID, f.EXP_RT, ft.TRANSITION_ID
+        """
+        df = pd.read_sql_query(query, con)
+        return self._finalize_feature_table(df, self.config.runner.ss_main_score)
 
-        con.close()
-        return table
+    def _fetch_alignment_features_sqlite(self, con):
+        if not check_sqlite_table(con, "FEATURE_MS2_ALIGNMENT"):
+            raise click.ClickException(
+                "MS2-level feature alignment table not present in file."
+            )
+        query = """
+            SELECT
+                ALIGNED_FEATURE_ID AS FEATURE_ID,
+                f.RUN_ID, f.PRECURSOR_ID, f.EXP_RT, fa.LABEL AS DECOY,
+                fa.XCORR_COELUTION_TO_REFERENCE AS VAR_XCORR_COELUTION_TO_REFERENCE,
+                fa.XCORR_SHAPE_TO_REFERENCE AS VAR_XCORR_SHAPE_TO_REFERENCE,
+                fa.MI_TO_REFERENCE AS VAR_MI_TO_REFERENCE,
+                fa.XCORR_COELUTION_TO_ALL AS VAR_XCORR_COELUTION_TO_ALL,
+                fa.XCORR_SHAPE_TO_ALL AS VAR_XCORR_SHAPE_TO_ALL,
+                fa.MI_TO_ALL AS VAR_MI_TO_ALL,
+                fa.RETENTION_TIME_DEVIATION AS VAR_RETENTION_TIME_DEVIATION,
+                fa.PEAK_INTENSITY_RATIO AS VAR_PEAK_INTENSITY_RATIO,
+                fa.ALIGNED_FILENAME || '_' || f.PRECURSOR_ID AS GROUP_ID
+            FROM FEATURE_MS2_ALIGNMENT fa
+            LEFT JOIN FEATURE f ON fa.REFERENCE_FEATURE_ID = f.ID
+        """
+        df = pd.read_sql_query(query, con)
+        df["DECOY"] = df["DECOY"].map({1: 0, -1: 1})
+        return self._finalize_feature_table(df, self.config.runner.ss_main_score)
 
     def _read_for_ipf(self):
-        # implement logic from `ipf.py`
         raise NotImplementedError
 
     def _read_for_context_level(self):
-        # implement logic from `levels_context.py`
         raise NotImplementedError
 
 
@@ -522,273 +552,107 @@ class OSWWriter(BaseWriter):
         if self.infile != self.outfile:
             copyfile(self.infile, self.outfile)
 
-        con = sqlite3.connect(self.config.outfile)
+        df = result.scored_tables
+        level = self.level
+        glyco = self.glyco
 
-        if self.glyco and self.level in ["ms2", "ms1ms2"]:
-            table = "SCORE_MS2"
-            if self.level in ("ms2", "ms1ms2"):
-                c = con.cursor()
-                c.execute("DROP TABLE IF EXISTS SCORE_MS2;")
-                c.execute("DROP TABLE IF EXISTS SCORE_MS2_PART_PEPTIDE;")
-                c.execute("DROP TABLE IF EXISTS SCORE_MS2_PART_GLYCAN;")
-                con.commit()
-                c.fetchall()
-
-                table = "SCORE_MS2"
-
-            elif self.level == "ms1":
-                c = con.cursor()
-                c.execute("DROP TABLE IF EXISTS SCORE_MS1;")
-                c.execute("DROP TABLE IF EXISTS SCORE_MS1_PART_PEPTIDE;")
-                c.execute("DROP TABLE IF EXISTS SCORE_MS1_PART_GLYCAN;")
-                con.commit()
-                c.fetchall()
-
-                table = "SCORE_MS1"
-
-            df = result.scored_tables
-            if "h_score" in df.columns:
-                df = df[
-                    [
-                        "feature_id",
-                        "d_score_combined",
-                        "h_score",
-                        "h0_score",
-                        "peak_group_rank",
-                        "q_value",
-                        "pep",
-                    ]
-                ]
-                df.columns = [
-                    "FEATURE_ID",
-                    "SCORE",
-                    "HSCORE",
-                    "H0SCORE",
-                    "RANK",
-                    "QVALUE",
-                    "PEP",
-                ]
-            else:
-                df = df[
-                    [
-                        "feature_id",
-                        "d_score_combined",
-                        "peak_group_rank",
-                        "q_value",
-                        "pep",
-                    ]
-                ]
-                df.columns = ["FEATURE_ID", "SCORE", "RANK", "QVALUE", "PEP"]
-            df.to_sql(table, con, index=False)
-
-            for part in ["peptide", "glycan"]:
-                df = result.scored_tables
-                df = df[["feature_id", "d_score_" + part, "pep_" + part]]
-                df.columns = ["FEATURE_ID", "SCORE", "PEP"]
-                df.to_sql(table + "_PART_" + part.upper(), con, index=False)
+        # Determine output table(s)
+        if glyco and level in ("ms2", "ms1ms2"):
+            tables = ["SCORE_MS2", "SCORE_MS2_PART_PEPTIDE", "SCORE_MS2_PART_GLYCAN"]
+        elif glyco and level == "ms1":
+            tables = ["SCORE_MS1", "SCORE_MS1_PART_PEPTIDE", "SCORE_MS1_PART_GLYCAN"]
         else:
-            if self.level in ("ms2", "ms1ms2"):
-                c = con.cursor()
-                c.execute("DROP TABLE IF EXISTS SCORE_MS2;")
-                con.commit()
-                c.fetchall()
+            tables = {
+                "ms2": "SCORE_MS2",
+                "ms1ms2": "SCORE_MS2",
+                "ms1": "SCORE_MS1",
+                "transition": "SCORE_TRANSITION",
+                "alignment": "SCORE_ALIGNMENT",
+            }[level]
 
-                df = result.scored_tables
-                if "h_score" in df.columns:
-                    df = df[
-                        [
-                            "feature_id",
-                            "d_score",
-                            "h_score",
-                            "h0_score",
-                            "peak_group_rank",
-                            "p_value",
-                            "q_value",
-                            "pep",
-                        ]
-                    ]
-                    df.columns = [
-                        "FEATURE_ID",
-                        "SCORE",
-                        "HSCORE",
-                        "H0SCORE",
-                        "RANK",
-                        "PVALUE",
-                        "QVALUE",
-                        "PEP",
-                    ]
-                else:
-                    df = df[
-                        [
-                            "feature_id",
-                            "d_score",
-                            "peak_group_rank",
-                            "p_value",
-                            "q_value",
-                            "pep",
-                        ]
-                    ]
-                    df.columns = [
-                        "FEATURE_ID",
-                        "SCORE",
-                        "RANK",
-                        "PVALUE",
-                        "QVALUE",
-                        "PEP",
-                    ]
-                table = "SCORE_MS2"
-                df.to_sql(table, con, index=False)
-            elif self.level == "ms1":
-                c = con.cursor()
-                c.execute("DROP TABLE IF EXISTS SCORE_MS1;")
-                con.commit()
-                c.fetchall()
+            if isinstance(tables, str):
+                tables = [tables]
 
-                df = result.scored_tables
-                if "h_score" in df.columns:
-                    df = df[
-                        [
-                            "feature_id",
-                            "d_score",
-                            "h_score",
-                            "h0_score",
-                            "peak_group_rank",
-                            "p_value",
-                            "q_value",
-                            "pep",
-                        ]
-                    ]
-                    df.columns = [
-                        "FEATURE_ID",
-                        "SCORE",
-                        "HSCORE",
-                        "H0SCORE",
-                        "RANK",
-                        "PVALUE",
-                        "QVALUE",
-                        "PEP",
-                    ]
-                else:
-                    df = df[
-                        [
-                            "feature_id",
-                            "d_score",
-                            "peak_group_rank",
-                            "p_value",
-                            "q_value",
-                            "pep",
-                        ]
-                    ]
-                    df.columns = [
-                        "FEATURE_ID",
-                        "SCORE",
-                        "RANK",
-                        "PVALUE",
-                        "QVALUE",
-                        "PEP",
-                    ]
-                table = "SCORE_MS1"
-                df.to_sql(table, con, index=False)
-            elif self.level == "transition":
-                c = con.cursor()
-                c.execute("DROP TABLE IF EXISTS SCORE_TRANSITION;")
-                con.commit()
-                c.fetchall()
+        # Drop existing tables
+        with sqlite3.connect(self.config.outfile) as con:
+            cur = con.cursor()
+            for tbl in tables:
+                cur.execute(f"DROP TABLE IF EXISTS {tbl}")
+            con.commit()
 
-                df = result.scored_tables[
+            # Prepare data for writing
+            if glyco and level in ("ms2", "ms1ms2"):
+                df_main = df[
                     [
                         "feature_id",
-                        "transition_id",
-                        "d_score",
+                        "d_score_combined",
                         "peak_group_rank",
-                        "p_value",
                         "q_value",
                         "pep",
                     ]
-                ]
-                df.columns = [
-                    "FEATURE_ID",
-                    "TRANSITION_ID",
-                    "SCORE",
-                    "RANK",
-                    "PVALUE",
-                    "QVALUE",
-                    "PEP",
-                ]
-                table = "SCORE_TRANSITION"
-                df.to_sql(table, con, index=False)
-            elif self.level == "alignment":
-                c = con.cursor()
-                c.execute("DROP TABLE IF EXISTS SCORE_ALIGNMENT;")
-                con.commit()
-                c.fetchall()
+                ].copy()
 
-                df = result.scored_tables[
+                if "h_score" in df.columns:
+                    df_main["h_score"] = df["h_score"]
+                    df_main["h0_score"] = df["h0_score"]
+
+                df_main.columns = [c.upper() for c in df_main.columns]
+                df_main = df_main.rename(
+                    columns={"PEAK_GROUP_RANK": "RANK", "D_SCORE_COMBINED": "SCORE"}
+                )
+                df_main.to_sql("SCORE_MS2", con, index=False)
+
+                # Write peptide/glycan part scores
+                for part in ["peptide", "glycan"]:
+                    df_part = df[
+                        ["feature_id", f"d_score_{part}", f"pep_{part}"]
+                    ].copy()
+                    df_part.columns = ["FEATURE_ID", "SCORE", "PEP"]
+                    df_part.to_sql(f"SCORE_MS2_PART_{part.upper()}", con, index=False)
+
+            elif glyco and level == "ms1":
+                df_main = df[
                     [
                         "feature_id",
-                        "d_score",
+                        "d_score_combined",
                         "peak_group_rank",
-                        "p_value",
                         "q_value",
                         "pep",
                     ]
-                ]
-                df.columns = ["FEATURE_ID", "SCORE", "RANK", "PVALUE", "QVALUE", "PEP"]
-                table = "SCORE_ALIGNMENT"
-                df.to_sql(table, con, index=False)
+                ].copy()
 
-        con.close()
+                if "h_score" in df.columns:
+                    df_main["h_score"] = df["h_score"]
+                    df_main["h0_score"] = df["h0_score"]
+
+                df_main.columns = [c.upper() for c in df_main.columns]
+                df_main = df_main.rename(
+                    columns={"PEAK_GROUP_RANK": "RANK", "D_SCORE_COMBINED": "SCORE"}
+                )
+                df_main.to_sql("SCORE_MS1", con, index=False)
+
+                for part in ["peptide", "glycan"]:
+                    df_part = df[
+                        ["feature_id", f"d_score_{part}", f"pep_{part}"]
+                    ].copy()
+                    df_part.columns = ["FEATURE_ID", "SCORE", "PEP"]
+                    df_part.to_sql(f"SCORE_MS1_PART_{part.upper()}", con, index=False)
+
+            else:
+                # Regular MS1, MS2, transition, or alignment
+                table_name = tables[0]
+                score_df = self._prepare_score_dataframe(df, level, table_name + "_")
+                score_df.to_sql(table_name, con, index=False)
+
         click.echo(f"Info: {self.outfile} written.")
 
-        if result.final_statistics is not None:
-            if self.config.glyco and self.level in ["ms2", "ms1ms2"]:
-                save_report_glyco(
-                    os.path.join(self.config.prefix + "_" + self.level + "_report.pdf"),
-                    self.config.outfile + ": " + self.level + "-level scoring",
-                    result.scored_tables,
-                    result.final_statistics,
-                    pi0,
-                )
-            else:
-                cutoffs = result.final_statistics["cutoff"].values
-                svalues = result.final_statistics["svalue"].values
-                qvalues = result.final_statistics["qvalue"].values
-
-                pvalues = result.scored_tables.loc[
-                    (result.scored_tables.peak_group_rank == 1)
-                    & (result.scored_tables.decoy == 0)
-                ]["p_value"].values
-                top_targets = result.scored_tables.loc[
-                    (result.scored_tables.peak_group_rank == 1)
-                    & (result.scored_tables.decoy == 0)
-                ]["d_score"].values
-                top_decoys = result.scored_tables.loc[
-                    (result.scored_tables.peak_group_rank == 1)
-                    & (result.scored_tables.decoy == 1)
-                ]["d_score"].values
-
-                save_report(
-                    os.path.join(self.config.prefix + "_" + self.level + "_report.pdf"),
-                    self.config.outfile,
-                    top_decoys,
-                    top_targets,
-                    cutoffs,
-                    svalues,
-                    qvalues,
-                    pvalues,
-                    pi0,
-                    self.config.color_palette,
-                )
-            click.echo(
-                f"Info: {os.path.join(self.config.prefix + '_' + self.level + '_report.pdf')} written."
-            )
+        # Save report if statistics are present
+        self._write_pdf_report_if_present(result, pi0)
 
     def _save_ipf_results(self, result):
-        # extract logic from ipf.py
         raise NotImplementedError
 
     def _save_context_level_results(self, result):
-        # extract logic from levels_context.py
         raise NotImplementedError
 
     def save_weights(self, weights):

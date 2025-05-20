@@ -132,9 +132,7 @@ class TSVWriter(BaseWriter):
             )
 
     def _save_ipf_results(self, result):
-        # extract logic from ipf.py
         raise NotImplementedError
 
     def _save_context_level_results(self, result):
-        # extract logic from levels_context.py
         raise NotImplementedError

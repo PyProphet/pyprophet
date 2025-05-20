@@ -39,7 +39,7 @@ class BaseReader(ABC):
 
     @property
     def glyco(self):
-        return self.config.glyco
+        return self.config.runner.glyco
 
     @abstractmethod
     def read(self):
@@ -47,6 +47,44 @@ class BaseReader(ABC):
         Abstract method to be implemented by subclasses to read data from a specific format.
         """
         raise NotImplementedError("Subclasses must implement 'read'.")
+
+    def _finalize_feature_table(self, df, ss_main_score):
+        df.columns = [c.lower() for c in df.columns]
+        main_score = ss_main_score.lower()
+        if main_score in df.columns:
+            df = df.rename(columns={main_score: "main_" + main_score})
+        elif main_score == "swath_pretrained":
+            # Add a pretrained main score corresponding to the original implementation in OpenSWATH
+            # This is optimized for 32-windows SCIEX TripleTOF 5600 data
+            df["main_var_pretrained"] = -(
+                -0.19011762 * df["var_library_corr"]
+                + 2.47298914 * df["var_library_rmsd"]
+                + 5.63906731 * df["var_norm_rt_score"]
+                + -0.62640133 * df["var_isotope_correlation_score"]
+                + 0.36006925 * df["var_isotope_overlap_score"]
+                + 0.08814003 * df["var_massdev_score"]
+                + 0.13978311 * df["var_xcorr_coelution"]
+                + -1.16475032 * df["var_xcorr_shape"]
+                + -0.19267813 * df["var_yseries_score"]
+                + -0.61712054 * df["var_log_sn_score"]
+            )
+        else:
+            raise click.ClickException(
+                f"Main score ({main_score}) not found in input columns: {df.columns}"
+            )
+
+        if self.classifier == "XGBoost" and self.level != "alignment":
+            click.echo(
+                "Info: Enable number of transitions & precursor / product charge scores for XGBoost-based classifier"
+            )
+            df = df.rename(
+                columns={
+                    "precursor_charge": "var_precursor_charge",
+                    "product_charge": "var_product_charge",
+                    "transition_count": "var_transition_count",
+                }
+            )
+        return df
 
 
 class BaseWriter(ABC):
@@ -81,7 +119,7 @@ class BaseWriter(ABC):
 
     @property
     def glyco(self):
-        return self.config.glyco
+        return self.config.runner.glyco
 
     @abstractmethod
     def save_results(self, result, pi0):
@@ -131,12 +169,28 @@ class BaseWriter(ABC):
         if level == "transition":
             score_cols.insert(1, "transition_id")
 
+        if level == "alignment":
+            score_cols.insert(2, "alignment_id")
+            score_cols.insert(2, "decoy")
+            # Reverse map DECOY 0 to 1 and 1 to -1
+            # arycal saves a label column to indicate 1 as target aligned peaks and -1 as the random/shuffled decoy aligned peak
+            df["decoy"] = df["decoy"].map({0: 1, 1: -1})
+
         df = df[score_cols].rename(columns=str.upper)
+        df = df.rename(columns={"D_SCORE": "SCORE"})
+
+        if level not in ("ms2", "ms1ms2") and self.config.file_type == "osw":
+            df = df.rename(columns={"PEAK_GROUP_RANK": "RANK"})
 
         if level == "transition":
             key_cols = {"FEATURE_ID", "TRANSITION_ID"}
+        elif level == "alignment":
+            key_cols = {"ALIGNMENT_ID", "FEATURE_ID", "DECOY"}
         else:
             key_cols = {"FEATURE_ID"}
+
+        if self.config.file_type == "osw":
+            return df
 
         rename_map = {
             col: f"{prefix}{col}" for col in df.columns if col not in key_cols
@@ -156,6 +210,7 @@ class BaseWriter(ABC):
                     f"Warn: Dropping existing {score_prefix} columns.", fg="yellow"
                 )
             )
+
         return [col for col in existing_cols if not col.startswith(score_prefix)]
 
     def _write_pdf_report_if_present(self, result, pi0):
@@ -167,6 +222,10 @@ class BaseWriter(ABC):
             return
 
         df = result.scored_tables
+        if self.level == "alignment":
+            # Map Decoy 1 to 0 and -1 to 1
+            df["decoy"] = df["decoy"].map({1: 0, -1: 1})
+
         prefix = self.config.prefix
         level = self.level
 
@@ -177,6 +236,29 @@ class BaseWriter(ABC):
         pvalues = df[(df.peak_group_rank == 1) & (df.decoy == 0)]["p_value"].values
         top_targets = df[(df.peak_group_rank == 1) & (df.decoy == 0)]["d_score"].values
         top_decoys = df[(df.peak_group_rank == 1) & (df.decoy == 1)]["d_score"].values
+
+        # Check if any of the values are empty, can't create a report if they are
+        if not all(
+            [
+                len(top_targets),
+                len(top_decoys),
+                len(cutoffs),
+                len(svalues),
+                len(qvalues),
+                len(pvalues),
+            ]
+        ):
+            click.echo(
+                click.style("Error: Not enough values to create a report.", fg="red")
+            )
+            click.echo(click.style(f"top_targets: {len(top_targets)}", fg="red"))
+            click.echo(click.style(f"top_decoys: {len(top_decoys)}", fg="red"))
+            click.echo(click.style(f"cutoffs: {len(cutoffs)}", fg="red"))
+            click.echo(click.style(f"svalues: {len(svalues)}", fg="red"))
+            click.echo(click.style(f"qvalues: {len(qvalues)}", fg="red"))
+            click.echo(click.style(f"pvalues: {len(pvalues)}", fg="red"))
+            click.echo(click.style(f"pi0: {len(pi0)}", fg="red"))
+            return
 
         pdf_path = os.path.join(prefix + f"_{level}_report.pdf")
         save_report(

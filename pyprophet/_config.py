@@ -154,7 +154,8 @@ class RunnerIOConfig(BaseIOConfig):
     runner: RunnerConfig
     extra_writes: dict = field(init=False)
 
-    def _post_init_(self):
+    def __post_init__(self):
+        super().__post_init__()
         self.extra_writes = dict(self._extra_writes())
 
     def to_kwargs(self) -> Dict[str, Any]:

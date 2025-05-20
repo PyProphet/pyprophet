@@ -50,16 +50,30 @@ class PyProphetRunner(object):
         self.config = config
 
         if is_sqlite_file(config.infile):
-            self.mode = "osw"
             self.table = OSWReader(config).read()
         elif is_parquet_file(config.infile):
-            self.mode = "parquet"
+            click.echo(
+                click.style(
+                    "Warn: Parquet input is experimental. Proceed with caution.",
+                    fg="yellow",
+                )
+            )
+            click.echo(
+                click.style(
+                    "Warn: If this is a single parquet with both precursor and transition data, it may require a lot of memory depending on how large your data is. Consider splitting it into a directory of separate precursors_features.parquet and transition_features.parquet files if you run into memory issues.",
+                    fg="yellow",
+                )
+            )
             self.table = ParquetReader(config).read()
         elif is_valid_split_parquet_dir(config.infile):
-            self.mode = "parquet_split"
+            click.echo(
+                click.style(
+                    "Warn: Split parquet input is experimental. Proceed with caution.",
+                    fg="yellow",
+                )
+            )
             self.table = SplitParquetReader(config).read()
         else:
-            self.mode = "tsv"
             self.table = TSVReader(config).read()
 
     @property
@@ -212,7 +226,7 @@ class PyProphetRunner(object):
 
         self.print_summary(result)
 
-        if self.mode == "tsv":
+        if self.config.file_type == "tsv":
             tsv_writer = TSVWriter(self.config)
             if self.glyco and self.level in ["ms2", "ms1ms2"]:
                 tsv_writer.save_results(result, pi0)
@@ -220,7 +234,7 @@ class PyProphetRunner(object):
                 tsv_writer.save_results(result, scorer.pi0)
             tsv_writer.save_weights(weights)
 
-        elif self.mode == "osw":
+        elif self.config.file_type == "osw":
             osw_writer = OSWWriter(self.config)
             if self.glyco and self.level in ["ms2", "ms1ms2"]:
                 osw_writer.save_results(result, pi0)
@@ -228,12 +242,12 @@ class PyProphetRunner(object):
                 osw_writer.save_results(result, scorer.pi0)
             osw_writer.save_weights(weights)
 
-        elif self.mode == "parquet":
+        elif self.config.file_type == "parquet":
             parquet_writer = ParquetWriter(self.config)
             parquet_writer.save_results(result, scorer.pi0)
             parquet_writer.save_weights(weights)
 
-        elif self.mode == "parquet_split":
+        elif self.config.file_type == "parquet_split":
             split_parquet_writer = SplitParquetWriter(self.config)
             split_parquet_writer.save_results(result, scorer.pi0)
             split_parquet_writer.save_weights(weights)
@@ -285,7 +299,7 @@ class PyProphetWeightApplier(PyProphetRunner):
             raise click.ClickException(
                 "Weights file %s does not exist." % apply_weights
             )
-        if self.mode in ("tsv", "parquet", "parquet_split"):
+        if self.config.file_type in ("tsv", "parquet", "parquet_split"):
             if self.classifier == "LDA":
                 try:
                     self.persisted_weights = pd.read_csv(apply_weights, sep=",")
@@ -299,7 +313,7 @@ class PyProphetWeightApplier(PyProphetRunner):
             elif self.classifier == "XGBoost":
                 with open(apply_weights, "rb") as file:
                     self.persisted_weights = pickle.load(file)
-        elif self.mode == "osw":
+        elif self.config.file_type == "osw":
             if self.classifier == "LDA":
                 try:
                     con = sqlite3.connect(apply_weights)
