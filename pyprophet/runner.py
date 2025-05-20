@@ -17,7 +17,7 @@ from .io.osw import OSWReader, OSWWriter
 from .io.parquet import ParquetReader, ParquetWriter
 from .io.split_parquet import SplitParquetReader, SplitParquetWriter
 from .io.tsv import TSVReader, TSVWriter
-from .data_handling import (
+from .io.util import (
     is_sqlite_file,
     is_parquet_file,
     is_valid_split_parquet_dir,
