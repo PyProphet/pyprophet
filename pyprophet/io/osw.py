@@ -324,19 +324,20 @@ class OSWReader(BaseReader):
             """
             CREATE OR REPLACE VIEW alignment_table AS
             SELECT
-                fa.ALIGNED_FEATURE_ID AS FEATURE_ID,
-                f.RUN_ID, f.PRECURSOR_ID, f.EXP_RT, fa.LABEL AS DECOY,
+                fa.ALIGNMENT_ID AS ALIGNMENT_ID, fa.RUN_ID,
+                fa.PRECURSOR_ID, fa.ALIGNED_FEATURE_ID AS FEATURE_ID,
+                fa.ALIGNED_RT, fa.LABEL AS DECOY,
                 fa.XCORR_COELUTION_TO_REFERENCE AS VAR_XCORR_COELUTION_TO_REFERENCE,
-                fa.XCORR_SHAPE_TO_REFERENCE AS VAR_XCORR_SHAPE_TO_REFERENCE,
+                fa.XCORR_SHAPE_TO_REFERENCE AS VAR_XCORR_SHAPE,
                 fa.MI_TO_REFERENCE AS VAR_MI_TO_REFERENCE,
                 fa.XCORR_COELUTION_TO_ALL AS VAR_XCORR_COELUTION_TO_ALL,
                 fa.XCORR_SHAPE_TO_ALL AS VAR_XCORR_SHAPE_TO_ALL,
                 fa.MI_TO_ALL AS VAR_MI_TO_ALL,
                 fa.RETENTION_TIME_DEVIATION AS VAR_RETENTION_TIME_DEVIATION,
                 fa.PEAK_INTENSITY_RATIO AS VAR_PEAK_INTENSITY_RATIO,
-                fa.ALIGNED_FILENAME || '_' || f.PRECURSOR_ID AS GROUP_ID
+                fa.ALIGNED_FEATURE_ID || '_' || fa.PRECURSOR_ID AS GROUP_ID
             FROM osw.FEATURE_MS2_ALIGNMENT fa
-            LEFT JOIN osw.FEATURE f ON fa.REFERENCE_FEATURE_ID = f.ID
+            ORDER BY fa.RUN_ID, fa.PRECURSOR_ID, fa.REFERENCE_RT
         """
         )
         df = con.execute("SELECT * FROM alignment_table").fetchdf()
@@ -502,19 +503,20 @@ class OSWReader(BaseReader):
             )
         query = """
             SELECT
-                ALIGNED_FEATURE_ID AS FEATURE_ID,
-                f.RUN_ID, f.PRECURSOR_ID, f.EXP_RT, fa.LABEL AS DECOY,
+                fa.ALIGNMENT_ID AS ALIGNMENT_ID, fa.RUN_ID,
+                fa.PRECURSOR_ID, fa.ALIGNED_FEATURE_ID AS FEATURE_ID,
+                fa.ALIGNED_RT, fa.LABEL AS DECOY,
                 fa.XCORR_COELUTION_TO_REFERENCE AS VAR_XCORR_COELUTION_TO_REFERENCE,
-                fa.XCORR_SHAPE_TO_REFERENCE AS VAR_XCORR_SHAPE_TO_REFERENCE,
+                fa.XCORR_SHAPE_TO_REFERENCE AS VAR_XCORR_SHAPE,
                 fa.MI_TO_REFERENCE AS VAR_MI_TO_REFERENCE,
                 fa.XCORR_COELUTION_TO_ALL AS VAR_XCORR_COELUTION_TO_ALL,
                 fa.XCORR_SHAPE_TO_ALL AS VAR_XCORR_SHAPE_TO_ALL,
                 fa.MI_TO_ALL AS VAR_MI_TO_ALL,
                 fa.RETENTION_TIME_DEVIATION AS VAR_RETENTION_TIME_DEVIATION,
                 fa.PEAK_INTENSITY_RATIO AS VAR_PEAK_INTENSITY_RATIO,
-                fa.ALIGNED_FILENAME || '_' || f.PRECURSOR_ID AS GROUP_ID
-            FROM FEATURE_MS2_ALIGNMENT fa
-            LEFT JOIN FEATURE f ON fa.REFERENCE_FEATURE_ID = f.ID
+                fa.ALIGNED_FEATURE_ID || '_' || fa.PRECURSOR_ID AS GROUP_ID
+            FROM osw.FEATURE_MS2_ALIGNMENT fa
+            ORDER BY fa.RUN_ID, fa.PRECURSOR_ID, fa.REFERENCE_RT
         """
         df = pd.read_sql_query(query, con)
         df["DECOY"] = df["DECOY"].map({1: 0, -1: 1})
