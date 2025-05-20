@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 import os
-from .data_handling import is_sqlite_file, is_parquet_file, is_valid_split_parquet_dir
+from .io.util import is_sqlite_file, is_parquet_file, is_valid_split_parquet_dir
 
 
 @dataclass
