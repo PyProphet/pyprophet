@@ -1,13 +1,14 @@
-from pyprophet.data_handling import check_sqlite_table
 import pandas as pd
 import os
 import sqlite3
 import click
 
+from pyprophet.io.util import check_sqlite_table
 from .report import plot_scores
 
+
 def precursor_report(con, max_rs_peakgroup_qvalue):
-    idx_query = '''
+    idx_query = """
 CREATE INDEX IF NOT EXISTS idx_precursor_precursor_id ON PRECURSOR (ID);
 CREATE INDEX IF NOT EXISTS idx_precursor_glycopeptide_mapping_precursor_id ON PRECURSOR_GLYCOPEPTIDE_MAPPING (PRECURSOR_ID);
 CREATE INDEX IF NOT EXISTS idx_precursor_peptide_mapping_precursor_id ON PRECURSOR_PEPTIDE_MAPPING (PRECURSOR_ID);
@@ -22,7 +23,7 @@ CREATE INDEX IF NOT EXISTS idx_peptide_peptide_id ON PEPTIDE (ID);
 CREATE INDEX IF NOT EXISTS idx_run_run_id ON RUN (ID);
 CREATE INDEX IF NOT EXISTS idx_feature_run_id ON FEATURE (RUN_ID);
 CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
-'''
+"""
     if check_sqlite_table(con, "FEATURE_MS1"):
         idx_query += "CREATE INDEX IF NOT EXISTS idx_feature_ms1_feature_id ON FEATURE_MS1 (FEATURE_ID);"
     if check_sqlite_table(con, "FEATURE_MS2"):
@@ -35,11 +36,11 @@ CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
         idx_query += "CREATE INDEX IF NOT EXISTS idx_score_ms2_part_glycan_feature_id ON SCORE_MS2_PART_GLYCAN (FEATURE_ID);"
 
     if max_rs_peakgroup_qvalue is not None:
-        qvalue_filter = 'WHERE SCORE_MS2.QVALUE < %s' % max_rs_peakgroup_qvalue
+        qvalue_filter = "WHERE SCORE_MS2.QVALUE < %s" % max_rs_peakgroup_qvalue
     else:
-        qvalue_filter = ''
-        
-    query = '''
+        qvalue_filter = ""
+
+    query = """
 SELECT RUN.ID AS id_run,
        GLYCOPEPTIDE.ID AS id_glycopeptide,
        PEPTIDE.ID AS id_peptide,
@@ -95,20 +96,25 @@ LEFT JOIN SCORE_MS2_PART_GLYCAN ON SCORE_MS2_PART_GLYCAN.FEATURE_ID = FEATURE.ID
 %s
 ORDER BY transition_group_id,
          peak_group_rank;
-''' % (qvalue_filter)
-    
+""" % (
+        qvalue_filter
+    )
+
     con.executescript(idx_query)
     data = pd.read_sql_query(query, con)
-    
-    con.executescript('''
+
+    con.executescript(
+        """
 CREATE INDEX IF NOT EXISTS idx_glycopeptide_glycosite_mapping_glycosite_id ON GLYCOPEPTIDE_GLYCOSITE_MAPPING (GLYCOSITE_ID);
 CREATE INDEX IF NOT EXISTS idx_glycosite_glycosite_id ON GLYCOSITE (ID);
 CREATE INDEX IF NOT EXISTS idx_glycopeptide_glycosite_mapping_glycopeptide_id ON GLYCOPEPTIDE_GLYCOSITE_MAPPING (GLYCOPEPTIDE_ID);
 CREATE INDEX IF NOT EXISTS idx_glycosite_protein_mapping_protein_id ON GLYCOSITE_PROTEIN_MAPPING (PROTEIN_ID);
 CREATE INDEX IF NOT EXISTS idx_protein_protein_id ON PROTEIN (ID);
 CREATE INDEX IF NOT EXISTS idx_glycosite_protein_mapping_glycosite_id ON GLYCOSITE_PROTEIN_MAPPING (GLYCOSITE_ID);
-''')
-    data_protein_glycosite = pd.read_sql_query('''
+"""
+    )
+    data_protein_glycosite = pd.read_sql_query(
+        """
 SELECT GLYCOPEPTIDE_ID AS id_glycopeptide,
        GROUP_CONCAT(PROTEIN.PROTEIN_ACCESSION,';') AS ProteinName,
        GROUP_CONCAT(GLYCOSITE.PROTEIN_GLYCOSITE,';') AS ProteinGlycoSite
@@ -117,27 +123,30 @@ INNER JOIN GLYCOSITE ON GLYCOPEPTIDE_GLYCOSITE_MAPPING.GLYCOSITE_ID = GLYCOSITE.
 INNER JOIN GLYCOSITE_PROTEIN_MAPPING ON GLYCOSITE.ID = GLYCOSITE_PROTEIN_MAPPING.GLYCOSITE_ID
 INNER JOIN PROTEIN ON GLYCOSITE_PROTEIN_MAPPING.PROTEIN_ID = PROTEIN.ID
 GROUP BY GLYCOPEPTIDE_ID;
-''', con)
-    data = pd.merge(data, data_protein_glycosite, how='inner', on=['id_glycopeptide'])
-    
+""",
+        con,
+    )
+    data = pd.merge(data, data_protein_glycosite, how="inner", on=["id_glycopeptide"])
+
     return data
 
 
 def transition_report(con, max_transition_pep):
     if max_transition_pep is not None:
-        pep_filter = 'AND SCORE_TRANSITION.PEP < %s' % max_transition_pep
+        pep_filter = "AND SCORE_TRANSITION.PEP < %s" % max_transition_pep
     else:
-        pep_filter = ''
-    
+        pep_filter = ""
+
     if check_sqlite_table(con, "SCORE_TRANSITION"):
-        idx_transition_query = '''
+        idx_transition_query = """
 CREATE INDEX IF NOT EXISTS idx_feature_transition_transition_id ON FEATURE_TRANSITION (TRANSITION_ID);
 CREATE INDEX IF NOT EXISTS idx_transition_transition_id ON TRANSITION (ID);
 CREATE INDEX IF NOT EXISTS idx_feature_transition_transition_id_feature_id ON FEATURE_TRANSITION (TRANSITION_ID, FEATURE_ID);
 CREATE INDEX IF NOT EXISTS idx_score_transition_transition_id_feature_id ON SCORE_TRANSITION (TRANSITION_ID, FEATURE_ID);
 CREATE INDEX IF NOT EXISTS idx_feature_transition_feature_id ON FEATURE_TRANSITION (FEATURE_ID);
-'''
-        transition_query = '''
+"""
+        transition_query = (
+            """
 SELECT FEATURE_TRANSITION.FEATURE_ID AS id,
   GROUP_CONCAT(AREA_INTENSITY,';') AS aggr_Peak_Area,
   GROUP_CONCAT(APEX_INTENSITY,';') AS aggr_Peak_Apex,
@@ -147,14 +156,16 @@ INNER JOIN TRANSITION ON FEATURE_TRANSITION.TRANSITION_ID = TRANSITION.ID
 INNER JOIN SCORE_TRANSITION ON FEATURE_TRANSITION.TRANSITION_ID = SCORE_TRANSITION.TRANSITION_ID AND FEATURE_TRANSITION.FEATURE_ID = SCORE_TRANSITION.FEATURE_ID
 WHERE TRANSITION.DECOY == 0 %s
 GROUP BY FEATURE_TRANSITION.FEATURE_ID
-''' % pep_filter
+"""
+            % pep_filter
+        )
     else:
-        idx_transition_query = '''
+        idx_transition_query = """
 CREATE INDEX IF NOT EXISTS idx_feature_transition_transition_id ON FEATURE_TRANSITION (TRANSITION_ID);
 CREATE INDEX IF NOT EXISTS idx_transition_transition_id ON TRANSITION (ID);
 CREATE INDEX IF NOT EXISTS idx_feature_transition_feature_id ON FEATURE_TRANSITION (FEATURE_ID);
-'''
-        transition_query = '''
+"""
+        transition_query = """
 SELECT FEATURE_ID AS id,
   GROUP_CONCAT(AREA_INTENSITY,';') AS aggr_Peak_Area,
   GROUP_CONCAT(APEX_INTENSITY,';') AS aggr_Peak_Apex,
@@ -162,45 +173,50 @@ SELECT FEATURE_ID AS id,
 FROM FEATURE_TRANSITION
 INNER JOIN TRANSITION ON FEATURE_TRANSITION.TRANSITION_ID = TRANSITION.ID
 GROUP BY FEATURE_ID
-'''
-    
-    con.executescript(idx_transition_query) 
+"""
+
+    con.executescript(idx_transition_query)
     data = pd.read_sql_query(transition_query, con)
     return data
 
 
 def glycopeptide_report(con, max_global_glycopeptide_qvalue):
     if max_global_glycopeptide_qvalue is not None:
-        qvalue_filter = 'AND SCORE_GLYCOPEPTIDE.QVALUE < %s' % \
-            max_global_glycopeptide_qvalue
+        qvalue_filter = (
+            "AND SCORE_GLYCOPEPTIDE.QVALUE < %s" % max_global_glycopeptide_qvalue
+        )
     else:
-        qvalue_filter = ''
-        
+        qvalue_filter = ""
+
     data = None
-    
-    for context in ['run-specific', 'experiment-wide', 'global']:
-        context_suffix = '_' + context.replace('-', '_')
-        if context == 'global':
-            run_id = ''
+
+    for context in ["run-specific", "experiment-wide", "global"]:
+        context_suffix = "_" + context.replace("-", "_")
+        if context == "global":
+            run_id = ""
         else:
-            run_id = 'RUN_ID AS id_run,'
-            
-        for part in ['peptide', 'glycan', 'total']:
-            if part == 'total':
-                part_suffix = ''
-                table_part_suffix = ''
-                m_score = ', QVALUE AS m_score_glycopeptide%s%s' % (part_suffix, context_suffix)
+            run_id = "RUN_ID AS id_run,"
+
+        for part in ["peptide", "glycan", "total"]:
+            if part == "total":
+                part_suffix = ""
+                table_part_suffix = ""
+                m_score = ", QVALUE AS m_score_glycopeptide%s%s" % (
+                    part_suffix,
+                    context_suffix,
+                )
                 m_score_filter = qvalue_filter
             else:
-                part_suffix = '_' + part
-                table_part_suffix = '_PART_' + part.upper()
-                m_score = ''
-                m_score_filter = ''
-            
+                part_suffix = "_" + part
+                table_part_suffix = "_PART_" + part.upper()
+                m_score = ""
+                m_score_filter = ""
+
             if not check_sqlite_table(con, "SCORE_GLYCOPEPTIDE" + table_part_suffix):
                 continue
-    
-            data_glycopeptide = pd.read_sql_query('''
+
+            data_glycopeptide = pd.read_sql_query(
+                """
 SELECT %(run_id)s
        GLYCOPEPTIDE_ID AS id_glycopeptide,
        PEP AS pep_glycopeptide%(part_suffix)s%(context_suffix)s
@@ -208,38 +224,46 @@ SELECT %(run_id)s
 FROM SCORE_GLYCOPEPTIDE%(table_part_suffix)s
 WHERE CONTEXT == '%(context)s'
       %(m_score_filter)s;
-''' % {
-    'run_id': run_id,
-    'part_suffix': part_suffix, 
-    'table_part_suffix': table_part_suffix,
-    'context_suffix': context_suffix,
-    'context': context,
-    'm_score': m_score,
-    'm_score_filter': m_score_filter
-}, con)
-            
+"""
+                % {
+                    "run_id": run_id,
+                    "part_suffix": part_suffix,
+                    "table_part_suffix": table_part_suffix,
+                    "context_suffix": context_suffix,
+                    "context": context,
+                    "m_score": m_score,
+                    "m_score_filter": m_score_filter,
+                },
+                con,
+            )
+
             if len(data_glycopeptide.index) > 0:
                 if data is None:
                     data = data_glycopeptide
                 else:
-                    if 'id_run' in data.columns and 'id_run' in data_glycopeptide.columns:
-                        on = ['id_run', 'id_glycopeptide']
+                    if (
+                        "id_run" in data.columns
+                        and "id_run" in data_glycopeptide.columns
+                    ):
+                        on = ["id_run", "id_glycopeptide"]
                     else:
-                        on = ['id_glycopeptide']
+                        on = ["id_glycopeptide"]
                     data = pd.merge(data, data_glycopeptide, on=on)
 
     return data
 
 
-def glycoform_report(con, 
-                     match_precursor,
-                     max_glycoform_pep,
-                     max_glycoform_qvalue,
-                     max_rs_peakgroup_qvalue):
+def glycoform_report(
+    con,
+    match_precursor,
+    max_glycoform_pep,
+    max_glycoform_qvalue,
+    max_rs_peakgroup_qvalue,
+):
     if not check_sqlite_table(con, "SCORE_GLYCOFORM"):
         raise click.ClickException("No glycoform scores.")
-        
-    idx_query = ''
+
+    idx_query = ""
     if check_sqlite_table(con, "FEATURE_MS1"):
         idx_query += "CREATE INDEX IF NOT EXISTS idx_feature_ms1_feature_id ON FEATURE_MS1 (FEATURE_ID);"
     if check_sqlite_table(con, "SCORE_MS1"):
@@ -254,39 +278,45 @@ def glycoform_report(con,
     if check_sqlite_table(con, "SCORE_GLYCOFORM"):
         idx_query += "CREATE INDEX IF NOT EXISTS idx_score_glycoform_feature_id ON SCORE_GLYCOFORM (FEATURE_ID);"
         idx_query += "CREATE INDEX IF NOT EXISTS idx_score_glycoform_glycopeptide_id ON SCORE_GLYCOFORM (GLYCOPEPTIDE_ID);"
-        
-    if match_precursor == 'exact':
-        glycofrom_match_precursor = ''
-        match_precursor_filter = 'GLYCOPEPTIDE.ID = GLYCOPEPTIDE_GLYCOFORM.ID'
-        transition_group_id = 'PRECURSOR.ID'
-    elif match_precursor == 'glycan_composition':
-        glycofrom_match_precursor = ''
-        match_precursor_filter = 'GLYCAN.GLYCAN_COMPOSITION = GLYCAN_GLYCOFORM.GLYCAN_COMPOSITION'
-        transition_group_id = 'PRECURSOR.ID'
+
+    if match_precursor == "exact":
+        glycofrom_match_precursor = ""
+        match_precursor_filter = "GLYCOPEPTIDE.ID = GLYCOPEPTIDE_GLYCOFORM.ID"
+        transition_group_id = "PRECURSOR.ID"
+    elif match_precursor == "glycan_composition":
+        glycofrom_match_precursor = ""
+        match_precursor_filter = (
+            "GLYCAN.GLYCAN_COMPOSITION = GLYCAN_GLYCOFORM.GLYCAN_COMPOSITION"
+        )
+        transition_group_id = "PRECURSOR.ID"
     else:
-        glycofrom_match_precursor = 'GLYCOPEPTIDE.ID = GLYCOPEPTIDE_GLYCOFORM.ID AS glycofrom_match_precursor,'
-        match_precursor_filter = '1 = 1'
-        transition_group_id = '''
+        glycofrom_match_precursor = (
+            "GLYCOPEPTIDE.ID = GLYCOPEPTIDE_GLYCOFORM.ID AS glycofrom_match_precursor,"
+        )
+        match_precursor_filter = "1 = 1"
+        transition_group_id = """
 PRECURSOR.ID || '_' || 
 PEPTIDE_GLYCOFORM.MODIFIED_SEQUENCE || '_' || 
 GLYCOPEPTIDE_GLYCOFORM.GLYCAN_SITE || ',' ||
 GLYCAN_GLYCOFORM.GLYCAN_STRUCT
-'''
+"""
 
     if max_rs_peakgroup_qvalue is not None:
-        ms2_qvalue_filter = 'AND SCORE_MS2.QVALUE < %s' % max_rs_peakgroup_qvalue
+        ms2_qvalue_filter = "AND SCORE_MS2.QVALUE < %s" % max_rs_peakgroup_qvalue
     else:
-        ms2_qvalue_filter = ''
+        ms2_qvalue_filter = ""
     if max_glycoform_pep is not None:
-        glycoform_pep_filter = 'AND SCORE_GLYCOFORM.PEP < %s' % max_glycoform_pep
+        glycoform_pep_filter = "AND SCORE_GLYCOFORM.PEP < %s" % max_glycoform_pep
     else:
-        glycoform_pep_filter = ''
+        glycoform_pep_filter = ""
     if max_glycoform_qvalue is not None:
-        glycoform_qvalue_filter = 'AND SCORE_GLYCOFORM.QVALUE < %s' % max_glycoform_qvalue
+        glycoform_qvalue_filter = (
+            "AND SCORE_GLYCOFORM.QVALUE < %s" % max_glycoform_qvalue
+        )
     else:
-        glycoform_qvalue_filter = ''
+        glycoform_qvalue_filter = ""
 
-    query = '''
+    query = """
 SELECT RUN.ID AS id_run,
        GLYCOPEPTIDE.ID AS id_glycopeptide,
        PEPTIDE.ID AS id_peptide,
@@ -358,29 +388,32 @@ WHERE %(match_precursor_filter)s
       %(glycoform_qvalue_filter)s
 ORDER BY transition_group_id,
          peak_group_rank;
-''' % {
-    'transition_group_id': transition_group_id, 
-    'glycofrom_match_precursor': glycofrom_match_precursor,
-    'score_ms1_pep': score_ms1_pep, 
-    'link_ms1': link_ms1, 
-    'match_precursor_filter': match_precursor_filter,
-    'ms2_qvalue_filter': ms2_qvalue_filter, 
-    'glycoform_pep_filter': glycoform_pep_filter, 
-    'glycoform_qvalue_filter': glycoform_qvalue_filter
-}
+""" % {
+        "transition_group_id": transition_group_id,
+        "glycofrom_match_precursor": glycofrom_match_precursor,
+        "score_ms1_pep": score_ms1_pep,
+        "link_ms1": link_ms1,
+        "match_precursor_filter": match_precursor_filter,
+        "ms2_qvalue_filter": ms2_qvalue_filter,
+        "glycoform_pep_filter": glycoform_pep_filter,
+        "glycoform_qvalue_filter": glycoform_qvalue_filter,
+    }
 
-    con.executescript(idx_query) 
+    con.executescript(idx_query)
     data = pd.read_sql_query(query, con)
-    
-    con.executescript('''
+
+    con.executescript(
+        """
 CREATE INDEX IF NOT EXISTS idx_glycopeptide_glycosite_mapping_glycosite_id ON GLYCOPEPTIDE_GLYCOSITE_MAPPING (GLYCOSITE_ID);
 CREATE INDEX IF NOT EXISTS idx_glycosite_glycosite_id ON GLYCOSITE (ID);
 CREATE INDEX IF NOT EXISTS idx_glycopeptide_glycosite_mapping_glycopeptide_id ON GLYCOPEPTIDE_GLYCOSITE_MAPPING (GLYCOPEPTIDE_ID);
 CREATE INDEX IF NOT EXISTS idx_glycosite_protein_mapping_protein_id ON GLYCOSITE_PROTEIN_MAPPING (PROTEIN_ID);
 CREATE INDEX IF NOT EXISTS idx_protein_protein_id ON PROTEIN (ID);
 CREATE INDEX IF NOT EXISTS idx_glycosite_protein_mapping_glycosite_id ON GLYCOSITE_PROTEIN_MAPPING (GLYCOSITE_ID);
-''')
-    data_protein_glycosite = pd.read_sql_query('''
+"""
+    )
+    data_protein_glycosite = pd.read_sql_query(
+        """
 SELECT GLYCOPEPTIDE_ID AS id_glycopeptide,
        GROUP_CONCAT(PROTEIN.PROTEIN_ACCESSION,';') AS ProteinName,
        GROUP_CONCAT(GLYCOSITE.PROTEIN_GLYCOSITE,';') AS ProteinGlycoSite
@@ -389,101 +422,131 @@ INNER JOIN GLYCOSITE ON GLYCOPEPTIDE_GLYCOSITE_MAPPING.GLYCOSITE_ID = GLYCOSITE.
 INNER JOIN GLYCOSITE_PROTEIN_MAPPING ON GLYCOSITE.ID = GLYCOSITE_PROTEIN_MAPPING.GLYCOSITE_ID
 INNER JOIN PROTEIN ON GLYCOSITE_PROTEIN_MAPPING.PROTEIN_ID = PROTEIN.ID
 GROUP BY GLYCOPEPTIDE_ID;
-''', con)
-    data = pd.merge(data, data_protein_glycosite, how='inner', on=['id_glycopeptide'])
-    
+""",
+        con,
+    )
+    data = pd.merge(data, data_protein_glycosite, how="inner", on=["id_glycopeptide"])
+
     return data
 
 
-def export_tsv(infile, outfile, format='legacy_merged', outcsv=False, 
-               transition_quantification=True, max_transition_pep=0.7, 
-               glycoform=False, glycoform_match_precursor='glycan_composition',
-               max_glycoform_pep=None,
-               max_glycoform_qvalue=0.01,
-               max_rs_peakgroup_qvalue=0.05,
-               glycopeptide=True, max_global_glycopeptide_qvalue=0.01):
-    
+def export_tsv(
+    infile,
+    outfile,
+    format="legacy_merged",
+    outcsv=False,
+    transition_quantification=True,
+    max_transition_pep=0.7,
+    glycoform=False,
+    glycoform_match_precursor="glycan_composition",
+    max_glycoform_pep=None,
+    max_glycoform_qvalue=0.01,
+    max_rs_peakgroup_qvalue=0.05,
+    glycopeptide=True,
+    max_global_glycopeptide_qvalue=0.01,
+):
+
     osw = sqlite3.connect(infile)
-    
+
     click.echo("Info: Reading peak group-level results.")
     if not glycoform:
-        data = precursor_report(
-            osw, 
-            max_rs_peakgroup_qvalue=max_rs_peakgroup_qvalue
-        )
+        data = precursor_report(osw, max_rs_peakgroup_qvalue=max_rs_peakgroup_qvalue)
     else:
         data = glycoform_report(
-            osw, 
+            osw,
             match_precursor=glycoform_match_precursor,
             max_glycoform_pep=max_glycoform_pep,
             max_glycoform_qvalue=max_glycoform_qvalue,
-            max_rs_peakgroup_qvalue=max_rs_peakgroup_qvalue
+            max_rs_peakgroup_qvalue=max_rs_peakgroup_qvalue,
         )
-            
+
     if transition_quantification:
         click.echo("Info: Reading transition-level results.")
-        data_transition = transition_report(
-            osw, 
-            max_transition_pep=max_transition_pep
-        )
+        data_transition = transition_report(osw, max_transition_pep=max_transition_pep)
         if data_transition is not None and len(data_transition.index) > 0:
-            data = pd.merge(data, data_transition, how='left', on=['id'])
-        
+            data = pd.merge(data, data_transition, how="left", on=["id"])
+
     if glycopeptide:
         click.echo("Info: Reading glycopeptide-level results.")
         data_glycopeptide = glycopeptide_report(
-            osw,
-            max_global_glycopeptide_qvalue=max_global_glycopeptide_qvalue
-        )        
+            osw, max_global_glycopeptide_qvalue=max_global_glycopeptide_qvalue
+        )
         if data_glycopeptide is not None and len(data_glycopeptide.index) > 0:
-            if 'id_run' in data_glycopeptide.columns:
-                data = pd.merge(data, data_glycopeptide, how='inner', on=['id_run','id_glycopeptide'])
+            if "id_run" in data_glycopeptide.columns:
+                data = pd.merge(
+                    data,
+                    data_glycopeptide,
+                    how="inner",
+                    on=["id_run", "id_glycopeptide"],
+                )
             else:
-                data = pd.merge(data, data_glycopeptide, how='inner', on=['id_glycopeptide'])
-        
+                data = pd.merge(
+                    data, data_glycopeptide, how="inner", on=["id_glycopeptide"]
+                )
+
     if outcsv:
         sep = ","
     else:
         sep = "\t"
 
-    if format == 'legacy_split':
-        data = data.drop(['id_run', 'id_glycopeptide', 'id_peptide'], axis=1)
-        data.groupby('filename').apply(lambda x: x.to_csv(
-            os.path.basename(x['filename'].values[0]) + '.tsv', 
-            sep=sep, index=False
-        ))
-    elif format == 'legacy_merged':
-        data.drop(['id_run', 'id_glycopeptide', 'id_peptide'], axis=1) \
-            .to_csv(outfile, sep=sep, index=False)
-    elif format == 'matrix':
-        data = data.iloc[data.groupby(['run_id', 'transition_group_id']) \
-            .apply(lambda x: x['m_score'].idxmin())]
-        
-        data = data[['transition_group_id', 
-                     'decoy', 'decoy_peptide', 'decoy_glycan',
-                     'Sequence', 'FullPeptideName',
-                     'GlycanStruct', 'GlycanComposition', 'GlycanSite',
-                     'Charge',
-                     'ProteinName', 'ProteinGlycoSite', 'filename', 'Intensity']]
-        
+    if format == "legacy_split":
+        data = data.drop(["id_run", "id_glycopeptide", "id_peptide"], axis=1)
+        data.groupby("filename").apply(
+            lambda x: x.to_csv(
+                os.path.basename(x["filename"].values[0]) + ".tsv", sep=sep, index=False
+            )
+        )
+    elif format == "legacy_merged":
+        data.drop(["id_run", "id_glycopeptide", "id_peptide"], axis=1).to_csv(
+            outfile, sep=sep, index=False
+        )
+    elif format == "matrix":
+        data = data.iloc[
+            data.groupby(["run_id", "transition_group_id"]).apply(
+                lambda x: x["m_score"].idxmin()
+            )
+        ]
+
+        data = data[
+            [
+                "transition_group_id",
+                "decoy",
+                "decoy_peptide",
+                "decoy_glycan",
+                "Sequence",
+                "FullPeptideName",
+                "GlycanStruct",
+                "GlycanComposition",
+                "GlycanSite",
+                "Charge",
+                "ProteinName",
+                "ProteinGlycoSite",
+                "filename",
+                "Intensity",
+            ]
+        ]
+
         data = data.pivot_table(
-            index=list(data.columns \
-                .difference(['filename', 'Intensity'], sort=False)), 
-            columns='filename', values='Intensity'
+            index=list(data.columns.difference(["filename", "Intensity"], sort=False)),
+            columns="filename",
+            values="Intensity",
         )
         data.to_csv(outfile, sep=sep, index=True)
 
     osw.close()
-    
-    
+
+
 def export_score_plots(infile):
     con = sqlite3.connect(infile)
 
-    if check_sqlite_table(con, "SCORE_MS2") and \
-        check_sqlite_table(con, "SCORE_MS2_PART_PEPTIDE") and \
-        check_sqlite_table(con, "SCORE_MS2_PART_GLYCAN"):
+    if (
+        check_sqlite_table(con, "SCORE_MS2")
+        and check_sqlite_table(con, "SCORE_MS2_PART_PEPTIDE")
+        and check_sqlite_table(con, "SCORE_MS2_PART_GLYCAN")
+    ):
         outfile = infile.split(".osw")[0] + "_ms2_score_plots.pdf"
-        table_ms2 = pd.read_sql_query('''
+        table_ms2 = pd.read_sql_query(
+            """
 SELECT *,
        RUN_ID || '_' || PRECURSOR_ID AS GROUP_ID
 FROM FEATURE_MS2
@@ -533,12 +596,15 @@ WHERE RANK == 1
 ORDER BY RUN_ID,
          PRECURSOR.ID ASC,
          FEATURE.EXP_RT ASC;
-''', con)
-        plot_scores(table_ms2, outfile, title=infile + ': MS2 scores')
+""",
+            con,
+        )
+        plot_scores(table_ms2, outfile, title=infile + ": MS2 scores")
 
     if check_sqlite_table(con, "SCORE_MS1"):
         outfile = infile.split(".osw")[0] + "_ms1_score_plots.pdf"
-        table_ms1 = pd.read_sql_query('''
+        table_ms1 = pd.read_sql_query(
+            """
 SELECT *,
        RUN_ID || '_' || PRECURSOR_ID AS GROUP_ID
 FROM FEATURE_MS1
@@ -568,12 +634,15 @@ WHERE RANK == 1
 ORDER BY RUN_ID,
          PRECURSOR.ID ASC,
          FEATURE.EXP_RT ASC;
-''', con)
-        plot_scores(table_ms1, outfile, title=infile + ': MS1 scores')
+""",
+            con,
+        )
+        plot_scores(table_ms1, outfile, title=infile + ": MS1 scores")
 
     if check_sqlite_table(con, "SCORE_TRANSITION"):
         outfile = infile.split(".osw")[0] + "_transition_score_plots.pdf"
-        table_transition = pd.read_sql_query('''
+        table_transition = pd.read_sql_query(
+            """
 SELECT TRANSITION.DECOY AS DECOY,
        FEATURE_TRANSITION.*,
        PRECURSOR.CHARGE AS VAR_PRECURSOR_CHARGE,
@@ -599,9 +668,9 @@ ORDER BY RUN_ID,
          PRECURSOR.ID,
          FEATURE.EXP_RT,
          TRANSITION.ID;
-''', con)
-        plot_scores(table_transition, outfile, title=infile + ': transition scores')
+""",
+            con,
+        )
+        plot_scores(table_transition, outfile, title=infile + ": transition scores")
 
     con.close()
-    
-    

@@ -131,9 +131,17 @@ class OSWReader(BaseReader):
     # DuckDB Queries
     # ----------------------------
 
+    def _fetch_tables_duckdb(self, con):
+        tables = con.execute(
+            "SELECT table_schema, table_name FROM information_schema.tables"
+        ).fetchdf()
+        return tables
+
     def _fetch_ms2_features_duckdb(self, con):
-        if not check_duckdb_table(con, "osw", "FEATURE_MS2"):
-            raise click.ClickException("MS2-level feature table not present in file.")
+        if not check_duckdb_table(con, "main", "FEATURE_MS2"):
+            raise click.ClickException(
+                f"MS2-level feature table not present in file.\nTable Info:\n{self._fetch_tables_duckdb(con)}"
+            )
 
         if self.glyco:
             con.execute(
@@ -206,8 +214,10 @@ class OSWReader(BaseReader):
         return self._finalize_feature_table(df, self.config.runner.ss_main_score)
 
     def _fetch_ms1_features_duckdb(self, con):
-        if not check_duckdb_table(con, "osw", "FEATURE_MS1"):
-            raise click.ClickException("MS1-level feature table not present in file.")
+        if not check_duckdb_table(con, "main", "FEATURE_MS1"):
+            raise click.ClickException(
+                f"MS1-level feature table not present in file.\nTable Info:\n{self._fetch_tables_duckdb(con)}"
+            )
 
         rc = self.config.runner
         glyco = rc.glyco
@@ -227,10 +237,10 @@ class OSWReader(BaseReader):
                 """
             )
         else:
-            if not check_duckdb_table(con, "osw", "SCORE_MS2"):
+            if not check_duckdb_table(con, "main", "SCORE_MS2"):
                 raise click.ClickException(
-                    "MS1-level scoring for glycoform inference requires prior MS2 or MS1MS2-level scoring. "
-                    "Please run 'pyprophet score --level=ms2' or 'pyprophet score --level=ms1ms2' on this file first."
+                    f"MS1-level scoring for glycoform inference requires prior MS2 or MS1MS2-level scoring. "
+                    "Please run 'pyprophet score --level=ms2' or 'pyprophet score --level=ms1ms2' on this file first.level\nTable Info:\n{self._fetch_tables_duckdb(con)}"
                 )
 
             con.execute(
@@ -259,15 +269,15 @@ class OSWReader(BaseReader):
         return self._finalize_feature_table(df, rc.ss_main_score)
 
     def _fetch_transition_features_duckdb(self, con):
-        if not check_duckdb_table(con, "osw", "SCORE_MS2"):
+        if not check_duckdb_table(con, "main", "SCORE_MS2"):
             raise click.ClickException(
-                "Transition-level scoring for IPF requires prior MS2 or MS1MS2-level scoring. "
-                "Please run 'pyprophet score --level=ms2' or 'pyprophet score --level=ms1ms2' first."
+                f"Transition-level scoring for IPF requires prior MS2 or MS1MS2-level scoring. "
+                "Please run 'pyprophet score --level=ms2' or 'pyprophet score --level=ms1ms2' first.\nTable Info:\n{self._fetch_tables_duckdb(con)}"
             )
 
-        if not check_duckdb_table(con, "osw", "FEATURE_TRANSITION"):
+        if not check_duckdb_table(con, "main", "FEATURE_TRANSITION"):
             raise click.ClickException(
-                "Transition-level feature table not present in file."
+                f"Transition-level feature table not present in file.\nTable Info:\n{self._fetch_tables_duckdb(con)}"
             )
 
         rc = self.config.runner
@@ -306,9 +316,9 @@ class OSWReader(BaseReader):
         return self._finalize_feature_table(df, self.config.runner.ss_main_score)
 
     def _fetch_alignment_features_duckdb(self, con):
-        if check_duckdb_table(con, "osw", "FEATURE_MS2_ALIGNMENT"):
+        if not check_duckdb_table(con, "main", "FEATURE_MS2_ALIGNMENT"):
             raise click.ClickException(
-                "MS2-level feature alignment table not present in file."
+                f"MS2-level feature alignment table not present in file.\nTable Info:\n{self._fetch_tables_duckdb(con)}"
             )
         con.execute(
             """

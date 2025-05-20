@@ -38,7 +38,7 @@ def check_sqlite_table(con, table):
 
 def check_duckdb_table(con, schema: str, table: str) -> bool:
     """
-    Check if a table exists in a DuckDB-attached SQLite schema.
+    Check if a table exists in a DuckDB-attached SQLite schema (case-insensitive).
 
     Args:
         con: DuckDB connection.
@@ -51,7 +51,8 @@ def check_duckdb_table(con, schema: str, table: str) -> bool:
     query = f"""
         SELECT COUNT(*) 
         FROM information_schema.tables 
-        WHERE table_schema = '{schema}' AND table_name = '{table.upper()}'
+        WHERE LOWER(table_schema) = LOWER('{schema}') 
+          AND LOWER(table_name) = LOWER('{table}')
     """
     result = con.execute(query).fetchone()[0]
     return result == 1
