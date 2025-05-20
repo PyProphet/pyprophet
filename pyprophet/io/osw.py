@@ -8,8 +8,6 @@ import click
 from ._base import BaseReader, BaseWriter, BaseIOConfig
 from .._config import RunnerIOConfig, IPFIOConfig, LevelContextIOConfig
 from .util import check_sqlite_table, check_duckdb_table
-from ..report import save_report
-from ..glyco.report import save_report as save_report_glyco
 
 
 class OSWReader(BaseReader):
@@ -239,8 +237,8 @@ class OSWReader(BaseReader):
         else:
             if not check_duckdb_table(con, "main", "SCORE_MS2"):
                 raise click.ClickException(
-                    f"MS1-level scoring for glycoform inference requires prior MS2 or MS1MS2-level scoring. "
-                    "Please run 'pyprophet score --level=ms2' or 'pyprophet score --level=ms1ms2' on this file first.level\nTable Info:\n{self._fetch_tables_duckdb(con)}"
+                    f"""MS1-level scoring for glycoform inference requires prior MS2 or MS1MS2-level scoring.\n
+                    Please run 'pyprophet score --level=ms2' or 'pyprophet score --level=ms1ms2' on this file first.level\nTable Info:\n{self._fetch_tables_duckdb(con)}"""
                 )
 
             con.execute(
@@ -271,8 +269,8 @@ class OSWReader(BaseReader):
     def _fetch_transition_features_duckdb(self, con):
         if not check_duckdb_table(con, "main", "SCORE_MS2"):
             raise click.ClickException(
-                f"Transition-level scoring for IPF requires prior MS2 or MS1MS2-level scoring. "
-                "Please run 'pyprophet score --level=ms2' or 'pyprophet score --level=ms1ms2' first.\nTable Info:\n{self._fetch_tables_duckdb(con)}"
+                f"""Transition-level scoring for IPF requires prior MS2 or MS1MS2-level scoring.\n
+                Please run 'pyprophet score --level=ms2' or 'pyprophet score --level=ms1ms2' first.\nTable Info:\n{self._fetch_tables_duckdb(con)}"""
             )
 
         if not check_duckdb_table(con, "main", "FEATURE_TRANSITION"):

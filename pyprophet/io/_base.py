@@ -17,7 +17,7 @@ class BaseReader(ABC):
         Initialize the reader with a given configuration.
 
         Args:
-            config (BaseIOConfig): Configuration object containing input details.
+            config (BaseIOConfig): Configuration object containing input details, and module specific config for params for reading.
         """
         self.config = config
 
@@ -53,7 +53,9 @@ class BaseReader(ABC):
         main_score = ss_main_score.lower()
         if main_score in df.columns:
             df = df.rename(columns={main_score: "main_" + main_score})
-        elif main_score == "swath_pretrained":
+        elif (
+            main_score == "swath_pretrained"
+        ):  # TODO: Should we deprecate this? This is probably not optimal for newer data from different instruments
             # Add a pretrained main score corresponding to the original implementation in OpenSWATH
             # This is optimized for 32-windows SCIEX TripleTOF 5600 data
             df["main_var_pretrained"] = -(
