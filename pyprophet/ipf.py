@@ -15,7 +15,7 @@ from .io.util import (
     create_index_if_not_exists,
     is_parquet_file,
     get_parquet_column_names,
-    is_valid_split_parquet_dir,
+    is_valid_single_split_parquet_dir,
 )
 from shutil import copyfile
 
@@ -1344,7 +1344,7 @@ def infer_peptidoforms(
         precursor_table = read_pyp_parquet_peakgroup_precursor(
             infile, ipf_max_peakgroup_pep, ipf_ms1_scoring, ipf_ms2_scoring
         )
-    elif is_valid_split_parquet_dir(infile):
+    elif is_valid_single_split_parquet_dir(infile):
         precursor_table = read_pyp_parquet_dir_peakgroup_precursor(
             infile, ipf_max_peakgroup_pep, ipf_ms1_scoring, ipf_ms2_scoring
         )
@@ -1365,7 +1365,7 @@ def infer_peptidoforms(
         peptidoform_table = read_pyp_parquet_transition(
             infile, ipf_max_transition_pep, ipf_h0
         )
-    elif is_valid_split_parquet_dir(infile):
+    elif is_valid_single_split_parquet_dir(infile):
         peptidoform_table = read_pyp_parquet_dir_transition(
             infile, ipf_max_transition_pep, ipf_h0
         )
@@ -1373,7 +1373,7 @@ def infer_peptidoforms(
         peptidoform_table = read_pyp_transition(infile, ipf_max_transition_pep, ipf_h0)
     ## prepare for propagating signal across runs for aligned features
     if propagate_signal_across_runs:
-        if is_valid_split_parquet_dir(infile):
+        if is_valid_single_split_parquet_dir(infile):
             across_run_feature_map = get_feature_mapping_across_runs_parquet(
                 infile, ipf_max_alignment_pep
             )
@@ -1471,7 +1471,7 @@ def infer_peptidoforms(
         peptidoform_data_m.write_parquet(
             outfile, compression="zstd", compression_level=11
         )
-    elif is_valid_split_parquet_dir(infile):
+    elif is_valid_single_split_parquet_dir(infile):
         precursor_file = os.path.join(infile, "precursors_features.parquet")
 
         # Rename score columnes wiht SCORE_IPF_

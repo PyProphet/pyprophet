@@ -1,12 +1,13 @@
-import pandas as pd
-import numpy as np
-import click
 import sys
 import os
 import pathlib
 import shutil
 import ast
 import time
+import pandas as pd
+import numpy as np
+import click
+from loguru import logger
 from functools import update_wrapper
 import sqlite3
 from tabulate import tabulate
@@ -14,7 +15,7 @@ from tabulate import tabulate
 from hyperopt import hp
 
 from ._config import RunnerIOConfig
-from .io.util import check_sqlite_table
+from .io.util import check_sqlite_table, setup_logger
 from .runner import PyProphetLearner, PyProphetWeightApplier
 from .ipf import infer_peptidoforms
 from .levels_contexts import (
@@ -28,7 +29,7 @@ from .levels_contexts import (
     backpropagate_oswr,
 )
 from .glyco.glycoform import infer_glycoforms
-from .split import split_osw
+from .split import split_merged_parquet, split_osw
 from .export import export_tsv, export_score_plots
 from .export_compound import export_compound_tsv
 from .glyco.export import (
@@ -347,6 +348,16 @@ class PythonLiteralOption(click.Option):
     show_default=True,
     help="Run in test mode with fixed seed.",
 )
+@click.option(
+    "-l",
+    "--log-level",
+    type=click.Choice(
+        ["TRACE", "DEBUG", "INFO", "SUCCESS", "WARNING", "ERROR", "CRITICAL"]
+    ),
+    default="INFO",
+    help="Set logging level",
+    show_default=True,
+)
 def score(
     infile,
     outfile,
@@ -382,15 +393,21 @@ def score(
     density_estimator,
     grid_size,
     tric_chromprob,
-    threads,
-    test,
     ss_score_filter,
     color_palette,
     main_score_selection_report,
+    threads,
+    test,
+    log_level,
 ):
     """
     Conduct semi-supervised learning and error-rate estimation for MS1, MS2 and transition-level data.
     """
+
+    log_level = log_level.upper()
+    os.environ["PYPROPHET_LOG_LEVEL"] = log_level  # Set globally
+
+    setup_logger()
 
     if outfile is None:
         outfile = infile
@@ -402,7 +419,7 @@ def score(
         outfile,
         subsample_ratio,
         level,
-        "score",
+        "score_learn",
         classifier,
         xgb_autotune,
         xeval_fraction,
@@ -441,16 +458,17 @@ def score(
 
     if not apply_weights:
         if subsample_ratio < 1.0:
-            click.echo(
-                f"Info: Conducting semi-supervised learning on {subsample_ratio * 100}% of the data."
+            logger.info(
+                f"Conducting semi-supervised learning on {subsample_ratio * 100} of the data.",
             )
             weights_path = PyProphetLearner(config).run()
             # Apply weights from subsampled result to full infile
-            click.echo(
-                f"Info: Applying weights from {weights_path} to the full data set."
+
+            logger.info(
+                f"Info: Applying weights from {weights_path} to the full data set.",
             )
             config.subsample_ratio = 1.0
-
+            config.context = "score_apply"
             PyProphetWeightApplier(weights_path, config).run()
         else:
             PyProphetLearner(config).run()
@@ -1411,6 +1429,12 @@ def merge(infiles, outfile, same_run, templatefile, merged_post_scored_runs):
     help="Merged OSW input file.",
 )
 @click.option(
+    "--out",
+    "outfile",
+    type=click.Path(exists=False),
+    help="Single run OSW output file.",
+)
+@click.option(
     "--threads",
     default=-1,
     show_default=True,
@@ -1418,11 +1442,14 @@ def merge(infiles, outfile, same_run, templatefile, merged_post_scored_runs):
     help="Number of threads used for splitting. -1 means all available CPUs.",
     callback=transform_threads,
 )
-def split(infile, threads):
+def split(infile, outfile, threads):
     """
     Split a merged OSW file into single runs.
     """
-    split_osw(infile, threads)
+    if infile.endswith(".osw"):
+        split_osw(infile, threads)
+    else:
+        split_merged_parquet(infile, outfile)
 
 
 # Backpropagate multi-run peptide and protein scores to single files

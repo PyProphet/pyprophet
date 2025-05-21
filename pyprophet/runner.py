@@ -4,6 +4,7 @@ import sys
 import os
 import time
 import warnings
+from loguru import logger
 import pandas as pd
 import numpy as np
 import polars as pl
@@ -13,20 +14,14 @@ import pickle
 
 
 from ._config import RunnerIOConfig
+from .io.util import setup_logger
 from .io.osw import OSWReader, OSWWriter
 from .io.parquet import ParquetReader, ParquetWriter
 from .io.split_parquet import SplitParquetReader, SplitParquetWriter
 from .io.tsv import TSVReader, TSVWriter
-from .io.util import (
-    is_sqlite_file,
-    is_parquet_file,
-    is_valid_split_parquet_dir,
-    check_sqlite_table,
-)
 from .pyprophet import PyProphet
 from .glyco.scoring import partial_score, combined_score
 from .glyco.stats import ErrorStatisticsCalculator
-
 
 try:
     profile
@@ -34,6 +29,9 @@ except NameError:
 
     def profile(fun):
         return fun
+
+
+setup_logger()
 
 
 class PyProphetRunner(object):
@@ -49,28 +47,22 @@ class PyProphetRunner(object):
     ):
         self.config = config
 
-        if is_sqlite_file(config.infile):
+        if self.config.file_type == "osw":
             self.table = OSWReader(config).read()
-        elif is_parquet_file(config.infile):
-            click.echo(
-                click.style(
-                    "Warn: Parquet input is experimental. Proceed with caution.",
-                    fg="yellow",
-                )
+        elif self.config.file_type == "parquet":
+            logger.warning(
+                "Parquet input is experimental. Proceed with caution.",
             )
-            click.echo(
-                click.style(
-                    "Warn: If this is a single parquet with both precursor and transition data, it may require a lot of memory depending on how large your data is. Consider splitting it into a directory of separate precursors_features.parquet and transition_features.parquet files if you run into memory issues.",
-                    fg="yellow",
-                )
+            logger.warning(
+                "If this is a single parquet with both precursor and transition data, it may require a lot of memory depending on how large your data is. Consider splitting it into a directory of separate precursors_features.parquet and transition_features.parquet files if you run into memory issues.",
             )
             self.table = ParquetReader(config).read()
-        elif is_valid_split_parquet_dir(config.infile):
-            click.echo(
-                click.style(
-                    "Warn: Split parquet input is experimental. Proceed with caution.",
-                    fg="yellow",
-                )
+        elif (
+            self.config.file_type == "parquet_split"
+            or self.config.file_type == "parquet_split_multi"
+        ):
+            logger.warning(
+                "Split parquet input is experimental. Proceed with caution.",
             )
             self.table = SplitParquetReader(config).read()
         else:
@@ -247,7 +239,10 @@ class PyProphetRunner(object):
             parquet_writer.save_results(result, scorer.pi0)
             parquet_writer.save_weights(weights)
 
-        elif self.config.file_type == "parquet_split":
+        elif (
+            self.config.file_type == "parquet_split"
+            or self.config.file_type == "parquet_split_multi"
+        ):
             split_parquet_writer = SplitParquetWriter(self.config)
             if (
                 self.config.subsample_ratio == 1
@@ -258,9 +253,7 @@ class PyProphetRunner(object):
         seconds = int(needed)
         msecs = int(1000 * (needed - seconds))
 
-        click.echo(
-            "Info: Total time: %d seconds and %d msecs wall time" % (seconds, msecs)
-        )
+        logger.info("Total time: %d seconds and %d msecs wall time" % (seconds, msecs))
 
         return self.config.extra_writes.get("trained_weights_path")
 
@@ -304,7 +297,12 @@ class PyProphetWeightApplier(PyProphetRunner):
             raise click.ClickException(
                 "Weights file %s does not exist." % apply_weights
             )
-        if self.config.file_type in ("tsv", "parquet", "parquet_split"):
+        if self.config.file_type in (
+            "tsv",
+            "parquet",
+            "parquet_split",
+            "parquet_split_multi",
+        ):
             if self.classifier == "LDA":
                 try:
                     self.persisted_weights = pd.read_csv(apply_weights, sep=",")

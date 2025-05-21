@@ -3,8 +3,12 @@ import os
 import pickle
 import pandas as pd
 import click
+from loguru import logger
+from .util import setup_logger
 from .._base import BaseIOConfig
 from ..report import save_report
+
+setup_logger()
 
 
 class BaseReader(ABC):
@@ -22,12 +26,20 @@ class BaseReader(ABC):
         self.config = config
 
     @property
+    def context(self):
+        return self.config.context
+
+    @property
     def infile(self):
         return self.config.infile
 
     @property
     def outfile(self):
         return self.config.outfile
+
+    @property
+    def file_type(self):
+        return self.config.file_type
 
     @property
     def subsample_ratio(self):
@@ -80,8 +92,8 @@ class BaseReader(ABC):
             )
 
         if self.classifier == "XGBoost" and self.level != "alignment":
-            click.echo(
-                "Info: Enable number of transitions & precursor / product charge scores for XGBoost-based classifier"
+            logger.info(
+                "Enable number of transitions & precursor / product charge scores for XGBoost-based classifier"
             )
             df = df.rename(
                 columns={
@@ -108,12 +120,20 @@ class BaseWriter(ABC):
         self.config = config
 
     @property
+    def context(self):
+        return self.config.context
+
+    @property
     def infile(self):
         return self.config.infile
 
     @property
     def outfile(self):
         return self.config.outfile
+
+    @property
+    def file_type(self):
+        return self.config.file_type
 
     @property
     def classifier(self):
@@ -211,10 +231,8 @@ class BaseWriter(ABC):
         """
         drop_cols = [col for col in existing_cols if col.startswith(score_prefix)]
         if drop_cols:
-            click.echo(
-                click.style(
-                    f"Warn: Dropping existing {score_prefix} columns.", fg="yellow"
-                )
+            logger.warning(
+                f"Warn: Dropping existing {score_prefix} columns.",
             )
 
         return [col for col in existing_cols if not col.startswith(score_prefix)]
@@ -254,16 +272,14 @@ class BaseWriter(ABC):
                 len(pvalues),
             ]
         ):
-            click.echo(
-                click.style("Error: Not enough values to create a report.", fg="red")
-            )
-            click.echo(click.style(f"top_targets: {len(top_targets)}", fg="red"))
-            click.echo(click.style(f"top_decoys: {len(top_decoys)}", fg="red"))
-            click.echo(click.style(f"cutoffs: {len(cutoffs)}", fg="red"))
-            click.echo(click.style(f"svalues: {len(svalues)}", fg="red"))
-            click.echo(click.style(f"qvalues: {len(qvalues)}", fg="red"))
-            click.echo(click.style(f"pvalues: {len(pvalues)}", fg="red"))
-            click.echo(click.style(f"pi0: {len(pi0)}", fg="red"))
+            logger.error("Not enough values to create a report.")
+            logger.error(f"top_targets: {len(top_targets)}")
+            logger.error(f"top_decoys: {len(top_decoys)}")
+            logger.error(f"cutoffs: {len(cutoffs)}")
+            logger.error(f"svalues: {len(svalues)}")
+            logger.error(f"qvalues: {len(qvalues)}")
+            logger.error(f"pvalues: {len(pvalues)}")
+            logger.error(f"pi0: {len(pi0)}")
             return
 
         pdf_path = os.path.join(prefix + f"_{level}_report.pdf")
@@ -279,20 +295,29 @@ class BaseWriter(ABC):
             pi0,
             self.config.runner.color_palette,
         )
-        click.echo(f"Info: {pdf_path} written.")
+        logger.info(f"{pdf_path} written.")
 
     def _save_tsv_weights(self, weights):
         """
-        Save the model weights to a TSV file.
+        Save the model weights to a TSV file, ensuring no duplicate levels.
 
-        Args:
-            weights: Model weights or trained object.
+        If weights for the current level already exist, they are removed before saving the new ones.
         """
         weights["level"] = self.level
         trained_weights_path = self.config.extra_writes.get("trained_weights_path")
+
         if trained_weights_path is not None:
-            weights.to_csv(trained_weights_path, sep=",", index=False, mode="a")
-            click.echo("Info: %s written." % trained_weights_path)
+
+            if os.path.exists(trained_weights_path):
+                existing_df = pd.read_csv(trained_weights_path, sep=",")
+                existing_df = existing_df[existing_df["level"] != self.level]
+                updated_df = pd.concat([existing_df, weights], ignore_index=True)
+            else:
+                updated_df = weights
+
+            # Always overwrite with a single header
+            updated_df.to_csv(trained_weights_path, sep=",", index=False)
+            logger.info(f"{trained_weights_path} written.")
 
     def _save_bin_weights(self, weights):
         """
@@ -305,4 +330,4 @@ class BaseWriter(ABC):
         if trained_weights_path is not None:
             with open(trained_weights_path, "wb") as file:
                 self.persisted_weights = pickle.dump(weights, file)
-            click.echo("Info: %s written." % trained_weights_path)
+            logger.info("%s written." % trained_weights_path)

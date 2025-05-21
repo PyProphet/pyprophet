@@ -1,5 +1,6 @@
 import numpy as np
 import click
+from loguru import logger
 
 from ._config import RunnerIOConfig
 from .data_handling import Experiment, update_chosen_main_score_in_table
@@ -37,7 +38,7 @@ class AbstractSemiSupervisedLearner(object):
     def learn_randomized(self, experiment, score_columns, working_thread_number):
         assert isinstance(experiment, Experiment)
 
-        click.echo("Info: Learning on cross-validation fold.")
+        logger.info("Learning on cross-validation fold.")
 
         experiment.split_for_xval(self.xeval_fraction, self.test)
         train = experiment.get_train_peaks()
@@ -93,7 +94,7 @@ class AbstractSemiSupervisedLearner(object):
     def learn_final(self, experiment):
         assert isinstance(experiment, Experiment)
 
-        click.echo("Info: Learning on cross-validated scores.")
+        logger.info("Learning on cross-validated scores.")
 
         experiment.rank_by("classifier_score")
 

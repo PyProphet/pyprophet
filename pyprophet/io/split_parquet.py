@@ -1,13 +1,18 @@
 import os
+import glob
 from shutil import copyfile
 import pandas as pd
 import pyarrow as pa
 import duckdb
 import click
+from loguru import logger
 
+from .util import setup_logger
 from ._base import BaseReader, BaseWriter, BaseIOConfig
-from .util import get_parquet_column_names
+from .util import print_parquet_tree, get_parquet_column_names
 from .._config import RunnerIOConfig, IPFIOConfig, LevelContextIOConfig
+
+setup_logger()
 
 
 class SplitParquetReader(BaseReader):
@@ -35,21 +40,15 @@ class SplitParquetReader(BaseReader):
 
     def __init__(self, config: BaseIOConfig):
         super().__init__(config)
+        self.config = config
 
-        # validate required files
-        required_files = [
-            "precursors_features.parquet",
-            "transition_features.parquet",
-        ]
-        for file in required_files:
-            if not os.path.exists(os.path.join(config.infile, file)):
-                click.echo(click.style(f"Error: Couldn't find: {file}", fg="red"))
-                raise click.ClickException(
-                    click.style(
-                        f"{file} is required for processing. Please check the input parquet hive directory.",
-                        fg="red",
-                    )
-                )
+        if config.file_type not in ("parquet_split", "parquet_split_multi"):
+            raise click.ClickException(
+                f"SplitParquetReader requires 'parquet_split' or 'parquet_split_multi' input, got '{config.file_type}' instead."
+            )
+
+        # Flag to indicate whether the input is a multi-run directory
+        self._is_multi_run = config.file_type == "parquet_split_multi"
 
     def read(self) -> pd.DataFrame:
         if isinstance(self.config, RunnerIOConfig):
@@ -79,63 +78,128 @@ class SplitParquetReader(BaseReader):
         return self._finalize_feature_table(feature_table, ss_main_score)
 
     def _init_duckdb_views(self, con):
-        for name in ["precursors", "transition", "feature_alignment"]:
-            if name == "feature_alignment":
-                path = os.path.join(self.infile, "feature_alignment.parquet")
+        base_dir = self.infile
+
+        # Gather files from multiple runs
+        precursor_files = glob.glob(
+            os.path.join(base_dir, "*.oswpq", "precursors_features.parquet")
+        )
+        transition_files = glob.glob(
+            os.path.join(base_dir, "*.oswpq", "transition_features.parquet")
+        )
+        alignment_file = os.path.join(base_dir, "feature_alignment.parquet")
+
+        # If no multi-run structure, check single run input directory
+        if not precursor_files:
+            precursor_path = os.path.join(base_dir, "precursors_features.parquet")
+            if os.path.exists(precursor_path):
+                precursor_files = [precursor_path]
+        if not transition_files:
+            transition_path = os.path.join(base_dir, "transition_features.parquet")
+            if os.path.exists(transition_path):
+                transition_files = [transition_path]
+        if self.context == "score_learn":
+            print_parquet_tree(
+                base_dir, precursor_files, transition_files, alignment_file
+            )
+
+        if not precursor_files:
+            raise click.ClickException("Error: No precursor Parquet files found.")
+
+        # Create TEMP table of sampled precursor IDs (if needed)
+        if self.subsample_ratio < 1.0:
+            logger.info(
+                f"Subsampling data for semi-supervised learning. Ratio: {self.subsample_ratio:.2f}"
+            )
+            con.execute(
+                f"""
+                CREATE TEMP TABLE sampled_precursor_ids AS
+                SELECT DISTINCT PRECURSOR_ID
+                FROM read_parquet({precursor_files})
+                USING SAMPLE {self.subsample_ratio * 100}%
+                """
+            )
+            n = con.execute("SELECT COUNT(*) FROM sampled_precursor_ids").fetchone()[0]
+            logger.info(f"Sampled {n} precursor IDs")
+
+        # Create view: precursors
+        if self.subsample_ratio < 1.0:
+            logger.debug("Creating 'precursors' view with sampled precursor IDs")
+            con.execute(
+                f"""
+                CREATE VIEW precursors AS
+                SELECT *
+                FROM read_parquet({precursor_files})
+                WHERE PRECURSOR_ID IN (SELECT PRECURSOR_ID FROM sampled_precursor_ids)
+                """
+            )
+        else:
+            logger.debug("Creating 'precursors' view with full input")
+            con.execute(
+                f"CREATE VIEW precursors AS SELECT * FROM read_parquet({precursor_files})"
+            )
+
+        # Create view: transition
+        if transition_files:
+            if self.subsample_ratio < 1.0:
+                logger.debug("Creating 'transition' view with sampled precursor IDs")
+                con.execute(
+                    f"""
+                    CREATE VIEW transition AS
+                    SELECT *
+                    FROM read_parquet({transition_files})
+                    WHERE PRECURSOR_ID IN (SELECT PRECURSOR_ID FROM sampled_precursor_ids)
+                    """
+                )
             else:
-                path = os.path.join(self.infile, f"{name}_features.parquet")
-            if os.path.exists(path):
-                if name == "precursors" and self.subsample_ratio < 1.0:
-                    click.echo(
-                        f"Info: Creating view for {path} with subsampling ratio {self.subsample_ratio}"
-                    )
-                    # Create sampled precursor ID table
-                    con.execute(
-                        f"""
-                        CREATE TEMP TABLE sampled_precursor_ids AS
-                        SELECT DISTINCT PRECURSOR_ID
-                        FROM read_parquet('{path}')
-                        USING SAMPLE {self.subsample_ratio * 100}%
-                        """
-                    )
+                logger.debug("Creating 'transition' view with full input")
+                con.execute(
+                    f"CREATE VIEW transition AS SELECT * FROM read_parquet({transition_files})"
+                )
 
-                    n = con.execute(
-                        "SELECT COUNT(*) FROM sampled_precursor_ids"
-                    ).fetchone()[0]
-                    click.echo(f"Info: Sampled {n} precursor IDs")
-
-                    # Create filtered precursors view
-                    con.execute(
-                        f"""
-                        CREATE VIEW precursors AS
-                        SELECT *
-                        FROM read_parquet('{path}')
-                        WHERE PRECURSOR_ID IN (SELECT PRECURSOR_ID FROM sampled_precursor_ids)
-                        """
-                    )
-
-                elif (
-                    name in ["transition", "feature_alignment"]
-                    and self.subsample_ratio < 1.0
-                ):
-                    click.echo(
-                        f"Info: Creating view for {path} with subsampling ratio {self.subsample_ratio}"
-                    )
-                    con.execute(
-                        f"""
-                        CREATE VIEW {name} AS
-                        SELECT *
-                        FROM read_parquet('{path}')
-                        WHERE PRECURSOR_ID IN (SELECT PRECURSOR_ID FROM sampled_precursor_ids)
-                        """
-                    )
-                else:
-                    con.execute(
-                        f"CREATE VIEW {name} AS SELECT * FROM read_parquet('{path}')"
-                    )
+        # Create view: feature_alignment
+        if os.path.exists(alignment_file):
+            if self.subsample_ratio < 1.0:
+                logger.debug(
+                    "Creating 'feature_alignment' view with sampled precursor IDs"
+                )
+                con.execute(
+                    f"""
+                    CREATE VIEW feature_alignment AS
+                    SELECT *
+                    FROM read_parquet('{alignment_file}')
+                    WHERE PRECURSOR_ID IN (SELECT PRECURSOR_ID FROM sampled_precursor_ids)
+                    """
+                )
+            else:
+                logger.debug("Creating 'feature_alignment' view with full input")
+                con.execute(
+                    f"CREATE VIEW feature_alignment AS SELECT * FROM read_parquet('{alignment_file}')"
+                )
 
     def _get_columns_by_prefix(self, parquet_file, prefix):
-        cols = get_parquet_column_names(os.path.join(self.infile, parquet_file))
+        """
+        Returns columns that start with `prefix` from one of the parquet files.
+        In multi-run mode, uses the first run's file as a representative.
+        """
+        if self._is_multi_run:
+            candidate = glob.glob(
+                os.path.join(self.config.infile, "*.oswpq", parquet_file)
+            )
+            if not candidate:
+                raise click.ClickException(
+                    f"Could not find '{parquet_file}' in any '.oswpq' subdirectory of '{self.config.infile}'."
+                )
+            path = candidate[0]
+        else:
+            path = os.path.join(self.config.infile, parquet_file)
+            if not os.path.exists(path):
+                raise click.ClickException(f"File '{path}' does not exist.")
+
+        cols = get_parquet_column_names(path)
+        if cols is None:
+            raise click.ClickException(f"Failed to read schema or columns from: {path}")
+
         return [c for c in cols if c.startswith(prefix)]
 
     def _fetch_feature_table(self, con):
@@ -286,20 +350,10 @@ class SplitParquetWriter(BaseWriter):
     def __init__(self, config: BaseIOConfig):
         super().__init__(config)
 
-        # validate required files
-        required_files = [
-            "precursors_features.parquet",
-            "transition_features.parquet",
-        ]
-        for file in required_files:
-            if not os.path.exists(os.path.join(config.infile, file)):
-                click.echo(click.style(f"Error: Couldn't find: {file}", fg="red"))
-                raise click.ClickException(
-                    click.style(
-                        f"An existing {file} is required for writing results to. Please check the input parquet hive directory.",
-                        fg="red",
-                    )
-                )
+        if self.file_type not in ("parquet_split", "parquet_split_multi"):
+            raise click.ClickException(
+                f"SplitParquetWriter requires 'parquet_split' or 'parquet_split_multi' input, got '{self.file_type}' instead."
+            )
 
     def save_results(self, result, pi0):
         if isinstance(self.config, RunnerIOConfig):
@@ -314,9 +368,6 @@ class SplitParquetWriter(BaseWriter):
             )
 
     def _save_semi_supervised_results(self, result, pi0):
-        if self.infile != self.outfile:
-            copyfile(self.infile, self.outfile)
-
         df = result.scored_tables
         level = self.level
 
@@ -338,14 +389,58 @@ class SplitParquetWriter(BaseWriter):
 
         file_key = file_map.get(level)
         prefix = prefix_map.get(level)
-        file_path = os.path.join(self.outfile, file_key)
-
         score_df = self._prepare_score_dataframe(df, level, prefix)
 
-        existing_cols = get_parquet_column_names(file_path)
-        columns_to_keep = self._get_columns_to_keep(existing_cols, prefix)
+        if self.file_type == "parquet_split_multi":
+            run_dirs = [
+                os.path.join(self.outfile, d)
+                for d in os.listdir(self.outfile)
+                if (d.endswith(".oswpq") or d.endswith(".oswpqd"))
+                and os.path.isdir(os.path.join(self.outfile, d))
+            ]
 
-        self._write_parquet_with_scores(file_path, score_df, columns_to_keep)
+            for run_dir in run_dirs:
+                file_path = os.path.join(run_dir, file_key)
+
+                if not os.path.exists(file_path):
+                    logger.warning(
+                        f"Warning: {file_path} does not exist. Skipping.",
+                    )
+                    continue
+
+                try:
+                    con = duckdb.connect()
+                    feature_ids = con.execute(
+                        f"SELECT FEATURE_ID FROM read_parquet('{file_path}')"
+                    ).fetchall()
+                    feature_ids = set(f[0] for f in feature_ids)
+                except Exception as e:
+                    logger.error(
+                        f"Error reading FEATURE_IDs from {file_path}: {e}",
+                    )
+                    continue
+
+                subset = score_df[score_df["FEATURE_ID"].isin(feature_ids)]
+
+                if subset.empty:
+                    logger.warning(f"No scores for {run_dir}, skipping write.")
+                    continue
+
+                existing_cols = get_parquet_column_names(file_path)
+                columns_to_keep = self._get_columns_to_keep(existing_cols, prefix)
+
+                self._write_parquet_with_scores(file_path, subset, columns_to_keep)
+
+        else:
+            file_path = os.path.join(self.outfile, file_key)
+
+            if not os.path.exists(file_path):
+                raise click.ClickException(f"Error: {file_path} not found for writing.")
+
+            existing_cols = get_parquet_column_names(file_path)
+            columns_to_keep = self._get_columns_to_keep(existing_cols, prefix)
+
+            self._write_parquet_with_scores(file_path, score_df, columns_to_keep)
 
         self._write_pdf_report_if_present(result, pi0)
 
@@ -387,7 +482,7 @@ class SplitParquetWriter(BaseWriter):
             (FORMAT 'parquet', COMPRESSION 'ZSTD', COMPRESSION_LEVEL 11);
             """
         )
-        click.echo(f"Info: {target_file} written.")
+        logger.info(f"{target_file} written.")
 
     def _save_ipf_results(self, result):
         raise NotImplementedError

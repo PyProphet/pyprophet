@@ -1,5 +1,6 @@
 from __future__ import division
 
+import os
 import time
 import operator
 import multiprocessing
@@ -8,7 +9,9 @@ from contextlib import contextmanager
 import pandas as pd
 import numpy as np
 import click
+from loguru import logger
 
+from .io.util import setup_logger
 from ._config import RunnerIOConfig, ErrorEstimationConfig
 from .stats import (
     lookup_values_from_error_table,
@@ -31,6 +34,9 @@ except NameError:
         return fun
 
 
+setup_logger()
+
+
 @contextmanager
 def timer(name=""):
     start_at = time.time()
@@ -45,11 +51,11 @@ def timer(name=""):
     needed -= minutes * 60
 
     if name:
-        click.echo(
-            "Info: Time needed for %s: %02d:%02d:%.1f" % (name, hours, minutes, needed)
+        logger.info(
+            "Time needed for %s: %02d:%02d:%.1f" % (name, hours, minutes, needed)
         )
     else:
-        click.echo("Info: Time needed: %02d:%02d:%.1f" % (hours, minutes, needed))
+        logger.info("Time needed: %02d:%02d:%.1f" % (hours, minutes, needed))
 
 
 Result = namedtuple("Result", "summary_statistics final_statistics scored_tables")
@@ -155,12 +161,12 @@ class Scorer(object):
         texp["q_value"] = q_values
         texp["s_value"] = s_values
         texp["p_value"] = p_values
-        click.echo(
-            "Info: Mean qvalue = %e, std_dev qvalue = %e"
+        logger.info(
+            "Mean qvalue = %e, std_dev qvalue = %e"
             % (np.mean(q_values), np.std(q_values, ddof=1))
         )
-        click.echo(
-            "Info: Mean svalue = %e, std_dev svalue = %e"
+        logger.info(
+            "Mean svalue = %e, std_dev svalue = %e"
             % (np.mean(s_values), np.std(s_values, ddof=1))
         )
         texp.add_peak_group_rank()
@@ -268,7 +274,7 @@ class PyProphet:
 
     def _apply_weights_on_exp(self, experiment, weights):
         learner = self.semi_supervised_learner
-        click.echo("Info: Applying pretrained weights.")
+        logger.info("Applying pretrained weights.")
 
         clf_scores = learner.score(experiment, weights)
         experiment.set_and_rerank("classifier_score", clf_scores)
@@ -293,7 +299,7 @@ class PyProphet:
         neval = self.rc.ss_num_iter
         ttt, ttd, ws = [], [], []
 
-        click.echo(f"Info: Learning on {neval} folds with {self.rc.threads} threads.")
+        logger.info(f"Learning on {neval} folds with {self.rc.threads} threads.")
 
         if self.rc.threads == 1:
             for _ in range(neval):
@@ -341,7 +347,7 @@ class PyProphet:
             for feat, importance in sorted(
                 mapped.items(), key=operator.itemgetter(1), reverse=True
             ):
-                click.echo(f"Info: Importance of {feat}: {importance}")
+                logger.info(f"Importance of {feat}: {importance}")
 
         # Score the table
         scorer = Scorer(
@@ -360,5 +366,5 @@ class PyProphet:
         final_stats, summary_stats = scorer.get_error_stats()
         result = Result(summary_stats, final_stats, scored_table)
 
-        click.echo("Info: Scoring and statistics complete.")
+        logger.info("Scoring and statistics complete.")
         return result, scorer, classifier_table

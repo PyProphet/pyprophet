@@ -1,6 +1,11 @@
 from dataclasses import dataclass, field
 import os
-from .io.util import is_sqlite_file, is_parquet_file, is_valid_split_parquet_dir
+from .io.util import (
+    is_sqlite_file,
+    is_parquet_file,
+    is_valid_single_split_parquet_dir,
+    is_valid_multi_split_parquet_dir,
+)
 
 
 @dataclass
@@ -32,8 +37,10 @@ class BaseIOConfig:
             self.file_type = "osw"
         elif is_parquet_file(self.infile):
             self.file_type = "parquet"
-        elif is_valid_split_parquet_dir(self.infile):
+        elif is_valid_single_split_parquet_dir(self.infile):
             self.file_type = "parquet_split"
+        elif is_valid_multi_split_parquet_dir(self.infile):
+            self.file_type = "parquet_split_multi"
         else:
             self.file_type = "tsv"
         self.prefix = os.path.splitext(self.outfile)[0]

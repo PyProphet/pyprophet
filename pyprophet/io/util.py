@@ -1,6 +1,33 @@
 import os
+import sys
+from collections import defaultdict
+import click
+from loguru import logger
 import pyarrow.parquet as pq
 from pyarrow.lib import ArrowInvalid, ArrowIOError
+
+
+_LOGGER_INITIALIZED = False  # Module-level flag
+
+
+def setup_logger():
+    global _LOGGER_INITIALIZED
+    if _LOGGER_INITIALIZED:
+        return
+
+    log_level = os.environ.get("PYPROPHET_LOG_LEVEL", "INFO").upper()
+
+    logger.remove()  # Remove default logger
+
+    logger.add(
+        sys.stdout,
+        colorize=True,
+        format="[ <green>{time:YYYY-MM-DD at HH:mm:ss}</green> <level>{level}</level> ] <level>{message}</level>",
+        # filter=__name__,
+        level=log_level,
+    )
+
+    _LOGGER_INITIALIZED = True
 
 
 def is_sqlite_file(filename):
@@ -92,21 +119,35 @@ def is_parquet_file(file_path):
         return False
 
 
-def is_valid_split_parquet_dir(path):
-    """
-    Checks if the directory contains both required parquet files
-    and that each is a valid Parquet file.
-    """
+def is_valid_single_split_parquet_dir(path):
+    """Check if directory contains single-run split parquet structure."""
+    required_files = ["precursors_features.parquet", "transition_features.parquet"]
+    return os.path.isdir(path) and all(
+        os.path.isfile(os.path.join(path, f)) and is_parquet_file(os.path.join(path, f))
+        for f in required_files
+    )
+
+
+def is_valid_multi_split_parquet_dir(path):
+    """Check if directory contains multiple subdirectories with split parquet files."""
     if not os.path.isdir(path):
         return False
 
     required_files = ["precursors_features.parquet", "transition_features.parquet"]
+    subdirs = [
+        os.path.join(path, d)
+        for d in os.listdir(path)
+        if d.endswith(".oswpq") and os.path.isdir(os.path.join(path, d))
+    ]
+    if not subdirs:
+        return False
 
-    for filename in required_files:
-        full_path = os.path.join(path, filename)
-        if not os.path.isfile(full_path):
-            return False
-        if not is_parquet_file(full_path):
+    for subdir in subdirs:
+        if not all(
+            os.path.isfile(os.path.join(subdir, f))
+            and is_parquet_file(os.path.join(subdir, f))
+            for f in required_files
+        ):
             return False
 
     return True
@@ -115,18 +156,53 @@ def is_valid_split_parquet_dir(path):
 def get_parquet_column_names(file_path):
     """
     Retrieves column names from a Parquet file without reading the entire file.
-
-    Args:
-        file_path (str): The path to the Parquet file.
-
-    Returns:
-        list: A list of column names in the Parquet file.
     """
-
     try:
         table_schema = pq.read_schema(file_path)
-        column_names = table_schema.names
-        return column_names
+        return table_schema.names
     except Exception as e:
-        print(f"An error occurred: {e}")
+        print(f"An error occurred while reading schema from '{file_path}': {e}")
         return None
+
+
+def print_parquet_tree(root_dir, precursors, transitions, alignment=None, max_runs=10):
+    setup_logger()
+
+    def group_by_run(files):
+        grouped = defaultdict(list)
+        for f in files:
+            parts = f.strip("/").split(os.sep)
+            if len(parts) >= 2:
+                grouped[parts[-2]].append(parts[-1])
+            else:
+                grouped["_root"].append(parts[-1])
+        return grouped
+
+    precursor_runs = group_by_run(precursors)
+    transition_runs = group_by_run(transitions)
+
+    all_runs = sorted(set(precursor_runs.keys()) | set(transition_runs.keys()))
+    logger.info(f"Detected {len(all_runs)} split_parquet run files")
+    logger.info("Input Parquet Structure:")
+    click.echo(f"└── 📁 {root_dir}")
+
+    runs_to_print = all_runs[:max_runs]
+    skipped = len(all_runs) - max_runs
+
+    for run in runs_to_print:
+        click.echo(f"    ├── 📁 {run}")
+        printed = set()
+        if run in precursor_runs:
+            for f in sorted(precursor_runs[run]):
+                click.echo(f"    │   ├── 📄 {f}")
+                printed.add(f)
+        if run in transition_runs:
+            for f in sorted(transition_runs[run]):
+                if f not in printed:
+                    click.echo(f"    │   └── 📄 {f}")
+
+    if skipped > 0:
+        click.echo(f"    │   ... ({skipped} more run(s) collapsed)")
+
+    if alignment:
+        click.echo(f"    └── 📄 {os.path.basename(alignment)}")

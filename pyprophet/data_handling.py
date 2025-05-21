@@ -2,9 +2,12 @@ import pandas as pd
 import numpy as np
 import random
 import click
+from loguru import logger
 import sys
 import os
 import multiprocessing
+
+from .io.util import setup_logger
 from .stats import mean_and_std_dev
 
 from .optimized import find_top_ranked, rank
@@ -15,6 +18,9 @@ except NameError:
 
     def profile(fun):
         return fun
+
+
+setup_logger()
 
 
 def format_bytes(size):
@@ -126,8 +132,8 @@ def cleanup_and_check(df):
     n_decoy = len(decoy_groups)
     n_target = len(target_groups)
 
-    click.echo(
-        "Info: Data set contains %d decoy and %d target groups." % (n_decoy, n_target)
+    logger.info(
+        "Data set contains %d decoy and %d target groups." % (n_decoy, n_target)
     )
     if n_decoy < 10 or n_target < 10:
         raise click.ClickException(
@@ -262,11 +268,8 @@ def prepare_data_table(
         col_name = "var_%d" % i
         col_data = table[v]
         if pd.isnull(col_data).all():
-            click.echo(
-                click.style(
-                    f"Warn: Column {v} contains only invalid/missing values. Column will be dropped.",
-                    fg="yellow",
-                )
+            logger.debug(
+                f"Column {v} contains only invalid/missing values. Column will be dropped."
             )
             continue
         else:
@@ -343,8 +346,8 @@ def update_chosen_main_score_in_table(train, score_columns, use_as_main_score):
     # Re-order main_score column index
     temp_col = train.df.pop("main_score")
     train.df.insert(5, temp_col.name, temp_col)
-    click.echo(
-        f"Info: Updated main score column from {old_main_score_column} to {use_as_main_score}..."
+    logger.debug(
+        f"Updated main score column from {old_main_score_column} to {use_as_main_score}..."
     )
     return train, tuple(updated_score_columns)
 
@@ -356,11 +359,11 @@ class Experiment(object):
         self.df = df.copy()
 
     def log_summary(self):
-        click.echo("Info: Summary of input data:")
-        click.echo("Info: %d peak groups" % len(self.df))
-        click.echo("Info: %d group ids" % len(self.df.tg_id.unique()))
-        click.echo(
-            "Info: %d scores including main score" % (len(self.df.columns.values) - 6)
+        logger.info("Summary of input data:")
+        logger.info("%d peak groups" % len(self.df))
+        logger.info("%d group ids" % len(self.df.tg_id.unique()))
+        logger.info(
+            "%d scores including main score" % (len(self.df.columns.values) - 6)
         )
 
     def __getitem__(self, *args):

@@ -3,6 +3,9 @@ import os
 import shutil
 import click
 import pandas as pd
+import duckdb
+import click
+from pathlib import Path
 from multiprocessing import Pool, cpu_count
 from typing import Tuple
 
@@ -93,3 +96,88 @@ def split_osw(infile: str, threads: int = cpu_count() - 1):
         pool.map(process_run, run_info_list)
 
     click.echo("Info: Splitting complete.")
+
+
+# Split merged split parquet files into individual files
+def split_merged_parquet(input_dir, output_dir):
+    input_dir = Path(input_dir)
+    output_dir = Path(output_dir or input_dir)
+
+    precursor_file = input_dir / "precursors_features.parquet"
+    transition_file = input_dir / "transition_features.parquet"
+    alignment_file = input_dir / "feature_alignment.parquet"
+
+    if not precursor_file.exists() or not transition_file.exists():
+        raise click.ClickException(
+            "Both 'precursors_features.parquet' and 'transition_features.parquet' are required."
+        )
+
+    con = duckdb.connect()
+
+    # Step 1: Load precursor table and determine unique runs
+    con.execute(
+        f"SELECT RUN_ID, FILENAME FROM read_parquet('{precursor_file}') GROUP BY RUN_ID, FILENAME"
+    )
+    run_info = con.fetchall()
+
+    click.echo(f"Detected {len(run_info)} runs:")
+    for run_id, filename in run_info:
+        click.echo(f"  - RUN_ID={run_id}, FILENAME='{filename}'")
+
+    for run_id, filename in run_info:
+        run_basename = Path(filename).stem
+        run_dir = output_dir / f"{run_basename}.oswpq"
+        run_dir.mkdir(parents=True, exist_ok=True)
+
+        # Step 2: Save precursor subset
+        precursor_out = run_dir / "precursors_features.parquet"
+        click.echo(f"Writing: {precursor_out}")
+        con.execute(
+            f"""
+            COPY (
+                SELECT * FROM read_parquet('{precursor_file}')
+                WHERE RUN_ID = {run_id}
+            ) TO '{precursor_out}' (FORMAT 'parquet', COMPRESSION 'ZSTD');
+        """
+        )
+
+        # Step 3: Extract FEATURE_IDs for the run
+        con.execute(
+            f"""
+            SELECT FEATURE_ID FROM read_parquet('{precursor_file}')
+            WHERE RUN_ID = {run_id}
+        """
+        )
+        feature_ids = [row[0] for row in con.fetchall()]
+        if not feature_ids:
+            click.echo(f"Warning: No FEATURE_IDs found for RUN_ID={run_id}")
+            continue
+
+        # Step 4: Write corresponding transition rows
+        transition_out = run_dir / "transition_features.parquet"
+        click.echo(f"Writing: {transition_out}")
+        con.execute(
+            f"""
+            COPY (
+                SELECT * FROM read_parquet('{transition_file}')
+                WHERE FEATURE_ID IN ({','.join(map(str, feature_ids))})
+            ) TO '{transition_out}' (FORMAT 'parquet', COMPRESSION 'ZSTD');
+        """
+        )
+
+    # Step 5: Copy alignment file (optional)
+    if alignment_file.exists():
+        output_alignment = output_dir / "feature_alignment.parquet"
+        if not output_alignment.exists():
+            click.echo(f"Copying alignment file: {output_alignment}")
+            con.execute(
+                f"""
+                COPY (
+                    SELECT * FROM read_parquet('{alignment_file}')
+                ) TO '{output_alignment}' (FORMAT 'parquet', COMPRESSION 'ZSTD');
+            """
+            )
+        else:
+            click.echo(f"Alignment file already exists: {output_alignment}")
+
+    click.echo("Info: Done splitting merged Parquet folder.")
