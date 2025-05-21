@@ -15,10 +15,7 @@ import pickle
 
 from ._config import RunnerIOConfig
 from .io.util import setup_logger
-from .io.osw import OSWReader, OSWWriter
-from .io.parquet import ParquetReader, ParquetWriter
-from .io.split_parquet import SplitParquetReader, SplitParquetWriter
-from .io.tsv import TSVReader, TSVWriter
+from .io.dispatcher import ReaderDispatcher, WriterDispatcher
 from .pyprophet import PyProphet
 from .glyco.scoring import partial_score, combined_score
 from .glyco.stats import ErrorStatisticsCalculator
@@ -46,27 +43,9 @@ class PyProphetRunner(object):
         config: RunnerIOConfig,
     ):
         self.config = config
-
-        if self.config.file_type == "osw":
-            self.table = OSWReader(config).read()
-        elif self.config.file_type == "parquet":
-            logger.warning(
-                "Parquet input is experimental. Proceed with caution.",
-            )
-            logger.warning(
-                "If this is a single parquet with both precursor and transition data, it may require a lot of memory depending on how large your data is. Consider splitting it into a directory of separate precursors_features.parquet and transition_features.parquet files if you run into memory issues.",
-            )
-            self.table = ParquetReader(config).read()
-        elif (
-            self.config.file_type == "parquet_split"
-            or self.config.file_type == "parquet_split_multi"
-        ):
-            logger.warning(
-                "Split parquet input is experimental. Proceed with caution.",
-            )
-            self.table = SplitParquetReader(config).read()
-        else:
-            self.table = TSVReader(config).read()
+        self.reader = ReaderDispatcher.get_reader(config)
+        self.writer = WriterDispatcher.get_writer(config)
+        self.table = self.reader.read()
 
     @property
     def classifier(self):
@@ -218,37 +197,13 @@ class PyProphetRunner(object):
 
         self.print_summary(result)
 
-        if self.config.file_type == "tsv":
-            tsv_writer = TSVWriter(self.config)
-            if self.glyco and self.level in ["ms2", "ms1ms2"]:
-                tsv_writer.save_results(result, pi0)
-            else:
-                tsv_writer.save_results(result, scorer.pi0)
-            tsv_writer.save_weights(weights)
-
-        elif self.config.file_type == "osw":
-            osw_writer = OSWWriter(self.config)
-            if self.glyco and self.level in ["ms2", "ms1ms2"]:
-                osw_writer.save_results(result, pi0)
-            else:
-                osw_writer.save_results(result, scorer.pi0)
-            osw_writer.save_weights(weights)
-
-        elif self.config.file_type == "parquet":
-            parquet_writer = ParquetWriter(self.config)
-            parquet_writer.save_results(result, scorer.pi0)
-            parquet_writer.save_weights(weights)
-
-        elif (
-            self.config.file_type == "parquet_split"
-            or self.config.file_type == "parquet_split_multi"
-        ):
-            split_parquet_writer = SplitParquetWriter(self.config)
-            if (
-                self.config.subsample_ratio == 1
-            ):  # Only save the full results if we are not subsampling
-                split_parquet_writer.save_results(result, scorer.pi0)
-            split_parquet_writer.save_weights(weights)
+        if self.glyco and self.level in ["ms2", "ms1ms2"]:
+            self.writer.save_results(result_peptide, pi0)
+        else:
+            if self.config.subsample_ratio == 1:
+                # We don't want to save the results if we subsampled the data, the second pass of applying the weights to the full data is when we save the results
+                self.writer.save_results(result, scorer.pi0)
+        self.writer.save_weights(weights)
 
         seconds = int(needed)
         msecs = int(1000 * (needed - seconds))

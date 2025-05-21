@@ -295,7 +295,7 @@ class BaseWriter(ABC):
             pi0,
             self.config.runner.color_palette,
         )
-        logger.info(f"{pdf_path} written.")
+        logger.success(f"{pdf_path} written.")
 
     def _save_tsv_weights(self, weights):
         """
@@ -317,7 +317,7 @@ class BaseWriter(ABC):
 
             # Always overwrite with a single header
             updated_df.to_csv(trained_weights_path, sep=",", index=False)
-            logger.info(f"{trained_weights_path} written.")
+            logger.success(f"{trained_weights_path} written.")
 
     def _save_bin_weights(self, weights):
         """
@@ -330,4 +330,4 @@ class BaseWriter(ABC):
         if trained_weights_path is not None:
             with open(trained_weights_path, "wb") as file:
                 self.persisted_weights = pickle.dump(weights, file)
-            logger.info("%s written." % trained_weights_path)
+            logger.success("%s written." % trained_weights_path)

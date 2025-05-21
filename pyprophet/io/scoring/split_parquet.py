@@ -7,10 +7,8 @@ import duckdb
 import click
 from loguru import logger
 
-from .util import setup_logger
-from ._base import BaseReader, BaseWriter, BaseIOConfig
-from .util import print_parquet_tree, get_parquet_column_names
-from .._config import RunnerIOConfig, IPFIOConfig, LevelContextIOConfig
+from .._base import BaseReader, BaseWriter, BaseIOConfig
+from ..util import setup_logger, print_parquet_tree, get_parquet_column_names
 
 setup_logger()
 
@@ -51,18 +49,6 @@ class SplitParquetReader(BaseReader):
         self._is_multi_run = config.file_type == "parquet_split_multi"
 
     def read(self) -> pd.DataFrame:
-        if isinstance(self.config, RunnerIOConfig):
-            return self._read_for_semi_supervised()
-        elif isinstance(self.config, IPFIOConfig):
-            return self._read_for_ipf()
-        elif isinstance(self.config, LevelContextIOConfig):
-            return self._read_for_context_level()
-        else:
-            raise NotImplementedError(
-                f"Unsupported config type: {type(self.config).__name__}"
-            )
-
-    def _read_for_semi_supervised(self) -> pd.DataFrame:
         con = duckdb.connect()
         self._init_duckdb_views(con)
 
@@ -324,12 +310,6 @@ class SplitParquetReader(BaseReader):
         ms1_df = con.execute(query).df()
         return pd.merge(df, ms1_df, how="left", on="FEATURE_ID")
 
-    def _read_for_ipf(self):
-        raise NotImplementedError
-
-    def _read_for_context_level(self):
-        raise NotImplementedError
-
 
 class SplitParquetWriter(BaseWriter):
     """
@@ -356,18 +336,6 @@ class SplitParquetWriter(BaseWriter):
             )
 
     def save_results(self, result, pi0):
-        if isinstance(self.config, RunnerIOConfig):
-            return self._save_semi_supervised_results(result, pi0)
-        elif isinstance(self.config, IPFIOConfig):
-            return self._save_ipf_results(result)
-        elif isinstance(self.config, LevelContextIOConfig):
-            return self._save_context_level_results(result)
-        else:
-            raise NotImplementedError(
-                f"Unsupported config type: {type(self.config).__name__}"
-            )
-
-    def _save_semi_supervised_results(self, result, pi0):
         df = result.scored_tables
         level = self.level
 
@@ -414,7 +382,7 @@ class SplitParquetWriter(BaseWriter):
                         f"SELECT FEATURE_ID FROM read_parquet('{file_path}')"
                     ).fetchall()
                     feature_ids = set(f[0] for f in feature_ids)
-                except Exception as e:
+                except duckdb.Error as e:
                     logger.error(
                         f"Error reading FEATURE_IDs from {file_path}: {e}",
                     )
@@ -482,10 +450,4 @@ class SplitParquetWriter(BaseWriter):
             (FORMAT 'parquet', COMPRESSION 'ZSTD', COMPRESSION_LEVEL 11);
             """
         )
-        logger.info(f"{target_file} written.")
-
-    def _save_ipf_results(self, result):
-        raise NotImplementedError
-
-    def _save_context_level_results(self, result):
-        raise NotImplementedError
+        logger.success(f"{target_file} written.")

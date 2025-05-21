@@ -1,8 +1,8 @@
 import pandas as pd
 import click
-from ._base import BaseReader, BaseWriter, BaseIOConfig
-from .._config import RunnerIOConfig, IPFIOConfig, LevelContextIOConfig
-from ..report import save_report
+
+from .._base import BaseReader, BaseWriter, BaseIOConfig
+from ...report import save_report
 
 
 class TSVReader(BaseReader):
@@ -27,27 +27,9 @@ class TSVReader(BaseReader):
         super().__init__(config)
 
     def read(self) -> pd.DataFrame:
-        if isinstance(self.config, RunnerIOConfig):
-            return self._read_for_semi_supervised()
-        elif isinstance(self.config, IPFIOConfig):
-            return self._read_for_ipf()
-        elif isinstance(self.config, LevelContextIOConfig):
-            return self._read_for_context_level()
-        else:
-            raise NotImplementedError(
-                f"Unsupported config type: {type(self.config).__name__}"
-            )
-
-    def _read_for_semi_supervised(self) -> pd.DataFrame:
         infile = self.config.infile
         table = pd.read_csv(infile, sep="\t")
         return table
-
-    def _read_for_ipf(self):
-        raise NotImplementedError
-
-    def _read_for_context_level(self):
-        raise NotImplementedError
 
 
 class TSVWriter(BaseWriter):
@@ -70,18 +52,6 @@ class TSVWriter(BaseWriter):
         super().__init__(config)
 
     def save_results(self, result, pi0):
-        if isinstance(self.config, RunnerIOConfig):
-            return self._save_semi_supervised_results(result, pi0)
-        elif isinstance(self.config, IPFIOConfig):
-            return self._save_ipf_results(result)
-        elif isinstance(self.config, LevelContextIOConfig):
-            return self._save_context_level_results(result)
-        else:
-            raise NotImplementedError(
-                f"Unsupported config type: {type(self.config).__name__}"
-            )
-
-    def _save_semi_supervised_results(self, result, pi0):
         summ_stat_path = self.config.extra_writes.get("summ_stat_path")
         if summ_stat_path is not None:
             result.summary_statistics.to_csv(summ_stat_path, sep=",", index=False)
@@ -130,9 +100,3 @@ class TSVWriter(BaseWriter):
             click.echo(
                 "Info: %s written." % self.config.extra_writes.get("report_path")
             )
-
-    def _save_ipf_results(self, result):
-        raise NotImplementedError
-
-    def _save_context_level_results(self, result):
-        raise NotImplementedError

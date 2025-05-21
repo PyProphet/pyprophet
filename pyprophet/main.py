@@ -358,6 +358,7 @@ class PythonLiteralOption(click.Option):
     help="Set logging level",
     show_default=True,
 )
+@logger.catch
 def score(
     infile,
     outfile,
@@ -456,10 +457,20 @@ def score(
         main_score_selection_report,
     )
 
+    # Validate file type and subsample ratio, subsample_ratio is currently only applicateble for "parquet_split", "parquet_split_multi". If this combination is not met, throw warning and set subsample_ratio to 1.0
+    if (
+        config.file_type not in ["parquet_split", "parquet_split_multi"]
+        and subsample_ratio < 1.0
+    ):
+        logger.warning(
+            "Semi-supervised learning on a subset of the data, and then applying the weights to the full data is currently only supported for `parquet_split` and `parquet_split_multi` files.\nFor `osw`, you need to manually subsample the osw using the `subsample` module.\nSetting subsample_ratio to 1.0.",
+        )
+        config.subsample_ratio = 1.0
+
     if not apply_weights:
-        if subsample_ratio < 1.0:
+        if config.subsample_ratio < 1.0:
             logger.info(
-                f"Conducting semi-supervised learning on {subsample_ratio * 100} of the data.",
+                f"Conducting semi-supervised learning on {config.subsample_ratio * 100} of the data.",
             )
             weights_path = PyProphetLearner(config).run()
             # Apply weights from subsampled result to full infile
@@ -471,8 +482,14 @@ def score(
             config.context = "score_apply"
             PyProphetWeightApplier(weights_path, config).run()
         else:
+            logger.info(
+                "Conducting semi-supervised learning.",
+            )
             PyProphetLearner(config).run()
     else:
+        logger.info(
+            f"Applying weights from {apply_weights} to the full data set.",
+        )
         PyProphetWeightApplier(apply_weights, config).run()
 
 

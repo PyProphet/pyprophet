@@ -3,10 +3,8 @@ import pandas as pd
 import pyarrow as pa
 import duckdb
 import click
-from ._base import BaseReader, BaseWriter, BaseIOConfig
-from .util import get_parquet_column_names
-from .._config import RunnerIOConfig, IPFIOConfig, LevelContextIOConfig
-from ..glyco.report import save_report as save_report_glyco
+from .._base import BaseReader, BaseWriter, BaseIOConfig
+from ..util import get_parquet_column_names
 
 
 class ParquetReader(BaseReader):
@@ -33,18 +31,6 @@ class ParquetReader(BaseReader):
         super().__init__(config)
 
     def read(self) -> pd.DataFrame:
-        if isinstance(self.config, RunnerIOConfig):
-            return self._read_for_semi_supervised()
-        elif isinstance(self.config, IPFIOConfig):
-            return self._read_for_ipf()
-        elif isinstance(self.config, LevelContextIOConfig):
-            return self._read_for_context_level()
-        else:
-            raise NotImplementedError(
-                f"Unsupported config type: {type(self.config).__name__}"
-            )
-
-    def _read_for_semi_supervised(self) -> pd.DataFrame:
         con = duckdb.connect()
         self._init_duckdb_views(con)
 
@@ -174,12 +160,6 @@ class ParquetReader(BaseReader):
         ms1_df = con.execute(query).df()
         return pd.merge(df, ms1_df, how="left", on="FEATURE_ID")
 
-    def _read_for_ipf(self):
-        raise NotImplementedError
-
-    def _read_for_context_level(self):
-        raise NotImplementedError
-
 
 class ParquetWriter(BaseWriter):
     """
@@ -201,18 +181,6 @@ class ParquetWriter(BaseWriter):
         super().__init__(config)
 
     def save_results(self, result, pi0):
-        if isinstance(self.config, RunnerIOConfig):
-            return self._save_semi_supervised_results(result, pi0)
-        elif isinstance(self.config, IPFIOConfig):
-            return self._save_ipf_results(result)
-        elif isinstance(self.config, LevelContextIOConfig):
-            return self._save_context_level_results(result)
-        else:
-            raise NotImplementedError(
-                f"Unsupported config type: {type(self.config).__name__}"
-            )
-
-    def _save_semi_supervised_results(self, result, pi0):
         if self.infile != self.outfile:
             copyfile(self.infile, self.outfile)
 
@@ -270,9 +238,3 @@ class ParquetWriter(BaseWriter):
             """
         )
         click.echo(f"Info: {target_file} written.")
-
-    def _save_ipf_results(self, result):
-        raise NotImplementedError
-
-    def _save_context_level_results(self, result):
-        raise NotImplementedError

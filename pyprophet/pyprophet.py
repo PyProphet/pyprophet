@@ -366,5 +366,5 @@ class PyProphet:
         final_stats, summary_stats = scorer.get_error_stats()
         result = Result(summary_stats, final_stats, scored_table)
 
-        logger.info("Scoring and statistics complete.")
+        logger.success("Scoring and statistics complete.")
         return result, scorer, classifier_table

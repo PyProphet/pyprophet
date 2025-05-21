@@ -5,9 +5,8 @@ import sqlite3
 import duckdb
 import pandas as pd
 import click
-from ._base import BaseReader, BaseWriter, BaseIOConfig
-from .._config import RunnerIOConfig, IPFIOConfig, LevelContextIOConfig
-from .util import check_sqlite_table, check_duckdb_table
+from ..util import check_sqlite_table, check_duckdb_table
+from .._base import BaseReader, BaseWriter, BaseIOConfig
 
 
 class OSWReader(BaseReader):
@@ -32,18 +31,6 @@ class OSWReader(BaseReader):
         super().__init__(config)
 
     def read(self) -> pd.DataFrame:
-        if isinstance(self.config, RunnerIOConfig):
-            return self._read_for_semi_supervised()
-        elif isinstance(self.config, IPFIOConfig):
-            return self._read_for_ipf()
-        elif isinstance(self.config, LevelContextIOConfig):
-            return self._read_for_context_level()
-        else:
-            raise NotImplementedError(
-                f"Unsupported config type: {type(self.config).__name__}"
-            )
-
-    def _read_for_semi_supervised(self) -> pd.DataFrame:
         self._create_indexes()
         try:
             con = duckdb.connect()
@@ -520,12 +507,6 @@ class OSWReader(BaseReader):
         df["DECOY"] = df["DECOY"].map({1: 0, -1: 1})
         return self._finalize_feature_table(df, self.config.runner.ss_main_score)
 
-    def _read_for_ipf(self):
-        raise NotImplementedError
-
-    def _read_for_context_level(self):
-        raise NotImplementedError
-
 
 class OSWWriter(BaseWriter):
     """
@@ -547,18 +528,6 @@ class OSWWriter(BaseWriter):
         super().__init__(config)
 
     def save_results(self, result, pi0):
-        if isinstance(self.config, RunnerIOConfig):
-            return self._save_semi_supervised_results(result, pi0)
-        elif isinstance(self.config, IPFIOConfig):
-            return self._save_ipf_results(result)
-        elif isinstance(self.config, LevelContextIOConfig):
-            return self._save_context_level_results(result)
-        else:
-            raise NotImplementedError(
-                f"Mode {self.config.mode} is not supported in OSWWriter."
-            )
-
-    def _save_semi_supervised_results(self, result, pi0):
         if self.infile != self.outfile:
             copyfile(self.infile, self.outfile)
 
@@ -658,12 +627,6 @@ class OSWWriter(BaseWriter):
 
         # Save report if statistics are present
         self._write_pdf_report_if_present(result, pi0)
-
-    def _save_ipf_results(self, result):
-        raise NotImplementedError
-
-    def _save_context_level_results(self, result):
-        raise NotImplementedError
 
     def save_weights(self, weights):
         if self.classifier == "LDA":
