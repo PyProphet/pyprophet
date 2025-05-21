@@ -336,12 +336,8 @@ class PyProphet:
             classifier_table = pd.DataFrame({"score": score_columns, "weight": weights})
         else:
             classifier_table = final_classifier.get_parameters()
-            mapped = {
-                f: v
-                for f, v in zip(
-                    score_columns, classifier_table.get("importance", {}).values()
-                )
-            }
+            mapper = {"f{0}".format(i): v for i, v in enumerate(score_columns)}
+            mapped = {mapper[k]: v for k, v in final_classifier.importance.items()}
             for feat, importance in sorted(
                 mapped.items(), key=operator.itemgetter(1), reverse=True
             ):
