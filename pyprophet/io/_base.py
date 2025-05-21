@@ -30,6 +30,10 @@ class BaseReader(ABC):
         return self.config.outfile
 
     @property
+    def subsample_ratio(self):
+        return self.config.subsample_ratio
+
+    @property
     def classifier(self):
         return self.config.runner.classifier
 

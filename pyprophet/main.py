@@ -93,6 +93,13 @@ class PythonLiteralOption(click.Option):
     type=click.Path(exists=False),
     help="PyProphet output file. Valid formats are .osw, .parquet and .tsv. Must be the same format as input file.",
 )
+@click.option(
+    "--subsample_ratio",
+    default=1.0,
+    show_default=True,
+    type=float,
+    help="Subsampling ratio for large data. Use <1.0 to subsample precursors for semi-supervised learning, the learned weights will then be applied to the full data set.",
+)
 # Semi-supervised learning
 @click.option(
     "--classifier",
@@ -343,6 +350,7 @@ class PythonLiteralOption(click.Option):
 def score(
     infile,
     outfile,
+    subsample_ratio,
     classifier,
     xgb_autotune,
     apply_weights,
@@ -392,6 +400,7 @@ def score(
     config = RunnerIOConfig.from_cli_args(
         infile,
         outfile,
+        subsample_ratio,
         level,
         "score",
         classifier,
@@ -431,7 +440,20 @@ def score(
     )
 
     if not apply_weights:
-        PyProphetLearner(config).run()
+        if subsample_ratio < 1.0:
+            click.echo(
+                f"Info: Conducting semi-supervised learning on {subsample_ratio * 100}% of the data."
+            )
+            weights_path = PyProphetLearner(config).run()
+            # Apply weights from subsampled result to full infile
+            click.echo(
+                f"Info: Applying weights from {weights_path} to the full data set."
+            )
+            config.subsample_ratio = 1.0
+
+            PyProphetWeightApplier(weights_path, config).run()
+        else:
+            PyProphetLearner(config).run()
     else:
         PyProphetWeightApplier(apply_weights, config).run()
 

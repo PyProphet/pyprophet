@@ -85,9 +85,54 @@ class SplitParquetReader(BaseReader):
             else:
                 path = os.path.join(self.infile, f"{name}_features.parquet")
             if os.path.exists(path):
-                con.execute(
-                    f"CREATE VIEW {name} AS SELECT * FROM read_parquet('{path}')"
-                )
+                if name == "precursors" and self.subsample_ratio < 1.0:
+                    click.echo(
+                        f"Info: Creating view for {path} with subsampling ratio {self.subsample_ratio}"
+                    )
+                    # Create sampled precursor ID table
+                    con.execute(
+                        f"""
+                        CREATE TEMP TABLE sampled_precursor_ids AS
+                        SELECT DISTINCT PRECURSOR_ID
+                        FROM read_parquet('{path}')
+                        USING SAMPLE {self.subsample_ratio * 100}%
+                        """
+                    )
+
+                    n = con.execute(
+                        "SELECT COUNT(*) FROM sampled_precursor_ids"
+                    ).fetchone()[0]
+                    click.echo(f"Info: Sampled {n} precursor IDs")
+
+                    # Create filtered precursors view
+                    con.execute(
+                        f"""
+                        CREATE VIEW precursors AS
+                        SELECT *
+                        FROM read_parquet('{path}')
+                        WHERE PRECURSOR_ID IN (SELECT PRECURSOR_ID FROM sampled_precursor_ids)
+                        """
+                    )
+
+                elif (
+                    name in ["transition", "feature_alignment"]
+                    and self.subsample_ratio < 1.0
+                ):
+                    click.echo(
+                        f"Info: Creating view for {path} with subsampling ratio {self.subsample_ratio}"
+                    )
+                    con.execute(
+                        f"""
+                        CREATE VIEW {name} AS
+                        SELECT *
+                        FROM read_parquet('{path}')
+                        WHERE PRECURSOR_ID IN (SELECT PRECURSOR_ID FROM sampled_precursor_ids)
+                        """
+                    )
+                else:
+                    con.execute(
+                        f"CREATE VIEW {name} AS SELECT * FROM read_parquet('{path}')"
+                    )
 
     def _get_columns_by_prefix(self, parquet_file, prefix):
         cols = get_parquet_column_names(os.path.join(self.infile, parquet_file))

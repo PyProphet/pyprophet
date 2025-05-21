@@ -162,6 +162,7 @@ class RunnerIOConfig(BaseIOConfig):
         return {
             "infile": self.infile,
             "outfile": self.outfile,
+            "subsample_ratio": self.subsample_ratio,
             "level": self.level,
             "prefix": self.prefix,
             **vars(self.runner),
@@ -172,6 +173,7 @@ class RunnerIOConfig(BaseIOConfig):
         cls,
         infile,
         outfile,
+        subsample_ratio,
         level,
         context,
         classifier,
@@ -301,6 +303,7 @@ class RunnerIOConfig(BaseIOConfig):
         return cls(
             infile=infile,
             outfile=outfile,
+            subsample_ratio=subsample_ratio,
             context=context,
             level=level,
             runner=runner_config,

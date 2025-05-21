@@ -249,7 +249,10 @@ class PyProphetRunner(object):
 
         elif self.config.file_type == "parquet_split":
             split_parquet_writer = SplitParquetWriter(self.config)
-            split_parquet_writer.save_results(result, scorer.pi0)
+            if (
+                self.config.subsample_ratio == 1
+            ):  # Only save the full results if we are not subsampling
+                split_parquet_writer.save_results(result, scorer.pi0)
             split_parquet_writer.save_weights(weights)
 
         seconds = int(needed)
@@ -258,6 +261,8 @@ class PyProphetRunner(object):
         click.echo(
             "Info: Total time: %d seconds and %d msecs wall time" % (seconds, msecs)
         )
+
+        return self.config.extra_writes.get("trained_weights_path")
 
     def print_summary(self, result):
         if result.summary_statistics is not None:
@@ -293,7 +298,7 @@ class PyProphetLearner(PyProphetRunner):
 class PyProphetWeightApplier(PyProphetRunner):
 
     def __init__(self, apply_weights: str, config: RunnerIOConfig):
-        super(PyProphetWeightApplier, self).__init__(self.config)
+        super(PyProphetWeightApplier, self).__init__(config)
 
         if not os.path.exists(apply_weights):
             raise click.ClickException(

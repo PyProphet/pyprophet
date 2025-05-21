@@ -12,6 +12,7 @@ class BaseIOConfig:
         infile (str): Path to the input file (e.g., .osw, .parquet).
         outfile (str): Path to the output file to be written.
         file_type (str): Type of the input file (e.g., 'osw', 'parquet', 'parquet_split', 'tsv').
+        subsample_ratio (float): Subsampling ratio for large data.
         level (str): Scoring level (e.g., 'ms1', 'ms2', 'transition', 'alignment').
         context (str): Context or mode in which the reader/writer operates
                        (e.g., 'score', 'ipf', 'level_context').
@@ -21,6 +22,7 @@ class BaseIOConfig:
     infile: str
     outfile: str
     file_type: str = field(init=False)
+    subsample_ratio: float
     level: str
     context: str
     prefix: str = field(init=False)
