@@ -89,7 +89,7 @@ class SplitParquetReader(BaseReader):
             if os.path.exists(transition_path):
                 transition_files = [transition_path]
 
-        print_parquet_tree(base_dir, precursor_files, transition_files, alignment_file)
+        # print_parquet_tree(base_dir, precursor_files, transition_files, alignment_file)
 
         if not precursor_files:
             raise click.ClickException("Error: No precursor Parquet files found.")
