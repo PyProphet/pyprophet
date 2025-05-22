@@ -170,7 +170,7 @@ class SplitParquetReader(BaseReader):
         Returns columns that start with `prefix` from one of the parquet files.
         In multi-run mode, uses the first run's file as a representative.
         """
-        if self._is_multi_run:
+        if self._is_multi_run and self.level != "alignment":
             candidate = glob.glob(
                 os.path.join(self.config.infile, "*.oswpq", parquet_file)
             )
@@ -361,7 +361,7 @@ class SplitParquetWriter(BaseWriter):
         prefix = prefix_map.get(level)
         score_df = self._prepare_score_dataframe(df, level, prefix)
 
-        if self.file_type == "parquet_split_multi":
+        if self.file_type == "parquet_split_multi" and self.level != "alignment":
             run_dirs = [
                 os.path.join(self.outfile, d)
                 for d in os.listdir(self.outfile)
