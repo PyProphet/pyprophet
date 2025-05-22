@@ -358,7 +358,7 @@ class PythonLiteralOption(click.Option):
     help="Set logging level",
     show_default=True,
 )
-@logger.catch
+# @logger.catch
 def score(
     infile,
     outfile,
@@ -1777,6 +1777,13 @@ def export(
     help="Split transition data into a separate parquet (default: True).",
 )
 @click.option(
+    "--split_runs/--no-split_runs",
+    "split_runs",
+    default=False,
+    show_default=True,
+    help="Split runs into separate parquet files/directories (default: False).",
+)
+@click.option(
     "--compression",
     "compression",
     default="zstd",
@@ -1803,6 +1810,7 @@ def export_parquet(
     noDecoys,
     scoring_format,
     split_transition_data,
+    split_runs,
     compression,
     compression_level,
 ):
@@ -1840,6 +1848,7 @@ def export_parquet(
                 compression_method=compression,
                 compression_level=compression_level,
                 split_transition_data=split_transition_data,
+                split_runs=split_runs,
             )
             end = time.time()
             click.echo(f"Info: {outfile} written in {end-start:.4f} seconds.")
