@@ -214,12 +214,12 @@ class SplitParquetReader(BaseReader):
         all_precursor_cols = get_parquet_column_names(precursor_files[0])
         all_transition_cols = get_parquet_column_names(transition_files[0])
 
-        con.execute(
-            f"CREATE VIEW precursors AS SELECT * FROM read_parquet({precursor_files})"
-        )
-        con.execute(
-            f"CREATE VIEW transitions AS SELECT * FROM read_parquet({transition_files})"
-        )
+        # con.execute(
+        #     f"CREATE VIEW precursors AS SELECT * FROM read_parquet({precursor_files})"
+        # )
+        # con.execute(
+        #     f"CREATE VIEW transitions AS SELECT * FROM read_parquet({transition_files})"
+        # )
 
         if not ipf_ms1 and ipf_ms2:
             if not any(
