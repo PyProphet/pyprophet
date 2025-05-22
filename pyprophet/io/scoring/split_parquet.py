@@ -212,10 +212,10 @@ class SplitParquetReader(BaseReader):
                 raise click.ClickException(
                     "Transition-level scoring for IPF requires prior MS2 or MS1MS2-level scoring. Please run 'pyprophet score --level=ms2' or 'pyprophet score --level=ms1ms2' on this file first."
                 )
-            if not os.path.exists(
-                os.path.join(self.infile, "transition_features.parquet")
-            ):
-                raise click.ClickException("Transition-level feature table not found.")
+            # if not os.path.exists(
+            #     os.path.join(self.infile, "transition_features.parquet")
+            # ):
+            #     raise click.ClickException("Transition-level feature table not found.")
             return self._fetch_transition_features(
                 con,
                 self._get_columns_by_prefix(
