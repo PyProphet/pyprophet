@@ -261,6 +261,10 @@ class PyProphetWeightApplier(PyProphetRunner):
             if self.classifier == "LDA":
                 try:
                     self.persisted_weights = pd.read_csv(apply_weights, sep=",")
+                    # Filter level column for current level
+                    self.persisted_weights = self.persisted_weights[
+                        self.persisted_weights["level"] == self.level
+                    ]
                     if self.level != self.persisted_weights["level"].unique()[0]:
                         raise click.ClickException("Weights file has wrong level.")
                 except Exception:
