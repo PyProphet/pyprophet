@@ -1,7 +1,8 @@
 from dataclasses import dataclass, field
-from typing import Any, Dict
+from typing import Any, Dict, List, Union
 import os
 from hyperopt import hp
+import numpy as np
 
 from ._base import BaseIOConfig
 
@@ -26,19 +27,19 @@ class ErrorEstimationConfig:
     """
 
     # Global FDR & pi0
-    parametric: bool
-    pfdr: bool
-    pi0_lambda: Any  # Could be float or List[float]
-    pi0_method: str
-    pi0_smooth_df: int
-    pi0_smooth_log_pi0: bool
+    parametric: bool = False
+    pfdr: bool = False
+    pi0_lambda: Union[float, List[float]] = (0.1, 0.5, 0.05)
+    pi0_method: str = "bootstrap"
+    pi0_smooth_df: int = 3
+    pi0_smooth_log_pi0: bool = False
 
     # Local FDR
-    lfdr_truncate: bool
-    lfdr_monotone: bool
-    lfdr_transformation: str
-    lfdr_adj: bool
-    lfdr_eps: float
+    lfdr_truncate: bool = True
+    lfdr_monotone: bool = True
+    lfdr_transformation: str = "probit"
+    lfdr_adj: float = 1.5
+    lfdr_eps: float = np.power(10.0, -8)
 
 
 @dataclass
@@ -84,47 +85,51 @@ class RunnerConfig:
     """
 
     # Scoring / classifier options
-    classifier: str
-    ss_main_score: str
-    main_score_selection_report: bool
+    classifier: str = "LDA"
+    ss_main_score: str = "auto"
+    main_score_selection_report: bool = False
 
     # XGBoost-related hyperparameters
-    xgb_hyperparams: bool
-    xgb_params: dict
-    xgb_params_space: dict
+    xgb_hyperparams: bool = False
+    xgb_params: dict = field(default_factory=dict)
+    xgb_params_space: dict = field(default_factory=dict)
 
     # Cross-validation settings
-    xeval_fraction: float
-    xeval_num_iter: int
+    xeval_fraction: float = 0.5
+    xeval_num_iter: int = 10
 
     # Semi-supervised settings
-    ss_initial_fdr: float
-    ss_iteration_fdr: float
-    ss_num_iter: int
-    ss_score_filter: bool
+    ss_initial_fdr: float = 0.15
+    ss_iteration_fdr: float = 0.05
+    ss_num_iter: int = 10
+    ss_score_filter: bool = (
+        False  # Derived from whether ss_score_filter string is empty
+    )
     ss_use_dynamic_main_score: bool = field(init=False)
 
     # Grouping & statistical options
-    group_id: str
-    error_estimation_config: ErrorEstimationConfig
+    group_id: str = "group_id"
+    error_estimation_config: ErrorEstimationConfig = field(
+        default_factory=ErrorEstimationConfig
+    )
 
     # IPF options
-    ipf_max_peakgroup_rank: int
-    ipf_max_peakgroup_pep: float
-    ipf_max_transition_isotope_overlap: float
-    ipf_min_transition_sn: float
+    ipf_max_peakgroup_rank: int = 1
+    ipf_max_peakgroup_pep: float = 0.7
+    ipf_max_transition_isotope_overlap: float = 0.5
+    ipf_min_transition_sn: float = 0.0
 
     # Glyco options
-    glyco: bool
-    density_estimator: str
-    grid_size: int
+    glyco: bool = False
+    density_estimator: str = "gmm"
+    grid_size: int = 256
 
     # Miscellaneous
-    add_alignment_features: bool
-    tric_chromprob: bool
-    threads: int
-    test: bool
-    color_palette: str
+    add_alignment_features: bool = False
+    tric_chromprob: bool = False
+    threads: int = 1
+    test: bool = False
+    color_palette: str = "normal"
 
     def __post_init__(self):
         # Check for auto main score selection
