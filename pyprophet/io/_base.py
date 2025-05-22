@@ -326,8 +326,12 @@ class BaseWriter(ABC):
         Args:
             weights: Model weights or trained object.
         """
-        trained_weights_path = self.config.extra_writes.get("trained_model_path")
+        trained_weights_path = self.config.extra_writes.get(
+            f"trained_model_path_{self.level}"
+        )
         if trained_weights_path is not None:
             with open(trained_weights_path, "wb") as file:
                 self.persisted_weights = pickle.dump(weights, file)
             logger.success("%s written." % trained_weights_path)
+        else:
+            logger.error(f"Trained model path {trained_weights_path} not found. ")

@@ -210,7 +210,12 @@ class PyProphetRunner(object):
 
         logger.info("Total time: %d seconds and %d msecs wall time" % (seconds, msecs))
 
-        return self.config.extra_writes.get("trained_weights_path")
+        if self.runner_config.classifier == "LDA":
+            return self.config.extra_writes.get("trained_weights_path")
+        elif self.runner_config.classifier == "XGBoost":
+            return self.config.extra_writes.get(
+                f"trained_model_path_{self.config.level}"
+            )
 
     def print_summary(self, result):
         if result.summary_statistics is not None:
