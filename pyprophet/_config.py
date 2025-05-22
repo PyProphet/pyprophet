@@ -333,8 +333,59 @@ class RunnerIOConfig(BaseIOConfig):
 
 @dataclass
 class IPFIOConfig(BaseIOConfig):
-    ipf_filter_decoys: bool
-    min_ipf_confidence: float
+    ipf_ms1_scoring: bool
+    ipf_ms2_scoring: bool
+    ipf_h0: bool
+    ipf_grouped_fdr: bool
+    ipf_max_precursor_pep: float
+    ipf_max_peakgroup_pep: float
+    ipf_max_precursor_peakgroup_pep: float
+    ipf_max_transition_pep: float
+    propagate_signal_across_runs: bool
+    ipf_max_alignment_pep: float
+    across_run_confidence_threshold: float
+
+    @classmethod
+    def from_cli_args(
+        cls,
+        infile,
+        outfile,
+        subsample_ratio,
+        level,
+        context,
+        ipf_ms1_scoring,
+        ipf_ms2_scoring,
+        ipf_h0,
+        ipf_grouped_fdr,
+        ipf_max_precursor_pep,
+        ipf_max_peakgroup_pep,
+        ipf_max_precursor_peakgroup_pep,
+        ipf_max_transition_pep,
+        propagate_signal_across_runs,
+        ipf_max_alignment_pep,
+        across_run_confidence_threshold,
+    ):
+        """
+        Creates a configuration object from command-line arguments.
+        """
+        return cls(
+            infile=infile,
+            outfile=outfile,
+            subsample_ratio=subsample_ratio,
+            level=level,
+            context=context,
+            ipf_ms1_scoring=ipf_ms1_scoring,
+            ipf_ms2_scoring=ipf_ms2_scoring,
+            ipf_h0=ipf_h0,
+            ipf_grouped_fdr=ipf_grouped_fdr,
+            ipf_max_precursor_pep=ipf_max_precursor_pep,
+            ipf_max_peakgroup_pep=ipf_max_peakgroup_pep,
+            ipf_max_precursor_peakgroup_pep=ipf_max_precursor_peakgroup_pep,
+            ipf_max_transition_pep=ipf_max_transition_pep,
+            propagate_signal_across_runs=propagate_signal_across_runs,
+            ipf_max_alignment_pep=ipf_max_alignment_pep,
+            across_run_confidence_threshold=across_run_confidence_threshold,
+        )
 
 
 @dataclass

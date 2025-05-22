@@ -470,7 +470,7 @@ def score(
     if not apply_weights:
         if config.subsample_ratio < 1.0:
             logger.info(
-                f"Conducting semi-supervised learning on {config.subsample_ratio * 100} of the data.",
+                f"Conducting semi-supervised learning on {config.subsample_ratio * 100}% of the data.",
             )
             weights_path = PyProphetLearner(config).run()
             # Apply weights from subsampled result to full infile

@@ -14,7 +14,7 @@ import pickle
 
 
 from ._config import RunnerIOConfig
-from .io.util import setup_logger
+from .io.util import setup_logger, check_sqlite_table
 from .io.dispatcher import ReaderDispatcher, WriterDispatcher
 from .pyprophet import PyProphet
 from .glyco.scoring import partial_score, combined_score

@@ -61,6 +61,8 @@ class SplitParquetReader(BaseReader):
             )
             feature_table = self._merge_ms1ms2_features(con, feature_table, ms1_cols)
 
+        con.close()
+
         return self._finalize_feature_table(feature_table, ss_main_score)
 
     def _init_duckdb_views(self, con):
@@ -95,7 +97,7 @@ class SplitParquetReader(BaseReader):
         # Create TEMP table of sampled precursor IDs (if needed)
         if self.subsample_ratio < 1.0:
             logger.info(
-                f"Subsampling data for semi-supervised learning. Ratio: {self.subsample_ratio:.2f}"
+                f"Subsampling {self.subsample_ratio * 100}% data for semi-supervised learning."
             )
             con.execute(
                 f"""
@@ -382,6 +384,7 @@ class SplitParquetWriter(BaseWriter):
                         f"SELECT FEATURE_ID FROM read_parquet('{file_path}')"
                     ).fetchall()
                     feature_ids = set(f[0] for f in feature_ids)
+                    con.close()
                 except duckdb.Error as e:
                     logger.error(
                         f"Error reading FEATURE_IDs from {file_path}: {e}",
@@ -450,4 +453,5 @@ class SplitParquetWriter(BaseWriter):
             (FORMAT 'parquet', COMPRESSION 'ZSTD', COMPRESSION_LEVEL 11);
             """
         )
+        con.close()
         logger.success(f"{target_file} written.")

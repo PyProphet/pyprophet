@@ -9,6 +9,12 @@ from .scoring.split_parquet import SplitParquetReader as SplitParquetScoringRead
 from .scoring.split_parquet import SplitParquetWriter as SplitParquetScoringWriter
 from .scoring.tsv import TSVReader as ScoringTSVReader
 from .scoring.tsv import TSVWriter as ScoringTSVWriter
+from .ipf.osw import OSWReader as IPFOSWReader
+from .ipf.osw import OSWWriter as IPFOSWWriter
+from .ipf.parquet import ParquetReader as IPFParquetReader
+from .ipf.parquet import ParquetWriter as IPFParquetWriter
+from .ipf.split_parquet import SplitParquetReader as IPFSplitParquetReader
+from .ipf.split_parquet import SplitParquetWriter as IPFSplitParquetWriter
 
 from .._config import RunnerIOConfig, IPFIOConfig, LevelContextIOConfig
 
@@ -16,8 +22,34 @@ setup_logger()
 
 
 class ReaderDispatcher:
+    """
+    Dispatcher class to route I/O configuration to the appropriate reader implementation.
+
+    Based on the `file_type` and optionally the config context, this class instantiates and returns
+    the correct reader (e.g., OSWReader, ParquetReader, SplitParquetReader).
+
+    Supported file types:
+    - "osw"
+    - "parquet"
+    - "parquet_split"
+    - "parquet_split_multi"
+    - "tsv" (Note: only supported for scoring)
+    """
+
     @staticmethod
     def get_reader(config):
+        """
+        Return the appropriate reader instance based on the config's file_type and context.
+
+        Args:
+            config (BaseIOConfig): Configuration object with file_type, level, and context.
+
+        Returns:
+            BaseReader: An instance of a subclass of BaseReader suitable for the given input type.
+
+        Raises:
+            ValueError: If an unsupported file type is provided.
+        """
         if config.file_type == "osw":
             return ReaderDispatcher._get_osw_reader(config)
         elif config.file_type == "parquet":
@@ -36,7 +68,7 @@ class ReaderDispatcher:
         if isinstance(config, RunnerIOConfig):
             return ScoringOSWReader(config)
         elif isinstance(config, IPFIOConfig):
-            raise NotImplementedError("OSW IPFReader not implemented.")
+            return IPFOSWReader(config)
         elif isinstance(config, LevelContextIOConfig):
             raise NotImplementedError("OSW ContextReader not implemented.")
         else:
@@ -47,7 +79,7 @@ class ReaderDispatcher:
         if isinstance(config, RunnerIOConfig):
             return ParquetScoringReader(config)
         elif isinstance(config, IPFIOConfig):
-            raise NotImplementedError("Parquet IPFReader not implemented.")
+            return IPFParquetReader(config)
         elif isinstance(config, LevelContextIOConfig):
             raise NotImplementedError("Parquet ContextReader not implemented.")
         else:
@@ -58,7 +90,7 @@ class ReaderDispatcher:
         if isinstance(config, RunnerIOConfig):
             return SplitParquetScoringReader(config)
         elif isinstance(config, IPFIOConfig):
-            raise NotImplementedError("SplitParquet IPFReader not implemented.")
+            return IPFSplitParquetReader(config)
         elif isinstance(config, LevelContextIOConfig):
             raise NotImplementedError("SplitParquet ContextReader not implemented.")
         else:
@@ -77,8 +109,34 @@ class ReaderDispatcher:
 
 
 class WriterDispatcher:
+    """
+    Dispatcher class to route I/O configuration to the appropriate writer implementation.
+
+    Based on the `file_type` and optionally the config context, this class instantiates and returns
+    the correct writer (e.g., OSWWriter, ParquetWriter, SplitParquetWriter).
+
+    Supported file types:
+    - "osw"
+    - "parquet"
+    - "parquet_split"
+    - "parquet_split_multi"
+    - "tsv"
+    """
+
     @staticmethod
     def get_writer(config):
+        """
+        Return the appropriate writer instance based on the config's file_type and context.
+
+        Args:
+            config (BaseIOConfig): Configuration object with file_type, level, and context.
+
+        Returns:
+            BaseWriter: An instance of a subclass of BaseWriter suitable for the given output type.
+
+        Raises:
+            ValueError: If an unsupported file type is provided.
+        """
         if config.file_type == "osw":
             return WriterDispatcher._get_osw_writer(config)
         elif config.file_type == "parquet":
@@ -95,7 +153,7 @@ class WriterDispatcher:
         if isinstance(config, RunnerIOConfig):
             return ScoringOSWWriter(config)
         elif isinstance(config, IPFIOConfig):
-            raise NotImplementedError("OSW IPFWriter not implemented.")
+            return IPFOSWWriter(config)
         elif isinstance(config, LevelContextIOConfig):
             raise NotImplementedError("OSW ContextWriter not implemented.")
         else:
@@ -106,7 +164,7 @@ class WriterDispatcher:
         if isinstance(config, RunnerIOConfig):
             return ParquetScoringWriter(config)
         elif isinstance(config, IPFIOConfig):
-            raise NotImplementedError("Parquet IPFWriter not implemented.")
+            return IPFParquetWriter(config)
         elif isinstance(config, LevelContextIOConfig):
             raise NotImplementedError("Parquet ContextWriter not implemented.")
         else:
@@ -117,7 +175,7 @@ class WriterDispatcher:
         if isinstance(config, RunnerIOConfig):
             return SplitParquetScoringWriter(config)
         elif isinstance(config, IPFIOConfig):
-            raise NotImplementedError("SplitParquet IPFWriter not implemented.")
+            return IPFSplitParquetWriter(config)
         elif isinstance(config, LevelContextIOConfig):
             raise NotImplementedError("SplitParquet ContextWriter not implemented.")
         else:
