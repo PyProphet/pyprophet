@@ -14,7 +14,7 @@ from tabulate import tabulate
 
 from hyperopt import hp
 
-from ._config import RunnerIOConfig
+from ._config import RunnerIOConfig, IPFIOConfig
 from .io.util import check_sqlite_table, setup_logger
 from .runner import PyProphetLearner, PyProphetWeightApplier
 from .ipf import infer_peptidoforms
@@ -606,9 +606,12 @@ def ipf(
     else:
         outfile = outfile
 
-    infer_peptidoforms(
+    config = IPFIOConfig.from_cli_args(
         infile,
         outfile,
+        1,  # Subsample ratio is not applicable for IPF
+        "ipf",  # Level is not applicable for IPF
+        "ipf",
         ipf_ms1_scoring,
         ipf_ms2_scoring,
         ipf_h0,
@@ -621,6 +624,8 @@ def ipf(
         ipf_max_alignment_pep,
         across_run_confidence_threshold,
     )
+
+    infer_peptidoforms(config)
 
 
 # Infer glycoforms
