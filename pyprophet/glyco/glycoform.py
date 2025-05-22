@@ -9,11 +9,39 @@ from pyprophet.io.util import check_sqlite_table
 from pyprophet.ipf import (
     apply_bm,
     compute_model_fdr,
-    get_feature_mapping_across_runs,
     transfer_confident_evidence_across_runs,
 )
 
 from .pepmass import GlycoPeptideMassCalculator
+
+
+def get_feature_mapping_across_runs(infile, ipf_max_alignment_pep=1):
+    click.echo("Info: Reading Across Run Feature Alignment Mapping ... ", nl=False)
+    start = time.time()
+
+    con = sqlite3.connect(infile)
+
+    data = pd.read_sql_query(
+        f"""SELECT  
+                DENSE_RANK() OVER (ORDER BY PRECURSOR_ID, ALIGNMENT_ID) AS ALIGNMENT_GROUP_ID,
+                ALIGNED_FEATURE_ID AS FEATURE_ID 
+                FROM (SELECT DISTINCT * FROM FEATURE_MS2_ALIGNMENT) AS FEATURE_MS2_ALIGNMENT
+                INNER JOIN 
+                (SELECT DISTINCT *, MIN(QVALUE) FROM SCORE_ALIGNMENT GROUP BY FEATURE_ID) AS SCORE_ALIGNMENT 
+                ON SCORE_ALIGNMENT.FEATURE_ID = FEATURE_MS2_ALIGNMENT.ALIGNED_FEATURE_ID
+                WHERE LABEL = 1
+                AND SCORE_ALIGNMENT.PEP < {ipf_max_alignment_pep}
+                ORDER BY ALIGNMENT_GROUP_ID""",
+        con,
+    )
+
+    data.columns = [col.lower() for col in data.columns]
+    con.close()
+
+    end = time.time()
+    click.echo(f"{end-start:.4f} seconds")
+
+    return data
 
 
 def read_glycoform_space(path, use_glycan_composition):
