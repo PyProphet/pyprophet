@@ -14,7 +14,7 @@ from tabulate import tabulate
 
 from hyperopt import hp
 
-from ._config import RunnerIOConfig, IPFIOConfig
+from ._config import RunnerIOConfig, IPFIOConfig, LevelContextIOConfig
 from .io.util import check_sqlite_table, setup_logger
 from .runner import PyProphetLearner, PyProphetWeightApplier
 from .ipf import infer_peptidoforms
@@ -786,7 +786,7 @@ def glycoform(
     default="run-specific",
     show_default=True,
     type=click.Choice(["run-specific", "experiment-wide", "global"]),
-    help="Context to estimate protein-level FDR control.",
+    help="Context to estimate peptide-level FDR control.",
 )
 # Statistics
 @click.option(
@@ -895,6 +895,29 @@ def peptide(
         outfile = infile
     else:
         outfile = outfile
+
+    config = LevelContextIOConfig.from_cli_args(
+        infile,
+        outfile,
+        1,  # Subsample ratio is not applicable for peptide-level inference
+        "peptide",
+        "levels_context",
+        context,
+        parametric,
+        pfdr,
+        pi0_lambda,
+        pi0_method,
+        pi0_smooth_df,
+        pi0_smooth_log_pi0,
+        lfdr_truncate,
+        lfdr_monotone,
+        lfdr_transformation,
+        lfdr_adj,
+        lfdr_eps,
+        color_palette,
+        None,
+        None,
+    )
 
     infer_peptides(
         infile,

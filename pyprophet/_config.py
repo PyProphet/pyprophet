@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Literal, Union
 import os
 from hyperopt import hp
 import numpy as np
@@ -338,17 +338,17 @@ class RunnerIOConfig(BaseIOConfig):
 
 @dataclass
 class IPFIOConfig(BaseIOConfig):
-    ipf_ms1_scoring: bool
-    ipf_ms2_scoring: bool
-    ipf_h0: bool
-    ipf_grouped_fdr: bool
-    ipf_max_precursor_pep: float
-    ipf_max_peakgroup_pep: float
-    ipf_max_precursor_peakgroup_pep: float
-    ipf_max_transition_pep: float
-    propagate_signal_across_runs: bool
-    ipf_max_alignment_pep: float
-    across_run_confidence_threshold: float
+    ipf_ms1_scoring: bool = True
+    ipf_ms2_scoring: bool = True
+    ipf_h0: bool = True
+    ipf_grouped_fdr: bool = False
+    ipf_max_precursor_pep: float = 0.7
+    ipf_max_peakgroup_pep: float = 0.7
+    ipf_max_precursor_peakgroup_pep: float = 0.4
+    ipf_max_transition_pep: float = 0.6
+    propagate_signal_across_runs: bool = False
+    ipf_max_alignment_pep: float = 0.7
+    across_run_confidence_threshold: float = 0.5
 
     @classmethod
     def from_cli_args(
@@ -395,5 +395,66 @@ class IPFIOConfig(BaseIOConfig):
 
 @dataclass
 class LevelContextIOConfig(BaseIOConfig):
-    context_level: str
-    aggregation_method: str
+    # level: Literal["peptide", "glycopeptide", "protein", "gene"] = "peptide"
+    context_fdr: Literal["global", "experiment-wide", "run-specific"] = "global"
+    error_estimation_config: ErrorEstimationConfig
+    color_palette: Literal["normal", "protan", "deutran", "tritan"] = "normal"
+
+    # Glycopeptide-specific options
+    density_estimator: Literal["kde", "gmm"] = "gmm"
+    grid_size: int = 256
+
+    @classmethod
+    def from_cli_args(
+        cls,
+        infile,
+        outfile,
+        subsample_ratio,
+        level,
+        context,  # context of module
+        context_fdr,
+        parametric,
+        pfdr,
+        pi0_lambda,
+        pi0_method,
+        pi0_smooth_df,
+        pi0_smooth_log_pi0,
+        lfdr_truncate,
+        lfdr_monotone,
+        lfdr_transformation,
+        lfdr_adj,
+        lfdr_eps,
+        color_palette,
+        density_estimator,
+        grid_size,
+    ):
+        """
+        Creates a configuration object from command-line arguments.
+        """
+
+        error_estimation_config = ErrorEstimationConfig(
+            parametric=parametric,
+            pfdr=pfdr,
+            pi0_lambda=pi0_lambda,
+            pi0_method=pi0_method,
+            pi0_smooth_df=pi0_smooth_df,
+            pi0_smooth_log_pi0=pi0_smooth_log_pi0,
+            lfdr_truncate=lfdr_truncate,
+            lfdr_monotone=lfdr_monotone,
+            lfdr_transformation=lfdr_transformation,
+            lfdr_adj=lfdr_adj,
+            lfdr_eps=lfdr_eps,
+        )
+
+        return cls(
+            infile=infile,
+            outfile=outfile,
+            subsample_ratio=subsample_ratio,
+            level=level,
+            context=context,
+            context_fdr=context_fdr,
+            error_estimation_config=error_estimation_config,
+            color_palette=color_palette,
+            density_estimator=density_estimator,
+            grid_size=grid_size,
+        )
