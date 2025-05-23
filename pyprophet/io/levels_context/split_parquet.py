@@ -229,7 +229,7 @@ class SplitParquetReader(BaseReader):
                 PROTEIN_ID AS PROTEIN_ID,
                 PRECURSOR_DECOY AS DECOY,
                 SCORE_MS2_SCORE AS SCORE,
-                {cfg.context_fdr} AS CONTEXT
+                '{cfg.context_fdr}' AS CONTEXT
             FROM precursors p
             JOIN one_peptide_proteins opp ON p.PEPTIDE_ID = opp.PEPTIDE_ID
             QUALIFY ROW_NUMBER() OVER (PARTITION BY {group_id} ORDER BY SCORE_MS2_SCORE DESC) = 1
@@ -274,7 +274,7 @@ class SplitParquetReader(BaseReader):
                 GENE_ID AS GENE_ID,
                 PRECURSOR_DECOY AS DECOY,
                 SCORE_MS2_SCORE AS SCORE,
-                {cfg.context_fdr} AS CONTEXT
+                '{cfg.context_fdr}' AS CONTEXT
             FROM precursors p
             JOIN one_gene_peptides ogp ON p.PEPTIDE_ID = ogp.PEPTIDE_ID
             QUALIFY ROW_NUMBER() OVER (PARTITION BY {group_id} ORDER BY SCORE_MS2_SCORE DESC) = 1
