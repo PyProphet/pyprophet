@@ -181,10 +181,12 @@ class SplitParquetReader(BaseReader):
             path = candidate[0]
         else:
             path = os.path.join(self.config.infile, parquet_file)
+            logger.trace(f"Using {path} for column extraction.")
             if not os.path.exists(path):
                 raise click.ClickException(f"File '{path}' does not exist.")
 
         cols = get_parquet_column_names(path)
+        logger.trace(f"Columns in {path}: {cols}")
         if cols is None:
             raise click.ClickException(f"Failed to read schema or columns from: {path}")
 
@@ -299,7 +301,8 @@ class SplitParquetReader(BaseReader):
                         a.FEATURE_ID || '_' || a.PRECURSOR_ID AS GROUP_ID
                     FROM feature_alignment a
                     ORDER BY a.RUN_ID, a.PRECURSOR_ID, a.REFERENCE_RT"""
-        df = con.execute(query).pl().to_pandas()
+
+        df = con.execute(query).df()
         # Map DECOY to 1 and -1 to 0 and 1
         # arycal saves a label column to indicate 1 as target aligned peaks and -1 as the random/shuffled decoy aligned peak
         df["DECOY"] = df["DECOY"].map({1: 0, -1: 1})
