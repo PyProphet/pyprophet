@@ -4,12 +4,12 @@ import pathlib
 import shutil
 import ast
 import time
+import sqlite3
 import pandas as pd
 import numpy as np
 import click
 from loguru import logger
 from functools import update_wrapper
-import sqlite3
 from tabulate import tabulate
 
 from hyperopt import hp
@@ -1298,8 +1298,16 @@ def backpropagate(infile, outfile, apply_scores):
     backpropagate_oswr(infile, outfile, apply_scores)
 
 
+@cli.group(name="export")
+def export():
+    """
+    Subcommands for exporting between different formats.
+    """
+    pass
+
+
 # Export TSV
-@cli.command()
+@export.command()
 # File handling
 @click.option(
     "--in",
@@ -1318,7 +1326,7 @@ def backpropagate(infile, outfile, apply_scores):
     "--format",
     default="legacy_split",
     show_default=True,
-    type=click.Choice(["matrix", "legacy_split", "legacy_merged", "score_plots"]),
+    type=click.Choice(["matrix", "legacy_split", "legacy_merged"]),
     help="Export format, either matrix, legacy_split/legacy_merged (mProphet/PyProphet) or score_plots format.",
 )
 @click.option(
@@ -1389,49 +1397,7 @@ def backpropagate(infile, outfile, apply_scores):
     type=float,
     help="[format: matrix/legacy] Filter results to maximum global protein-level q-value.",
 )
-# Glycoform
-@click.option(
-    "--glycoform/--no-glycoform",
-    "glycoform",
-    default=False,
-    show_default=True,
-    help="[format: matrix/legacy] Export glycoform results.",
-)
-@click.option(
-    "--glycoform_match_precursor",
-    default="glycan_composition",
-    show_default=True,
-    type=click.Choice(["exact", "glycan_composition", "none"]),
-    help="[format: matrix/legacy] Export glycoform results with glycan matched with precursor-level results.",
-)
-@click.option(
-    "--max_glycoform_pep",
-    default=1,
-    show_default=True,
-    type=float,
-    help="[format: matrix/legacy] Filter results to maximum glycoform PEP.",
-)
-@click.option(
-    "--max_glycoform_qvalue",
-    default=0.05,
-    show_default=True,
-    type=float,
-    help="[format: matrix/legacy] Filter results to maximum glycoform q-value.",
-)
-@click.option(
-    "--glycopeptide/--no-glycopeptide",
-    default=True,
-    show_default=True,
-    help="Append glycopeptide-level error-rate estimates if available.",
-)
-@click.option(
-    "--max_global_glycopeptide_qvalue",
-    default=0.01,
-    show_default=True,
-    type=float,
-    help="[format: matrix/legacy] Filter results to maximum global glycopeptide-level q-value.",
-)
-def export(
+def tsv(
     infile,
     outfile,
     format,
@@ -1445,74 +1411,37 @@ def export(
     max_global_peptide_qvalue,
     protein,
     max_global_protein_qvalue,
-    glycoform,
-    glycoform_match_precursor,
-    max_glycoform_pep,
-    max_glycoform_qvalue,
-    glycopeptide,
-    max_global_glycopeptide_qvalue,
 ):
     """
-    Export TSV/CSV tables
+    Export Proteomics/Peptidoform TSV/CSV tables
     """
-    if glycoform:
-        if format == "score_plots":
-            export_glyco_score_plots(infile)
+    if outfile is None:
+        if outcsv:
+            outfile = infile.split(".osw")[0] + ".csv"
         else:
-            if outfile is None:
-                if outcsv:
-                    outfile = infile.split(".osw")[0] + ".csv"
-                else:
-                    outfile = infile.split(".osw")[0] + ".tsv"
-            else:
-                outfile = outfile
-
-            export_glyco_tsv(
-                infile,
-                outfile,
-                format=format,
-                outcsv=outcsv,
-                transition_quantification=transition_quantification,
-                max_transition_pep=max_transition_pep,
-                glycoform=glycoform,
-                glycoform_match_precursor=glycoform_match_precursor,
-                max_glycoform_pep=max_glycoform_pep,
-                max_glycoform_qvalue=max_glycoform_qvalue,
-                max_rs_peakgroup_qvalue=max_rs_peakgroup_qvalue,
-                glycopeptide=glycopeptide,
-                max_global_glycopeptide_qvalue=max_global_glycopeptide_qvalue,
-            )
+            outfile = infile.split(".osw")[0] + ".tsv"
     else:
-        if format == "score_plots":
-            export_score_plots(infile)
-        else:
-            if outfile is None:
-                if outcsv:
-                    outfile = infile.split(".osw")[0] + ".csv"
-                else:
-                    outfile = infile.split(".osw")[0] + ".tsv"
-            else:
-                outfile = outfile
+        outfile = outfile
 
-            export_tsv(
-                infile,
-                outfile,
-                format,
-                outcsv,
-                transition_quantification,
-                max_transition_pep,
-                ipf,
-                ipf_max_peptidoform_pep,
-                max_rs_peakgroup_qvalue,
-                peptide,
-                max_global_peptide_qvalue,
-                protein,
-                max_global_protein_qvalue,
-            )
+    export_tsv(
+        infile,
+        outfile,
+        format,
+        outcsv,
+        transition_quantification,
+        max_transition_pep,
+        ipf,
+        ipf_max_peptidoform_pep,
+        max_rs_peakgroup_qvalue,
+        peptide,
+        max_global_peptide_qvalue,
+        protein,
+        max_global_protein_qvalue,
+    )
 
 
 # Export to Parquet
-@cli.command()
+@export.command()
 @click.option(
     "--in",
     "infile",
@@ -1591,7 +1520,7 @@ def export(
     type=int,
     help="Compression level to use for parquet file.",
 )
-def export_parquet(
+def parquet(
     infile,
     outfile,
     oswfile,
@@ -1685,7 +1614,7 @@ def export_parquet(
 
 
 # Export Compound TSV
-@cli.command()
+@export.command()
 # File handling
 @click.option(
     "--in",
@@ -1704,7 +1633,7 @@ def export_parquet(
     "--format",
     default="legacy_merged",
     show_default=True,
-    type=click.Choice(["matrix", "legacy_merged", "score_plots"]),
+    type=click.Choice(["matrix", "legacy_merged"]),
     help="Export format, either matrix, legacy_merged (PyProphet) or score_plots format.",
 )
 @click.option(
@@ -1722,22 +1651,177 @@ def export_parquet(
     type=float,
     help="[format: matrix/legacy] Filter results to maximum run-specific peak group-level q-value.",
 )
-def export_compound(infile, outfile, format, outcsv, max_rs_peakgroup_qvalue):
+def compound(infile, outfile, format, outcsv, max_rs_peakgroup_qvalue):
     """
     Export Compound TSV/CSV tables
     """
-    if format == "score_plots":
-        export_score_plots(infile)
-    else:
-        if outfile is None:
-            if outcsv:
-                outfile = infile.split(".osw")[0] + ".csv"
-            else:
-                outfile = infile.split(".osw")[0] + ".tsv"
+    if outfile is None:
+        if outcsv:
+            outfile = infile.split(".osw")[0] + ".csv"
         else:
-            outfile = outfile
+            outfile = infile.split(".osw")[0] + ".tsv"
+    else:
+        outfile = outfile
 
-        export_compound_tsv(infile, outfile, format, outcsv, max_rs_peakgroup_qvalue)
+    export_compound_tsv(infile, outfile, format, outcsv, max_rs_peakgroup_qvalue)
+
+
+# Export Glycoform TSV
+@export.command()
+# File handling
+@click.option(
+    "--in",
+    "infile",
+    required=True,
+    type=click.Path(exists=True),
+    help="PyProphet input file.",
+)
+@click.option(
+    "--out",
+    "outfile",
+    type=click.Path(exists=False),
+    help="Output TSV/CSV (matrix, legacy_split, legacy_merged) file.",
+)
+@click.option(
+    "--format",
+    default="legacy_split",
+    show_default=True,
+    type=click.Choice(["matrix", "legacy_split", "legacy_merged"]),
+    help="Export format, either matrix, legacy_split/legacy_merged (mProphet/PyProphet) format.",
+)
+@click.option(
+    "--csv/--no-csv",
+    "outcsv",
+    default=False,
+    show_default=True,
+    help="Export CSV instead of TSV file.",
+)
+# Context
+@click.option(
+    "--transition_quantification/--no-transition_quantification",
+    default=True,
+    show_default=True,
+    help="[format: legacy] Report aggregated transition-level quantification.",
+)
+@click.option(
+    "--max_transition_pep",
+    default=0.7,
+    show_default=True,
+    type=float,
+    help="[format: legacy] Maximum PEP to retain scored transitions for quantification (requires transition-level scoring).",
+)
+@click.option(
+    "--max_rs_peakgroup_qvalue",
+    default=0.05,
+    show_default=True,
+    type=float,
+    help="[format: matrix/legacy] Filter results to maximum run-specific peak group-level q-value.",
+)
+@click.option(
+    "--glycoform_match_precursor",
+    default="glycan_composition",
+    show_default=True,
+    type=click.Choice(["exact", "glycan_composition", "none"]),
+    help="[format: matrix/legacy] Export glycoform results with glycan matched with precursor-level results.",
+)
+@click.option(
+    "--max_glycoform_pep",
+    default=1,
+    show_default=True,
+    type=float,
+    help="[format: matrix/legacy] Filter results to maximum glycoform PEP.",
+)
+@click.option(
+    "--max_glycoform_qvalue",
+    default=0.05,
+    show_default=True,
+    type=float,
+    help="[format: matrix/legacy] Filter results to maximum glycoform q-value.",
+)
+@click.option(
+    "--glycopeptide/--no-glycopeptide",
+    default=True,
+    show_default=True,
+    help="Append glycopeptide-level error-rate estimates if available.",
+)
+@click.option(
+    "--max_global_glycopeptide_qvalue",
+    default=0.01,
+    show_default=True,
+    type=float,
+    help="[format: matrix/legacy] Filter results to maximum global glycopeptide-level q-value.",
+)
+def glyco(
+    infile,
+    outfile,
+    format,
+    outcsv,
+    transition_quantification,
+    max_transition_pep,
+    max_rs_peakgroup_qvalue,
+    glycoform_match_precursor,
+    max_glycoform_pep,
+    max_glycoform_qvalue,
+    glycopeptide,
+    max_global_glycopeptide_qvalue,
+):
+    """
+    Export Gylcoform TSV/CSV tables
+    """
+
+    if outfile is None:
+        if outcsv:
+            outfile = infile.split(".osw")[0] + ".csv"
+        else:
+            outfile = infile.split(".osw")[0] + ".tsv"
+    else:
+        outfile = outfile
+
+    export_glyco_tsv(
+        infile,
+        outfile,
+        format=format,
+        outcsv=outcsv,
+        transition_quantification=transition_quantification,
+        max_transition_pep=max_transition_pep,
+        glycoform=glycoform,
+        glycoform_match_precursor=glycoform_match_precursor,
+        max_glycoform_pep=max_glycoform_pep,
+        max_glycoform_qvalue=max_glycoform_qvalue,
+        max_rs_peakgroup_qvalue=max_rs_peakgroup_qvalue,
+        glycopeptide=glycopeptide,
+        max_global_glycopeptide_qvalue=max_global_glycopeptide_qvalue,
+    )
+
+
+# Export score plots
+@export.command()
+@click.option(
+    "--in",
+    "infile",
+    required=True,
+    type=click.Path(exists=True),
+    help="PyProphet OSW input file.",
+)
+# Glycoform
+@click.option(
+    "--glycoform/--no-glycoform",
+    "glycoform",
+    default=False,
+    show_default=True,
+    help="Export glycoform score plots.",
+)
+def score_plots(infile):
+    """
+    Export score plots
+    """
+    if infile.endswith(".osw"):
+        if not glycoform:
+            export_score_plots(infile)
+        else:
+            export_glyco_score_plots(infile)
+    else:
+        raise click.ClickException("Input file must be of type .osw")
 
 
 # Filter sqMass or OSW files
