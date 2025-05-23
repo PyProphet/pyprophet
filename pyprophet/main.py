@@ -57,9 +57,28 @@ except NameError:
         return fun
 
 
-@click.group(chain=True)
+class GlobalLogLevelGroup(click.Group):
+    def invoke(self, ctx):
+        log_level = ctx.params.get("log_level", "INFO").upper()
+        setup_logger(log_level=log_level)
+        ctx.obj = {"LOG_LEVEL": log_level}
+        return super().invoke(ctx)
+
+
+# Changed chain to False to allow grouping related subcommands @singjc
+@click.group(chain=False, cls=GlobalLogLevelGroup)
 @click.version_option()
-def cli():
+@click.option(
+    "--log-level",
+    default="INFO",
+    type=click.Choice(
+        ["TRACE", "DEBUG", "INFO", "SUCCESS", "WARNING", "ERROR", "CRITICAL"],
+        case_sensitive=False,
+    ),
+    help="Set global logging level.",
+)
+@click.pass_context
+def cli(ctx, log_level):
     """
     PyProphet: Semi-supervised learning and scoring of OpenSWATH results.
 
@@ -76,6 +95,91 @@ class PythonLiteralOption(click.Option):
             return ast.literal_eval(value)
         except Exception:
             raise click.BadParameter(value)
+
+
+def shared_statistics_options(func):
+    """
+    Decorator to add shared statistics options to a command.
+    """
+    options = [
+        click.option(
+            "--parametric/--no-parametric",
+            default=False,
+            show_default=True,
+            help="Do parametric estimation of p-values.",
+        ),
+        click.option(
+            "--pfdr/--no-pfdr",
+            default=False,
+            show_default=True,
+            help="Compute positive false discovery rate (pFDR) instead of FDR.",
+        ),
+        click.option(
+            "--pi0_lambda",
+            default=[0.1, 0.5, 0.05],
+            show_default=True,
+            type=(float, float, float),
+            help="Use non-parametric estimation of p-values. Either use <START END STEPS>, e.g. 0.1, 1.0, 0.1 or set to fixed value, e.g. 0.4, 0, 0.",
+            callback=transform_pi0_lambda,
+        ),
+        click.option(
+            "--pi0_method",
+            default="bootstrap",
+            show_default=True,
+            type=click.Choice(["smoother", "bootstrap"]),
+            help="Method for choosing tuning parameter in pi₀ estimation.",
+        ),
+        click.option(
+            "--pi0_smooth_df",
+            default=3,
+            show_default=True,
+            type=int,
+            help="Degrees of freedom for smoother when estimating pi₀.",
+        ),
+        click.option(
+            "--pi0_smooth_log_pi0/--no-pi0_smooth_log_pi0",
+            default=False,
+            show_default=True,
+            help="Apply smoother to log(pi₀) values during estimation.",
+        ),
+        click.option(
+            "--lfdr_truncate/--no-lfdr_truncate",
+            show_default=True,
+            default=True,
+            help="If True, local FDR values > 1 are set to 1.",
+        ),
+        click.option(
+            "--lfdr_monotone/--no-lfdr_monotone",
+            show_default=True,
+            default=True,
+            help="Ensure local FDR values are non-decreasing with p-values.",
+        ),
+        click.option(
+            "--lfdr_transformation",
+            default="probit",
+            show_default=True,
+            type=click.Choice(["probit", "logit"]),
+            help="Transformation applied to p-values for local FDR estimation.",
+        ),
+        click.option(
+            "--lfdr_adj",
+            default=1.5,
+            show_default=True,
+            type=float,
+            help="Smoothing bandwidth multiplier used in density estimation.",
+        ),
+        click.option(
+            "--lfdr_eps",
+            default=np.power(10.0, -8),
+            show_default=True,
+            type=float,
+            help="Threshold for p-value tails in local FDR calculation.",
+        ),
+    ]
+
+    for option in reversed(options):
+        func = option(func)
+    return func
 
 
 # PyProphet semi-supervised learning and scoring
@@ -175,79 +279,7 @@ class PythonLiteralOption(click.Option):
     type=str,
     help="Group identifier for calculation of statistics.",
 )
-@click.option(
-    "--parametric/--no-parametric",
-    default=False,
-    show_default=True,
-    help="Do parametric estimation of p-values.",
-)
-@click.option(
-    "--pfdr/--no-pfdr",
-    default=False,
-    show_default=True,
-    help="Compute positive false discovery rate (pFDR) instead of FDR.",
-)
-@click.option(
-    "--pi0_lambda",
-    default=[0.1, 0.5, 0.05],
-    show_default=True,
-    type=(float, float, float),
-    help="Use non-parametric estimation of p-values. Either use <START END STEPS>, e.g. 0.1, 1.0, 0.1 or set to fixed value, e.g. 0.4, 0, 0.",
-    callback=transform_pi0_lambda,
-)
-@click.option(
-    "--pi0_method",
-    default="bootstrap",
-    show_default=True,
-    type=click.Choice(["smoother", "bootstrap"]),
-    help='Either "smoother" or "bootstrap"; the method for automatically choosing tuning parameter in the estimation of pi_0, the proportion of true null hypotheses.',
-)
-@click.option(
-    "--pi0_smooth_df",
-    default=3,
-    show_default=True,
-    type=int,
-    help="Number of degrees-of-freedom to use when estimating pi_0 with a smoother.",
-)
-@click.option(
-    "--pi0_smooth_log_pi0/--no-pi0_smooth_log_pi0",
-    default=False,
-    show_default=True,
-    help='If True and pi0_method = "smoother", pi0 will be estimated by applying a smoother to a scatterplot of log(pi0) estimates against the tuning parameter lambda.',
-)
-@click.option(
-    "--lfdr_truncate/--no-lfdr_truncate",
-    show_default=True,
-    default=True,
-    help="If True, local FDR values >1 are set to 1.",
-)
-@click.option(
-    "--lfdr_monotone/--no-lfdr_monotone",
-    show_default=True,
-    default=True,
-    help="If True, local FDR values are non-decreasing with increasing p-values.",
-)
-@click.option(
-    "--lfdr_transformation",
-    default="probit",
-    show_default=True,
-    type=click.Choice(["probit", "logit"]),
-    help='Either a "probit" or "logit" transformation is applied to the p-values so that a local FDR estimate can be formed that does not involve edge effects of the [0,1] interval in which the p-values lie.',
-)
-@click.option(
-    "--lfdr_adj",
-    default=1.5,
-    show_default=True,
-    type=float,
-    help="Numeric value that is applied as a multiple of the smoothing bandwidth used in the density estimation.",
-)
-@click.option(
-    "--lfdr_eps",
-    default=np.power(10.0, -8),
-    show_default=True,
-    type=float,
-    help="Numeric value that is threshold for the tails of the empirical p-value distribution.",
-)
+@shared_statistics_options
 # OpenSWATH options
 @click.option(
     "--level",
@@ -348,18 +380,10 @@ class PythonLiteralOption(click.Option):
     show_default=True,
     help="Run in test mode with fixed seed.",
 )
-@click.option(
-    "-l",
-    "--log-level",
-    type=click.Choice(
-        ["TRACE", "DEBUG", "INFO", "SUCCESS", "WARNING", "ERROR", "CRITICAL"]
-    ),
-    default="INFO",
-    help="Set logging level",
-    show_default=True,
-)
+@click.pass_context
 # @logger.catch
 def score(
+    ctx,
     infile,
     outfile,
     subsample_ratio,
@@ -399,16 +423,10 @@ def score(
     main_score_selection_report,
     threads,
     test,
-    log_level,
 ):
     """
     Conduct semi-supervised learning and error-rate estimation for MS1, MS2 and transition-level data.
     """
-
-    log_level = log_level.upper()
-    os.environ["PYPROPHET_LOG_LEVEL"] = log_level  # Set globally
-
-    setup_logger()
 
     if outfile is None:
         outfile = infile
@@ -764,8 +782,16 @@ def glycoform(
     )
 
 
+@cli.group(name="levels-context")
+def levels_context():
+    """
+    Subcommands for FDR estimation at different biological levels.
+    """
+    pass
+
+
 # Peptide-level inference
-@cli.command()
+@levels_context.command()
 # File handling
 @click.option(
     "--in",
@@ -789,79 +815,7 @@ def glycoform(
     help="Context to estimate peptide-level FDR control.",
 )
 # Statistics
-@click.option(
-    "--parametric/--no-parametric",
-    default=False,
-    show_default=True,
-    help="Do parametric estimation of p-values.",
-)
-@click.option(
-    "--pfdr/--no-pfdr",
-    default=False,
-    show_default=True,
-    help="Compute positive false discovery rate (pFDR) instead of FDR.",
-)
-@click.option(
-    "--pi0_lambda",
-    default=[0.1, 0.5, 0.05],
-    show_default=True,
-    type=(float, float, float),
-    help="Use non-parametric estimation of p-values. Either use <START END STEPS>, e.g. 0.1, 1.0, 0.1 or set to fixed value, e.g. 0.4, 0, 0.",
-    callback=transform_pi0_lambda,
-)
-@click.option(
-    "--pi0_method",
-    default="bootstrap",
-    show_default=True,
-    type=click.Choice(["smoother", "bootstrap"]),
-    help='Either "smoother" or "bootstrap"; the method for automatically choosing tuning parameter in the estimation of pi_0, the proportion of true null hypotheses.',
-)
-@click.option(
-    "--pi0_smooth_df",
-    default=3,
-    show_default=True,
-    type=int,
-    help="Number of degrees-of-freedom to use when estimating pi_0 with a smoother.",
-)
-@click.option(
-    "--pi0_smooth_log_pi0/--no-pi0_smooth_log_pi0",
-    default=False,
-    show_default=True,
-    help='If True and pi0_method = "smoother", pi0 will be estimated by applying a smoother to a scatterplot of log(pi0) estimates against the tuning parameter lambda.',
-)
-@click.option(
-    "--lfdr_truncate/--no-lfdr_truncate",
-    show_default=True,
-    default=True,
-    help="If True, local FDR values >1 are set to 1.",
-)
-@click.option(
-    "--lfdr_monotone/--no-lfdr_monotone",
-    show_default=True,
-    default=True,
-    help="If True, local FDR values are non-decreasing with increasing p-values.",
-)
-@click.option(
-    "--lfdr_transformation",
-    default="probit",
-    show_default=True,
-    type=click.Choice(["probit", "logit"]),
-    help='Either a "probit" or "logit" transformation is applied to the p-values so that a local FDR estimate can be formed that does not involve edge effects of the [0,1] interval in which the p-values lie.',
-)
-@click.option(
-    "--lfdr_adj",
-    default=1.5,
-    show_default=True,
-    type=float,
-    help="Numeric value that is applied as a multiple of the smoothing bandwidth used in the density estimation.",
-)
-@click.option(
-    "--lfdr_eps",
-    default=np.power(10.0, -8),
-    show_default=True,
-    type=float,
-    help="Numeric value that is threshold for the tails of the empirical p-value distribution.",
-)
+@shared_statistics_options
 # Visualization
 @click.option(
     "--color_palette",
@@ -923,7 +877,7 @@ def peptide(
 
 
 # GlycoPeptide-level inference
-@cli.command()
+@levels_context.command()
 @click.option(
     "--in", "infile", required=True, type=click.Path(exists=True), help="Input file."
 )
@@ -949,58 +903,7 @@ def peptide(
     type=int,
     help="Number of d-score cutoffs to build grid coordinates for local FDR calculation.",
 )
-@click.option(
-    "--parametric/--no-parametric",
-    default=False,
-    show_default=True,
-    help="Do parametric estimation of p-values.",
-)
-@click.option(
-    "--pfdr/--no-pfdr",
-    default=False,
-    show_default=True,
-    help="Compute positive false discovery rate (pFDR) instead of FDR.",
-)
-@click.option(
-    "--pi0_lambda",
-    default=[0.1, 0.5, 0.05],
-    show_default=True,
-    type=(float, float, float),
-    help="Use non-parametric estimation of p-values. Either use <START END STEPS>, e.g. 0.1, 1.0, 0.1 or set to fixed value, e.g. 0.4, 0, 0.",
-    callback=transform_pi0_lambda,
-)
-@click.option(
-    "--pi0_method",
-    default="bootstrap",
-    show_default=True,
-    type=click.Choice(["smoother", "bootstrap"]),
-    help='Either "smoother" or "bootstrap"; the method for automatically choosing tuning parameter in the estimation of pi_0, the proportion of true null hypotheses.',
-)
-@click.option(
-    "--pi0_smooth_df",
-    default=3,
-    show_default=True,
-    type=int,
-    help="Number of degrees-of-freedom to use when estimating pi_0 with a smoother.",
-)
-@click.option(
-    "--pi0_smooth_log_pi0/--no-pi0_smooth_log_pi0",
-    default=False,
-    show_default=True,
-    help='If True and pi0_method = "smoother", pi0 will be estimated by applying a smoother to a scatterplot of log(pi0) estimates against the tuning parameter lambda.',
-)
-@click.option(
-    "--lfdr_truncate/--no-lfdr_truncate",
-    show_default=True,
-    default=True,
-    help="If True, local FDR values >1 are set to 1.",
-)
-@click.option(
-    "--lfdr_monotone/--no-lfdr_monotone",
-    show_default=True,
-    default=True,
-    help="If True, local FDR values are non-increasing with increasing d-scores.",
-)
+@shared_statistics_options
 def glycopeptide(
     infile,
     outfile,
@@ -1015,6 +918,7 @@ def glycopeptide(
     pi0_smooth_log_pi0,
     lfdr_truncate,
     lfdr_monotone,
+    **kwargs,  # unused kwargs for shared_statistics_options
 ):
     """
     Infer glycopeptides and conduct error-rate estimation in different contexts.
@@ -1049,7 +953,7 @@ def glycopeptide(
 
 
 # Gene-level inference
-@cli.command()
+@levels_context.command()
 # File handling
 @click.option(
     "--in",
@@ -1073,79 +977,7 @@ def glycopeptide(
     help="Context to estimate gene-level FDR control.",
 )
 # Statistics
-@click.option(
-    "--parametric/--no-parametric",
-    default=False,
-    show_default=True,
-    help="Do parametric estimation of p-values.",
-)
-@click.option(
-    "--pfdr/--no-pfdr",
-    default=False,
-    show_default=True,
-    help="Compute positive false discovery rate (pFDR) instead of FDR.",
-)
-@click.option(
-    "--pi0_lambda",
-    default=[0.1, 0.5, 0.05],
-    show_default=True,
-    type=(float, float, float),
-    help="Use non-parametric estimation of p-values. Either use <START END STEPS>, e.g. 0.1, 1.0, 0.1 or set to fixed value, e.g. 0.4, 0, 0.",
-    callback=transform_pi0_lambda,
-)
-@click.option(
-    "--pi0_method",
-    default="bootstrap",
-    show_default=True,
-    type=click.Choice(["smoother", "bootstrap"]),
-    help='Either "smoother" or "bootstrap"; the method for automatically choosing tuning parameter in the estimation of pi_0, the proportion of true null hypotheses.',
-)
-@click.option(
-    "--pi0_smooth_df",
-    default=3,
-    show_default=True,
-    type=int,
-    help="Number of degrees-of-freedom to use when estimating pi_0 with a smoother.",
-)
-@click.option(
-    "--pi0_smooth_log_pi0/--no-pi0_smooth_log_pi0",
-    default=False,
-    show_default=True,
-    help='If True and pi0_method = "smoother", pi0 will be estimated by applying a smoother to a scatterplot of log(pi0) estimates against the tuning parameter lambda.',
-)
-@click.option(
-    "--lfdr_truncate/--no-lfdr_truncate",
-    show_default=True,
-    default=True,
-    help="If True, local FDR values >1 are set to 1.",
-)
-@click.option(
-    "--lfdr_monotone/--no-lfdr_monotone",
-    show_default=True,
-    default=True,
-    help="If True, local FDR values are non-decreasing with increasing p-values.",
-)
-@click.option(
-    "--lfdr_transformation",
-    default="probit",
-    show_default=True,
-    type=click.Choice(["probit", "logit"]),
-    help='Either a "probit" or "logit" transformation is applied to the p-values so that a local FDR estimate can be formed that does not involve edge effects of the [0,1] interval in which the p-values lie.',
-)
-@click.option(
-    "--lfdr_adj",
-    default=1.5,
-    show_default=True,
-    type=float,
-    help="Numeric value that is applied as a multiple of the smoothing bandwidth used in the density estimation.",
-)
-@click.option(
-    "--lfdr_eps",
-    default=np.power(10.0, -8),
-    show_default=True,
-    type=float,
-    help="Numeric value that is threshold for the tails of the empirical p-value distribution.",
-)
+@shared_statistics_options
 # Visualization
 @click.option(
     "--color_palette",
@@ -1207,7 +1039,7 @@ def gene(
 
 
 # Protein-level inference
-@cli.command()
+@levels_context.command()
 # File handling
 @click.option(
     "--in",
@@ -1231,79 +1063,7 @@ def gene(
     help="Context to estimate protein-level FDR control.",
 )
 # Statistics
-@click.option(
-    "--parametric/--no-parametric",
-    default=False,
-    show_default=True,
-    help="Do parametric estimation of p-values.",
-)
-@click.option(
-    "--pfdr/--no-pfdr",
-    default=False,
-    show_default=True,
-    help="Compute positive false discovery rate (pFDR) instead of FDR.",
-)
-@click.option(
-    "--pi0_lambda",
-    default=[0.1, 0.5, 0.05],
-    show_default=True,
-    type=(float, float, float),
-    help="Use non-parametric estimation of p-values. Either use <START END STEPS>, e.g. 0.1, 1.0, 0.1 or set to fixed value, e.g. 0.4, 0, 0.",
-    callback=transform_pi0_lambda,
-)
-@click.option(
-    "--pi0_method",
-    default="bootstrap",
-    show_default=True,
-    type=click.Choice(["smoother", "bootstrap"]),
-    help='Either "smoother" or "bootstrap"; the method for automatically choosing tuning parameter in the estimation of pi_0, the proportion of true null hypotheses.',
-)
-@click.option(
-    "--pi0_smooth_df",
-    default=3,
-    show_default=True,
-    type=int,
-    help="Number of degrees-of-freedom to use when estimating pi_0 with a smoother.",
-)
-@click.option(
-    "--pi0_smooth_log_pi0/--no-pi0_smooth_log_pi0",
-    default=False,
-    show_default=True,
-    help='If True and pi0_method = "smoother", pi0 will be estimated by applying a smoother to a scatterplot of log(pi0) estimates against the tuning parameter lambda.',
-)
-@click.option(
-    "--lfdr_truncate/--no-lfdr_truncate",
-    show_default=True,
-    default=True,
-    help="If True, local FDR values >1 are set to 1.",
-)
-@click.option(
-    "--lfdr_monotone/--no-lfdr_monotone",
-    show_default=True,
-    default=True,
-    help="If True, local FDR values are non-decreasing with increasing p-values.",
-)
-@click.option(
-    "--lfdr_transformation",
-    default="probit",
-    show_default=True,
-    type=click.Choice(["probit", "logit"]),
-    help='Either a "probit" or "logit" transformation is applied to the p-values so that a local FDR estimate can be formed that does not involve edge effects of the [0,1] interval in which the p-values lie.',
-)
-@click.option(
-    "--lfdr_adj",
-    default=1.5,
-    show_default=True,
-    type=float,
-    help="Numeric value that is applied as a multiple of the smoothing bandwidth used in the density estimation.",
-)
-@click.option(
-    "--lfdr_eps",
-    default=np.power(10.0, -8),
-    show_default=True,
-    type=float,
-    help="Numeric value that is threshold for the tails of the empirical p-value distribution.",
-)
+@shared_statistics_options
 # Visualization
 @click.option(
     "--color_palette",
