@@ -106,51 +106,6 @@ def infer_genes(
 
     if context in ["global", "experiment-wide", "run-specific"]:
         data = reader.read()
-            con.executescript(
-                """
-                CREATE INDEX IF NOT EXISTS idx_peptide_gene_mapping_gene_id ON PEPTIDE_GENE_MAPPING (GENE_ID);
-                CREATE INDEX IF NOT EXISTS idx_peptide_gene_mapping_peptide_id ON PEPTIDE_GENE_MAPPING (PEPTIDE_ID);
-                CREATE INDEX IF NOT EXISTS idx_peptide_peptide_id ON PEPTIDE (ID);
-                CREATE INDEX IF NOT EXISTS idx_precursor_peptide_mapping_peptide_id ON PRECURSOR_PEPTIDE_MAPPING (PEPTIDE_ID);
-                CREATE INDEX IF NOT EXISTS idx_precursor_peptide_mapping_precursor_id ON PRECURSOR_PEPTIDE_MAPPING (PRECURSOR_ID);
-                CREATE INDEX IF NOT EXISTS idx_precursor_precursor_id ON PRECURSOR (ID);
-                CREATE INDEX IF NOT EXISTS idx_feature_precursor_id ON FEATURE (PRECURSOR_ID);
-                CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
-                CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);
-            """
-            )
-
-            data = pd.read_sql_query(
-                """
-                SELECT %s AS RUN_ID,
-                       %s AS GROUP_ID,
-                       GENE.ID AS GENE_ID,
-                       PRECURSOR.DECOY AS DECOY,
-                       SCORE,
-                       "%s" AS CONTEXT
-                FROM GENE
-                INNER JOIN
-                  (SELECT PEPTIDE_GENE_MAPPING.PEPTIDE_ID AS PEPTIDE_ID,
-                          GENE_ID
-                   FROM
-                     (SELECT PEPTIDE_ID,
-                             COUNT(*) AS NUM_GENES
-                      FROM PEPTIDE_GENE_MAPPING
-                      GROUP BY PEPTIDE_ID) AS GENES_PER_PEPTIDE
-                   INNER JOIN PEPTIDE_GENE_MAPPING ON GENES_PER_PEPTIDE.PEPTIDE_ID = PEPTIDE_GENE_MAPPING.PEPTIDE_ID
-                   WHERE NUM_GENES == 1) AS PEPTIDE_GENE_MAPPING ON GENE.ID = PEPTIDE_GENE_MAPPING.GENE_ID
-                INNER JOIN PEPTIDE ON PEPTIDE_GENE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
-                INNER JOIN PRECURSOR_PEPTIDE_MAPPING ON PEPTIDE.ID = PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID
-                INNER JOIN PRECURSOR ON PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID = PRECURSOR.ID
-                INNER JOIN FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID
-                INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
-                GROUP BY GROUP_ID
-                HAVING MAX(SCORE)
-                ORDER BY SCORE DESC
-                """
-                % (run_id, group_id, context),
-                con,
-            )
     else:
         raise click.ClickException("Unspecified context selected.")
 
@@ -208,51 +163,6 @@ def infer_proteins(
 
     if context in ["global", "experiment-wide", "run-specific"]:
         data = reader.read()
-            con.executescript(
-                """
-                CREATE INDEX IF NOT EXISTS idx_peptide_protein_mapping_protein_id ON PEPTIDE_PROTEIN_MAPPING (PROTEIN_ID);
-                CREATE INDEX IF NOT EXISTS idx_peptide_protein_mapping_peptide_id ON PEPTIDE_PROTEIN_MAPPING (PEPTIDE_ID);
-                CREATE INDEX IF NOT EXISTS idx_peptide_peptide_id ON PEPTIDE (ID);
-                CREATE INDEX IF NOT EXISTS idx_precursor_peptide_mapping_peptide_id ON PRECURSOR_PEPTIDE_MAPPING (PEPTIDE_ID);
-                CREATE INDEX IF NOT EXISTS idx_precursor_peptide_mapping_precursor_id ON PRECURSOR_PEPTIDE_MAPPING (PRECURSOR_ID);
-                CREATE INDEX IF NOT EXISTS idx_precursor_precursor_id ON PRECURSOR (ID);
-                CREATE INDEX IF NOT EXISTS idx_feature_precursor_id ON FEATURE (PRECURSOR_ID);
-                CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
-                CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);
-            """
-            )
-
-            data = pd.read_sql_query(
-                """
-                SELECT %s AS RUN_ID,
-                       %s AS GROUP_ID,
-                       PROTEIN.ID AS PROTEIN_ID,
-                       PRECURSOR.DECOY AS DECOY,
-                       SCORE,
-                       "%s" AS CONTEXT
-                FROM PROTEIN
-                INNER JOIN
-                  (SELECT PEPTIDE_PROTEIN_MAPPING.PEPTIDE_ID AS PEPTIDE_ID,
-                          PROTEIN_ID
-                   FROM
-                     (SELECT PEPTIDE_ID,
-                             COUNT(*) AS NUM_PROTEINS
-                      FROM PEPTIDE_PROTEIN_MAPPING
-                      GROUP BY PEPTIDE_ID) AS PROTEINS_PER_PEPTIDE
-                   INNER JOIN PEPTIDE_PROTEIN_MAPPING ON PROTEINS_PER_PEPTIDE.PEPTIDE_ID = PEPTIDE_PROTEIN_MAPPING.PEPTIDE_ID
-                   WHERE NUM_PROTEINS == 1) AS PEPTIDE_PROTEIN_MAPPING ON PROTEIN.ID = PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID
-                INNER JOIN PEPTIDE ON PEPTIDE_PROTEIN_MAPPING.PEPTIDE_ID = PEPTIDE.ID
-                INNER JOIN PRECURSOR_PEPTIDE_MAPPING ON PEPTIDE.ID = PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID
-                INNER JOIN PRECURSOR ON PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID = PRECURSOR.ID
-                INNER JOIN FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID
-                INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
-                GROUP BY GROUP_ID
-                HAVING MAX(SCORE)
-                ORDER BY SCORE DESC
-                """
-                % (run_id, group_id, context),
-                con,
-            )
     else:
         raise click.ClickException("Unspecified context selected.")
 
