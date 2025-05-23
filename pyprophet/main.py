@@ -470,25 +470,25 @@ def score(
     if not apply_weights:
         if config.subsample_ratio < 1.0:
             logger.info(
-                f"Conducting semi-supervised learning on {config.subsample_ratio * 100}% of the data.",
+                f"Conducting {level} semi-supervised learning on {config.subsample_ratio * 100}% of the data.",
             )
             weights_path = PyProphetLearner(config).run()
             # Apply weights from subsampled result to full infile
 
             logger.info(
-                f"Info: Applying weights from {weights_path} to the full data set.",
+                f"Info: Applying {level} weights from {weights_path} to the full data set.",
             )
             config.subsample_ratio = 1.0
             config.context = "score_apply"
             PyProphetWeightApplier(weights_path, config).run()
         else:
             logger.info(
-                "Conducting semi-supervised learning.",
+                f"Conducting {level} semi-supervised learning.",
             )
             PyProphetLearner(config).run()
     else:
         logger.info(
-            f"Applying weights from {apply_weights} to the full data set.",
+            f"Applying {level} weights from {apply_weights} to the full data set.",
         )
         PyProphetWeightApplier(apply_weights, config).run()
 
@@ -919,23 +919,7 @@ def peptide(
         None,
     )
 
-    infer_peptides(
-        infile,
-        outfile,
-        context,
-        parametric,
-        pfdr,
-        pi0_lambda,
-        pi0_method,
-        pi0_smooth_df,
-        pi0_smooth_log_pi0,
-        lfdr_truncate,
-        lfdr_monotone,
-        lfdr_transformation,
-        lfdr_adj,
-        lfdr_eps,
-        color_palette,
-    )
+    infer_peptides(config)
 
 
 # GlycoPeptide-level inference
@@ -1038,21 +1022,30 @@ def glycopeptide(
     if outfile is None:
         outfile = infile
 
-    infer_glycopeptides(
+    config = LevelContextIOConfig.from_cli_args(
         infile,
         outfile,
-        context=context,
-        density_estimator=density_estimator,
-        grid_size=grid_size,
-        parametric=parametric,
-        pfdr=pfdr,
-        pi0_lambda=pi0_lambda,
-        pi0_method=pi0_method,
-        pi0_smooth_df=pi0_smooth_df,
-        pi0_smooth_log_pi0=pi0_smooth_log_pi0,
-        lfdr_truncate=lfdr_truncate,
-        lfdr_monotone=lfdr_monotone,
+        1,  # Subsample ratio is not applicable for glycopeptide-level inference
+        "glycopeptide",
+        "levels_context",
+        context,
+        parametric,
+        pfdr,
+        pi0_lambda,
+        pi0_method,
+        pi0_smooth_df,
+        pi0_smooth_log_pi0,
+        lfdr_truncate,
+        lfdr_monotone,
+        "probit",
+        1.5,
+        1e-8,
+        "normal",
+        density_estimator,
+        grid_size,
     )
+
+    infer_glycopeptides(config)
 
 
 # Gene-level inference
@@ -1187,9 +1180,12 @@ def gene(
     else:
         outfile = outfile
 
-    infer_genes(
+    config = LevelContextIOConfig.from_cli_args(
         infile,
         outfile,
+        1,  # Subsample ratio is not applicable for gene-level inference
+        "gene",
+        "levels_context",
         context,
         parametric,
         pfdr,
@@ -1203,7 +1199,11 @@ def gene(
         lfdr_adj,
         lfdr_eps,
         color_palette,
+        None,
+        None,
     )
+
+    infer_genes(config)
 
 
 # Protein-level inference
@@ -1338,9 +1338,12 @@ def protein(
     else:
         outfile = outfile
 
-    infer_proteins(
+    config = LevelContextIOConfig.from_cli_args(
         infile,
         outfile,
+        1,  # Subsample ratio is not applicable for gene-level inference
+        "protein",
+        "levels_context",
         context,
         parametric,
         pfdr,
@@ -1354,7 +1357,11 @@ def protein(
         lfdr_adj,
         lfdr_eps,
         color_palette,
+        None,
+        None,
     )
+
+    infer_proteins(config)
 
 
 # Subsample OpenSWATH file to minimum for integrated scoring
