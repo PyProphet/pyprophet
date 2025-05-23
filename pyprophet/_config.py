@@ -333,6 +333,9 @@ class RunnerIOConfig(BaseIOConfig):
         yield "trained_model_path_transition", os.path.join(
             self.prefix + "_transition_model.bin"
         )
+        yield "trained_model_path_alignment", os.path.join(
+            self.prefix + "_alignment_model.bin"
+        )
         yield "report_path", os.path.join(self.prefix + "_report.pdf")
 
 
@@ -397,7 +400,9 @@ class IPFIOConfig(BaseIOConfig):
 class LevelContextIOConfig(BaseIOConfig):
     # level: Literal["peptide", "glycopeptide", "protein", "gene"] = "peptide"
     context_fdr: Literal["global", "experiment-wide", "run-specific"] = "global"
-    error_estimation_config: ErrorEstimationConfig
+    error_estimation_config: ErrorEstimationConfig = field(
+        default_factory=ErrorEstimationConfig
+    )
     color_palette: Literal["normal", "protan", "deutran", "tritan"] = "normal"
 
     # Glycopeptide-specific options
