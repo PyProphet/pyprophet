@@ -203,7 +203,7 @@ class BaseWriter(ABC):
         df = df[score_cols].rename(columns=str.upper)
         df = df.rename(columns={"D_SCORE": "SCORE"})
 
-        if level not in ("ms2", "ms1ms2") and self.config.file_type == "osw":
+        if self.config.file_type == "osw" or self.level not in ("ms1ms2", "ms2"):
             df = df.rename(columns={"PEAK_GROUP_RANK": "RANK"})
 
         if level == "transition":
