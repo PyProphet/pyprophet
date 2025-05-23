@@ -73,12 +73,12 @@ class ParquetReader(BaseReader):
                 "Apply scoring to MS2-level data before running peptide-level scoring."
             )
 
-        if cfg.context == "global":
+        if cfg.context_fdr == "global":
             run_id = "NULL"
             group_id = "PEPTIDE_ID"
         else:
             run_id = "RUN_ID"
-            group_id = 'RUN_ID || "_" || PEPTIDE_ID'
+            group_id = "RUN_ID || '_' || PEPTIDE_ID"
 
         logger.info("Reading peptide-level data ...")
         query = f"""
@@ -105,12 +105,12 @@ class ParquetReader(BaseReader):
                 "Apply scoring to MS2-level data before running protein-level scoring."
             )
 
-        if cfg.context == "global":
+        if cfg.context_fdr == "global":
             run_id = "NULL"
             group_id = "PROTEIN_ID"
         else:
             run_id = "RUN_ID"
-            group_id = 'RUN_ID || "_" || PROTEIN_ID'
+            group_id = "RUN_ID || '_' || PROTEIN_ID"
 
         logger.info("Reading protein-level data ...")
         query = f"""
@@ -145,12 +145,12 @@ class ParquetReader(BaseReader):
                 "Apply scoring to MS2-level data before running gene-level scoring."
             )
 
-        if cfg.context == "global":
+        if cfg.context_fdr == "global":
             run_id = "NULL"
             group_id = "GENE_ID"
         else:
             run_id = "RUN_ID"
-            group_id = 'RUN_ID || "_" || GENE_ID'
+            group_id = "RUN_ID || '_' || GENE_ID"
 
         logger.info("Reading gene-level data ...")
         query = f"""
@@ -223,6 +223,8 @@ class ParquetWriter(BaseWriter):
                 "pep",
             ]
         ]
+        # drop context column
+        result = result.drop(columns=["context"])
 
         result.columns = [col.upper() for col in result.columns]
 
@@ -234,11 +236,17 @@ class ParquetWriter(BaseWriter):
             )
         )
 
-        score_cols = [col for col in result.columns if col.startswith(col_prefix)]
+        score_cols = [
+            col
+            for col in result.columns
+            if col.startswith(col_prefix) and col != "RUN_ID"
+        ]
 
         existing_cols = get_parquet_column_names(file_path)
-        score_cols = [col for col in existing_cols if col.startswith(col_prefix)]
-        if score_cols:
+        exitsting_score_cols = [
+            col for col in existing_cols if col.startswith(col_prefix)
+        ]
+        if exitsting_score_cols:
             logger.warning(
                 f"Warn: There are existing {col_prefix}_ columns, these will be dropped."
             )
@@ -249,17 +257,30 @@ class ParquetWriter(BaseWriter):
         con = duckdb.connect()
         con.register("scores", pa.Table.from_pandas(result))
 
-        con.execute(
-            f"""
-            COPY (
-                SELECT {select_old}, {new_score_sql}
-                FROM read_parquet('{file_path}') p
-                LEFT JOIN scores s
-                ON p.RUN_ID = s.RUN_ID
-            ) TO '{file_path}'
-            (FORMAT 'parquet', COMPRESSION 'ZSTD', COMPRESSION_LEVEL 11)
-            """
-        )
+        if context == "global":
+            con.execute(
+                f"""
+                COPY (
+                    SELECT {select_old}, {new_score_sql}
+                    FROM read_parquet('{file_path}') p
+                    LEFT JOIN scores s
+                    ON p.{context_level_id.upper()} = s.{context_level_id.upper()}
+                ) TO '{file_path}'
+                (FORMAT 'parquet', COMPRESSION 'ZSTD', COMPRESSION_LEVEL 11)
+                """
+            )
+        else:
+            con.execute(
+                f"""
+                COPY (
+                    SELECT {select_old}, {new_score_sql}
+                    FROM read_parquet('{file_path}') p
+                    LEFT JOIN scores s
+                    ON p.RUN_ID = s.RUN_ID AND p.{context_level_id.upper()} = s.{context_level_id.upper()}
+                ) TO '{file_path}'
+                (FORMAT 'parquet', COMPRESSION 'ZSTD', COMPRESSION_LEVEL 11)
+                """
+            )
         con.close()
 
         logger.success(f"Updated: {file_path}")

@@ -169,12 +169,12 @@ class SplitParquetReader(BaseReader):
                 "Apply scoring to MS2-level data before running peptide-level scoring."
             )
 
-        if cfg.context == "global":
+        if cfg.context_fdr == "global":
             run_id = "NULL"
             group_id = "PEPTIDE_ID"
         else:
             run_id = "RUN_ID"
-            group_id = 'RUN_ID || "_" || PEPTIDE_ID'
+            group_id = "RUN_ID || '_' || PEPTIDE_ID"
 
         logger.info("Reading peptide-level data ...")
         query = f"""
@@ -184,9 +184,9 @@ class SplitParquetReader(BaseReader):
                 PEPTIDE_ID AS PEPTIDE_ID,
                 PRECURSOR_DECOY AS DECOY,
                 SCORE_MS2_SCORE AS SCORE,
-                {cfg.context_fdr} AS CONTEXT
+                '{cfg.context_fdr}' AS CONTEXT
             FROM precursors p
-            QUALIFY ROW_NUMBER() OVER (PARTITION BY {group_id} ORDER BY SCORE_MS2 DESC) = 1
+            QUALIFY ROW_NUMBER() OVER (PARTITION BY {group_id} ORDER BY SCORE_MS2_SCORE DESC) = 1
         """
 
         df = con.execute(query).df()
@@ -207,12 +207,12 @@ class SplitParquetReader(BaseReader):
                 "Apply scoring to MS2-level data before running protein-level scoring."
             )
 
-        if cfg.context == "global":
+        if cfg.context_fdr == "global":
             run_id = "NULL"
             group_id = "PROTEIN_ID"
         else:
             run_id = "RUN_ID"
-            group_id = 'RUN_ID || "_" || PROTEIN_ID'
+            group_id = "RUN_ID || '_' || PROTEIN_ID"
 
         logger.info("Reading protein-level data ...")
         query = f"""
@@ -252,12 +252,12 @@ class SplitParquetReader(BaseReader):
                 "Apply scoring to MS2-level data before running gene-level scoring."
             )
 
-        if cfg.context == "global":
+        if cfg.context_fdr == "global":
             run_id = "NULL"
             group_id = "GENE_ID"
         else:
             run_id = "RUN_ID"
-            group_id = 'RUN_ID || "_" || GENE_ID'
+            group_id = "RUN_ID || '_' || GENE_ID"
 
         logger.info("Reading gene-level data ...")
         query = f"""
@@ -336,6 +336,8 @@ class SplitParquetWriter(BaseWriter):
                 "pep",
             ]
         ]
+        # drop context column
+        result = result.drop(columns=["context"])
 
         result.columns = [col.upper() for col in result.columns]
 
@@ -347,7 +349,11 @@ class SplitParquetWriter(BaseWriter):
             )
         )
 
-        score_cols = [col for col in result.columns if col.startswith(col_prefix)]
+        score_cols = [
+            col
+            for col in result.columns
+            if col.startswith(col_prefix) and col != "RUN_ID"
+        ]
 
         # Determine output files to modify
         if self.file_type == "parquet_split_multi":
@@ -366,28 +372,12 @@ class SplitParquetWriter(BaseWriter):
                 logger.warning(f"File not found, skipping: {file_path}")
                 continue
 
-            # Read FEATURE_IDs from current file
-            try:
-                con = duckdb.connect()
-                run_ids = con.execute(
-                    f"SELECT DISTINCT RUN_ID FROM read_parquet('{file_path}')"
-                ).fetchall()
-                con.close()
-            except Exception as e:
-                logger.error(f"Error reading RUN_IDs from {file_path}: {e}")
-                continue
-
-            run_ids = set(f[0] for f in run_ids)
-            subset = result[result["RUN_ID"].isin(run_ids)]
-
-            if subset.empty:
-                logger.warning(f"No matching RUN_IDs found for {run_dir}, skipping.")
-                continue
-
             # Identify columns to keep from original parquet file
             existing_cols = get_parquet_column_names(file_path)
-            score_cols = [col for col in existing_cols if col.startswith(col_prefix)]
-            if score_cols:
+            exitsting_score_cols = [
+                col for col in existing_cols if col.startswith(col_prefix)
+            ]
+            if exitsting_score_cols:
                 logger.warning(
                     f"Warn: There are existing {col_prefix}_ columns, these will be dropped."
                 )
@@ -398,19 +388,52 @@ class SplitParquetWriter(BaseWriter):
             new_score_sql = ", ".join([f"s.{col}" for col in score_cols])
 
             con = duckdb.connect()
-            con.register("scores", pa.Table.from_pandas(subset))
+            con.register("scores", pa.Table.from_pandas(result))
 
-            con.execute(
-                f"""
-                COPY (
-                    SELECT {select_old}, {new_score_sql}
-                    FROM read_parquet('{file_path}') p
-                    LEFT JOIN scores s
-                    ON p.RUN_ID = s.RUN_ID
-                ) TO '{file_path}'
-                (FORMAT 'parquet', COMPRESSION 'ZSTD', COMPRESSION_LEVEL 11)
-                """
-            )
+            if context == "global":
+                con.execute(
+                    f"""
+                    COPY (
+                        SELECT {select_old}, {new_score_sql}
+                        FROM read_parquet('{file_path}') p
+                        LEFT JOIN scores s
+                        ON p.{context_level_id.upper()} = s.{context_level_id.upper()}
+                    ) TO '{file_path}'
+                    (FORMAT 'parquet', COMPRESSION 'ZSTD', COMPRESSION_LEVEL 11)
+                    """
+                )
+            else:
+                # Read RUN_IDs from current file
+                try:
+                    con_tmp = duckdb.connect()
+                    run_ids = con.execute(
+                        f"SELECT DISTINCT RUN_ID FROM read_parquet('{file_path}')"
+                    ).fetchall()
+                    con_tmp.close()
+                except Exception as e:
+                    logger.error(f"Error reading RUN_IDs from {file_path}: {e}")
+                    continue
+
+                run_ids = set(f[0] for f in run_ids)
+                subset = result[result["RUN_ID"].isin(run_ids)]
+
+                if subset.empty:
+                    logger.warning(
+                        f"No matching RUN_IDs found for {run_dir}, skipping."
+                    )
+                    continue
+
+                con.execute(
+                    f"""
+                    COPY (
+                        SELECT {select_old}, {new_score_sql}
+                        FROM read_parquet('{file_path}') p
+                        LEFT JOIN scores s
+                        ON p.RUN_ID = s.RUN_ID AND p.{context_level_id.upper()} = s.{context_level_id.upper()}
+                    ) TO '{file_path}'
+                    (FORMAT 'parquet', COMPRESSION 'ZSTD', COMPRESSION_LEVEL 11)
+                    """
+                )
             con.close()
 
-        logger.success(f"Updated: {file_path}")
+            logger.success(f"Updated: {file_path}")
