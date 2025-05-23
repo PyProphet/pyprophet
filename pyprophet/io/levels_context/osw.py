@@ -8,7 +8,8 @@ import pandas as pd
 import click
 from loguru import logger
 from ..util import setup_logger, check_sqlite_table, check_duckdb_table
-from .._base import BaseReader, BaseWriter, BaseIOConfig
+from .._base import BaseReader, BaseWriter
+from ..._config import LevelContextIOConfig
 
 setup_logger()
 
@@ -31,7 +32,7 @@ class OSWReader(BaseReader):
         read(): Read data from the input file based on the alogorithm.
     """
 
-    def __init__(self, config: BaseIOConfig):
+    def __init__(self, config: LevelContextIOConfig):
         super().__init__(config)
 
     def read(self) -> pd.DataFrame:
@@ -161,7 +162,7 @@ class OSWReader(BaseReader):
                 f"Apply scoring to MS2-level data before running peptide-level scoring.\nTable Info:\n{self._fetch_tables_duckdb(con)}"
             )
         cfg = self.config  # LevelContextIOConfig instance
-        if cfg.context == "global":
+        if cfg.context_fdr == "global":
             run_id = "NULL"
             group_id = "PEPTIDE.ID"
         else:
@@ -176,6 +177,7 @@ class OSWReader(BaseReader):
                     {group_id} AS GROUP_ID,
                     PEPTIDE.ID AS PEPTIDE_ID,
                     PRECURSOR.DECOY,
+                    SCORE_MS2.SCORE AS SCORE,
                     {cfg.context_fdr} AS CONTEXT
                 FROM osw.PEPTIDE
                 INNER JOIN osw.PRECURSOR_PEPTIDE_MAPPING ON PEPTIDE.ID = PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID
@@ -200,7 +202,7 @@ class OSWReader(BaseReader):
                 f"Apply scoring to MS2-level data before running glycopeptide-level scoring.\nTable Info:\n{self._fetch_tables_duckdb(con)}"
             )
         cfg = self.config
-        if cfg.context == "global":
+        if cfg.context_fdr == "global":
             run_id = "NULL"
             group_id = "GLYCOPEPTIDE.ID"
         else:
@@ -242,7 +244,7 @@ class OSWReader(BaseReader):
             )
         cfg = self.config
 
-        if cfg.context == "global":
+        if cfg.context_fdr == "global":
             run_id = "NULL"
             group_id = "PROTEIN.ID"
         else:
@@ -289,7 +291,7 @@ class OSWReader(BaseReader):
             )
         cfg = self.config
 
-        if cfg.context == "global":
+        if cfg.context_fdr == "global":
             run_id = "NULL"
             group_id = "GENE.ID"
         else:
@@ -340,7 +342,7 @@ class OSWReader(BaseReader):
             )
 
         cfg = self.config  # LevelContextIOConfig instance
-        if cfg.context == "global":
+        if cfg.context_fdr == "global":
             run_id = "NULL"
             group_id = "PEPTIDE.ID"
         else:
@@ -355,6 +357,7 @@ class OSWReader(BaseReader):
                     {group_id} AS GROUP_ID,
                     PEPTIDE.ID AS PEPTIDE_ID,
                     PRECURSOR.DECOY,
+                    SCORE_MS2.SCORE AS SCORE,
                     {cfg.context_fdr} AS CONTEXT
                 FROM PEPTIDE
                 INNER JOIN PRECURSOR_PEPTIDE_MAPPING ON PEPTIDE.ID = PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID
@@ -379,7 +382,7 @@ class OSWReader(BaseReader):
                 "Apply scoring to MS2-level data before running glycopeptide-level scoring."
             )
         cfg = self.config
-        if cfg.context == "global":
+        if cfg.context_fdr == "global":
             run_id = "NULL"
             group_id = "GLYCOPEPTIDE.ID"
         else:
@@ -420,7 +423,7 @@ class OSWReader(BaseReader):
                 "Apply scoring to MS2-level data before running protein-level scoring."
             )
         cfg = self.config
-        if cfg.context == "global":
+        if cfg.context_fdr == "global":
             run_id = "NULL"
             group_id = "PROTEIN.ID"
         else:
@@ -463,7 +466,7 @@ class OSWReader(BaseReader):
                 "Apply scoring to MS2-level data before running gene-level scoring."
             )
         cfg = self.config
-        if cfg.context == "global":
+        if cfg.context_fdr == "global":
             run_id = "NULL"
             group_id = "GENE.ID"
         else:
@@ -517,7 +520,7 @@ class OSWWriter(BaseWriter):
         save_weights(weights): Save the weights to the output file.
     """
 
-    def __init__(self, config: BaseIOConfig):
+    def __init__(self, config: LevelContextIOConfig):
         super().__init__(config)
 
         self.context_level_id_map = {
@@ -530,7 +533,7 @@ class OSWWriter(BaseWriter):
         """
         Save the results to the output file based on the module using this class.
         """
-        context = self.config.context
+        context = self.config.context_fdr
         if self.infile != self.outfile:
             copyfile(self.infile, self.outfile)
 

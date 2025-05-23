@@ -8,7 +8,8 @@ import pandas as pd
 import click
 from loguru import logger
 from ..util import setup_logger, check_sqlite_table, check_duckdb_table
-from .._base import BaseReader, BaseWriter, BaseIOConfig
+from .._base import BaseReader, BaseWriter
+from ..._config import IPFIOConfig
 
 setup_logger()
 
@@ -31,7 +32,7 @@ class OSWReader(BaseReader):
         read(): Read data from the input file based on the alogorithm.
     """
 
-    def __init__(self, config: BaseIOConfig):
+    def __init__(self, config: IPFIOConfig):
         super().__init__(config)
 
     def read(
@@ -554,7 +555,7 @@ class OSWWriter(BaseWriter):
         save_weights(weights): Save the weights to the output file.
     """
 
-    def __init__(self, config: BaseIOConfig):
+    def __init__(self, config: IPFIOConfig):
         super().__init__(config)
 
     def save_results(self, result):

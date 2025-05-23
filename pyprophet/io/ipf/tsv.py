@@ -2,8 +2,8 @@ from typing import Literal
 import pandas as pd
 import click
 
-from .._base import BaseReader, BaseWriter, BaseIOConfig
-from ...report import save_report
+from .._base import BaseReader, BaseWriter
+from ..._config import IPFIOConfig
 
 
 class TSVReader(BaseReader):
@@ -24,7 +24,7 @@ class TSVReader(BaseReader):
         read(): Read data from the input file based on the alogorithm.
     """
 
-    def __init__(self, config: BaseIOConfig):
+    def __init__(self, config: IPFIOConfig):
         super().__init__(config)
 
     def read(
@@ -49,7 +49,7 @@ class TSVWriter(BaseWriter):
         save_weights(weights): Save the weights to the output file.
     """
 
-    def __init__(self, config: BaseIOConfig):
+    def __init__(self, config: IPFIOConfig):
         super().__init__(config)
 
     def save_results(self, result):

@@ -16,13 +16,7 @@ from .report import save_report
 from shutil import copyfile
 from ._config import LevelContextIOConfig
 from .io.dispatcher import ReaderDispatcher, WriterDispatcher
-from .io.levels_context.osw import OSWReader, OSWWriter
-from .io.util import (
-    is_sqlite_file,
-    check_sqlite_table,
-    is_parquet_file,
-    get_parquet_column_names,
-)
+from .io.util import check_sqlite_table
 from .glyco.stats import statistics_report as glyco_statistics_report
 
 

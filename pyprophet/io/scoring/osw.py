@@ -7,6 +7,7 @@ import pandas as pd
 import click
 from ..util import check_sqlite_table, check_duckdb_table
 from .._base import BaseReader, BaseWriter, BaseIOConfig
+from ..._config import RunnerIOConfig
 
 
 class OSWReader(BaseReader):
@@ -27,7 +28,7 @@ class OSWReader(BaseReader):
         read(): Read data from the input file based on the alogorithm.
     """
 
-    def __init__(self, config: BaseIOConfig):
+    def __init__(self, config: RunnerIOConfig):
         super().__init__(config)
 
     def read(self) -> pd.DataFrame:
@@ -524,7 +525,7 @@ class OSWWriter(BaseWriter):
         save_weights(weights): Save the weights to the output file.
     """
 
-    def __init__(self, config: BaseIOConfig):
+    def __init__(self, config: RunnerIOConfig):
         super().__init__(config)
 
     def save_results(self, result, pi0):

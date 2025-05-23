@@ -3,8 +3,9 @@ import pandas as pd
 import pyarrow as pa
 import duckdb
 import click
-from .._base import BaseReader, BaseWriter, BaseIOConfig
 from ..util import get_parquet_column_names
+from .._base import BaseReader, BaseWriter
+from ..._config import RunnerIOConfig
 
 
 class ParquetReader(BaseReader):
@@ -27,7 +28,7 @@ class ParquetReader(BaseReader):
         read(): Read data from the input file based on the alogorithm.
     """
 
-    def __init__(self, config: BaseIOConfig):
+    def __init__(self, config: RunnerIOConfig):
         super().__init__(config)
 
     def read(self) -> pd.DataFrame:
@@ -177,7 +178,7 @@ class ParquetWriter(BaseWriter):
         save_weights(weights): Save the weights to the output file.
     """
 
-    def __init__(self, config: BaseIOConfig):
+    def __init__(self, config: RunnerIOConfig):
         super().__init__(config)
 
     def save_results(self, result, pi0):

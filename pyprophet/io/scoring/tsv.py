@@ -1,7 +1,8 @@
 import pandas as pd
 import click
 
-from .._base import BaseReader, BaseWriter, BaseIOConfig
+from .._base import BaseReader, BaseWriter
+from ..._config import RunnerIOConfig
 from ...report import save_report
 
 
@@ -23,7 +24,7 @@ class TSVReader(BaseReader):
         read(): Read data from the input file based on the alogorithm.
     """
 
-    def __init__(self, config: BaseIOConfig):
+    def __init__(self, config: RunnerIOConfig):
         super().__init__(config)
 
     def read(self) -> pd.DataFrame:
@@ -48,7 +49,7 @@ class TSVWriter(BaseWriter):
         save_weights(weights): Save the weights to the output file.
     """
 
-    def __init__(self, config: BaseIOConfig):
+    def __init__(self, config: RunnerIOConfig):
         super().__init__(config)
 
     def save_results(self, result, pi0):

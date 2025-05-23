@@ -6,8 +6,9 @@ import pyarrow as pa
 import duckdb
 import click
 from loguru import logger
-from .._base import BaseReader, BaseWriter, BaseIOConfig
 from ..util import setup_logger, get_parquet_column_names
+from .._base import BaseReader, BaseWriter
+from ..._config import IPFIOConfig
 
 setup_logger()
 
@@ -32,7 +33,7 @@ class ParquetReader(BaseReader):
         read(): Read data from the input file based on the alogorithm.
     """
 
-    def __init__(self, config: BaseIOConfig):
+    def __init__(self, config: IPFIOConfig):
         super().__init__(config)
 
         if config.propagate_signal_across_runs:
@@ -283,7 +284,7 @@ class ParquetWriter(BaseWriter):
         save_weights(weights): Save the weights to the output file.
     """
 
-    def __init__(self, config: BaseIOConfig):
+    def __init__(self, config: IPFIOConfig):
         super().__init__(config)
 
     def save_results(self, result):
@@ -292,7 +293,7 @@ class ParquetWriter(BaseWriter):
 
         target_file = self.outfile
 
-        # Rename score columnes wiht SCORE_IPF_
+        # Rename score columnes with SCORE_IPF_
         result = result.rename(
             columns={
                 "PRECURSOR_PEAKGROUP_PEP": "SCORE_IPF_PRECURSOR_PEAKGROUP_PEP",

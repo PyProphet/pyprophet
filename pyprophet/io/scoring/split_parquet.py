@@ -7,8 +7,10 @@ import duckdb
 import click
 from loguru import logger
 
-from .._base import BaseReader, BaseWriter, BaseIOConfig
 from ..util import setup_logger, print_parquet_tree, get_parquet_column_names
+from .._base import BaseReader, BaseWriter
+from ..._config import RunnerIOConfig
+
 
 setup_logger()
 
@@ -36,7 +38,7 @@ class SplitParquetReader(BaseReader):
         read(): Read data from the input file based on the alogorithm.
     """
 
-    def __init__(self, config: BaseIOConfig):
+    def __init__(self, config: RunnerIOConfig):
         super().__init__(config)
         self.config = config
 
@@ -332,7 +334,7 @@ class SplitParquetWriter(BaseWriter):
         save_weights(weights): Save the weights to the output file.
     """
 
-    def __init__(self, config: BaseIOConfig):
+    def __init__(self, config: RunnerIOConfig):
         super().__init__(config)
 
         if self.file_type not in ("parquet_split", "parquet_split_multi"):
