@@ -6,11 +6,9 @@ import pyarrow as pa
 import duckdb
 import click
 from loguru import logger
-from ..util import setup_logger, get_parquet_column_names
+from ..util import get_parquet_column_names
 from .._base import BaseReader, BaseWriter
 from ..._config import LevelContextIOConfig
-
-setup_logger()
 
 
 class ParquetReader(BaseReader):

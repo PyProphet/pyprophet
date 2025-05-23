@@ -8,12 +8,9 @@ import duckdb
 import click
 from loguru import logger
 
-from ..util import setup_logger, print_parquet_tree, get_parquet_column_names
+from ..util import print_parquet_tree, get_parquet_column_names
 from .._base import BaseReader, BaseWriter
 from ..._config import IPFIOConfig
-
-
-setup_logger()
 
 
 class SplitParquetReader(BaseReader):

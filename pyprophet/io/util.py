@@ -10,15 +10,12 @@ from pyarrow.lib import ArrowInvalid, ArrowIOError
 _LOGGER_INITIALIZED = False  # Module-level flag
 
 
-def setup_logger():
+def setup_logger(log_level):
     global _LOGGER_INITIALIZED
     if _LOGGER_INITIALIZED:
         return
 
-    log_level = os.environ.get("PYPROPHET_LOG_LEVEL", "INFO").upper()
-
     logger.remove()  # Remove default logger
-
     logger.add(
         sys.stdout,
         colorize=True,
@@ -166,7 +163,6 @@ def get_parquet_column_names(file_path):
 
 
 def print_parquet_tree(root_dir, precursors, transitions, alignment=None, max_runs=10):
-    setup_logger()
 
     def group_by_run(files):
         grouped = defaultdict(list)

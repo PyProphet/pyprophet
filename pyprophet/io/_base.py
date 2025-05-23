@@ -4,11 +4,9 @@ import pickle
 import pandas as pd
 import click
 from loguru import logger
-from .util import setup_logger
+
 from .._base import BaseIOConfig
 from ..report import save_report
-
-setup_logger()
 
 
 class BaseReader(ABC):

@@ -11,12 +11,9 @@ from loguru import logger
 from .._base import BaseReader, BaseWriter
 from ..._config import LevelContextIOConfig
 from ..util import (
-    setup_logger,
     print_parquet_tree,
     get_parquet_column_names,
 )
-
-setup_logger()
 
 
 class SplitParquetReader(BaseReader):
@@ -279,6 +276,7 @@ class SplitParquetReader(BaseReader):
             JOIN one_gene_peptides ogp ON p.PEPTIDE_ID = ogp.PEPTIDE_ID
             QUALIFY ROW_NUMBER() OVER (PARTITION BY {group_id} ORDER BY SCORE_MS2_SCORE DESC) = 1
         """
+
         df = con.execute(query).df()
         df.columns = [col.lower() for col in df.columns]
         return df

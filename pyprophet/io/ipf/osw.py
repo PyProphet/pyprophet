@@ -7,11 +7,9 @@ import duckdb
 import pandas as pd
 import click
 from loguru import logger
-from ..util import setup_logger, check_sqlite_table, check_duckdb_table
+from ..util import check_sqlite_table, check_duckdb_table
 from .._base import BaseReader, BaseWriter
 from ..._config import IPFIOConfig
-
-setup_logger()
 
 
 class OSWReader(BaseReader):

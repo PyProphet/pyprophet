@@ -8,6 +8,7 @@ import scipy.stats
 import scipy.special
 import multiprocessing
 import click
+from loguru import logger
 import os
 
 from .optimized import (
@@ -250,13 +251,25 @@ def pi0est(
                 "pi0_method must be one of 'smoother' or 'bootstrap'."
             )
     if pi0 <= 0:
-        plot_hist(
-            p,
-            f"p-value density histogram used during pi0 estimation",
-            "p-value",
-            "density histogram",
-            "pi0_estimation_error_pvalue_histogram_plot.pdf",
-        )
+        # # Try from uniprot import histogram, then default to plot_hist
+        # try:
+        #     from uniplot import histogram
+
+        #     histogram(
+        #         p,
+        #         bins=10,
+        #         bins_min=0,
+        #         bins_max=1,
+        #         title="ditribution of p-values used during pi0 estimation",
+        #     )
+        # except ImportError:
+        #     plot_hist(
+        #         p,
+        #         f"p-value density histogram used during pi0 estimation",
+        #         "p-value",
+        #         "density histogram",
+        #         "pi0_estimation_error_pvalue_histogram_plot.pdf",
+        #     )
         raise click.ClickException(
             f"The estimated pi0 <= 0. Check that you have valid p-values or use a different range of lambda. Current lambda range: {lambda_}"
         )

@@ -11,7 +11,7 @@ import numpy as np
 import click
 from loguru import logger
 
-from .io.util import setup_logger
+
 from ._config import RunnerIOConfig, ErrorEstimationConfig
 from .stats import (
     lookup_values_from_error_table,
@@ -32,9 +32,6 @@ except NameError:
 
     def profile(fun):
         return fun
-
-
-setup_logger()
 
 
 @contextmanager

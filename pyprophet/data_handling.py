@@ -7,9 +7,8 @@ import sys
 import os
 import multiprocessing
 
-from .io.util import setup_logger
-from .stats import mean_and_std_dev
 
+from .stats import mean_and_std_dev
 from .optimized import find_top_ranked, rank
 
 try:
@@ -18,9 +17,6 @@ except NameError:
 
     def profile(fun):
         return fun
-
-
-setup_logger()
 
 
 def format_bytes(size):

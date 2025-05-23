@@ -4,10 +4,7 @@ from scipy.stats import rankdata
 from loguru import logger
 
 from ._config import IPFIOConfig
-from .io.util import setup_logger
 from .io.dispatcher import ReaderDispatcher, WriterDispatcher
-
-setup_logger()
 
 
 def compute_model_fdr(data_in):

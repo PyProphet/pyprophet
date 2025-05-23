@@ -1,6 +1,6 @@
 from loguru import logger
 
-from .util import setup_logger
+
 from .scoring.osw import OSWReader as ScoringOSWReader
 from .scoring.osw import OSWWriter as ScoringOSWWriter
 from .scoring.parquet import ParquetReader as ParquetScoringReader
@@ -27,8 +27,6 @@ from .levels_context.split_parquet import (
 )
 
 from .._config import RunnerIOConfig, IPFIOConfig, LevelContextIOConfig
-
-setup_logger()
 
 
 class ReaderDispatcher:

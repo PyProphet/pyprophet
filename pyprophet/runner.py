@@ -28,9 +28,6 @@ except NameError:
         return fun
 
 
-setup_logger()
-
-
 class PyProphetRunner(object):
 
     __metaclass__ = abc.ABCMeta
