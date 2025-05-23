@@ -699,7 +699,23 @@ def convert_osw_to_parquet(
                 click.echo("Writing global feature_alignment.parquet...")
                 align_path = os.path.join(outfile, "feature_alignment.parquet")
                 query = f"""
-                SELECT *
+                SELECT 
+                    ALIGNMENT_ID,
+                    RUN_ID,
+                    PRECURSOR_ID,
+                    ALIGNED_FEATURE_ID AS FEATURE_ID,
+                    REFERENCE_FEATURE_ID,
+                    ALIGNED_RT,
+                    REFERENCE_RT,
+                    XCORR_COELUTION_TO_REFERENCE AS VAR_XCORR_COELUTION_TO_REFERENCE,
+                    XCORR_SHAPE_TO_REFERENCE AS VAR_XCORR_SHAPE_TO_REFERENCE, 
+                    MI_TO_REFERENCE AS VAR_MI_TO_REFERENCE, 
+                    XCORR_COELUTION_TO_ALL AS VAR_XCORR_COELUTION_TO_ALL,  
+                    XCORR_SHAPE_TO_ALL AS VAR_XCORR_SHAPE, 
+                    MI_TO_ALL AS VAR_MI_TO_ALL, 
+                    RETENTION_TIME_DEVIATION AS VAR_RETENTION_TIME_DEVIATION, 
+                    PEAK_INTENSITY_RATIO AS VAR_PEAK_INTENSITY_RATIO,
+                    LABEL AS DECOY
                 FROM sqlite_scan('{infile}', 'FEATURE_MS2_ALIGNMENT')
                 """
                 conn.execute(
