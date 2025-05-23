@@ -1,18 +1,12 @@
-import gc
 import os
-import time
-import duckdb
+import re
 import sqlite3
-import numpy as np
+import duckdb
 import pandas as pd
 import polars as pl
-import pyarrow as pa
-import pyarrow.parquet as pq
-from pyprophet.export import check_sqlite_table
-from duckdb_extensions import extension_importer
-import re
-import click
-from pyprophet.data_handling import format_bytes
+from loguru import logger
+
+from .io.util import check_sqlite_table
 
 
 def load_sqlite_scanner(conn: duckdb.DuckDBPyConnection):
@@ -41,6 +35,11 @@ def load_sqlite_scanner(conn: duckdb.DuckDBPyConnection):
 def get_table_columns(sqlite_file: str, table: str) -> list:
     with sqlite3.connect(sqlite_file) as conn:
         return [row[1] for row in conn.execute(f"PRAGMA table_info({table})")]
+
+
+def get_table_columns_with_types(sqlite_file: str, table: str) -> list:
+    with sqlite3.connect(sqlite_file) as conn:
+        return [(row[1], row[2]) for row in conn.execute(f"PRAGMA table_info({table})")]
 
 
 def getPeptideProteinScoreTable(conndb, level):
@@ -449,36 +448,70 @@ def convert_osw_to_parquet(
             sql_conn, "FEATURE_MS2_ALIGNMENT"
         )
 
+    logger.info("Preparing columns for query selection...")
     has_library_drift_time = "LIBRARY_DRIFT_TIME" in precursor_columns
     has_annotation = "ANNOTATION" in transition_columns
     has_im = "EXP_IM" in feature_columns
 
-    # Prepare feature ms1 columns for sql query
-    feature_ms1_cols = get_table_columns(infile, "FEATURE_MS1")
-    feature_ms1_cols.remove("FEATURE_ID")
-    feature_ms1_cols = [f"{col} AS FEATURE_MS1_{col}" for col in feature_ms1_cols]
-    feature_ms1_cols_sql = ", ".join([f"FEATURE_MS1.{col}" for col in feature_ms1_cols])
+    # Prepare FEATURE_MS1 columns with data types for sql query
+    feature_ms1_cols = get_table_columns_with_types(infile, "FEATURE_MS1")
+    # Filter out the column with name "FEATURE_ID" from the list
+    feature_ms1_cols = [col for col in feature_ms1_cols if col[0] != "FEATURE_ID"]
 
-    # Prepare feature ms2 columns for sql query
-    feature_ms2_cols = get_table_columns(infile, "FEATURE_MS2")
-    feature_ms2_cols.remove("FEATURE_ID")
-    feature_ms2_cols = [f"{col} AS FEATURE_MS2_{col}" for col in feature_ms2_cols]
-    feature_ms2_cols_sql = ", ".join([f"FEATURE_MS2.{col}" for col in feature_ms2_cols])
+    # Now you can use feature_ms1_cols for column SQL creation
+    feature_ms1_cols_sql = ", ".join(
+        [f"FEATURE_MS1.{col[0]} AS FEATURE_MS1_{col[0]}" for col in feature_ms1_cols]
+    )
+    feature_ms1_cols_types = ", ".join(
+        [f"FEATURE_MS1_{col[0]} {col[1]}" for col in feature_ms1_cols]
+    )
 
-    # Prepare feature transition columns for sql query
-    feature_transition_cols = get_table_columns(infile, "FEATURE_TRANSITION")
-    feature_transition_cols.remove("FEATURE_ID")
-    feature_transition_cols.remove("TRANSITION_ID")
-    feature_transition_cols = ["FEATURE_ID"] + [
-        f"{col} AS FEATURE_TRANSITION_{col}" for col in feature_transition_cols
+    # Prepare null FEATURE_MS1 columns with types for sql query
+    as_null_feature_ms1_cols_sql = ", ".join(
+        [f"NULL AS FEATURE_MS1_{col[0]}" for col in feature_ms1_cols]
+    )
+
+    # Prepare FEATURE_MS2 columns with data types for sql query
+    feature_ms2_cols = get_table_columns_with_types(infile, "FEATURE_MS2")
+    feature_ms2_cols = [col for col in feature_ms2_cols if col[0] != "FEATURE_ID"]
+    feature_ms2_cols_sql = ", ".join(
+        [f"FEATURE_MS2.{col[0]} AS FEATURE_MS2_{col[0]}" for col in feature_ms2_cols]
+    )
+    feature_ms2_cols_types = ", ".join(
+        [f"FEATURE_MS2_{col[0]} {col[1]}" for col in feature_ms2_cols]
+    )
+
+    # Prepare null FEATURE_MS2 columns with types for sql query
+    as_null_feature_ms2_cols_sql = ", ".join(
+        [f"NULL AS FEATURE_MS2_{col[0]}" for col in feature_ms2_cols]
+    )
+
+    # Prepare FEATURE_TRANSITION columns with data types for sql query
+    feature_transition_cols = get_table_columns_with_types(infile, "FEATURE_TRANSITION")
+    feature_transition_cols = [
+        col
+        for col in feature_transition_cols
+        if col[0] != "FEATURE_ID" and col[0] != "TRANSITION_ID"
     ]
     feature_transition_cols_sql = ", ".join(
-        [f"FEATURE_TRANSITION.{col}" for col in feature_transition_cols]
+        [
+            f"FEATURE_TRANSITION.{col[0]} AS FEATURE_TRANSITION_{col[0]}"
+            for col in feature_transition_cols
+        ]
+    )
+    feature_transition_cols_types = ", ".join(
+        [f"FEATURE_TRANSITION_{col[0]} {col[1]}" for col in feature_transition_cols]
+    )
+
+    # Prepare null FEATURE_TRANSITION columns with types for sql query
+    as_null_feature_transition_cols_sql = ", ".join(
+        [f"NULL AS FEATURE_TRANSITION_{col[0]}" for col in feature_transition_cols]
     )
 
     if split_transition_data:
         os.makedirs(outfile, exist_ok=True)
 
+        # Note: the normalized peptide query is not robust at the moment, and is bound / limited to these 4 common modiciations. This however is needed for IPF, since we have to map the identifying peptides to the empirical peptides.
         precursor_template = """
             WITH normalized_peptides AS (
                 SELECT 
@@ -505,7 +538,7 @@ def convert_osw_to_parquet(
                     g.IPF_PEPTIDE_ID
                 FROM normalized_peptides np
                 JOIN ipf_groups g USING (NORMALIZED_SEQUENCE)
-            )
+            ) 
 
             SELECT 
                 PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID AS PROTEIN_ID,
@@ -595,7 +628,9 @@ def convert_osw_to_parquet(
             # ──────────────────────────────────────────────
             # Split by run: write each run to its own folder
             # ──────────────────────────────────────────────
-            click.echo("Info: Splitting by run and writing individual directories...")
+            logger.info(
+                "Splitting by run and writing individual split parquet directories..."
+            )
 
             run_df = conn.execute(
                 f"SELECT ID, FILENAME FROM sqlite_scan('{infile}', 'RUN')"
@@ -614,7 +649,7 @@ def convert_osw_to_parquet(
                 run_dir = os.path.join(outfile, f"{run_name}.oswpq")
                 os.makedirs(run_dir, exist_ok=True)
 
-                click.echo(f"Exporting run: {run_name} to {run_dir}")
+                logger.info(f"Exporting run: {run_name} to {run_dir}")
 
                 # Export precursor-level features for this run
                 precursor_query = (
@@ -696,7 +731,7 @@ def convert_osw_to_parquet(
 
             # Write global feature alignment file
             if feature_ms2_alignment_table_exists:
-                click.echo("Writing global feature_alignment.parquet...")
+                logger.info("Writing global feature_alignment.parquet...")
                 align_path = os.path.join(outfile, "feature_alignment.parquet")
                 query = f"""
                 SELECT 
@@ -728,9 +763,10 @@ def convert_osw_to_parquet(
             # ──────────────────────────────────────────────
             # One set of split parquet files for all runs
             # ──────────────────────────────────────────────
-            click.echo("Info: Writing precursor data...")
+            logger.info("Writing a separate precursors and transitions parquet file...")
 
             path = os.path.join(outfile, "precursors_features.parquet")
+            logger.info(f"Writing precursor data to: {path}")
 
             precursor_query = precursor_template.format(
                 infile=infile,
@@ -760,9 +796,9 @@ def convert_osw_to_parquet(
             # Execute the COPY query in DuckDB — this streams directly to disk
             conn.execute(copy_query)
 
-            click.echo("Info: Writing transition data...")
-
             path = os.path.join(outfile, "transition_features.parquet")
+
+            logger.info(f"Writing transition data to: {path}")
 
             transition_query = transition_template.format(
                 infile=infile,
@@ -779,7 +815,7 @@ def convert_osw_to_parquet(
             conn.execute(copy_transition_query)
 
             if feature_ms2_alignment_table_exists:
-                click.echo("Info: Writing feature alignment data...")
+                logger.info("Writing feature alignment data...")
 
                 path = os.path.join(outfile, "feature_alignment.parquet")
 
@@ -809,14 +845,42 @@ def convert_osw_to_parquet(
                 conn.execute(copy_query)
 
     else:
-        click.echo(
-            "Info: Writing both precursor and transition data to a single parquet file..."
+        logger.info(
+            "Writing both precursor and transition data to a single parquet file..."
         )
 
-        template = """
+        precursor_template = """
+        WITH normalized_peptides AS (
+                SELECT 
+                    ID AS PEPTIDE_ID,
+                    REPLACE(
+                        REPLACE(
+                            REPLACE(
+                                REPLACE(MODIFIED_SEQUENCE, '(UniMod:1)', '(Acetyl)'),
+                            '(UniMod:35)', '(Oxidation)'),
+                        '(UniMod:21)', '(Phospho)'),
+                    '(UniMod:4)', '(Carbamidomethyl)') AS NORMALIZED_SEQUENCE
+                FROM sqlite_scan('{infile}', 'PEPTIDE')
+            ),
+            ipf_groups AS (
+                SELECT 
+                    NORMALIZED_SEQUENCE,
+                    MIN(PEPTIDE_ID) AS IPF_PEPTIDE_ID
+                FROM normalized_peptides
+                GROUP BY NORMALIZED_SEQUENCE
+            ),
+            peptide_ipf_map AS (
+                SELECT 
+                    np.PEPTIDE_ID,
+                    g.IPF_PEPTIDE_ID
+                FROM normalized_peptides np
+                JOIN ipf_groups g USING (NORMALIZED_SEQUENCE)
+            ) 
+            
         SELECT 
             PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID AS PROTEIN_ID,
             PEPTIDE.ID AS PEPTIDE_ID,
+            pipf.IPF_PEPTIDE_ID AS IPF_PEPTIDE_ID,
             PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID AS PRECURSOR_ID,
             PROTEIN.PROTEIN_ACCESSION AS PROTEIN_ACCESSION,
             PEPTIDE.UNMODIFIED_SEQUENCE,
@@ -845,24 +909,24 @@ def convert_osw_to_parquet(
             FEATURE.RIGHT_WIDTH,
             {feature_ms1_cols_sql},
             {feature_ms2_cols_sql},
-            TRANSITION_PEPTIDE_MAPPING.PEPTIDE_ID AS IPF_PEPTIDE_ID,
-            TRANSITION_PRECURSOR_MAPPING.PRECURSOR_ID AS PRECURSOR_ID,
-            TRANSITION.ID AS TRANSITION_ID,
-            TRANSITION.TRAML_ID AS TRANSITION_TRAML_ID,
-            TRANSITION.PRODUCT_MZ,
-            TRANSITION.CHARGE AS TRANSITION_CHARGE,
-            TRANSITION.TYPE AS TRANSITION_TYPE,
-            TRANSITION.ORDINAL AS TRANSITION_ORDINAL,
-            {annotation} AS ANNOTATION,
-            TRANSITION.DETECTING AS TRANSITION_DETECTING,
-            TRANSITION.LIBRARY_INTENSITY AS TRANSITION_LIBRARY_INTENSITY,
-            TRANSITION.DECOY AS TRANSITION_DECOY,
+            NULL AS TRANSITION_ID,
+            NULL AS TRANSITION_TRAML_ID,
+            NULL AS PRODUCT_MZ,
+            NULL AS TRANSITION_CHARGE,
+            NULL AS TRANSITION_TYPE,
+            NULL AS TRANSITION_ORDINAL,
+            NULL AS ANNOTATION,
+            NULL AS TRANSITION_DETECTING,
+            NULL AS TRANSITION_LIBRARY_INTENSITY,
+            NULL AS TRANSITION_DECOY,
             {feature_transition_cols_sql}
         FROM sqlite_scan('{infile}', 'PRECURSOR') AS PRECURSOR
         INNER JOIN sqlite_scan('{infile}', 'PRECURSOR_PEPTIDE_MAPPING') AS PRECURSOR_PEPTIDE_MAPPING 
             ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
         INNER JOIN sqlite_scan('{infile}', 'PEPTIDE') AS PEPTIDE 
             ON PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
+        INNER JOIN peptide_ipf_map AS pipf
+            ON PEPTIDE.ID = pipf.PEPTIDE_ID
         INNER JOIN sqlite_scan('{infile}', 'PEPTIDE_PROTEIN_MAPPING') AS PEPTIDE_PROTEIN_MAPPING 
             ON PEPTIDE.ID = PEPTIDE_PROTEIN_MAPPING.PEPTIDE_ID
         INNER JOIN sqlite_scan('{infile}', 'PROTEIN') AS PROTEIN 
@@ -877,9 +941,54 @@ def convert_osw_to_parquet(
             ON FEATURE.ID = FEATURE_MS2.FEATURE_ID
         INNER JOIN sqlite_scan('{infile}', 'RUN') AS RUN 
             ON FEATURE.RUN_ID = RUN.ID
+        """
+
+        transition_template = """
+        SELECT
+            NULL AS PROTEIN_ID,
+            NULL AS PEPTIDE_ID,
+            TRANSITION_PEPTIDE_MAPPING.PEPTIDE_ID AS IPF_PEPTIDE_ID,
+            TRANSITION_PRECURSOR_MAPPING.PRECURSOR_ID AS PRECURSOR_ID,
+            NULL AS PROTEIN_ACCESSION,
+            NULL AS UNMODIFIED_SEQUENCE,
+            NULL AS MODIFIED_SEQUENCE,
+            NULL AS PRECURSOR_TRAML_ID,
+            NULL AS PRECURSOR_GROUP_LABEL,
+            NULL AS PRECURSOR_MZ,
+            NULL AS PRECURSOR_CHARGE,
+            NULL AS PRECURSOR_LIBRARY_INTENSITY,
+            NULL AS PRECURSOR_LIBRARY_RT,
+            NULL AS PRECURSOR_LIBRARY_DRIFT_TIME,
+            NULL AS GENE_ID,
+            NULL AS GENE_NAME,
+            NULL AS GENE_DECOY,
+            NULL AS PROTEIN_DECOY,
+            NULL AS PEPTIDE_DECOY,
+            NULL AS PRECURSOR_DECOY,
+            NULL AS RUN_ID,
+            NULL AS FILENAME,
+            NULL AS FEATURE_ID,
+            NULL AS EXP_RT,
+            NULL AS EXP_IM,
+            NULL as NORM_RT,
+            NULL AS DELTA_RT,
+            NULL AS LEFT_WIDTH,
+            NULL AS RIGHT_WIDTH,
+            {feature_ms1_cols_sql},
+            {feature_ms2_cols_sql},
+            TRANSITION.ID AS TRANSITION_ID,
+            TRANSITION.TRAML_ID AS TRANSITION_TRAML_ID,
+            TRANSITION.PRODUCT_MZ,
+            TRANSITION.CHARGE AS TRANSITION_CHARGE,
+            TRANSITION.TYPE AS TRANSITION_TYPE,
+            TRANSITION.ORDINAL AS TRANSITION_ORDINAL,
+            {annotation} AS ANNOTATION,
+            TRANSITION.DETECTING AS TRANSITION_DETECTING,
+            TRANSITION.LIBRARY_INTENSITY AS TRANSITION_LIBRARY_INTENSITY,
+            TRANSITION.DECOY AS TRANSITION_DECOY,
+            {feature_transition_cols_sql}
         -- Join Transition info
-        INNER JOIN sqlite_scan('{infile}', 'TRANSITION_PRECURSOR_MAPPING') AS TRANSITION_PRECURSOR_MAPPING 
-            ON PRECURSOR.ID = TRANSITION_PRECURSOR_MAPPING.PRECURSOR_ID
+        FROM sqlite_scan('{infile}', 'TRANSITION_PRECURSOR_MAPPING') AS TRANSITION_PRECURSOR_MAPPING 
         INNER JOIN sqlite_scan('{infile}', 'TRANSITION') AS TRANSITION
             ON TRANSITION_PRECURSOR_MAPPING.TRANSITION_ID = TRANSITION.ID
         FULL JOIN sqlite_scan('{infile}', 'TRANSITION_PEPTIDE_MAPPING') AS TRANSITION_PEPTIDE_MAPPING 
@@ -889,7 +998,58 @@ def convert_osw_to_parquet(
             ON TRANSITION.ID = FEATURE_TRANSITION.TRANSITION_ID
         """
 
-        query = template.format(
+        # Step 1: Create a Temporary Table in DuckDB
+        create_temp_table_query = f"""
+        CREATE TABLE temp_table (
+            PROTEIN_ID INTEGER,
+            PEPTIDE_ID INTEGER,
+            IPF_PEPTIDE_ID INTEGER,
+            PRECURSOR_ID INTEGER,
+            PROTEIN_ACCESSION TEXT,
+            UNMODIFIED_SEQUENCE TEXT,
+            MODIFIED_SEQUENCE TEXT,
+            PRECURSOR_TRAML_ID TEXT,
+            PRECURSOR_GROUP_LABEL TEXT,
+            PRECURSOR_MZ DOUBLE,
+            PRECURSOR_CHARGE INTEGER,
+            PRECURSOR_LIBRARY_INTENSITY DOUBLE,
+            PRECURSOR_LIBRARY_RT DOUBLE,
+            PRECURSOR_LIBRARY_DRIFT_TIME DOUBLE,
+            GENE_ID INTEGER,
+            GENE_NAME TEXT,
+            GENE_DECOY BOOLEAN,
+            PROTEIN_DECOY BOOLEAN,
+            PEPTIDE_DECOY BOOLEAN,
+            PRECURSOR_DECOY BOOLEAN,
+            RUN_ID BIGINT,
+            FILENAME TEXT,
+            FEATURE_ID BIGINT,
+            EXP_RT DOUBLE,
+            EXP_IM DOUBLE,
+            NORM_RT DOUBLE,
+            DELTA_RT DOUBLE,
+            LEFT_WIDTH DOUBLE,
+            RIGHT_WIDTH DOUBLE,
+            {feature_ms1_cols_types},  -- FEATURE_MS1 columns
+            {feature_ms2_cols_types},  -- FEATURE_MS2 columns
+            TRANSITION_ID INTEGER,
+            TRANSITION_TRAML_ID TEXT,
+            PRODUCT_MZ DOUBLE,
+            TRANSITION_CHARGE INTEGER,
+            TRANSITION_TYPE TEXT,
+            TRANSITION_ORDINAL INTEGER,
+            ANNOTATION TEXT,
+            TRANSITION_DETECTING BOOLEAN,
+            TRANSITION_LIBRARY_INTENSITY DOUBLE,
+            TRANSITION_DECOY BOOLEAN,
+            {feature_transition_cols_types},  -- FEATURE_TRANSITION columns
+        );
+        """
+
+        conn.execute(create_temp_table_query)
+
+        # Step 2: Insert Precursor Data into the Temporary Table
+        precursor_query = precursor_template.format(
             infile=infile,
             library_drift_time=(
                 "PRECURSOR.LIBRARY_DRIFT_TIME" if has_library_drift_time else "NULL"
@@ -910,6 +1070,16 @@ def convert_osw_to_parquet(
             exp_im="FEATURE.EXP_IM" if has_im else "NULL",
             feature_ms1_cols_sql=feature_ms1_cols_sql,
             feature_ms2_cols_sql=feature_ms2_cols_sql,
+            feature_transition_cols_sql=as_null_feature_transition_cols_sql,
+        )
+        logger.info(f"Writing precursor data to temporary table...")
+        conn.execute(f"INSERT INTO temp_table {precursor_query}")
+
+        # Step 3: Insert Transition Data into the Same Temporary Table
+        transition_query = transition_template.format(
+            infile=infile,
+            feature_ms1_cols_sql=as_null_feature_ms1_cols_sql,
+            feature_ms2_cols_sql=as_null_feature_ms2_cols_sql,
             annotation=(
                 "TRANSITION.ANNOTATION"
                 if has_annotation
@@ -917,13 +1087,17 @@ def convert_osw_to_parquet(
             ),
             feature_transition_cols_sql=feature_transition_cols_sql,
         )
+        logger.info(f"Writing transition data to temporary table...")
+        conn.execute(f"INSERT INTO temp_table {transition_query}")
 
-        copy_query = f"COPY ({query}) TO '{outfile}' (FORMAT 'parquet', COMPRESSION '{compression_method}', COMPRESSION_LEVEL {compression_level});"
-
-        conn.execute(copy_query)
+        # Step 4: Export the Data to Parquet
+        logger.info(f"Writing data to: {outfile}")
+        conn.execute(
+            f"COPY temp_table TO '{outfile}' (FORMAT 'parquet', COMPRESSION '{compression_method}', COMPRESSION_LEVEL {compression_level});"
+        )
 
         if feature_ms2_alignment_table_exists:
-            click.echo("Info: Writing feature alignment data...")
+            logger.info("Writing feature alignment data...")
 
             # Get outfile without any extensions
             outfile = os.path.splitext(outfile)[0]
