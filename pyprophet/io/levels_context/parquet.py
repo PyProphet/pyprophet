@@ -90,7 +90,7 @@ class ParquetReader(BaseReader):
                 SCORE_MS2_SCORE AS SCORE,
                 {cfg.context_fdr} AS CONTEXT
             FROM precursors p
-            QUALIFY ROW_NUMBER() OVER (PARTITION BY {group_id} ORDER BY SCORE_MS2 DESC) = 1
+            QUALIFY ROW_NUMBER() OVER (PARTITION BY {group_id} ORDER BY SCORE_MS2_SCORE DESC) = 1
         """
 
         df = con.execute(query).df()
@@ -130,7 +130,7 @@ class ParquetReader(BaseReader):
                 {cfg.context_fdr} AS CONTEXT
             FROM precursors p
             JOIN one_peptide_proteins opp ON p.PEPTIDE_ID = opp.PEPTIDE_ID
-            QUALIFY ROW_NUMBER() OVER (PARTITION BY {group_id} ORDER BY SCORE_MS2 DESC) = 1
+            QUALIFY ROW_NUMBER() OVER (PARTITION BY {group_id} ORDER BY SCORE_MS2_SCORE DESC) = 1
         """
         df = con.execute(query).df()
         df.columns = [col.lower() for col in df.columns]
@@ -170,7 +170,7 @@ class ParquetReader(BaseReader):
                 {cfg.context_fdr} AS CONTEXT
             FROM precursors p
             JOIN one_gene_peptides ogp ON p.PEPTIDE_ID = ogp.PEPTIDE_ID
-            QUALIFY ROW_NUMBER() OVER (PARTITION BY {group_id} ORDER BY SCORE_MS2 DESC) = 1
+            QUALIFY ROW_NUMBER() OVER (PARTITION BY {group_id} ORDER BY SCORE_MS2_SCORE DESC) = 1
         """
         df = con.execute(query).df()
         df.columns = [col.lower() for col in df.columns]
