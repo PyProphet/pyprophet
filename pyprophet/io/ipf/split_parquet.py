@@ -233,7 +233,7 @@ class SplitParquetReader(BaseReader):
             FROM precursors p
             INNER JOIN (
                 SELECT FEATURE_ID, SCORE_TRANSITION_PEP
-                FROM transitions
+                FROM transition
                 WHERE TRANSITION_TYPE = '' AND TRANSITION_DECOY = 0
             ) t ON p.FEATURE_ID = t.FEATURE_ID
             WHERE p.PRECURSOR_DECOY = 0 AND p.SCORE_MS2_PEP < {pep_threshold};
@@ -268,7 +268,7 @@ class SplitParquetReader(BaseReader):
             FROM precursors p
             INNER JOIN (
                 SELECT FEATURE_ID, SCORE_TRANSITION_PEP
-                FROM transitions
+                FROM transition
                 WHERE TRANSITION_TYPE = '' AND TRANSITION_DECOY = 0
             ) t ON p.FEATURE_ID = t.FEATURE_ID
             WHERE p.PRECURSOR_DECOY = 0 AND p.SCORE_MS2_PEP < {pep_threshold};
@@ -328,7 +328,7 @@ class SplitParquetReader(BaseReader):
         # Evidence table: transition-level PEPs
         query = f"""
         SELECT t.FEATURE_ID, t.TRANSITION_ID, t.SCORE_TRANSITION_PEP AS PEP
-        FROM transitions t
+        FROM transition t
         WHERE t.TRANSITION_TYPE != ''
         AND t.TRANSITION_DECOY = 0
         AND t.SCORE_TRANSITION_PEP < {pep_threshold}
@@ -338,7 +338,7 @@ class SplitParquetReader(BaseReader):
         # Bitmask table: transition-peptidoform presence
         query = """
         SELECT DISTINCT t.TRANSITION_ID, t.IPF_PEPTIDE_ID AS PEPTIDE_ID, 1 AS BMASK
-        FROM transitions t
+        FROM transition t
         WHERE t.TRANSITION_TYPE != ''
         AND t.TRANSITION_DECOY = 0
         AND t.IPF_PEPTIDE_ID IS NOT NULL
@@ -348,7 +348,7 @@ class SplitParquetReader(BaseReader):
         # Peptidoform count per feature
         query = """
         SELECT t.FEATURE_ID, COUNT(DISTINCT t.IPF_PEPTIDE_ID) AS NUM_PEPTIDOFORMS
-        FROM transitions t
+        FROM transition t
         WHERE t.TRANSITION_TYPE != ''
         AND t.TRANSITION_DECOY = 0
         AND t.IPF_PEPTIDE_ID IS NOT NULL
@@ -360,7 +360,7 @@ class SplitParquetReader(BaseReader):
         # Peptidoform mapping: (feature_id, peptide_id)
         query = """
         SELECT DISTINCT t.FEATURE_ID, t.IPF_PEPTIDE_ID AS PEPTIDE_ID
-        FROM transitions t
+        FROM transition t
         WHERE t.TRANSITION_TYPE != ''
         AND t.TRANSITION_DECOY = 0
         AND t.IPF_PEPTIDE_ID IS NOT NULL
