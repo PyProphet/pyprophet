@@ -1,5 +1,6 @@
 import pandas as pd
 import click
+from loguru import logger
 
 from .._base import BaseReader, BaseWriter
 from ..._config import RunnerIOConfig
@@ -56,17 +57,17 @@ class TSVWriter(BaseWriter):
         summ_stat_path = self.config.extra_writes.get("summ_stat_path")
         if summ_stat_path is not None:
             result.summary_statistics.to_csv(summ_stat_path, sep=",", index=False)
-            click.echo("Info: %s written." % summ_stat_path)
+            logger.success("%s written." % summ_stat_path)
 
         full_stat_path = self.config.extra_writes.get("full_stat_path")
         if full_stat_path is not None:
             result.final_statistics.to_csv(full_stat_path, sep=",", index=False)
-            click.echo("Info: %s written." % full_stat_path)
+            logger.success("%s written." % full_stat_path)
 
         output_path = self.config.extra_writes.get("output_path")
         if output_path is not None:
             result.scored_tables.to_csv(output_path, sep="\t", index=False)
-            click.echo("Info: %s written." % output_path)
+            logger.success("%s written." % output_path)
 
         if result.final_statistics is not None:
             cutoffs = result.final_statistics["cutoff"].values
@@ -98,6 +99,4 @@ class TSVWriter(BaseWriter):
                 pi0,
                 self.config.runner.color_palette,
             )
-            click.echo(
-                "Info: %s written." % self.config.extra_writes.get("report_path")
-            )
+            logger.success("%s written." % self.config.extra_writes.get("report_path"))

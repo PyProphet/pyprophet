@@ -294,4 +294,4 @@ class ParquetWriter(BaseWriter):
         )
 
         con.close()
-        click.echo(f"Info: {target_file} written.")
+        logger.success(f"{target_file} written.")

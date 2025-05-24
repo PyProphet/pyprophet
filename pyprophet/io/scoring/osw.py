@@ -5,6 +5,7 @@ import sqlite3
 import duckdb
 import pandas as pd
 import click
+from loguru import logger
 from ..util import check_sqlite_table, check_duckdb_table
 from .._base import BaseReader, BaseWriter, BaseIOConfig
 from ..._config import RunnerIOConfig
@@ -40,11 +41,8 @@ class OSWReader(BaseReader):
             con.execute(f"ATTACH DATABASE '{self.infile}' AS osw (TYPE sqlite);")
             return self._read_using_duckdb(con)
         except ModuleNotFoundError as e:
-            click.echo(
-                click.style(
-                    f"Warn: DuckDB sqlite_scanner failed, falling back to SQLite. Reason: {e}",
-                    fg="yellow",
-                )
+            logger.warning(
+                f"Warn: DuckDB sqlite_scanner failed, falling back to SQLite. Reason: {e}"
             )
             con = sqlite3.connect(self.infile)
             return self._read_using_sqlite(con)
@@ -73,11 +71,7 @@ class OSWReader(BaseReader):
                 try:
                     sqlite_con.execute(stmt)
                 except sqlite3.OperationalError as e:
-                    click.echo(
-                        click.style(
-                            f"Warn: SQLite index creation failed: {e}", fg="yellow"
-                        )
-                    )
+                    logger.warning(f"Warn: SQLite index creation failed: {e}")
 
             sqlite_con.commit()
             sqlite_con.close()
@@ -644,7 +638,7 @@ class OSWWriter(BaseWriter):
                 score_df = self._prepare_score_dataframe(df, level, table_name + "_")
                 score_df.to_sql(table_name, con, index=False)
 
-        click.echo(f"Info: {self.outfile} written.")
+        logger.success(f"{self.outfile} written.")
 
         # Save report if statistics are present
         self._write_pdf_report_if_present(result, pi0)
