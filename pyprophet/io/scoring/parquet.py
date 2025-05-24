@@ -83,21 +83,43 @@ class ParquetReader(BaseReader):
 
     def _fetch_ms2_features(self, con, feature_cols):
         cols_sql = ", ".join([f"p.{col}" for col in feature_cols])
-        query = f"""SELECT p.RUN_ID, p.PRECURSOR_ID, p.PRECURSOR_CHARGE, p.FEATURE_ID,
-                        p.EXP_RT, p.PRECURSOR_DECOY AS DECOY, {cols_sql},
-                        COALESCE(t.TRANSITION_COUNT, 0) AS TRANSITION_COUNT,
-                        p.RUN_ID || '_' || p.PRECURSOR_ID AS GROUP_ID
-                    FROM data p
-                    LEFT JOIN (
-                        SELECT PRECURSOR_ID, COUNT(*) AS TRANSITION_COUNT
-                        FROM (
-                            SELECT DISTINCT PRECURSOR_ID, TRANSITION_ID
-                            FROM data
-                            WHERE TRANSITION_DETECTING = 1
-                        ) sub
-                        GROUP BY PRECURSOR_ID
-                    ) t ON p.PRECURSOR_ID = t.PRECURSOR_ID
-                    ORDER BY p.RUN_ID, p.PRECURSOR_ID, p.EXP_RT"""
+        cols_sql_inner = ", ".join([f"{col}" for col in feature_cols])
+        query = f"""
+                SELECT
+                    p.RUN_ID,
+                    p.PRECURSOR_ID,
+                    p.PRECURSOR_CHARGE,
+                    p.FEATURE_ID,
+                    p.EXP_RT,
+                    p.PRECURSOR_DECOY AS DECOY,
+                    {cols_sql},
+                    COALESCE(t.TRANSITION_COUNT, 0) AS TRANSITION_COUNT,
+                    p.RUN_ID || '_' || p.PRECURSOR_ID AS GROUP_ID
+                FROM (
+                    SELECT
+                        RUN_ID,
+                        PRECURSOR_ID,
+                        PRECURSOR_CHARGE,
+                        FEATURE_ID,
+                        EXP_RT,
+                        PRECURSOR_DECOY,
+                        {cols_sql_inner}
+                    FROM data
+                    WHERE MODIFIED_SEQUENCE IS NOT NULL
+                ) AS p
+                LEFT JOIN (
+                    SELECT PRECURSOR_ID, COUNT(*) AS TRANSITION_COUNT
+                    FROM (
+                        SELECT DISTINCT PRECURSOR_ID, TRANSITION_ID
+                        FROM data
+                        WHERE MODIFIED_SEQUENCE IS NULL
+                        AND TRANSITION_DETECTING = 1
+                    ) sub
+                    GROUP BY PRECURSOR_ID
+                ) AS t ON p.PRECURSOR_ID = t.PRECURSOR_ID
+                ORDER BY p.RUN_ID, p.PRECURSOR_ID, p.EXP_RT
+                """
+
         df = (
             con.execute(query)
             .pl()
@@ -107,10 +129,11 @@ class ParquetReader(BaseReader):
 
     def _fetch_ms1_features(self, con, feature_cols):
         cols_sql = ", ".join([f"p.{col}" for col in feature_cols])
-        query = f"""SELECT p.RUN_ID, p.PRECURSOR_ID, p.PRECURSOR_CHARGE, p.FEATURE_ID,
+        query = f"""SELECT DISTINCT p.RUN_ID, p.PRECURSOR_ID, p.PRECURSOR_CHARGE, p.FEATURE_ID,
                         p.EXP_RT, p.PRECURSOR_DECOY AS DECOY, {cols_sql},
                         p.RUN_ID || '_' || p.PRECURSOR_ID AS GROUP_ID
                     FROM data p
+                    WHERE p.RUN_ID IS NOT NULL
                     ORDER BY p.RUN_ID, p.PRECURSOR_ID, p.EXP_RT"""
         df = (
             con.execute(query)
@@ -157,7 +180,7 @@ class ParquetReader(BaseReader):
 
     def _merge_ms1ms2_features(self, con, df, feature_cols):
         cols_sql = ", ".join([f"p.{col}" for col in feature_cols])
-        query = f"SELECT p.FEATURE_ID, {cols_sql} FROM data p"
+        query = f"SELECT DISTINCT p.FEATURE_ID, {cols_sql} FROM data p"
         ms1_df = con.execute(query).df()
         return pd.merge(df, ms1_df, how="left", on="FEATURE_ID")
 

@@ -258,10 +258,11 @@ class SplitParquetReader(BaseReader):
 
     def _fetch_ms1_features(self, con, feature_cols):
         cols_sql = ", ".join([f"p.{col}" for col in feature_cols])
-        query = f"""SELECT p.RUN_ID, p.PRECURSOR_ID, p.PRECURSOR_CHARGE, p.FEATURE_ID,
+        query = f"""SELECT DISTINCT p.RUN_ID, p.PRECURSOR_ID, p.PRECURSOR_CHARGE, p.FEATURE_ID,
                         p.EXP_RT, p.PRECURSOR_DECOY AS DECOY, {cols_sql},
                         p.RUN_ID || '_' || p.PRECURSOR_ID AS GROUP_ID
                     FROM precursors p
+                    WHERE p.RUN_ID IS NOT NULL
                     ORDER BY p.RUN_ID, p.PRECURSOR_ID, p.EXP_RT"""
         df = (
             con.execute(query)
@@ -310,7 +311,7 @@ class SplitParquetReader(BaseReader):
 
     def _merge_ms1ms2_features(self, con, df, feature_cols):
         cols_sql = ", ".join([f"p.{col}" for col in feature_cols])
-        query = f"SELECT p.FEATURE_ID, {cols_sql} FROM precursors p"
+        query = f"SELECT DISTINCT p.FEATURE_ID, {cols_sql} FROM precursors p"
         ms1_df = con.execute(query).df()
         return pd.merge(df, ms1_df, how="left", on="FEATURE_ID")
 
