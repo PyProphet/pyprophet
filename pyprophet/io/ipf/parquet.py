@@ -318,6 +318,15 @@ class ParquetWriter(BaseWriter):
         ]
         column_list_sql = ", ".join([f"p.{col}" for col in columns_to_keep])
 
+        # Validate input row entry count and joined entry count remain the same
+        self._validate_row_count_after_join(
+            con,
+            target_file,
+            "p.FEATURE_ID, p.IPF_PEPTIDE_ID",
+            "ON p.FEATURE_ID = s.FEATURE_ID AND p.IPF_PEPTIDE_ID = s.PEPTIDE_ID",
+            "p",
+        )
+
         # Write the new scores to the parquet file
         con.execute(
             f"""
@@ -335,5 +344,11 @@ class ParquetWriter(BaseWriter):
             (FORMAT 'parquet', COMPRESSION 'ZSTD', COMPRESSION_LEVEL 11);
         """
         )
+
+        logger.debug(
+            f"After appendings scores, {target_file} has {self._get_parquet_row_count(con, target_file)} entries"
+        )
+
+        con.close()
 
         logger.success(f"{target_file} written.")

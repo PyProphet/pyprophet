@@ -524,6 +524,15 @@ class SplitParquetWriter(BaseWriter):
             con = duckdb.connect()
             con.register("scores", pa.Table.from_pandas(subset))
 
+            # Validate input row entry count and joined entry count remain the same
+            self._validate_row_count_after_join(
+                con,
+                file_path,
+                "p.FEATURE_ID, p.IPF_PEPTIDE_ID",
+                "ON p.FEATURE_ID = s.FEATURE_ID AND p.IPF_PEPTIDE_ID = s.PEPTIDE_ID",
+                "p",
+            )
+
             con.execute(
                 f"""
                 COPY (
@@ -535,5 +544,10 @@ class SplitParquetWriter(BaseWriter):
                 (FORMAT 'parquet', COMPRESSION 'ZSTD', COMPRESSION_LEVEL 11)
                 """
             )
+
+            logger.debug(
+                f"After appendings scores, {file_path} has {self._get_parquet_row_count(con, file_path)} entries"
+            )
+
             con.close()
             logger.success(f"Updated: {file_path}")

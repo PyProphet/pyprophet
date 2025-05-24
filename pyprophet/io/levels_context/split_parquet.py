@@ -389,6 +389,15 @@ class SplitParquetWriter(BaseWriter):
             con.register("scores", pa.Table.from_pandas(result))
 
             if context == "global":
+                # Validate input row entry count and joined entry count remain the same
+                self._validate_row_count_after_join(
+                    con,
+                    file_path,
+                    f"p.{context_level_id.upper()}",
+                    f"p.{context_level_id.upper()} = s.{context_level_id.upper()}",
+                    "p",
+                )
+
                 con.execute(
                     f"""
                     COPY (
@@ -421,6 +430,15 @@ class SplitParquetWriter(BaseWriter):
                     )
                     continue
 
+                # Validate input row entry count and joined entry count remain the same
+                self._validate_row_count_after_join(
+                    con,
+                    file_path,
+                    f"p.RUN_ID, p.{context_level_id.upper()}",
+                    f"p.RUN_ID = s.RUN_ID AND p.{context_level_id.upper()} = s.{context_level_id.upper()}",
+                    "p",
+                )
+
                 con.execute(
                     f"""
                     COPY (
@@ -432,6 +450,10 @@ class SplitParquetWriter(BaseWriter):
                     (FORMAT 'parquet', COMPRESSION 'ZSTD', COMPRESSION_LEVEL 11)
                     """
                 )
+                logger.debug(
+                    f"After appendings scores, {file_path} has {self._get_parquet_row_count(con, file_path)} entries"
+                )
+
             con.close()
 
             logger.success(f"Updated: {file_path}")
