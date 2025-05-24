@@ -63,6 +63,9 @@ class BaseReader(ABC):
         raise NotImplementedError("Subclasses must implement 'read'.")
 
     def _finalize_feature_table(self, df, ss_main_score):
+        """
+        Finalize the feature table for semi-supervised scoring.
+        """
         df.columns = [c.lower() for c in df.columns]
         main_score = ss_main_score.lower()
         if main_score in df.columns:
