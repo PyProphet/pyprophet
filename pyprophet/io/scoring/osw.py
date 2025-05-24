@@ -277,7 +277,7 @@ class OSWReader(BaseReader):
                 f.PRECURSOR_ID,
                 f.EXP_RT,
                 p.CHARGE AS PRECURSOR_CHARGE,
-                t.PRODUCT_CHARGE,
+                t.CHARGE AS PRODUCT_CHARGE,
                 f.RUN_ID || '_' || ft.FEATURE_ID || '_' || f.PRECURSOR_ID || '_' || ft.TRANSITION_ID AS GROUP_ID
             FROM osw.FEATURE_TRANSITION ft
             INNER JOIN osw.FEATURE f ON ft.FEATURE_ID = f.ID
@@ -465,7 +465,7 @@ class OSWReader(BaseReader):
                 f.PRECURSOR_ID,
                 f.EXP_RT,
                 p.CHARGE AS PRECURSOR_CHARGE,
-                t.PRODUCT_CHARGE,
+                t.CHARGE AS PRODUCT_CHARGE,
                 f.RUN_ID || '_' || ft.FEATURE_ID || '_' || f.PRECURSOR_ID || '_' || ft.TRANSITION_ID AS GROUP_ID
             FROM FEATURE_TRANSITION ft
             INNER JOIN FEATURE f ON ft.FEATURE_ID = f.ID
