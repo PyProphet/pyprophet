@@ -144,17 +144,37 @@ class ParquetReader(BaseReader):
 
     def _fetch_transition_features(self, con, feature_cols):
         cols_sql = ", ".join([f"t.{col}" for col in feature_cols])
+        cols_sql_inner = ", ".join([f"{col}" for col in feature_cols])
         rc = self.config.runner
         query = f"""SELECT t.TRANSITION_DECOY AS DECOY, t.FEATURE_ID, t.TRANSITION_ID,
                         {cols_sql}, p.PRECURSOR_CHARGE, t.TRANSITION_CHARGE,
                         p.RUN_ID || '_' || t.FEATURE_ID || '_' || t.TRANSITION_ID AS GROUP_ID
-                    FROM data t
-                    WHERE t.SCORE_MS2_PEAK_GROUP_RANK <= {rc.ipf_max_peakgroup_rank}
-                        AND t.SCORE_MS2_PEP <= {rc.ipf_max_peakgroup_pep}
-                        AND t.PRECURSOR_DECOY = 0
+                    FROM (
+                        SELECT
+                            RUN_ID,
+                            PRECURSOR_ID,
+                            TRANSITION_ID,
+                            TRANSITION_DECOY,
+                            FEATURE_ID,
+                            TRANSITION_CHARGE,
+                            {cols_sql_inner}
+                        FROM data
+                        WHERE MODIFIED_SEQUENCE IS NULL
+                    ) AS t
+                    LEFT JOIN (
+                        SELECT PRECURSOR_ID, PRECURSOR_CHARGE, PRECURSOR_DECOY, RUN_ID, FEATURE_ID, EXP_RT, SCORE_MS2_PEP, SCORE_MS2_PEAK_GROUP_RANK
+                        FROM (
+                            SELECT DISTINCT PRECURSOR_ID, PRECURSOR_CHARGE, PRECURSOR_DECOY, RUN_ID, FEATURE_ID, EXP_RT, SCORE_MS2_PEP, SCORE_MS2_PEAK_GROUP_RANK
+                            FROM data
+                            WHERE MODIFIED_SEQUENCE IS NOT NULL
+                        ) sub
+                    ) AS p ON t.PRECURSOR_ID = p.PRECURSOR_ID AND t.FEATURE_ID = p.FEATURE_ID
+                    WHERE p.SCORE_MS2_PEAK_GROUP_RANK <= {rc.ipf_max_peakgroup_rank}
+                        AND p.SCORE_MS2_PEP <= {rc.ipf_max_peakgroup_pep}
+                        AND p.PRECURSOR_DECOY = 0
                         AND t.FEATURE_TRANSITION_VAR_ISOTOPE_OVERLAP_SCORE <= {rc.ipf_max_transition_isotope_overlap}
                         AND t.FEATURE_TRANSITION_VAR_LOG_SN_SCORE > {rc.ipf_min_transition_sn}
-                    ORDER BY t.RUN_ID, t.PRECURSOR_ID, t.EXP_RT, t.TRANSITION_ID"""
+                    ORDER BY t.RUN_ID, t.PRECURSOR_ID, p.EXP_RT, t.TRANSITION_ID"""
         df = (
             con.execute(query)
             .pl()
