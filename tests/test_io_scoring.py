@@ -8,6 +8,7 @@ from pyprophet.io.scoring.split_parquet import SplitParquetReader
 from pyprophet.io.scoring.tsv import TSVReader  # legacy, limited support
 from pyprophet._config import RunnerIOConfig, RunnerConfig
 
+
 xgb_hyperparams = {
     "autotune": False,
     "autotune_num_rounds": 10,
@@ -70,6 +71,20 @@ def create_reader_config(level, infile, outfile):
 
 
 def compare_dataframes(df1, df2, cols):
+    """
+    Compare two pandas DataFrames based on the selected columns.
+
+    Parameters:
+    - df1 (pandas.DataFrame): The first DataFrame to compare.
+    - df2 (pandas.DataFrame): The second DataFrame to compare.
+    - cols (list): List of columns to use for comparison.
+
+    Raises:
+    - AssertionError: If either DataFrame is empty or if the selected columns do not match.
+
+    Returns:
+    - None
+    """
     # Sort both dataframes by the same columns
     df1_sorted = df1.sort_values(by=["run_id", "feature_id"]).reset_index(drop=True)
     df2_sorted = df2.sort_values(by=["run_id", "feature_id"]).reset_index(drop=True)
@@ -219,6 +234,17 @@ def tsv_reader(level):
     ],
 )
 def test_reader_level(request, level, reader_fixture):
+    """
+    Test function to validate the output of a reader for a given level.
+
+    Parameters:
+    - request: pytest request object
+    - level: level to test
+    - reader_fixture: fixture name for the reader
+
+    Returns:
+    - None
+    """
     reader = request.getfixturevalue(reader_fixture)
     df = reader.read()
 
@@ -255,7 +281,14 @@ def test_reader_level(request, level, reader_fixture):
     ],
 )
 def test_compare_readers(request, level, reader_fixture):
-    """Test that all readers produce consistent output for a given level."""
+    """
+    Test that all readers produce consistent output for a given level.
+
+    Parameters:
+    - request: pytest request object
+    - level: level to test
+    - reader_fixture: fixture name for the primary reader
+    """
     # Get the primary reader
     primary_reader = request.getfixturevalue(reader_fixture)
     df_primary = primary_reader.read()
