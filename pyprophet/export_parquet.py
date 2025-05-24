@@ -1001,10 +1001,10 @@ def convert_osw_to_parquet(
         # Step 1: Create a Temporary Table in DuckDB
         create_temp_table_query = f"""
         CREATE TABLE temp_table (
-            PROTEIN_ID INTEGER,
-            PEPTIDE_ID INTEGER,
-            IPF_PEPTIDE_ID INTEGER,
-            PRECURSOR_ID INTEGER,
+            PROTEIN_ID BIGINT,
+            PEPTIDE_ID BIGINT,
+            IPF_PEPTIDE_ID BIGINT,
+            PRECURSOR_ID BIGINT,
             PROTEIN_ACCESSION TEXT,
             UNMODIFIED_SEQUENCE TEXT,
             MODIFIED_SEQUENCE TEXT,
@@ -1015,7 +1015,7 @@ def convert_osw_to_parquet(
             PRECURSOR_LIBRARY_INTENSITY DOUBLE,
             PRECURSOR_LIBRARY_RT DOUBLE,
             PRECURSOR_LIBRARY_DRIFT_TIME DOUBLE,
-            GENE_ID INTEGER,
+            GENE_ID BIGINT,
             GENE_NAME TEXT,
             GENE_DECOY BOOLEAN,
             PROTEIN_DECOY BOOLEAN,
@@ -1032,7 +1032,7 @@ def convert_osw_to_parquet(
             RIGHT_WIDTH DOUBLE,
             {feature_ms1_cols_types},  -- FEATURE_MS1 columns
             {feature_ms2_cols_types},  -- FEATURE_MS2 columns
-            TRANSITION_ID INTEGER,
+            TRANSITION_ID BIGINT,
             TRANSITION_TRAML_ID TEXT,
             PRODUCT_MZ DOUBLE,
             TRANSITION_CHARGE INTEGER,
