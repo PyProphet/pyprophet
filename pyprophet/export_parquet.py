@@ -609,6 +609,7 @@ def convert_osw_to_parquet(
                 TRANSITION.DETECTING AS TRANSITION_DETECTING,
                 TRANSITION.LIBRARY_INTENSITY AS TRANSITION_LIBRARY_INTENSITY,
                 TRANSITION.DECOY AS TRANSITION_DECOY,
+                FEATURE.ID AS FEATURE_ID,
                 {feature_transition_cols_sql}
             FROM sqlite_scan('{infile}', 'TRANSITION') AS TRANSITION
             FULL JOIN sqlite_scan('{infile}', 'TRANSITION_PRECURSOR_MAPPING') AS TRANSITION_PRECURSOR_MAPPING 
