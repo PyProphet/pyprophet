@@ -967,7 +967,7 @@ def convert_osw_to_parquet(
             NULL AS PRECURSOR_DECOY,
             NULL AS RUN_ID,
             NULL AS FILENAME,
-            NULL AS FEATURE_ID,
+            FEATURE_TRANSITION.FEATURE_ID AS FEATURE_ID,
             NULL AS EXP_RT,
             NULL AS EXP_IM,
             NULL as NORM_RT,
@@ -1004,7 +1004,7 @@ def convert_osw_to_parquet(
             PROTEIN_ID BIGINT,
             PEPTIDE_ID BIGINT,
             IPF_PEPTIDE_ID BIGINT,
-            PRECURSOR_ID BIGINT,
+            PRECURSOR_ID BIGINT, -- Need PRECURSOR_ID to map to TRANSITION data
             PROTEIN_ACCESSION TEXT,
             UNMODIFIED_SEQUENCE TEXT,
             MODIFIED_SEQUENCE TEXT,
@@ -1023,7 +1023,7 @@ def convert_osw_to_parquet(
             PRECURSOR_DECOY BOOLEAN,
             RUN_ID BIGINT,
             FILENAME TEXT,
-            FEATURE_ID BIGINT,
+            FEATURE_ID BIGINT, -- NEED FEATURE_ID to map to TRANSITION data
             EXP_RT DOUBLE,
             EXP_IM DOUBLE,
             NORM_RT DOUBLE,
