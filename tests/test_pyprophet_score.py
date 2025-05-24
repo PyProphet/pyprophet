@@ -36,6 +36,13 @@ class TestRunner:
         shutil.copy(src_path, self.temp_folder)
         return os.path.join(self.temp_folder, filename)
 
+    def copy_test_dir(self, dirname):
+        """Copy test directory to temp directory"""
+        src_path = os.path.join(DATA_FOLDER, dirname)
+        dst_path = os.path.join(self.temp_folder, dirname)
+        shutil.copytree(src_path, dst_path)
+        return dst_path
+
     def run_command(self, cmdline):
         """Execute a shell command and return output"""
         try:
@@ -108,6 +115,14 @@ class TestStrategy:
 
     def verify(self, regtest):
         """Verify results"""
+        raise NotImplementedError
+
+    def apply_weights(self):
+        """Apply weights"""
+        raise NotImplementedError
+
+    def verify_weights(self, regtest):
+        """Verify weights"""
         raise NotImplementedError
 
 
@@ -209,6 +224,7 @@ class ParquetTestStrategy(TestStrategy):
 
     def prepare(self):
         self.input_file = self.runner.copy_test_file("test_data.parquet")
+        self.weights_file = self.runner.copy_test_file("test_data_weights.csv")
 
     def execute(self, levels=None, **kwargs):
         if not levels:
@@ -234,6 +250,10 @@ class ParquetTestStrategy(TestStrategy):
             self.runner.run_command(level_cmd)
 
     def verify(self, regtest):
+        # Read input file and print the shape of the infilee_dir/transition_featues.parquet file
+        data = pd.read_parquet(self.input_file)
+        print(data.shape[0], file=regtest)
+
         config = IPFIOConfig(
             infile=self.input_file,
             outfile=self.input_file,
@@ -245,6 +265,251 @@ class ParquetTestStrategy(TestStrategy):
         config.ipf_max_peakgroup_pep = 1.0
         config.ipf_ms1_scoring = True
         config.ipf_ms2_scoring = True
+        reader = ReaderDispatcher.get_reader(config)
+        table = reader.read(level="peakgroup_precursor")
+        print(table.head(100).sort_index(axis=1), file=regtest)
+
+    def apply_weights(self):
+        cmd = f"pyprophet score --level ms2 --pi0_method=smoother --pi0_lambda 0.4 0 0 --in={self.input_file} --apply_weights={self.weights_file} --test --ss_iteration_fdr=0.02"
+        self.runner.run_command(cmd)
+
+        cmd = f"pyprophet score --level transition --pi0_method=smoother --pi0_lambda 0.4 0 0 --in={self.input_file} --apply_weights={self.weights_file} --test --ss_iteration_fdr=0.02"
+        self.runner.run_command(cmd)
+
+    def verify_weights(self, regtest):
+        # Read input file and print the shape of the infilee_dir/transition_featues.parquet file
+        data = pd.read_parquet(self.input_file)
+        # (96,259, 23)
+        print(data.shape[0], file=regtest)
+
+        # Check for "SCORE_MS2_" columns
+        cols = [col for col in data.columns if col.startswith("SCORE_MS2_")]
+        assert len(cols) > 0, "No SCORE_MS2_ columns found in the data"
+
+        # Checkk for "SCORE_TRANSITION_" columns
+        cols = [col for col in data.columns if col.startswith("SCORE_TRANSITION_")]
+        assert len(cols) > 0, "No SCORE_TRANSITION_ columns found in the data"
+
+        config = IPFIOConfig(
+            infile=self.input_file,
+            outfile=self.input_file,
+            subsample_ratio=1.0,
+            level="peakgroup_precursor",
+            context="ipf",
+        )
+        config.file_type = "parquet"
+        config.ipf_max_peakgroup_pep = 1.0
+        config.ipf_ms1_scoring = False
+        config.ipf_ms2_scoring = False
+        reader = ReaderDispatcher.get_reader(config)
+        table = reader.read(level="peakgroup_precursor")
+        print(table.head(100).sort_index(axis=1), file=regtest)
+
+
+class SplitParquetTestStrategy(TestStrategy):
+    """Test strategy for Parquet files"""
+
+    def prepare(self):
+        self.input_file = self.runner.copy_test_dir("test_data.oswpq")
+        self.weights_file = self.runner.copy_test_file("test_data_weights.csv")
+
+    def execute(self, levels=None, **kwargs):
+        if not levels:
+            levels = ["ms1", "ms2", "transition"]
+
+        # Execute each level command separately
+        for level in levels:
+            level_cmd = self.config.build_command(self.input_file, level)
+
+            if kwargs.get("parametric"):
+                level_cmd += " --parametric"
+            if kwargs.get("pfdr"):
+                level_cmd += " --pfdr"
+            if kwargs.get("pi0_lambda"):
+                level_cmd += f" --pi0_lambda={kwargs['pi0_lambda']}"
+            if kwargs.get("xgboost"):
+                level_cmd += " --classifier=XGBoost"
+            if kwargs.get("xgboost_tune"):
+                level_cmd += " --xgb_autotune"
+            if kwargs.get("score_filter"):
+                level_cmd = self.config.add_score_filter(level_cmd, level)
+
+            self.runner.run_command(level_cmd)
+
+    def verify(self, regtest):
+        # Read input file and print the shape of the infilee_dir/transition_featues.parquet file
+        data = pd.read_parquet(
+            os.path.join(self.input_file, "transition_features.parquet")
+        )
+        # (96,259, 23)
+        print(data.shape[0], file=regtest)
+
+        config = IPFIOConfig(
+            infile=self.input_file,
+            outfile=self.input_file,
+            subsample_ratio=1.0,
+            level="peakgroup_precursor",
+            context="ipf",
+        )
+        config.file_type = "parquet_split"
+        config.ipf_max_peakgroup_pep = 1.0
+        config.ipf_ms1_scoring = True
+        config.ipf_ms2_scoring = True
+        reader = ReaderDispatcher.get_reader(config)
+        table = reader.read(level="peakgroup_precursor")
+        print(table.head(100).sort_index(axis=1), file=regtest)
+
+    def apply_weights(self):
+        cmd = f"pyprophet score --level ms2 --pi0_method=smoother --pi0_lambda 0.4 0 0 --in={self.input_file} --apply_weights={self.weights_file} --test --ss_iteration_fdr=0.02"
+        self.runner.run_command(cmd)
+
+        cmd = f"pyprophet score --level transition --pi0_method=smoother --pi0_lambda 0.4 0 0 --in={self.input_file} --apply_weights={self.weights_file} --test --ss_iteration_fdr=0.02"
+        self.runner.run_command(cmd)
+
+    def verify_weights(self, regtest):
+        # Read input file and print the shape of the infilee_dir/transition_featues.parquet file
+        data = pd.read_parquet(
+            os.path.join(
+                self.input_file,
+                "precursors_features.parquet",
+            )
+        )
+        # (96,259, 23)
+        print(data.shape[0], file=regtest)
+
+        # Check for "SCORE_MS2_" columns
+        cols = [col for col in data.columns if col.startswith("SCORE_MS2_")]
+        assert len(cols) > 0, "No SCORE_MS2_ columns found in the data"
+
+        # Checkk for "SCORE_TRANSITION_" columns
+        data = pd.read_parquet(
+            os.path.join(
+                self.input_file,
+                "transition_features.parquet",
+            )
+        )
+        # (96,259, 23)
+        print(data.shape[0], file=regtest)
+        cols = [col for col in data.columns if col.startswith("SCORE_TRANSITION_")]
+        assert len(cols) > 0, "No SCORE_TRANSITION_ columns found in the data"
+
+        config = IPFIOConfig(
+            infile=self.input_file,
+            outfile=self.input_file,
+            subsample_ratio=1.0,
+            level="peakgroup_precursor",
+            context="ipf",
+        )
+        config.file_type = "parquet_split"
+        config.ipf_max_peakgroup_pep = 1.0
+        config.ipf_ms1_scoring = False
+        config.ipf_ms2_scoring = False
+        reader = ReaderDispatcher.get_reader(config)
+        table = reader.read(level="peakgroup_precursor")
+        print(table.head(100).sort_index(axis=1), file=regtest)
+
+
+class MultiSplitParquetTestStrategy(TestStrategy):
+    """Test strategy for Parquet files"""
+
+    def prepare(self):
+        self.input_file = self.runner.copy_test_dir("test_data.oswpqd")
+        self.weights_file = self.runner.copy_test_file("test_data_weights.csv")
+
+    def execute(self, levels=None, **kwargs):
+        if not levels:
+            levels = ["ms1", "ms2", "transition"]
+
+        # Execute each level command separately
+        for level in levels:
+            level_cmd = self.config.build_command(self.input_file, level)
+
+            if kwargs.get("parametric"):
+                level_cmd += " --parametric"
+            if kwargs.get("pfdr"):
+                level_cmd += " --pfdr"
+            if kwargs.get("pi0_lambda"):
+                level_cmd += f" --pi0_lambda={kwargs['pi0_lambda']}"
+            if kwargs.get("xgboost"):
+                level_cmd += " --classifier=XGBoost"
+            if kwargs.get("xgboost_tune"):
+                level_cmd += " --xgb_autotune"
+            if kwargs.get("score_filter"):
+                level_cmd = self.config.add_score_filter(level_cmd, level)
+
+            self.runner.run_command(level_cmd)
+
+    def verify(self, regtest):
+        # Read input file and print the shape of the infilee_dir/transition_featues.parquet file
+        data = pd.read_parquet(
+            os.path.join(
+                self.input_file,
+                "napedro_L120420_010_SW.oswpq/transition_features.parquet",
+            )
+        )
+        # (96,259, 23)
+        print(data.shape[0], file=regtest)
+
+        config = IPFIOConfig(
+            infile=self.input_file,
+            outfile=self.input_file,
+            subsample_ratio=1.0,
+            level="peakgroup_precursor",
+            context="ipf",
+        )
+        config.file_type = "parquet_split_multi"
+        config.ipf_max_peakgroup_pep = 1.0
+        config.ipf_ms1_scoring = True
+        config.ipf_ms2_scoring = True
+        reader = ReaderDispatcher.get_reader(config)
+        table = reader.read(level="peakgroup_precursor")
+        print(table.head(100).sort_index(axis=1), file=regtest)
+
+    def apply_weights(self):
+        cmd = f"pyprophet score --level ms2 --pi0_method=smoother --pi0_lambda 0.4 0 0 --in={self.input_file} --apply_weights={self.weights_file} --test --ss_iteration_fdr=0.02"
+        self.runner.run_command(cmd)
+
+        cmd = f"pyprophet score --level transition --pi0_method=smoother --pi0_lambda 0.4 0 0 --in={self.input_file} --apply_weights={self.weights_file} --test --ss_iteration_fdr=0.02"
+        self.runner.run_command(cmd)
+
+    def verify_weights(self, regtest):
+        # Read input file and print the shape of the infilee_dir/transition_featues.parquet file
+        data = pd.read_parquet(
+            os.path.join(
+                self.input_file,
+                "napedro_L120420_010_SW.oswpq/precursors_features.parquet",
+            )
+        )
+        # (96,259, 23)
+        print(data.shape[0], file=regtest)
+
+        # Check for "SCORE_MS2_" columns
+        cols = [col for col in data.columns if col.startswith("SCORE_MS2_")]
+        assert len(cols) > 0, "No SCORE_MS2_ columns found in the data"
+
+        # Checkk for "SCORE_TRANSITION_" columns
+        data = pd.read_parquet(
+            os.path.join(
+                self.input_file,
+                "napedro_L120420_010_SW.oswpq/transition_features.parquet",
+            )
+        )
+        # (96,259, 23)
+        print(data.shape[0], file=regtest)
+        cols = [col for col in data.columns if col.startswith("SCORE_TRANSITION_")]
+        assert len(cols) > 0, "No SCORE_TRANSITION_ columns found in the data"
+
+        config = IPFIOConfig(
+            infile=self.input_file,
+            outfile=self.input_file,
+            subsample_ratio=1.0,
+            level="peakgroup_precursor",
+            context="ipf",
+        )
+        config.file_type = "parquet_split_multi"
+        config.ipf_max_peakgroup_pep = 1.0
+        config.ipf_ms1_scoring = False
+        config.ipf_ms2_scoring = False
         reader = ReaderDispatcher.get_reader(config)
         table = reader.read(level="peakgroup_precursor")
         print(table.head(100).sort_index(axis=1), file=regtest)
@@ -267,6 +532,28 @@ def run_generic_test(test_runner, test_config, strategy_class, regtest, **kwargs
     strategy.prepare()
     strategy.execute(**kwargs)
     strategy.verify(regtest)
+
+
+def run_generic_test_overwrite(
+    test_runner, test_config, strategy_class, regtest, **kwargs
+):
+    strategy = strategy_class(test_runner, test_config)
+    strategy.prepare()
+    strategy.execute(**kwargs)
+    strategy.verify(regtest)
+    # Second run to overwrite the previous results, the rows should be the same'
+    # This is important for the parquet tests, to ensure they data is the same and not just adding additional rows
+    strategy.execute(**kwargs)
+    strategy.verify(regtest)
+
+
+def run_generic_test_apply_weights(
+    test_runner, test_config, strategy_class, regtest, **kwargs
+):
+    strategy = strategy_class(test_runner, test_config)
+    strategy.prepare()
+    strategy.apply_weights(**kwargs)
+    strategy.verify_weights(regtest)
 
 
 def run_metabo_test(
@@ -415,6 +702,15 @@ def test_osw_10(test_runner, test_config, regtest):
     run_metabo_test(test_runner, test_config, regtest, ms1ms2=True, score_filter=True)
 
 
+def test_tsv_apply_weights(test_runner, test_config, regtest):
+    # Initial scoring
+    run_generic_test(test_runner, test_config, TSVTestStrategy, regtest)
+
+    # Apply weights
+    cmd = "pyprophet score --pi0_method=smoother --pi0_lambda 0.4 0 0 --in=test_data.txt --apply_weights=test_data_weights.csv --test --ss_iteration_fdr=0.02"
+    test_runner.run_command(cmd)
+
+
 # Parquet Tests
 def test_parquet_0(test_runner, test_config, regtest):
     run_generic_test(
@@ -478,6 +774,193 @@ def test_parquet_7(test_runner, test_config, regtest):
         pi0_lambda="0 0 0",
         ms1ms2=True,
         score_filter=True,
+    )
+
+
+def test_parquet_8(test_runner, test_config, regtest):
+    run_generic_test_overwrite(
+        test_runner, test_config, ParquetTestStrategy, regtest, pi0_lambda="0 0 0"
+    )
+
+
+def test_parquet_apply_weights(test_runner, test_config, regtest):
+    # Apply weights
+    run_generic_test_apply_weights(
+        test_runner, test_config, ParquetTestStrategy, regtest
+    )
+
+
+# Split Parquet Tests
+def test_split_parquet_0(test_runner, test_config, regtest):
+    run_generic_test(
+        test_runner,
+        test_config,
+        SplitParquetTestStrategy,
+        regtest,
+        pi0_lambda="0 0 0",
+    )
+
+
+def test_split_parquet_1(test_runner, test_config, regtest):
+    run_generic_test(
+        test_runner,
+        test_config,
+        SplitParquetTestStrategy,
+        regtest,
+        parametric=True,
+        pi0_lambda="0 0 0",
+    )
+
+
+def test_split_parquet_2(test_runner, test_config, regtest):
+    run_generic_test(
+        test_runner,
+        test_config,
+        SplitParquetTestStrategy,
+        regtest,
+        pfdr=True,
+        pi0_lambda="0 0 0",
+    )
+
+
+def test_split_parquet_3(test_runner, test_config, regtest):
+    run_generic_test(
+        test_runner,
+        test_config,
+        SplitParquetTestStrategy,
+        regtest,
+        pfdr=True,
+        pi0_lambda="0 0 0",
+        ms1ms2=True,
+    )
+
+
+def test_split_parquet_6(test_runner, test_config, regtest):
+    run_generic_test(
+        test_runner,
+        test_config,
+        SplitParquetTestStrategy,
+        regtest,
+        pfdr=True,
+        pi0_lambda="0 0 0",
+        score_filter=True,
+    )
+
+
+def test_split_parquet_7(test_runner, test_config, regtest):
+    run_generic_test(
+        test_runner,
+        test_config,
+        SplitParquetTestStrategy,
+        regtest,
+        pfdr=True,
+        pi0_lambda="0 0 0",
+        ms1ms2=True,
+        score_filter=True,
+    )
+
+
+def test_split_parquet_8(test_runner, test_config, regtest):
+    run_generic_test_overwrite(
+        test_runner,
+        test_config,
+        SplitParquetTestStrategy,
+        regtest,
+        pi0_lambda="0 0 0",
+    )
+
+
+def test_split_parquet_apply_weights(test_runner, test_config, regtest):
+    # Apply weights
+    run_generic_test_apply_weights(
+        test_runner, test_config, SplitParquetTestStrategy, regtest
+    )
+
+
+# Multi-Split Parquet Tests
+def test_multi_split_parquet_0(test_runner, test_config, regtest):
+    run_generic_test(
+        test_runner,
+        test_config,
+        MultiSplitParquetTestStrategy,
+        regtest,
+        pi0_lambda="0 0 0",
+    )
+
+
+def test_multi_split_parquet_1(test_runner, test_config, regtest):
+    run_generic_test(
+        test_runner,
+        test_config,
+        MultiSplitParquetTestStrategy,
+        regtest,
+        parametric=True,
+        pi0_lambda="0 0 0",
+    )
+
+
+def test_multi_split_parquet_2(test_runner, test_config, regtest):
+    run_generic_test(
+        test_runner,
+        test_config,
+        MultiSplitParquetTestStrategy,
+        regtest,
+        pfdr=True,
+        pi0_lambda="0 0 0",
+    )
+
+
+def test_multi_split_parquet_3(test_runner, test_config, regtest):
+    run_generic_test(
+        test_runner,
+        test_config,
+        MultiSplitParquetTestStrategy,
+        regtest,
+        pfdr=True,
+        pi0_lambda="0 0 0",
+        ms1ms2=True,
+    )
+
+
+def test_multi_split_parquet_6(test_runner, test_config, regtest):
+    run_generic_test(
+        test_runner,
+        test_config,
+        MultiSplitParquetTestStrategy,
+        regtest,
+        pfdr=True,
+        pi0_lambda="0 0 0",
+        score_filter=True,
+    )
+
+
+def test_multi_split_parquet_7(test_runner, test_config, regtest):
+    run_generic_test(
+        test_runner,
+        test_config,
+        MultiSplitParquetTestStrategy,
+        regtest,
+        pfdr=True,
+        pi0_lambda="0 0 0",
+        ms1ms2=True,
+        score_filter=True,
+    )
+
+
+def test_multi_split_parquet_8(test_runner, test_config, regtest):
+    run_generic_test_overwrite(
+        test_runner,
+        test_config,
+        MultiSplitParquetTestStrategy,
+        regtest,
+        pi0_lambda="0 0 0",
+    )
+
+
+def test_multi_split_parquet_apply_weights(test_runner, test_config, regtest):
+    # Apply weights
+    run_generic_test_apply_weights(
+        test_runner, test_config, MultiSplitParquetTestStrategy, regtest
     )
 
 
