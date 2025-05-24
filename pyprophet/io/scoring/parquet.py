@@ -1,10 +1,12 @@
+import sys
 from shutil import copyfile
 import pandas as pd
 import pyarrow as pa
 import duckdb
 import click
+from loguru import logger
 from ..util import get_parquet_column_names
-from .._base import BaseReader, BaseWriter
+from .._base import BaseReader, BaseWriter, RowCountMismatchError
 from ..._config import RunnerIOConfig
 
 
@@ -146,13 +148,14 @@ class ParquetReader(BaseReader):
         cols_sql = ", ".join([f"t.{col}" for col in feature_cols])
         cols_sql_inner = ", ".join([f"{col}" for col in feature_cols])
         rc = self.config.runner
-        query = f"""SELECT t.TRANSITION_DECOY AS DECOY, t.FEATURE_ID, t.TRANSITION_ID,
+        query = f"""SELECT t.TRANSITION_DECOY AS DECOY, t.FEATURE_ID, t.IPF_PEPTIDE_ID, t.TRANSITION_ID,
                         {cols_sql}, p.PRECURSOR_CHARGE, t.TRANSITION_CHARGE,
                         p.RUN_ID || '_' || t.FEATURE_ID || '_' || t.TRANSITION_ID AS GROUP_ID
                     FROM (
                         SELECT
                             RUN_ID,
                             PRECURSOR_ID,
+                            IPF_PEPTIDE_ID,
                             TRANSITION_ID,
                             TRANSITION_DECOY,
                             FEATURE_ID,
@@ -258,19 +261,23 @@ class ParquetWriter(BaseWriter):
 
         if self.level == "transition":
             prefix = "t"
-            join_on = (
-                "t.FEATURE_ID = s.FEATURE_ID AND t.TRANSITION_ID = s.TRANSITION_ID"
-            )
+            join_on = "t.FEATURE_ID = s.FEATURE_ID AND t.TRANSITION_ID = s.TRANSITION_ID AND t.IPF_PEPTIDE_ID = s.IPF_PEPTIDE_ID"
+            key_cols = "t.FEATURE_ID, t.TRANSITION_ID, t.IPF_PEPTIDE_ID"
         elif self.level == "alignment":
             prefix = "a"
             join_on = "a.ALIGNMENT_ID = s.ALIGNMENT_ID AND a.FEATURE_ID = s.FEATURE_ID AND a.DECOY = s.DECOY"
+            key_cols = "a.ALIGNMENT_ID, a.FEATURE_ID"
         else:
             prefix = "p"
             join_on = "p.FEATURE_ID = s.FEATURE_ID"
+            key_cols = "p.FEATURE_ID"
 
         select_old = ", ".join([f"{prefix}.{col}" for col in keep_columns])
         con = duckdb.connect()
         con.register("scores", pa.Table.from_pandas(df))
+
+        # Validate input row entry count and joined entry count remain the same
+        self._validate_row_count_after_join(con, target_file, key_cols, join_on, prefix)
 
         con.execute(
             f"""
@@ -281,4 +288,10 @@ class ParquetWriter(BaseWriter):
             ) TO '{target_file}' (FORMAT 'parquet', COMPRESSION 'ZSTD', COMPRESSION_LEVEL 11)
             """
         )
+
+        logger.debug(
+            f"After appendings scores, {target_file} has {self._get_parquet_row_count(con, target_file)} entries"
+        )
+
+        con.close()
         click.echo(f"Info: {target_file} written.")

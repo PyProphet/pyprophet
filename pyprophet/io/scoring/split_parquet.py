@@ -1,4 +1,5 @@
 import os
+import sys
 import glob
 from shutil import copyfile
 import pandas as pd
@@ -8,7 +9,7 @@ import click
 from loguru import logger
 
 from ..util import print_parquet_tree, get_parquet_column_names
-from .._base import BaseReader, BaseWriter
+from .._base import BaseReader, BaseWriter, RowCountMismatchError
 from ..._config import RunnerIOConfig
 
 
@@ -274,7 +275,7 @@ class SplitParquetReader(BaseReader):
     def _fetch_transition_features(self, con, feature_cols):
         cols_sql = ", ".join([f"t.{col}" for col in feature_cols])
         rc = self.config.runner
-        query = f"""SELECT t.TRANSITION_DECOY AS DECOY, t.FEATURE_ID, t.TRANSITION_ID,
+        query = f"""SELECT t.TRANSITION_DECOY AS DECOY, t.FEATURE_ID, t.IPF_PEPTIDE_ID, t.TRANSITION_ID,
                         {cols_sql}, p.PRECURSOR_CHARGE, t.TRANSITION_CHARGE,
                         p.RUN_ID || '_' || t.FEATURE_ID || '_' || t.TRANSITION_ID AS GROUP_ID
                     FROM transition t
@@ -362,6 +363,7 @@ class SplitParquetWriter(BaseWriter):
 
         file_key = file_map.get(level)
         prefix = prefix_map.get(level)
+
         score_df = self._prepare_score_dataframe(df, level, prefix)
 
         if self.file_type == "parquet_split_multi" and self.level != "alignment":
@@ -421,29 +423,42 @@ class SplitParquetWriter(BaseWriter):
     def _write_parquet_with_scores(
         self, target_file: str, df: pd.DataFrame, keep_columns: list[str]
     ):
+        # Define columns for scoring
         new_score_cols = [
             col
             for col in df.columns
-            if col not in ("FEATURE_ID", "TRANSITION_ID", "ALIGNMENT_ID", "DECOY")
+            if col
+            not in (
+                "FEATURE_ID",
+                "TRANSITION_ID",
+                "IPF_PEPTIDE_ID",
+                "ALIGNMENT_ID",
+                "DECOY",
+            )
         ]
         new_score_sql = ", ".join([f"s.{col}" for col in new_score_cols])
 
         prefix = "p"
         join_on = "p.FEATURE_ID = s.FEATURE_ID"
+        key_cols = "p.FEATURE_ID"
         if self.level == "transition":
             prefix = "t"
-            join_on = (
-                "t.FEATURE_ID = s.FEATURE_ID AND t.TRANSITION_ID = s.TRANSITION_ID"
-            )
+            join_on = "t.FEATURE_ID = s.FEATURE_ID AND t.TRANSITION_ID = s.TRANSITION_ID AND t.IPF_PEPTIDE_ID = s.IPF_PEPTIDE_ID"
+            key_cols = "t.FEATURE_ID, t.TRANSITION_ID, t.IPF_PEPTIDE_ID"
         if self.level == "alignment":
             prefix = "a"
             join_on = "a.ALIGNMENT_ID = s.ALIGNMENT_ID AND a.FEATURE_ID = s.FEATURE_ID AND a.DECOY = s.DECOY"
+            key_cols = "a.ALIGNMENT_ID, a.FEATURE_ID, a.DECOY"
 
         table_alias = prefix
         select_old = ", ".join([f"{table_alias}.{col}" for col in keep_columns])
 
+        # Register the DataFrame as a table in DuckDB
         con = duckdb.connect()
         con.register("scores", pa.Table.from_pandas(df))
+
+        # Validate input row entry count and joined entry count remain the same
+        self._validate_row_count_after_join(con, target_file, key_cols, join_on, prefix)
 
         con.execute(
             f"""
@@ -456,5 +471,11 @@ class SplitParquetWriter(BaseWriter):
             (FORMAT 'parquet', COMPRESSION 'ZSTD', COMPRESSION_LEVEL 11);
             """
         )
+
+        logger.debug(
+            f"After appendings scores, {target_file} has {self._get_parquet_row_count(con, target_file)} entries"
+        )
+
         con.close()
-        logger.success(f"{target_file} written.")
+
+        logger.success(f"{target_file} written successfully.")

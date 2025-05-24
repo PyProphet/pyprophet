@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import sys
 import os
 import pickle
 import pandas as pd
@@ -7,6 +8,14 @@ from loguru import logger
 
 from .._base import BaseIOConfig
 from ..report import save_report
+
+
+class RowCountMismatchError(Exception):
+    """
+    Exception to raise when the new output with joined scores has a different amount of rows than the input.
+    """
+
+    pass
 
 
 class BaseReader(ABC):
@@ -194,7 +203,8 @@ class BaseWriter(ABC):
             score_cols.insert(3, "h0_score")
 
         if level == "transition":
-            score_cols.insert(1, "transition_id")
+            score_cols.insert(1, "ipf_peptide_id")
+            score_cols.insert(2, "transition_id")
 
         if level == "alignment":
             score_cols.insert(2, "alignment_id")
@@ -210,7 +220,7 @@ class BaseWriter(ABC):
             df = df.rename(columns={"PEAK_GROUP_RANK": "RANK"})
 
         if level == "transition":
-            key_cols = {"FEATURE_ID", "TRANSITION_ID"}
+            key_cols = {"FEATURE_ID", "IPF_PEPTIDE_ID", "TRANSITION_ID"}
         elif level == "alignment":
             key_cols = {"ALIGNMENT_ID", "FEATURE_ID", "DECOY"}
         else:
@@ -336,3 +346,77 @@ class BaseWriter(ABC):
             logger.success("%s written." % trained_weights_path)
         else:
             logger.error(f"Trained model path {trained_weights_path} not found. ")
+
+    def _get_parquet_row_count(self, con, target_file: str) -> int:
+        """
+        Get the row count of a Parquet file.
+
+        Parameters:
+            con: DuckDB connection object
+            target_file: Path to the Parquet file
+
+        Returns:
+            int: Row count of the Parquet file
+        """
+        query = f"SELECT COUNT(*) FROM read_parquet('{target_file}')"
+        row_count = con.execute(query).fetchone()[0]
+        return row_count
+
+    def _validate_row_count_after_join(
+        self, con, target_file: str, key_cols: str, join_on: str, prefix: str
+    ):
+        """
+        Validates the row count after performing a join operation on a Parquet file.
+
+        This is important, because we would not expect the appending of scores to change the number of rows in the input Parquet file.
+
+        Parameters:
+            con: DuckDB connection object
+            target_file: Path to the Parquet file
+            key_cols: The key columns for the join operation
+            join_on: The condition for the join operation
+            prefix: The prefix (table alias) used for the Parquet file in the query
+
+        Raises:
+            RowCountMismatchError: If the row count of the resulting join doesn't match the original row count.
+        """
+
+        # Retrieve the row count of the original Parquet file
+        original_row_count = self._get_parquet_row_count(con, target_file)
+
+        logger.debug(
+            f"Prior to appending scores, {target_file} has {original_row_count} entries"
+        )
+
+        # Construct the validation query
+        validate_query = f"""
+            SELECT 
+                COUNT(*) AS row_count
+            FROM (
+                SELECT {key_cols}
+                FROM read_parquet('{target_file}') {prefix}
+                LEFT JOIN scores s
+                ON {join_on}
+            ) AS subquery
+        """
+
+        # Get the row count after the join
+        result = con.execute(validate_query).fetchone()
+        resulting_row_count = result[0]
+
+        # If row count mismatch occurs, raise an error and log it
+        if resulting_row_count != original_row_count:
+            error_message = (
+                f"There was an issue with appending scores to {target_file}.\n"
+                f"Row count mismatch: Original rows {original_row_count} ≠ Resulting rows {resulting_row_count}.\n"
+                "Appending scores resulted in a different number of entries than the original input file. This is unexpected behaviour."
+            )
+
+            # Log the error with the exception and stack trace
+            try:
+                raise RowCountMismatchError(error_message)
+            except RowCountMismatchError as e:
+                logger.opt(exception=e, depth=1).critical(f"Critical error: {str(e)}")
+
+            # Optionally stop execution
+            sys.exit(1)
