@@ -47,7 +47,29 @@ class ParquetReader(BaseReader):
         return self._finalize_feature_table(feature_table, ss_main_score)
 
     def _init_duckdb_views(self, con):
-        con.execute(f"CREATE VIEW data AS SELECT * FROM read_parquet('{self.infile}')")
+        # Create TEMP table of sampled precursors IDs (if needed)
+        if self.subsample_ratio < 1.0:
+            logger.info(
+                f"Subsampling {self.subsample_ratio * 100}% data for semi-supervised learning."
+            )
+            con.execute(
+                f"""
+                CREATE TEMP TABLE sampled_precursor_ids AS
+                SELECT DISTINCT PRECURSOR_ID
+                FROM read_parquet({self.infile})
+                USING SAMPLE {self.subsample_ratio * 100}%
+                """
+            )
+            n = con.execute("SELECT COUNT(*) FROM sampled_precursor_ids").fetchone()[0]
+            logger.info(f"Sampled {n} precursor IDs")
+
+            con.execute(
+                f"CREATE VIEW data AS SELECT * FROM read_parquet('{self.infile}') WHERE PRECURSOR_ID IN (SELECT PRECURSOR_ID FROM sampled_precursor_ids)"
+            )
+        else:
+            con.execute(
+                f"CREATE VIEW data AS SELECT * FROM read_parquet('{self.infile}')"
+            )
 
     def _get_columns_by_prefix(self, parquet_file, prefix):
         cols = get_parquet_column_names(parquet_file)
