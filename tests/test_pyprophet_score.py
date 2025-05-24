@@ -234,6 +234,8 @@ class ParquetTestStrategy(TestStrategy):
         for level in levels:
             level_cmd = self.config.build_command(self.input_file, level)
 
+            if kwargs.get("subsample_ratio"):
+                level_cmd += f" --subsample_ratio={kwargs['subsample_ratio']}"
             if kwargs.get("parametric"):
                 level_cmd += " --parametric"
             if kwargs.get("pfdr"):
@@ -321,6 +323,8 @@ class SplitParquetTestStrategy(TestStrategy):
         for level in levels:
             level_cmd = self.config.build_command(self.input_file, level)
 
+            if kwargs.get("subsample_ratio"):
+                level_cmd += f" --subsample_ratio={kwargs['subsample_ratio']}"
             if kwargs.get("parametric"):
                 level_cmd += " --parametric"
             if kwargs.get("pfdr"):
@@ -424,6 +428,8 @@ class MultiSplitParquetTestStrategy(TestStrategy):
         for level in levels:
             level_cmd = self.config.build_command(self.input_file, level)
 
+            if kwargs.get("subsample_ratio"):
+                level_cmd += f" --subsample_ratio={kwargs['subsample_ratio']}"
             if kwargs.get("parametric"):
                 level_cmd += " --parametric"
             if kwargs.get("pfdr"):
@@ -783,6 +789,17 @@ def test_parquet_8(test_runner, test_config, regtest):
     )
 
 
+def test_parquet_9(test_runner, test_config, regtest):
+    run_generic_test(
+        test_runner,
+        test_config,
+        ParquetTestStrategy,
+        regtest,
+        pi0_lambda="0 0 0",
+        subample_ratio=0.5,
+    )
+
+
 def test_parquet_apply_weights(test_runner, test_config, regtest):
     # Apply weights
     run_generic_test_apply_weights(
@@ -870,6 +887,17 @@ def test_split_parquet_8(test_runner, test_config, regtest):
     )
 
 
+def test_split_parquet_9(test_runner, test_config, regtest):
+    run_generic_test(
+        test_runner,
+        test_config,
+        SplitParquetTestStrategy,
+        regtest,
+        pi0_lambda="0 0 0",
+        subample_ratio=0.5,
+    )
+
+
 def test_split_parquet_apply_weights(test_runner, test_config, regtest):
     # Apply weights
     run_generic_test_apply_weights(
@@ -954,6 +982,17 @@ def test_multi_split_parquet_8(test_runner, test_config, regtest):
         MultiSplitParquetTestStrategy,
         regtest,
         pi0_lambda="0 0 0",
+    )
+
+
+def test_multi_split_parquet_9(test_runner, test_config, regtest):
+    run_generic_test(
+        test_runner,
+        test_config,
+        MultiSplitParquetTestStrategy,
+        regtest,
+        pi0_lambda="0 0 0",
+        subample_ratio=0.5,
     )
 
 
