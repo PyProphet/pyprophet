@@ -197,6 +197,16 @@ class OSWReader(BaseReader):
         df = con.execute(
             "SELECT * FROM ms2_table ORDER BY RUN_ID, PRECURSOR_ID, EXP_RT"
         ).fetchdf()
+
+        if self.level == "ms1ms2":
+            ms1_df = con.execute("SELECT * FROM osw.FEATURE_MS1").fetchdf()
+            ms1_scores = [c for c in ms1_df.columns if c.startswith("VAR_")]
+            ms1_df = ms1_df[["FEATURE_ID"] + ms1_scores]
+            ms1_df.columns = ["FEATURE_ID"] + [
+                "VAR_MS1_" + s.split("VAR_")[1] for s in ms1_scores
+            ]
+            df = pd.merge(df, ms1_df, how="left", on="FEATURE_ID")
+
         return self._finalize_feature_table(df, self.config.runner.ss_main_score)
 
     def _fetch_ms1_features_duckdb(self, con):
@@ -395,6 +405,16 @@ class OSWReader(BaseReader):
             """
 
         df = pd.read_sql_query(query, con)
+
+        if self.level == "ms1ms2":
+            ms1_df = pd.read_sql_query("SELECT * FROM FEATURE_MS1", con)
+            ms1_scores = [c for c in ms1_df.columns if c.startswith("VAR_")]
+            ms1_df = ms1_df[["FEATURE_ID"] + ms1_scores]
+            ms1_df.columns = ["FEATURE_ID"] + [
+                "VAR_MS1_" + s.split("VAR_")[1] for s in ms1_scores
+            ]
+            df = pd.merge(df, ms1_df, how="left", on="FEATURE_ID")
+
         return self._finalize_feature_table(df, self.config.runner.ss_main_score)
 
     def _fetch_ms1_features_sqlite(self, con):
