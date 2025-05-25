@@ -184,7 +184,7 @@ def shared_statistics_options(func):
 
 # PyProphet semi-supervised learning and scoring
 @cli.command()
-# # File handling
+# File handling
 @click.option(
     "--in",
     "infile",
@@ -210,14 +210,14 @@ def shared_statistics_options(func):
     "--classifier",
     default="LDA",
     show_default=True,
-    type=click.Choice(["LDA", "XGBoost"]),
-    help='Either a "LDA" or "XGBoost" classifier is used for semi-supervised learning.',
+    type=click.Choice(["LDA", "SVM", "XGBoost"]),
+    help='Either a "LDA", "SVM" or "XGBoost" classifier is used for semi-supervised learning.',
 )
 @click.option(
-    "--xgb_autotune/--no-xgb_autotune",
+    "--autotune/--no-autotune",
     default=False,
     show_default=True,
-    help="XGBoost: Autotune hyperparameters.",
+    help="Autotune hyperparameters for XGBoost/SVM.",
 )
 @click.option(
     "--apply_weights",
@@ -270,6 +270,12 @@ def shared_statistics_options(func):
     "--ss_score_filter",
     default="",
     help='Specify scores which should used for scoring. In addition specific predefined profiles can be used. For example for metabolomis data use "metabolomics".  Please specify any additional input as follows: "var_ms1_xcorr_coelution,var_library_corr,var_xcorr_coelution,etc."',
+)
+@click.option(
+    "--ss_scale_features/--no-ss_scale_features",
+    default=False,
+    show_default=True,
+    help="Scale features before semi-supervised learning.",
 )
 # Statistics
 @click.option(
@@ -381,14 +387,14 @@ def shared_statistics_options(func):
     help="Run in test mode with fixed seed.",
 )
 @click.pass_context
-# @logger.catch
+@logger.catch(reraise=True)
 def score(
     ctx,
     infile,
     outfile,
     subsample_ratio,
     classifier,
-    xgb_autotune,
+    autotune,
     apply_weights,
     xeval_fraction,
     xeval_num_iter,
@@ -396,6 +402,8 @@ def score(
     ss_iteration_fdr,
     ss_num_iter,
     ss_main_score,
+    ss_score_filter,
+    ss_scale_features,
     group_id,
     parametric,
     pfdr,
@@ -418,7 +426,6 @@ def score(
     density_estimator,
     grid_size,
     tric_chromprob,
-    ss_score_filter,
     color_palette,
     main_score_selection_report,
     threads,
@@ -440,13 +447,15 @@ def score(
         level,
         "score_learn",
         classifier,
-        xgb_autotune,
+        autotune,
         xeval_fraction,
         xeval_num_iter,
         ss_initial_fdr,
         ss_iteration_fdr,
         ss_num_iter,
         ss_main_score,
+        ss_score_filter,
+        ss_scale_features,
         group_id,
         parametric,
         pfdr,
@@ -470,14 +479,13 @@ def score(
         tric_chromprob,
         threads,
         test,
-        ss_score_filter,
         color_palette,
         main_score_selection_report,
     )
 
     # Validate file type and subsample ratio, subsample_ratio is currently only applicateble for "parquet_split", "parquet_split_multi". If this combination is not met, throw warning and set subsample_ratio to 1.0
     if (
-        config.file_type not in ["parquet_split", "parquet_split_multi"]
+        config.file_type not in ["parquet", "parquet_split", "parquet_split_multi"]
         and subsample_ratio < 1.0
     ):
         logger.warning(

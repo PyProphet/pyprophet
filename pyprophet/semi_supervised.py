@@ -4,7 +4,7 @@ from loguru import logger
 
 from ._config import RunnerIOConfig
 from .data_handling import Experiment, update_chosen_main_score_in_table
-from .classifiers import AbstractLearner, XGBLearner
+from .classifiers import AbstractLearner, SVMLearner, XGBLearner
 from .stats import find_cutoff
 
 try:
@@ -28,7 +28,7 @@ class AbstractSemiSupervisedLearner(object):
     def iter_semi_supervised_learning(self, train):
         raise NotImplementedError()
 
-    def averaged_learner(self, params):
+    def averaged_learner(self, params, **kwargs):
         raise NotImplementedError()
 
     def score(self, df, params):
@@ -137,6 +137,7 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
             self, xeval_fraction, xeval_num_iter, test
         )
         self.inner_learner = inner_learner
+        self.autotune = inner_learner.autotune
         self.xeval_fraction = xeval_fraction
         self.xeval_num_iter = xeval_num_iter
         self.ss_initial_fdr = ss_initial_fdr
@@ -365,16 +366,19 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
             and self.inner_learner.xgb_hyperparams["autotune"]
         ):
             self.inner_learner.tune(td_peaks, bt_peaks, True)
+        elif isinstance(self.inner_learner, SVMLearner) and self.inner_learner.autotune:
+            self.inner_learner.tune(td_peaks, bt_peaks, True)
 
         model = self.inner_learner.learn(td_peaks, bt_peaks, True)
         w = model.get_parameters()
         clf_scores = model.score(train, True)
         return w, clf_scores
 
-    def averaged_learner(self, params):
-        return self.inner_learner.averaged_learner(params)
+    def averaged_learner(self, params, **kwargs):
+        return self.inner_learner.averaged_learner(params, **kwargs)
 
     def set_learner(self, model):
+        logger.trace(f"Setting inner learner parmeters from : {model}")
         return self.inner_learner.set_parameters(model)
 
     def score(self, df, params):

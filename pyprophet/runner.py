@@ -209,6 +209,8 @@ class PyProphetRunner(object):
 
         if self.runner_config.classifier == "LDA":
             return self.config.extra_writes.get("trained_weights_path")
+        elif self.runner_config.classifier == "SVM":
+            return self.config.extra_writes.get("trained_weights_path")
         elif self.runner_config.classifier == "XGBoost":
             return self.config.extra_writes.get(
                 f"trained_model_path_{self.config.level}"

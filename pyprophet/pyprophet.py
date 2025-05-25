@@ -22,7 +22,7 @@ from .stats import (
     posterior_chromatogram_hypotheses_fast,
 )
 from .data_handling import prepare_data_table, Experiment
-from .classifiers import LDALearner, XGBLearner
+from .classifiers import LDALearner, SVMLearner, XGBLearner
 from .semi_supervised import StandardSemiSupervisedLearner
 
 
@@ -92,6 +92,7 @@ class Scorer(object):
         error_estimation_config: ErrorEstimationConfig,
         tric_chromprob,
         ss_score_filter,
+        ss_scale_features,
         color_palette,
         level,
     ):
@@ -107,6 +108,7 @@ class Scorer(object):
         self.error_estimation_config = error_estimation_config
         self.tric_chromprob = tric_chromprob
         self.ss_score_filter = ss_score_filter
+        self.ss_scale_features = ss_scale_features
         self.color_palette = color_palette
         self.level = level
 
@@ -138,7 +140,7 @@ class Scorer(object):
 
     def score(self, table):
 
-        prepared_table, __ = prepare_data_table(
+        prepared_table, __, used_var_column_ids = prepare_data_table(
             table,
             self.ss_score_filter,
             tg_id_name=self.group_id,
@@ -146,6 +148,9 @@ class Scorer(object):
             level=self.level,
         )
         texp = Experiment(prepared_table)
+        if self.ss_scale_features:
+            logger.info("Scaling features.")
+            texp.scale_features(["main_score"] + used_var_column_ids)
         score = self.classifier.score(texp, True)
         texp["r_score"] = score
         texp["d_score"] = (score - self.mu) / self.nu
@@ -220,10 +225,14 @@ class PyProphet:
         self.rc = config.runner
 
         # Instantiate base learner
+        logger.trace(f"Initializing base learner: {self.rc.classifier}")
         if self.rc.classifier == "LDA":
             base_learner = LDALearner()
+        elif self.rc.classifier == "SVM":
+            base_learner = SVMLearner(1, 1000, self.rc.autotune)
         elif self.rc.classifier == "XGBoost":
             base_learner = XGBLearner(
+                self.rc.autotune,
                 self.rc.xgb_hyperparams,
                 self.rc.xgb_params,
                 self.rc.xgb_params_space,
@@ -240,13 +249,17 @@ class PyProphet:
         )
 
     def _setup_experiment(self, table):
-        prepared_table, score_columns = prepare_data_table(
+        prepared_table, score_columns, used_var_column_ids = prepare_data_table(
             table,
             self.rc.ss_score_filter,
             tg_id_name=self.rc.group_id,
             level=self.config.level,
         )
+
         experiment = Experiment(prepared_table)
+        if self.rc.ss_scale_features:
+            logger.info("Scaling features.")
+            experiment.scale_features(["main_score"] + used_var_column_ids)
         experiment.log_summary()
         return experiment, score_columns
 
@@ -255,6 +268,13 @@ class PyProphet:
             experiment, score_columns = self._setup_experiment(table)
 
             if self.rc.classifier == "LDA":
+                if np.all(score_columns == loaded_weights["score"].values):
+                    weights = loaded_weights["weight"].values
+                else:
+                    raise click.ClickException(
+                        "Scores in weights file do not match data."
+                    )
+            elif self.rc.classifier == "SVM":
                 if np.all(score_columns == loaded_weights["score"].values):
                     weights = loaded_weights["weight"].values
                 else:
@@ -279,6 +299,14 @@ class PyProphet:
         if self.rc.classifier == "LDA":
             ws = [weights.flatten()]
             return learner.averaged_learner(ws)
+        elif self.rc.classifier == "SVM":
+            ws = [weights.flatten()]
+            return learner.averaged_learner(
+                ws,
+                C=learner.inner_learner.C,
+                max_iter=learner.inner_learner.max_iter,
+                autotune=learner.inner_learner.autotune,
+            )
         else:  # XGBoost
             return learner.set_learner(weights)
 
@@ -322,6 +350,13 @@ class PyProphet:
 
         if self.rc.classifier == "LDA":
             return learner.averaged_learner(ws)
+        # elif self.rc.classifier == "SVM":
+        #     return learner.averaged_learner(
+        #         ws,
+        #         C=learner.inner_learner.C,
+        #         max_iter=learner.inner_learner.max_iter,
+        #         autotune=learner.inner_learner.autotune,
+        #     )
 
         # XGBoost - integrate cross-validation scores and train final model
         ttt_avg = pd.concat(ttt, axis=1).mean(axis=1)
@@ -337,6 +372,11 @@ class PyProphet:
         if self.rc.classifier == "LDA":
             weights = final_classifier.get_parameters()
             classifier_table = pd.DataFrame({"score": score_columns, "weight": weights})
+        elif self.rc.classifier == "SVM":
+            classifier_table = final_classifier.get_parameters()
+            feat_weights = final_classifier.get_weights(score_columns)
+            for feat, weight in zip(feat_weights["feature"], feat_weights["weight"]):
+                logger.info(f"Weight of {feat}: {weight}")
         else:
             classifier_table = final_classifier.get_parameters()
             mapper = {"f{0}".format(i): v for i, v in enumerate(score_columns)}
@@ -355,6 +395,7 @@ class PyProphet:
             error_estimation_config=self.rc.error_estimation_config,
             tric_chromprob=self.rc.tric_chromprob,
             ss_score_filter=self.rc.ss_score_filter,
+            ss_scale_features=self.rc.ss_scale_features,
             color_palette=self.rc.color_palette,
             level=self.config.level,
         )

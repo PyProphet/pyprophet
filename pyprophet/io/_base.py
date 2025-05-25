@@ -177,6 +177,8 @@ class BaseWriter(ABC):
         """
         if self.classifier == "LDA":
             self._save_tsv_weights(weights)
+        elif self.classifier == "SVM":
+            self._save_tsv_weights(weights)
         elif self.classifier == "XGBoost":
             self._save_bin_weights(weights)
         else:
@@ -248,7 +250,7 @@ class BaseWriter(ABC):
 
         return [col for col in existing_cols if not col.startswith(score_prefix)]
 
-    def _write_pdf_report_if_present(self, result, pi0):
+    def _write_pdf_report(self, result, pi0):
         """
         Write a PDF report if the scoring results contain final statistics.
         """
@@ -260,6 +262,9 @@ class BaseWriter(ABC):
         if self.level == "alignment":
             # Map Decoy 1 to 0 and -1 to 1
             df["decoy"] = df["decoy"].map({1: 0, -1: 1})
+
+        # print(df)
+        # print(df.columns)
 
         prefix = self.config.prefix
         level = self.level
@@ -305,6 +310,36 @@ class BaseWriter(ABC):
             pvalues,
             pi0,
             self.config.runner.color_palette,
+            self.level,
+            df=df,
+        )
+        logger.success(f"{pdf_path} written.")
+
+    def _write_levels_context_pdf_report(self, data, stat_table, pi0):
+        """
+        Write a PDF report for levels context.
+        """
+        context = self.config.context_fdr
+        prefix = self.config.prefix
+        analyte = self.config.level
+        if context == "run-specific":
+            prefix = prefix + "_" + str(data["run_id"].unique()[0])
+
+        pdf_path = os.path.join(prefix + "_" + context + "_" + analyte + "_report.pdf")
+        title = prefix + "_" + context + "_" + analyte + "-level error-rate control"
+        save_report(
+            pdf_path,
+            title,
+            data[data.decoy == 1]["score"].values,
+            data[data.decoy == 0]["score"].values,
+            stat_table["cutoff"].values,
+            stat_table["svalue"].values,
+            stat_table["qvalue"].values,
+            data[data.decoy == 0]["p_value"].values,
+            pi0,
+            self.config.color_palette,
+            analyte,
+            data,
         )
         logger.success(f"{pdf_path} written.")
 
@@ -399,6 +434,8 @@ class BaseWriter(ABC):
                 ON {join_on}
             ) AS subquery
         """
+
+        logger.trace(f"Row Entry validation query:\n{validate_query}")
 
         # Get the row count after the join
         result = con.execute(validate_query).fetchone()
