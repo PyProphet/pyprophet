@@ -6,6 +6,7 @@ from loguru import logger
 import sys
 import os
 import multiprocessing
+from sklearn.preprocessing import StandardScaler
 
 
 from .stats import mean_and_std_dev
@@ -114,7 +115,7 @@ def cleanup_and_check(df):
     sub_df = df.loc[:, score_columns]
     flags = ~pd.isnull(sub_df)
     valid_rows = flags.all(axis=1)
-
+    logger.trace(f"{valid_rows.sum()} valid rows out of {len(df)}")
     df_cleaned = df.loc[valid_rows, :]
 
     # decoy / non decoy sub tables
@@ -132,6 +133,7 @@ def cleanup_and_check(df):
         "Data set contains %d decoy and %d target groups." % (n_decoy, n_target)
     )
     if n_decoy < 10 or n_target < 10:
+        print(sub_df)
         raise click.ClickException(
             "At least 10 decoy groups and 10 target groups are required."
         )
@@ -260,6 +262,7 @@ def prepare_data_table(
         "main_score",
     ]
     used_var_column_names = []
+    used_var_column_ids = []
     for i, v in enumerate(var_column_names):
         col_name = "var_%d" % i
         col_data = table[v]
@@ -270,6 +273,7 @@ def prepare_data_table(
             continue
         else:
             used_var_column_names.append(v)
+            used_var_column_ids.append(col_name)
 
         data[col_name] = col_data
         column_names.append(col_name)
@@ -282,7 +286,7 @@ def prepare_data_table(
 
     all_score_columns = (main_score_name,) + tuple(used_var_column_names)
     df = cleanup_and_check(df)
-    return df, all_score_columns
+    return df, all_score_columns, used_var_column_ids
 
 
 def update_chosen_main_score_in_table(train, score_columns, use_as_main_score):
@@ -374,6 +378,27 @@ class Experiment(object):
         ]:
             raise click.ClickException("Use '[...]' syntax to set input file columns.")
         object.__setattr__(self, name, value)
+
+    def scale_features(self, score_columns):
+        """
+        Scale the features to [0,1] range
+        Args:
+            score_columns: list of columns to be scaled
+        """
+
+        scaler = StandardScaler()
+        # Get the feature matrix from the DataFrame
+        feature_matrix = self.df[score_columns].values
+        # Fit the scaler to the feature matrix
+        scaler.fit(feature_matrix)
+        # Transform the feature matrix
+        scaled_features = scaler.transform(feature_matrix)
+        # Update the DataFrame with the scaled features
+        for i, col in enumerate(score_columns):
+            logger.trace(
+                f"Scaling column {col}: min={scaled_features[:, i].min()}, max={scaled_features[:, i].max()}, mean={scaled_features[:, i].mean()}, std={scaled_features[:, i].std()}"
+            )
+            self.df[col] = scaled_features[:, i]
 
     def set_and_rerank(self, col_name, scores):
         self.df.loc[:, col_name] = scores
