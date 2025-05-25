@@ -11,18 +11,29 @@ _LOGGER_INITIALIZED = False  # Module-level flag
 
 
 def setup_logger(log_level):
+    def formatter(record):
+        # Format with module, function, and line number
+        # mod_func_line = f"{record['module']}::{record['function']}:{record['line']}"
+        # return (
+        #     f"[ <green>{record['time']:YYYY-MM-DD at HH:mm:ss}</green> | "
+        #     f"<level>{record['level']: <7}</level> | "
+        #     f"{mod_func_line: <37} ] "
+        #     f"<level>{record['message']}</level>\n"
+        # )
+        mod_func_line = f"{record['module']}::{record['line']}"
+        return (
+            f"[ <green>{record['time']:YYYY-MM-DD at HH:mm:ss}</green> | "
+            f"<level>{record['level']: <7}</level> | "
+            f"{mod_func_line: <27} ] "
+            f"<level>{record['message']}</level>\n"
+        )
+
     global _LOGGER_INITIALIZED
     if _LOGGER_INITIALIZED:
         return
 
     logger.remove()  # Remove default logger
-    logger.add(
-        sys.stdout,
-        colorize=True,
-        format="[ <green>{time:YYYY-MM-DD at HH:mm:ss}</green> <level>{level}</level> ] <level>{message}</level>",
-        # filter=__name__,
-        level=log_level,
-    )
+    logger.add(sys.stdout, colorize=True, format=formatter, level=log_level)
 
     _LOGGER_INITIALIZED = True
 
