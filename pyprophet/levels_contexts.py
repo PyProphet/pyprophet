@@ -22,9 +22,6 @@ from .glyco.stats import statistics_report as glyco_statistics_report
 
 def statistics_report(
     data,
-    outfile,
-    context,
-    analyte,
     parametric,
     pfdr,
     pi0_lambda,
@@ -36,7 +33,7 @@ def statistics_report(
     lfdr_transformation,
     lfdr_adj,
     lfdr_eps,
-    color_palette,
+    writer,
 ):
 
     error_stat, pi0 = error_statistics(
@@ -72,22 +69,7 @@ def statistics_report(
     data["q_value"] = q_values
     data["pep"] = peps
 
-    if context == "run-specific":
-        outfile = outfile + "_" + str(data["run_id"].unique()[0])
-
-    # export PDF report
-    save_report(
-        outfile + "_" + context + "_" + analyte + ".pdf",
-        outfile + ": " + context + " " + analyte + "-level error-rate control",
-        data[data.decoy == 1]["score"].values,
-        data[data.decoy == 0]["score"].values,
-        stat_table["cutoff"].values,
-        stat_table["svalue"].values,
-        stat_table["qvalue"].values,
-        data[data.decoy == 0]["p_value"].values,
-        pi0,
-        color_palette,
-    )
+    writer._write_levels_context_pdf_report(data, stat_table, pi0)
 
     return data
 
@@ -97,6 +79,7 @@ def infer_genes(
 ):
     context = config.context_fdr
     reader = ReaderDispatcher.get_reader(config)
+    writer = WriterDispatcher.get_writer(config)
 
     if context in ["global", "experiment-wide", "run-specific"]:
         data = reader.read()
@@ -108,9 +91,6 @@ def infer_genes(
     if context == "run-specific":
         data = data.groupby("run_id").apply(
             statistics_report,
-            config.outfile,
-            context,
-            "gene",
             config.error_estimation_config.parametric,
             config.error_estimation_config.pfdr,
             config.error_estimation_config.pi0_lambda,
@@ -122,14 +102,11 @@ def infer_genes(
             config.error_estimation_config.lfdr_transformation,
             config.error_estimation_config.lfdr_adj,
             config.error_estimation_config.lfdr_eps,
-            config.color_palette,
+            writer,
         )
     elif context in ["global", "experiment-wide"]:
         data = statistics_report(
             data,
-            config.outfile,
-            context,
-            "gene",
             config.error_estimation_config.parametric,
             config.error_estimation_config.pfdr,
             config.error_estimation_config.pi0_lambda,
@@ -141,11 +118,10 @@ def infer_genes(
             config.error_estimation_config.lfdr_transformation,
             config.error_estimation_config.lfdr_adj,
             config.error_estimation_config.lfdr_eps,
-            config.color_palette,
+            writer,
         )
 
     # Store results
-    writer = WriterDispatcher.get_writer(config)
     writer.save_results(data)
 
 
@@ -154,6 +130,7 @@ def infer_proteins(
 ):
     context = config.context_fdr
     reader = ReaderDispatcher.get_reader(config)
+    writer = WriterDispatcher.get_writer(config)
 
     if context in ["global", "experiment-wide", "run-specific"]:
         data = reader.read()
@@ -165,9 +142,6 @@ def infer_proteins(
     if context == "run-specific":
         data = data.groupby("run_id").apply(
             statistics_report,
-            config.outfile,
-            context,
-            "protein",
             config.error_estimation_config.parametric,
             config.error_estimation_config.pfdr,
             config.error_estimation_config.pi0_lambda,
@@ -179,14 +153,11 @@ def infer_proteins(
             config.error_estimation_config.lfdr_transformation,
             config.error_estimation_config.lfdr_adj,
             config.error_estimation_config.lfdr_eps,
-            config.color_palette,
+            writer,
         )
     elif context in ["global", "experiment-wide"]:
         data = statistics_report(
             data,
-            config.outfile,
-            context,
-            "protein",
             config.error_estimation_config.parametric,
             config.error_estimation_config.pfdr,
             config.error_estimation_config.pi0_lambda,
@@ -198,17 +169,17 @@ def infer_proteins(
             config.error_estimation_config.lfdr_transformation,
             config.error_estimation_config.lfdr_adj,
             config.error_estimation_config.lfdr_eps,
-            config.color_palette,
+            writer,
         )
 
     # Store results
-    writer = WriterDispatcher.get_writer(config)
     writer.save_results(data)
 
 
 def infer_peptides(config: LevelContextIOConfig):
     context = config.context_fdr
     reader = ReaderDispatcher.get_reader(config)
+    writer = WriterDispatcher.get_writer(config)
 
     if context in ["global", "experiment-wide", "run-specific"]:
         data = reader.read()
@@ -218,9 +189,6 @@ def infer_peptides(config: LevelContextIOConfig):
     if context == "run-specific":
         data = data.groupby("run_id").apply(
             statistics_report,
-            config.outfile,
-            context,
-            "peptide",
             config.error_estimation_config.parametric,
             config.error_estimation_config.pfdr,
             config.error_estimation_config.pi0_lambda,
@@ -232,15 +200,12 @@ def infer_peptides(config: LevelContextIOConfig):
             config.error_estimation_config.lfdr_transformation,
             config.error_estimation_config.lfdr_adj,
             config.error_estimation_config.lfdr_eps,
-            config.color_palette,
+            writer,
         )
 
     elif context in ["global", "experiment-wide"]:
         data = statistics_report(
             data,
-            config.outfile,
-            context,
-            "peptide",
             config.error_estimation_config.parametric,
             config.error_estimation_config.pfdr,
             config.error_estimation_config.pi0_lambda,
@@ -252,11 +217,10 @@ def infer_peptides(config: LevelContextIOConfig):
             config.error_estimation_config.lfdr_transformation,
             config.error_estimation_config.lfdr_adj,
             config.error_estimation_config.lfdr_eps,
-            config.color_palette,
+            writer,
         )
 
     # store data in table
-    writer = WriterDispatcher.get_writer(config)
     writer.save_results(data)
 
 
@@ -279,7 +243,7 @@ def infer_glycopeptides(
         data = (
             data.groupby("run_id")
             .apply(
-                statistics_report,
+                glyco_statistics_report,
                 config.outfile,
                 context,
                 "glycopeptide",
