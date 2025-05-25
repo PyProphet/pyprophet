@@ -513,7 +513,7 @@ def save_report(
     plotter = PlotGenerator(color_palette)
 
     with PdfPages(pdf_path) as pdf:
-        logger.trace("Generating main panel plot")
+        logger.debug("Generating main panel plot")
         try:
             # Plot main panel
             plotter.plot_main_panel(
