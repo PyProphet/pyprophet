@@ -48,7 +48,8 @@ class RunnerConfig:
     Configuration for scoring, classifier setup, learning parameters, and optional features.
 
     Attributes:
-        classifier (str): Classifier type used for semi-supervised learning ('LDA' or 'XGBoost').
+        classifier (str): Classifier type used for semi-supervised learning ('LDA', 'SVM' or 'XGBoost').
+        autotune (bool): Whether to autotune hyperparameters for the classifier (XGBoost / SVM)
         ss_main_score (str): Starting main score for semi-supervised learning (can be 'auto').
         main_score_selection_report (bool): Whether to generate a report for main score selection.
 
@@ -63,6 +64,7 @@ class RunnerConfig:
         ss_iteration_fdr (float): FDR threshold used in subsequent learning iterations.
         ss_num_iter (int): Number of semi-supervised training iterations.
         ss_score_filter (bool): Whether to filter features based on score set or profile.
+        ss_scale_features (bool): Whether to scale features before training.
         ss_use_dynamic_main_score (bool): Automatically determined during `__post_init__`.
 
         group_id (str): Column used to group PSMs for learning and statistics.
@@ -86,6 +88,7 @@ class RunnerConfig:
 
     # Scoring / classifier options
     classifier: str = "LDA"
+    autotune: bool = False
     ss_main_score: str = "auto"
     main_score_selection_report: bool = False
 
@@ -105,6 +108,7 @@ class RunnerConfig:
     ss_score_filter: bool = (
         False  # Derived from whether ss_score_filter string is empty
     )
+    ss_scale_features: bool = False
     ss_use_dynamic_main_score: bool = field(init=False)
 
     # Grouping & statistical options
@@ -182,13 +186,15 @@ class RunnerIOConfig(BaseIOConfig):
         level,
         context,
         classifier,
-        xgb_autotune,
+        autotune,
         xeval_fraction,
         xeval_num_iter,
         ss_initial_fdr,
         ss_iteration_fdr,
         ss_num_iter,
         ss_main_score,
+        ss_score_filter,
+        ss_scale_features,
         group_id,
         parametric,
         pfdr,
@@ -212,7 +218,6 @@ class RunnerIOConfig(BaseIOConfig):
         tric_chromprob,
         threads,
         test,
-        ss_score_filter,
         color_palette,
         main_score_selection_report,
     ):
@@ -220,7 +225,7 @@ class RunnerIOConfig(BaseIOConfig):
         Creates a configuration object from command-line arguments.
         """
         xgb_hyperparams = {
-            "autotune": xgb_autotune,
+            "autotune": autotune,
             "autotune_num_rounds": 10,
             "num_boost_round": 100,
             "early_stopping_rounds": 10,
@@ -282,6 +287,7 @@ class RunnerIOConfig(BaseIOConfig):
 
         runner_config = RunnerConfig(
             classifier=classifier,
+            autotune=autotune,
             ss_main_score=ss_main_score,
             main_score_selection_report=main_score_selection_report,
             xgb_hyperparams=xgb_hyperparams,
@@ -293,6 +299,7 @@ class RunnerIOConfig(BaseIOConfig):
             ss_iteration_fdr=ss_iteration_fdr,
             ss_num_iter=ss_num_iter,
             ss_score_filter=ss_score_filter,
+            ss_scale_features=ss_scale_features,
             group_id=group_id,
             error_estimation_config=error_estimation_config,
             ipf_max_peakgroup_rank=ipf_max_peakgroup_rank,
