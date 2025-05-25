@@ -109,7 +109,7 @@ class SplitParquetReader(BaseReader):
 
         # Create view: precursors
         if self.subsample_ratio < 1.0:
-            logger.debug("Creating 'precursors' view with sampled precursor IDs")
+            logger.trace("Creating 'precursors' view with sampled precursor IDs")
             con.execute(
                 f"""
                 CREATE VIEW precursors AS
@@ -119,7 +119,7 @@ class SplitParquetReader(BaseReader):
                 """
             )
         else:
-            logger.debug("Creating 'precursors' view with full input")
+            logger.trace("Creating 'precursors' view with full input")
             con.execute(
                 f"CREATE VIEW precursors AS SELECT * FROM read_parquet({precursor_files})"
             )

@@ -111,7 +111,7 @@ class SplitParquetReader(BaseReader):
 
         # Create view: precursors
         if self.subsample_ratio < 1.0:
-            logger.debug("Creating 'precursors' view with sampled precursor IDs")
+            logger.trace("Creating 'precursors' view with sampled precursor IDs")
             con.execute(
                 f"""
                 CREATE VIEW precursors AS
@@ -121,7 +121,7 @@ class SplitParquetReader(BaseReader):
                 """
             )
         else:
-            logger.debug("Creating 'precursors' view with full input")
+            logger.trace("Creating 'precursors' view with full input")
             con.execute(
                 f"CREATE VIEW precursors AS SELECT * FROM read_parquet({precursor_files})"
             )
@@ -129,7 +129,7 @@ class SplitParquetReader(BaseReader):
         # Create view: transition
         if transition_files:
             if self.subsample_ratio < 1.0:
-                logger.debug("Creating 'transition' view with sampled precursor IDs")
+                logger.trace("Creating 'transition' view with sampled precursor IDs")
                 con.execute(
                     f"""
                     CREATE VIEW transition AS
@@ -139,7 +139,7 @@ class SplitParquetReader(BaseReader):
                     """
                 )
             else:
-                logger.debug("Creating 'transition' view with full input")
+                logger.trace("Creating 'transition' view with full input")
                 con.execute(
                     f"CREATE VIEW transition AS SELECT * FROM read_parquet({transition_files})"
                 )
@@ -147,7 +147,7 @@ class SplitParquetReader(BaseReader):
         # Create view: feature_alignment
         if os.path.exists(alignment_file):
             if self.subsample_ratio < 1.0:
-                logger.debug(
+                logger.trace(
                     "Creating 'feature_alignment' view with sampled precursor IDs"
                 )
                 con.execute(
@@ -159,7 +159,7 @@ class SplitParquetReader(BaseReader):
                     """
                 )
             else:
-                logger.debug("Creating 'feature_alignment' view with full input")
+                logger.trace("Creating 'feature_alignment' view with full input")
                 con.execute(
                     f"CREATE VIEW feature_alignment AS SELECT * FROM read_parquet('{alignment_file}')"
                 )
@@ -529,7 +529,7 @@ class SplitParquetWriter(BaseWriter):
                 con,
                 file_path,
                 "p.FEATURE_ID, p.IPF_PEPTIDE_ID",
-                "ON p.FEATURE_ID = s.FEATURE_ID AND p.IPF_PEPTIDE_ID = s.PEPTIDE_ID",
+                "p.FEATURE_ID = s.FEATURE_ID AND p.IPF_PEPTIDE_ID = s.PEPTIDE_ID",
                 "p",
             )
 

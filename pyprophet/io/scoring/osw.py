@@ -256,6 +256,7 @@ class OSWReader(BaseReader):
             )
 
         df = con.execute("SELECT * FROM ms1_table").fetchdf()
+
         return self._finalize_feature_table(df, rc.ss_main_score)
 
     def _fetch_transition_features_duckdb(self, con):
@@ -641,7 +642,7 @@ class OSWWriter(BaseWriter):
         logger.success(f"{self.outfile} written.")
 
         # Save report if statistics are present
-        self._write_pdf_report_if_present(result, pi0)
+        self._write_pdf_report(result, pi0)
 
     def save_weights(self, weights):
         if self.classifier == "LDA":

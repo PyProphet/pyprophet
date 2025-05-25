@@ -271,7 +271,7 @@ class ParquetWriter(BaseWriter):
 
         self._write_parquet_with_scores(target_file, score_df, columns_to_keep)
 
-        self._write_pdf_report_if_present(result, pi0)
+        self._write_pdf_report(result, pi0)
 
     def _write_parquet_with_scores(self, target_file, df, keep_columns):
         new_score_cols = [

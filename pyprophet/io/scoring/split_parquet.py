@@ -112,7 +112,7 @@ class SplitParquetReader(BaseReader):
 
         # Create view: precursors
         if self.subsample_ratio < 1.0:
-            logger.debug("Creating 'precursors' view with sampled precursor IDs")
+            logger.trace("Creating 'precursors' view with sampled precursor IDs")
             con.execute(
                 f"""
                 CREATE VIEW precursors AS
@@ -122,7 +122,7 @@ class SplitParquetReader(BaseReader):
                 """
             )
         else:
-            logger.debug("Creating 'precursors' view with full input")
+            logger.trace("Creating 'precursors' view with full input")
             con.execute(
                 f"CREATE VIEW precursors AS SELECT * FROM read_parquet({precursor_files})"
             )
@@ -130,7 +130,7 @@ class SplitParquetReader(BaseReader):
         # Create view: transition
         if transition_files:
             if self.subsample_ratio < 1.0:
-                logger.debug("Creating 'transition' view with sampled precursor IDs")
+                logger.trace("Creating 'transition' view with sampled precursor IDs")
                 con.execute(
                     f"""
                     CREATE VIEW transition AS
@@ -140,7 +140,7 @@ class SplitParquetReader(BaseReader):
                     """
                 )
             else:
-                logger.debug("Creating 'transition' view with full input")
+                logger.trace("Creating 'transition' view with full input")
                 con.execute(
                     f"CREATE VIEW transition AS SELECT * FROM read_parquet({transition_files})"
                 )
@@ -160,7 +160,7 @@ class SplitParquetReader(BaseReader):
                     """
                 )
             else:
-                logger.debug("Creating 'feature_alignment' view with full input")
+                logger.trace("Creating 'feature_alignment' view with full input")
                 con.execute(
                     f"CREATE VIEW feature_alignment AS SELECT * FROM read_parquet('{alignment_file}')"
                 )
@@ -275,7 +275,7 @@ class SplitParquetReader(BaseReader):
     def _fetch_transition_features(self, con, feature_cols):
         cols_sql = ", ".join([f"t.{col}" for col in feature_cols])
         rc = self.config.runner
-        query = f"""SELECT t.TRANSITION_DECOY AS DECOY, t.FEATURE_ID, t.IPF_PEPTIDE_ID, t.TRANSITION_ID,
+        query = f"""SELECT t.TRANSITION_DECOY AS DECOY, t.RUN_ID, t.FEATURE_ID, t.IPF_PEPTIDE_ID, t.TRANSITION_ID, t.FEATURE_TRANSITION_AREA_INTENSITY AS AREA_INTENSITY,
                         {cols_sql}, p.PRECURSOR_CHARGE, t.TRANSITION_CHARGE,
                         p.RUN_ID || '_' || t.FEATURE_ID || '_' || t.TRANSITION_ID AS GROUP_ID
                     FROM transition t
@@ -286,6 +286,7 @@ class SplitParquetReader(BaseReader):
                         AND t.FEATURE_TRANSITION_VAR_ISOTOPE_OVERLAP_SCORE <= {rc.ipf_max_transition_isotope_overlap}
                         AND t.FEATURE_TRANSITION_VAR_LOG_SN_SCORE > {rc.ipf_min_transition_sn}
                     ORDER BY p.RUN_ID, p.PRECURSOR_ID, p.EXP_RT, t.TRANSITION_ID"""
+        logger.trace(f"Transition features SQL query: {query}")
         df = (
             con.execute(query)
             .pl()
@@ -418,7 +419,7 @@ class SplitParquetWriter(BaseWriter):
 
             self._write_parquet_with_scores(file_path, score_df, columns_to_keep)
 
-        self._write_pdf_report_if_present(result, pi0)
+        self._write_pdf_report(result, pi0)
 
     def _write_parquet_with_scores(
         self, target_file: str, df: pd.DataFrame, keep_columns: list[str]
