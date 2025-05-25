@@ -23,6 +23,7 @@ keywords = ["bioinformatics", "openSWATH", "mass spectrometry"]
 # Dependencies required for runtime
 dependencies = [
     "Click",
+    "loguru",
     "duckdb",
     "duckdb-extensions",
     "duckdb-extension-sqlite-scanner",
@@ -37,6 +38,7 @@ dependencies = [
     "hyperopt",
     "statsmodels >= 0.8.0",
     "matplotlib",
+    "seaborn",
     "tabulate",
     "pyarrow",
     "pypdf"
