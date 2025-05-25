@@ -178,9 +178,6 @@ class SVMLearner(LinearLearner):
         self.C = grid_search.best_params_["C"]
         self.max_iter = grid_search.best_params_["max_iter"]
 
-        # Optionally, retrain the model with the best parameters
-        # self.learn(decoy_peaks, target_peaks, use_main_score)
-
         return self
 
     def learn(self, decoy_peaks, target_peaks, use_main_score=True):
