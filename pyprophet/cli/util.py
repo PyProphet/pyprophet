@@ -289,3 +289,99 @@ def transform_subsample_ratio(ctx, param, value):
             "Wrong input values for subsample_ratio. subsample_ratio must be within [0,1]."
         )
     return value
+
+
+def shared_statistics_options(func):
+    """
+    Decorator to add shared statistics options to a command.
+    """
+    options = [
+        click.option(
+            "--parametric/--no-parametric",
+            default=False,
+            show_default=True,
+            help="Do parametric estimation of p-values.",
+            hidden=False,
+        ),
+        click.option(
+            "--pfdr/--no-pfdr",
+            default=False,
+            show_default=True,
+            help="Compute positive false discovery rate (pFDR) instead of FDR.",
+            hidden=True,
+        ),
+        click.option(
+            "--pi0_lambda",
+            default=[0.1, 0.5, 0.05],
+            show_default=True,
+            type=(float, float, float),
+            help="Use non-parametric estimation of p-values. Either use <START END STEPS>, e.g. 0.1, 1.0, 0.1 or set to fixed value, e.g. 0.4, 0, 0.",
+            hidden=True,
+            callback=transform_pi0_lambda,
+        ),
+        click.option(
+            "--pi0_method",
+            default="bootstrap",
+            show_default=True,
+            type=click.Choice(["smoother", "bootstrap"]),
+            help="Method for choosing tuning parameter in pi₀ estimation.",
+            hidden=True,
+        ),
+        click.option(
+            "--pi0_smooth_df",
+            default=3,
+            show_default=True,
+            type=int,
+            help="Degrees of freedom for smoother when estimating pi₀.",
+            hidden=True,
+        ),
+        click.option(
+            "--pi0_smooth_log_pi0/--no-pi0_smooth_log_pi0",
+            default=False,
+            show_default=True,
+            help="Apply smoother to log(pi₀) values during estimation.",
+            hidden=True,
+        ),
+        click.option(
+            "--lfdr_truncate/--no-lfdr_truncate",
+            show_default=True,
+            default=True,
+            help="If True, local FDR values > 1 are set to 1.",
+            hidden=True,
+        ),
+        click.option(
+            "--lfdr_monotone/--no-lfdr_monotone",
+            show_default=True,
+            default=True,
+            help="Ensure local FDR values are non-decreasing with p-values.",
+            hidden=True,
+        ),
+        click.option(
+            "--lfdr_transformation",
+            default="probit",
+            show_default=True,
+            type=click.Choice(["probit", "logit"]),
+            help="Transformation applied to p-values for local FDR estimation.",
+            hidden=True,
+        ),
+        click.option(
+            "--lfdr_adj",
+            default=1.5,
+            show_default=True,
+            type=float,
+            help="Smoothing bandwidth multiplier used in density estimation.",
+            hidden=True,
+        ),
+        click.option(
+            "--lfdr_eps",
+            default=np.power(10.0, -8),
+            show_default=True,
+            type=float,
+            help="Threshold for p-value tails in local FDR calculation.",
+            hidden=True,
+        ),
+    ]
+
+    for option in reversed(options):
+        func = option(func)
+    return func
