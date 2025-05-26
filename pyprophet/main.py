@@ -2,20 +2,17 @@ import sys
 import os
 import pathlib
 import shutil
-import ast
 import time
 import sqlite3
 import pandas as pd
 import numpy as np
 import click
 from loguru import logger
-from functools import update_wrapper
 from tabulate import tabulate
 
-from hyperopt import hp
-
+from .util import CombinedGroup, PythonLiteralOption, write_logfile
 from ._config import RunnerIOConfig, IPFIOConfig, LevelContextIOConfig
-from .io.util import check_sqlite_table, setup_logger
+from .io.util import check_sqlite_table
 from .runner import PyProphetLearner, PyProphetWeightApplier
 from .ipf import infer_peptidoforms
 from .levels_contexts import (
@@ -57,16 +54,8 @@ except NameError:
         return fun
 
 
-class GlobalLogLevelGroup(click.Group):
-    def invoke(self, ctx):
-        log_level = ctx.params.get("log_level", "INFO").upper()
-        setup_logger(log_level=log_level)
-        ctx.obj = {"LOG_LEVEL": log_level}
-        return super().invoke(ctx)
-
-
 # Changed chain to False to allow grouping related subcommands @singjc
-@click.group(chain=False, cls=GlobalLogLevelGroup)
+@click.group(chain=False, cls=CombinedGroup)
 @click.version_option()
 @click.option(
     "--log-level",
@@ -86,17 +75,6 @@ def cli(ctx, log_level):
     """
 
 
-# https://stackoverflow.com/a/47730333
-class PythonLiteralOption(click.Option):
-    def type_cast_value(self, ctx, value):
-        if not isinstance(value, str):  # required for Click>=8.0.0
-            return value
-        try:
-            return ast.literal_eval(value)
-        except Exception:
-            raise click.BadParameter(value)
-
-
 def shared_statistics_options(func):
     """
     Decorator to add shared statistics options to a command.
@@ -107,12 +85,14 @@ def shared_statistics_options(func):
             default=False,
             show_default=True,
             help="Do parametric estimation of p-values.",
+            hidden=False,
         ),
         click.option(
             "--pfdr/--no-pfdr",
             default=False,
             show_default=True,
             help="Compute positive false discovery rate (pFDR) instead of FDR.",
+            hidden=True,
         ),
         click.option(
             "--pi0_lambda",
@@ -120,6 +100,7 @@ def shared_statistics_options(func):
             show_default=True,
             type=(float, float, float),
             help="Use non-parametric estimation of p-values. Either use <START END STEPS>, e.g. 0.1, 1.0, 0.1 or set to fixed value, e.g. 0.4, 0, 0.",
+            hidden=True,
             callback=transform_pi0_lambda,
         ),
         click.option(
@@ -128,6 +109,7 @@ def shared_statistics_options(func):
             show_default=True,
             type=click.Choice(["smoother", "bootstrap"]),
             help="Method for choosing tuning parameter in pi₀ estimation.",
+            hidden=True,
         ),
         click.option(
             "--pi0_smooth_df",
@@ -135,24 +117,28 @@ def shared_statistics_options(func):
             show_default=True,
             type=int,
             help="Degrees of freedom for smoother when estimating pi₀.",
+            hidden=True,
         ),
         click.option(
             "--pi0_smooth_log_pi0/--no-pi0_smooth_log_pi0",
             default=False,
             show_default=True,
             help="Apply smoother to log(pi₀) values during estimation.",
+            hidden=True,
         ),
         click.option(
             "--lfdr_truncate/--no-lfdr_truncate",
             show_default=True,
             default=True,
             help="If True, local FDR values > 1 are set to 1.",
+            hidden=True,
         ),
         click.option(
             "--lfdr_monotone/--no-lfdr_monotone",
             show_default=True,
             default=True,
             help="Ensure local FDR values are non-decreasing with p-values.",
+            hidden=True,
         ),
         click.option(
             "--lfdr_transformation",
@@ -160,6 +146,7 @@ def shared_statistics_options(func):
             show_default=True,
             type=click.Choice(["probit", "logit"]),
             help="Transformation applied to p-values for local FDR estimation.",
+            hidden=True,
         ),
         click.option(
             "--lfdr_adj",
@@ -167,6 +154,7 @@ def shared_statistics_options(func):
             show_default=True,
             type=float,
             help="Smoothing bandwidth multiplier used in density estimation.",
+            hidden=True,
         ),
         click.option(
             "--lfdr_eps",
@@ -174,6 +162,7 @@ def shared_statistics_options(func):
             show_default=True,
             type=float,
             help="Threshold for p-value tails in local FDR calculation.",
+            hidden=True,
         ),
     ]
 
@@ -218,6 +207,7 @@ def shared_statistics_options(func):
     default=False,
     show_default=True,
     help="Autotune hyperparameters for XGBoost/SVM.",
+    hidden=True,
 )
 @click.option(
     "--apply_weights",
@@ -230,6 +220,7 @@ def shared_statistics_options(func):
     show_default=True,
     type=float,
     help="Data fraction used for cross-validation of semi-supervised learning step.",
+    hidden=True,
 )
 @click.option(
     "--xeval_num_iter",
@@ -244,6 +235,7 @@ def shared_statistics_options(func):
     show_default=True,
     type=float,
     help="Initial FDR cutoff for best scoring targets.",
+    hidden=True,
 )
 @click.option(
     "--ss_iteration_fdr",
@@ -251,6 +243,7 @@ def shared_statistics_options(func):
     show_default=True,
     type=float,
     help="Iteration FDR cutoff for best scoring targets.",
+    hidden=True,
 )
 @click.option(
     "--ss_num_iter",
@@ -265,11 +258,13 @@ def shared_statistics_options(func):
     show_default=True,
     type=str,
     help='Main score to start semi-supervised-learning. Default is set to auto, meaning each iteration of learning a dynamic main score selection process will occur. If you want to have a set starting main score for each learning iteration, you can set a specifc score, i.e. "var_xcorr_shape"',
+    hidden=True,
 )
 @click.option(
     "--ss_score_filter",
     default="",
     help='Specify scores which should used for scoring. In addition specific predefined profiles can be used. For example for metabolomis data use "metabolomics".  Please specify any additional input as follows: "var_ms1_xcorr_coelution,var_library_corr,var_xcorr_coelution,etc."',
+    hidden=True,
 )
 @click.option(
     "--ss_scale_features/--no-ss_scale_features",
@@ -284,6 +279,7 @@ def shared_statistics_options(func):
     show_default=True,
     type=str,
     help="Group identifier for calculation of statistics.",
+    hidden=True,
 )
 @shared_statistics_options
 # OpenSWATH options
@@ -299,6 +295,7 @@ def shared_statistics_options(func):
     default=False,
     show_default=True,
     help="Add alignment features to scoring.",
+    hidden=True,
 )
 # IPF options
 @click.option(
@@ -307,6 +304,7 @@ def shared_statistics_options(func):
     show_default=True,
     type=int,
     help="Assess transitions only for candidate peak groups until maximum peak group rank.",
+    hidden=True,
 )
 @click.option(
     "--ipf_max_peakgroup_pep",
@@ -314,6 +312,7 @@ def shared_statistics_options(func):
     show_default=True,
     type=float,
     help="Assess transitions only for candidate peak groups until maximum posterior error probability.",
+    hidden=True,
 )
 @click.option(
     "--ipf_max_transition_isotope_overlap",
@@ -321,6 +320,7 @@ def shared_statistics_options(func):
     show_default=True,
     type=float,
     help="Maximum isotope overlap to consider transitions in IPF.",
+    hidden=True,
 )
 @click.option(
     "--ipf_min_transition_sn",
@@ -328,6 +328,7 @@ def shared_statistics_options(func):
     show_default=True,
     type=float,
     help="Minimum log signal-to-noise level to consider transitions in IPF. Set -1 to disable this filter.",
+    hidden=True,
 )
 # Glyco/GproDIA Options
 @click.option(
@@ -335,6 +336,7 @@ def shared_statistics_options(func):
     default=False,
     show_default=True,
     help="Whether glycopeptide scoring should be enabled.",
+    hidden=True,
 )
 @click.option(
     "--density_estimator",
@@ -342,6 +344,7 @@ def shared_statistics_options(func):
     show_default=True,
     type=click.Choice(["kde", "gmm"]),
     help='Either kernel density estimation ("kde") or Gaussian mixture model ("gmm") is used for score density estimation.',
+    hidden=True,
 )
 @click.option(
     "--grid_size",
@@ -349,6 +352,7 @@ def shared_statistics_options(func):
     show_default=True,
     type=int,
     help="Number of d-score cutoffs to build grid coordinates for local FDR calculation.",
+    hidden=True,
 )
 # TRIC
 @click.option(
@@ -356,6 +360,7 @@ def shared_statistics_options(func):
     default=False,
     show_default=True,
     help="Whether chromatogram probabilities for TRIC should be computed.",
+    hidden=True,
 )
 # Visualization
 @click.option(
@@ -364,12 +369,14 @@ def shared_statistics_options(func):
     show_default=True,
     type=click.Choice(["normal", "protan", "deutran", "tritan"]),
     help="Color palette to use in reports.",
+    hidden=True,
 )
 @click.option(
     "--main_score_selection_report/--no-main_score_selection_report",
     default=False,
     show_default=True,
     help="Generate a report for main score selection process.",
+    hidden=True,
 )
 # Processing
 @click.option(
@@ -385,6 +392,7 @@ def shared_statistics_options(func):
     default=False,
     show_default=True,
     help="Run in test mode with fixed seed.",
+    hidden=True,
 )
 @click.pass_context
 @logger.catch(reraise=True)
@@ -482,6 +490,8 @@ def score(
         color_palette,
         main_score_selection_report,
     )
+
+    write_logfile(ctx.obj["LOG_LEVEL"], f"{config.prefix}_pyp_score_{level}.log")
 
     # Validate file type and subsample ratio, subsample_ratio is currently only applicateble for "parquet_split", "parquet_split_multi". If this combination is not met, throw warning and set subsample_ratio to 1.0
     if (
