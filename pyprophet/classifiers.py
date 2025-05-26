@@ -67,27 +67,24 @@ class LinearLearner(AbstractLearner):
         if self.classifier is None:
             raise ValueError("Classifier has not been trained yet.")
 
-        weights = self.classifier.coef_
-        intercept = self.classifier.intercept_
-
-        assert weights.shape[0] == 1
-        assert weights.shape[1] == len(features)
-        assert len(intercept) == 1
+        elif isinstance(self.classifier, np.ndarray):
+            # If classifier is a numpy array, assume it contains weights
+            weights = self.classifier
+            assert weights.shape[0] == len(features)
+        elif isinstance(self.classifier, LinearSVC):
+            weights = self.classifier.coef_
+            intercept = self.classifier.intercept_
+            assert weights.shape[0] == 1
+            assert weights.shape[1] == len(features)
 
         weights = weights.flatten()
-        df = (
-            pd.DataFrame(
-                {"feature": features, "weight": weights, "abs_weight": abs(weights)}
-            )
-            .sort_values("abs_weight", ascending=False)
-            .drop(columns="abs_weight")
-        )
+        df = pd.DataFrame({"score": features, "weight": weights})
 
-        # Add intercept row (optional)
-        df = pd.concat(
-            [df, pd.DataFrame([{"feature": "intercept", "weight": intercept[0]}])],
-            ignore_index=True,
-        )
+        # # Add intercept row (optional)
+        # df = pd.concat(
+        #     [df, pd.DataFrame([{"score": "intercept", "weight": intercept[0]}])],
+        #     ignore_index=True,
+        # )
 
         return df
 
@@ -201,7 +198,11 @@ class SVMLearner(LinearLearner):
 
     def score(self, peaks, use_main_score):
         X = peaks.get_feature_matrix(use_main_score)
-        return self.classifier.decision_function(X)
+        # Check if self.classifier is loaded weights (an numpy.ndarray object)
+        if isinstance(self.classifier, np.ndarray):
+            return np.dot(X, self.classifier).astype(np.float32)
+        elif isinstance(self.classifier, LinearSVC):
+            return self.classifier.decision_function(X)
 
     def get_parameters(self):
         return self.classifier
