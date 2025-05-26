@@ -225,7 +225,7 @@ class ParquetReader(BaseReader):
 
     def _merge_ms1ms2_features(self, con, df, feature_cols):
         cols_sql = ", ".join([f"p.{col}" for col in feature_cols])
-        query = f"SELECT DISTINCT p.FEATURE_ID, {cols_sql} FROM data p"
+        query = f"SELECT DISTINCT p.FEATURE_ID, {cols_sql} FROM data p WHERE TRANSITION_ID IS NULL"
         ms1_df = con.execute(query).df()
         return pd.merge(df, ms1_df, how="left", on="FEATURE_ID")
 
@@ -274,6 +274,8 @@ class ParquetWriter(BaseWriter):
         self._write_pdf_report(result, pi0)
 
     def _write_parquet_with_scores(self, target_file, df, keep_columns):
+        con = duckdb.connect()
+
         new_score_cols = [
             col
             for col in df.columns
@@ -283,36 +285,177 @@ class ParquetWriter(BaseWriter):
 
         if self.level == "transition":
             prefix = "t"
-            join_on = "t.FEATURE_ID = s.FEATURE_ID AND t.TRANSITION_ID = s.TRANSITION_ID AND t.IPF_PEPTIDE_ID = s.IPF_PEPTIDE_ID"
-            key_cols = "t.FEATURE_ID, t.TRANSITION_ID, t.IPF_PEPTIDE_ID"
+            join_on = (
+                "t.FEATURE_ID = s.FEATURE_ID AND t.TRANSITION_ID = s.TRANSITION_ID"
+            )
+            if "IPF_PEPTIDE_ID" in df.columns:
+                join_on += " AND t.IPF_PEPTIDE_ID = s.IPF_PEPTIDE_ID"
+            key_cols = "t.FEATURE_ID, t.TRANSITION_ID" + (
+                ", t.IPF_PEPTIDE_ID" if "IPF_PEPTIDE_ID" in df.columns else ""
+            )
+            select_old = ", ".join([f"{prefix}.{col}" for col in keep_columns])
+
+            # Create temp table with target schema
+            create_table_sql = f"CREATE TEMP TABLE output_table AS SELECT * FROM read_parquet('{target_file}') LIMIT 0"
+            con.execute(create_table_sql)
+
+            existing_columns = [
+                col[0] for col in con.execute("DESCRIBE output_table").fetchall()
+            ]
+            for col in new_score_cols:
+                if col in existing_columns:
+                    con.execute(f"ALTER TABLE output_table DROP COLUMN {col}")
+                con.execute(f"ALTER TABLE output_table ADD COLUMN {col} FLOAT")
+
+            con.register("scores", df)
+
+            # Process precursors - insert with NULL scores
+            con.execute(
+                f"""
+                INSERT INTO output_table
+                SELECT {select_old}, {','.join([f'NULL AS {col}' for col in new_score_cols])}
+                FROM (SELECT * 
+                    FROM read_parquet('{target_file}') t
+                    WHERE t.TRANSITION_ID IS NULL
+                    ) AS t
+                """
+            )
+
+            # Process transitions - insert with actual scores
+            con.execute(
+                f"""
+                INSERT INTO output_table
+                SELECT {select_old}, {new_score_sql}
+                FROM (SELECT * 
+                    FROM read_parquet('{target_file}') t
+                    WHERE t.TRANSITION_ID IS NOT NULL
+                    ) AS t
+                LEFT JOIN scores s ON {join_on}
+                """
+            )
+
+            # Validate final row count
+            original_count = self._get_parquet_row_count(con, target_file)
+            result_count = con.execute("SELECT COUNT(*) FROM output_table").fetchone()[
+                0
+            ]
+
+            if original_count != result_count:
+                error_message = (
+                    f"There was an issue with appending scores to {target_file}.\n"
+                    f"Row count mismatch: Original rows {original_count} ≠ Resulting rows {result_count}.\n"
+                    "Appending scores resulted in a different number of entries than the original input file. This is unexpected behaviour."
+                )
+                try:
+                    raise RowCountMismatchError(error_message)
+                except RowCountMismatchError as e:
+                    logger.opt(exception=e, depth=1).critical(
+                        f"Critical error: {str(e)}"
+                    )
+                sys.exit(1)
+
+            con.execute(
+                f"""
+                COPY (SELECT * FROM output_table) 
+                TO '{target_file}' (FORMAT 'parquet', COMPRESSION 'ZSTD', COMPRESSION_LEVEL 11)
+                """
+            )
+
         elif self.level == "alignment":
             prefix = "a"
             join_on = "a.ALIGNMENT_ID = s.ALIGNMENT_ID AND a.FEATURE_ID = s.FEATURE_ID AND a.DECOY = s.DECOY"
             key_cols = "a.ALIGNMENT_ID, a.FEATURE_ID"
-        else:
-            prefix = "p"
-            join_on = "p.FEATURE_ID = s.FEATURE_ID"
-            key_cols = "p.FEATURE_ID"
+            select_old = ", ".join([f"{prefix}.{col}" for col in keep_columns])
 
-        select_old = ", ".join([f"{prefix}.{col}" for col in keep_columns])
-        con = duckdb.connect()
-        con.register("scores", pa.Table.from_pandas(df))
+            con.register("scores", pa.Table.from_pandas(df))
+            self._validate_row_count_after_join(
+                con, target_file, key_cols, join_on, prefix
+            )
 
-        # Validate input row entry count and joined entry count remain the same
-        self._validate_row_count_after_join(con, target_file, key_cols, join_on, prefix)
-
-        con.execute(
-            f"""
-            COPY (
-                SELECT {select_old}, {new_score_sql}
-                FROM read_parquet('{target_file}') {prefix}
-                LEFT JOIN scores s ON {join_on}
-            ) TO '{target_file}' (FORMAT 'parquet', COMPRESSION 'ZSTD', COMPRESSION_LEVEL 11)
+            con.execute(
+                f"""
+                COPY (
+                    SELECT {select_old}, {new_score_sql}
+                    FROM read_parquet('{target_file}') {prefix}
+                    LEFT JOIN scores s ON {join_on}
+                ) TO '{target_file}' (FORMAT 'parquet', COMPRESSION 'ZSTD', COMPRESSION_LEVEL 11)
             """
-        )
+            )
+
+        else:  # precursor level
+            prefix = "p"
+            select_old = ", ".join([f"{prefix}.{col}" for col in keep_columns])
+
+            create_table_sql = f"CREATE TEMP TABLE output_table AS SELECT * FROM read_parquet('{target_file}') LIMIT 0"
+            con.execute(create_table_sql)
+
+            existing_columns = [
+                col[0] for col in con.execute("DESCRIBE output_table").fetchall()
+            ]
+            for col in new_score_cols:
+                if col in existing_columns:
+                    con.execute(f"ALTER TABLE output_table DROP COLUMN {col}")
+
+            for col in new_score_cols:
+                con.execute(f"ALTER TABLE output_table ADD COLUMN {col} FLOAT")
+
+            # Process precursors - insert with scores
+            con.register("scores", df)
+            con.execute(
+                f"""
+                INSERT INTO output_table
+                SELECT {select_old}, {new_score_sql}
+                FROM (SELECT * 
+                    FROM read_parquet('{target_file}') p
+                    WHERE p.TRANSITION_ID IS NULL
+                    ) AS p
+                LEFT JOIN scores s ON p.FEATURE_ID = s.FEATURE_ID
+                
+            """
+            )
+
+            # Process transitions - insert with NULL scores
+            con.execute(
+                f"""
+                INSERT INTO output_table
+                SELECT {select_old}, {','.join([f'NULL AS {col}' for col in new_score_cols])}
+                FROM (SELECT *
+                    FROM read_parquet('{target_file}') p
+                    WHERE p.TRANSITION_ID IS NOT NULL
+                    ) AS p
+            """
+            )
+
+            # Validate row size
+            original_count = self._get_parquet_row_count(con, target_file)
+            result_count = con.execute("SELECT COUNT(*) FROM output_table").fetchone()[
+                0
+            ]
+
+            if original_count != result_count:
+                error_message = (
+                    f"There was an issue with appending scores to {target_file}.\n"
+                    f"Row count mismatch: Original rows {original_count} ≠ Resulting rows {result_count}.\n"
+                    "Appending scores resulted in a different number of entries than the original input file. This is unexpected behaviour."
+                )
+
+                try:
+                    raise RowCountMismatchError(error_message)
+                except RowCountMismatchError as e:
+                    logger.opt(exception=e, depth=1).critical(
+                        f"Critical error: {str(e)}"
+                    )
+                sys.exit(1)
+
+            con.execute(
+                f"""
+                COPY (SELECT * FROM output_table) 
+                TO '{target_file}' (FORMAT 'parquet', COMPRESSION 'ZSTD', COMPRESSION_LEVEL 11)
+            """
+            )
 
         logger.debug(
-            f"After appendings scores, {target_file} has {self._get_parquet_row_count(con, target_file)} entries"
+            f"After appending scores, {target_file} has {self._get_parquet_row_count(con, target_file)} entries"
         )
 
         con.close()
