@@ -1,8 +1,8 @@
-import pandas as pd
 import sqlite3
+import pandas as pd
 
-from .io.util import check_sqlite_table
-from .data_handling import write_scores_sql_command
+
+from .io.util import check_sqlite_table, write_scores_sql_command
 from .report import plot_scores
 
 

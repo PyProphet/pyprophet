@@ -1,9 +1,9 @@
 from typing import List
+import inspect
+
 import numpy as np
 import pandas as pd
-import click
 from loguru import logger
-import inspect
 
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.svm import LinearSVC
@@ -14,12 +14,10 @@ from sklearn.model_selection import (
     KFold,
 )
 import xgboost as xgb
-from .data_handling import Experiment
-
-from hyperopt import hp, tpe
+from hyperopt import tpe
 from hyperopt.fmin import fmin
 
-import sys
+from .data_handling import Experiment
 
 
 class AbstractLearner(object):
@@ -275,7 +273,7 @@ class XGBLearner(AbstractLearner):
             # click.echo("Info: AUC: {:.3f} hyperparameters: {}".format(score, params))
             return score
 
-        click.echo("Info: Autotuning of XGB hyperparameters.")
+        logger.info("Autotuning of XGB hyperparameters.")
 
         assert isinstance(decoy_peaks, Experiment)
         assert isinstance(target_peaks, Experiment)
@@ -372,7 +370,7 @@ class XGBLearner(AbstractLearner):
         )
 
         self.xgb_params_tuned.update(best_learning)
-        click.echo("Info: Optimal hyperparameters: {}".format(self.xgb_params_tuned))
+        logger.info("Optimal hyperparameters: {}".format(self.xgb_params_tuned))
 
         self.xgb_params = self.xgb_params_tuned
 

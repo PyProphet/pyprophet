@@ -2,10 +2,10 @@ import numpy as np
 import click
 from loguru import logger
 
-from ._config import RunnerIOConfig
 from .data_handling import Experiment, update_chosen_main_score_in_table
 from .classifiers import AbstractLearner, SVMLearner, XGBLearner
-from .stats import find_cutoff
+from .._config import RunnerIOConfig
+from ..stats import find_cutoff
 
 try:
     profile

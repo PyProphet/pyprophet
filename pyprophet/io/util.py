@@ -45,6 +45,29 @@ def check_sqlite_table(con, table):
     return table_present
 
 
+# extracts the scores and writes it into an SQL command
+# in some cases some post processing has to be performed depending on which
+# position the statement should be inserted (e.g. export_compounds.py)
+def write_scores_sql_command(con, score_sql, feature_name, var_replacement):
+    feature = pd.read_sql_query("""PRAGMA table_info(%s)""" % feature_name, con)
+    score_names_sql = [
+        name for name in feature["name"].tolist() if name.startswith("VAR")
+    ]
+    score_names_lower = [
+        name.lower().replace("var_", var_replacement) for name in score_names_sql
+    ]
+    for i in range(0, len(score_names_sql)):
+        score_sql = score_sql + str(
+            feature_name
+            + "."
+            + score_names_sql[i]
+            + " AS "
+            + score_names_lower[i]
+            + ", "
+        )
+    return score_sql
+
+
 def check_duckdb_table(con, schema: str, table: str) -> bool:
     """
     Check if a table exists in a DuckDB-attached SQLite schema (case-insensitive).

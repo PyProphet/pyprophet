@@ -1,24 +1,20 @@
 import abc
-import click
-import sys
+
 import os
 import time
 import warnings
+import pickle
+import sqlite3
+import click
 from loguru import logger
 import pandas as pd
-import numpy as np
-import polars as pl
-import sqlite3
-import duckdb
-import pickle
 
-
-from ._config import RunnerIOConfig
-from .io.util import check_sqlite_table
-from .io.dispatcher import ReaderDispatcher, WriterDispatcher
 from .pyprophet import PyProphet
-from .glyco.scoring import partial_score, combined_score
-from .glyco.stats import ErrorStatisticsCalculator
+from .._config import RunnerIOConfig
+from ..io.util import check_sqlite_table
+from ..io.dispatcher import ReaderDispatcher, WriterDispatcher
+from ..glyco.scoring import partial_score, combined_score
+from ..glyco.stats import ErrorStatisticsCalculator
 
 try:
     profile
@@ -84,9 +80,9 @@ class PyProphetRunner(object):
             start_at = time.time()
 
             start_at_peptide = time.time()
-            click.echo("*" * 30 + "  Glycoform Scoring  " + "*" * 30)
-            click.echo("-" * 80)
-            click.echo("Info: Scoring peptide part")
+            logger.opt(raw=True).info("*" * 30 + "  Glycoform Scoring  " + "*" * 30)
+            logger.opt(raw=True).info("-" * 80)
+            logger.info("Scoring peptide part")
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
                 (result_peptide, _scorer_peptide, weights_peptide) = self.run_algo(
@@ -95,13 +91,13 @@ class PyProphetRunner(object):
             end_at_peptide = time.time() - start_at_peptide
             seconds = int(end_at_peptide)
             msecs = int(1000 * (end_at_peptide - seconds))
-            click.echo(
-                "Info: peptide part scored: %d seconds and %d msecs" % (seconds, msecs)
+            logger.info(
+                "peptide part scored: %d seconds and %d msecs" % (seconds, msecs)
             )
 
             start_at_glycan = time.time()
-            click.echo("-" * 80)
-            click.echo("Info: Scoring glycan part")
+            logger.opt(raw=True).info("-" * 80)
+            logger.info("Scoring glycan part")
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
                 (result_glycan, scorer_glycan, weights_glycan) = partial_score(
@@ -111,31 +107,30 @@ class PyProphetRunner(object):
             end_at_glycan = time.time() - start_at_glycan
             seconds = int(end_at_glycan)
             msecs = int(1000 * (end_at_glycan - seconds))
-            click.echo(
-                "Info: glycan part scored: %d seconds and %d msecs" % (seconds, msecs)
+            logger.info(
+                "glycan part scored: %d seconds and %d msecs" % (seconds, msecs)
             )
 
             start_at_combined = time.time()
-            click.echo("-" * 80)
-            click.echo("Info: Calculating combined scores")
+            logger.opt(raw=True).info("-" * 80)
+            logger.info("Calculating combined scores")
             (result_combined, weights_combined) = combined_score(
                 self.runner_config.group_id, result_peptide, result_glycan
             )
 
             if isinstance(weights_combined, pd.DataFrame):
-                click.echo(weights_combined)
+                logger.info(weights_combined)
 
             end_at_combined = time.time() - start_at_combined
             seconds = int(end_at_combined)
             msecs = int(1000 * (end_at_combined - seconds))
-            click.echo(
-                "Info: combined scores calculated: %d seconds and %d msecs"
-                % (seconds, msecs)
+            logger.info(
+                "combined scores calculated: %d seconds and %d msecs" % (seconds, msecs)
             )
 
             start_at_stats = time.time()
-            click.echo("-" * 80)
-            click.echo("Info: Calculating error statistics")
+            logger.opt(raw=True).info("-" * 80)
+            logger.info("Calculating error statistics")
             error_stat = ErrorStatisticsCalculator(
                 result_combined,
                 density_estimator=self.runner_config.density_estimator,
@@ -158,9 +153,8 @@ class PyProphetRunner(object):
             end_at_stats = time.time() - start_at_stats
             seconds = int(end_at_stats)
             msecs = int(1000 * (end_at_stats - seconds))
-            click.echo(
-                "Info: error statistics finished: %d seconds and %d msecs"
-                % (seconds, msecs)
+            logger.info(
+                "error statistics finished: %d seconds and %d msecs" % (seconds, msecs)
             )
 
             if all(
@@ -218,9 +212,12 @@ class PyProphetRunner(object):
 
     def print_summary(self, result):
         if result.summary_statistics is not None:
-            click.echo("=" * 80)
-            click.echo(result.summary_statistics)
-            click.echo("=" * 80)
+            logger.opt(raw=True).info("=" * 80)
+            logger.opt(raw=True).info("\n")
+            logger.opt(raw=True).info(result.summary_statistics)
+            logger.opt(raw=True).info("\n")
+            logger.opt(raw=True).info("=" * 80)
+            logger.opt(raw=True).info("\n")
 
 
 class PyProphetLearner(PyProphetRunner):

@@ -9,7 +9,7 @@ import multiprocessing
 from sklearn.preprocessing import StandardScaler
 
 
-from .stats import mean_and_std_dev
+from ..stats import mean_and_std_dev
 from .optimized import find_top_ranked, rank
 
 try:
@@ -43,56 +43,6 @@ def use_metabolomics_scores():
         "var_library_corr",
         "var_norm_rt_score",
     ]
-
-
-# extracts the scores and writes it into an SQL command
-# in some cases some post processing has to be performed depending on which
-# position the statement should be inserted (e.g. export_compounds.py)
-def write_scores_sql_command(con, score_sql, feature_name, var_replacement):
-    feature = pd.read_sql_query("""PRAGMA table_info(%s)""" % feature_name, con)
-    score_names_sql = [
-        name for name in feature["name"].tolist() if name.startswith("VAR")
-    ]
-    score_names_lower = [
-        name.lower().replace("var_", var_replacement) for name in score_names_sql
-    ]
-    for i in range(0, len(score_names_sql)):
-        score_sql = score_sql + str(
-            feature_name
-            + "."
-            + score_names_sql[i]
-            + " AS "
-            + score_names_lower[i]
-            + ", "
-        )
-    return score_sql
-
-
-# Parameter transformation functions
-def transform_pi0_lambda(ctx, param, value):
-    if value[1] == 0 and value[2] == 0:
-        pi0_lambda = value[0]
-    elif 0 <= value[0] < 1 and value[0] <= value[1] <= 1 and 0 < value[2] < 1:
-        pi0_lambda = np.arange(value[0], value[1], value[2])
-    else:
-        raise click.ClickException(
-            "Wrong input values for pi0_lambda. pi0_lambda must be within [0,1)."
-        )
-    return pi0_lambda
-
-
-def transform_threads(ctx, param, value):
-    if value == -1:
-        value = multiprocessing.cpu_count()
-    return value
-
-
-def transform_subsample_ratio(ctx, param, value):
-    if value < 0 or value > 1:
-        raise click.ClickException(
-            "Wrong input values for subsample_ratio. subsample_ratio must be within [0,1]."
-        )
-    return value
 
 
 def check_for_unique_blocks(tg_ids):

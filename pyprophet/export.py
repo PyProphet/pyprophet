@@ -1,35 +1,64 @@
+import os
+import sqlite3
 import pandas as pd
 import numpy as np
-import sqlite3
 import click
-import os
 
-from .io.util import check_sqlite_table
-from .data_handling import write_scores_sql_command
+
+from .io.util import check_sqlite_table, write_scores_sql_command
 from .report import plot_scores
 
 
-def export_tsv(infile, outfile, format, outcsv, transition_quantification, max_transition_pep, ipf, ipf_max_peptidoform_pep, max_rs_peakgroup_qvalue, peptide, max_global_peptide_qvalue, protein, max_global_protein_qvalue):
+def export_tsv(
+    infile,
+    outfile,
+    format,
+    outcsv,
+    transition_quantification,
+    max_transition_pep,
+    ipf,
+    ipf_max_peptidoform_pep,
+    max_rs_peakgroup_qvalue,
+    peptide,
+    max_global_peptide_qvalue,
+    protein,
+    max_global_protein_qvalue,
+):
 
     con = sqlite3.connect(infile)
 
-    # output for merged but not scored pyprophet input 
-    if (check_sqlite_table(con, "SCORE_MS1") is False and check_sqlite_table(con, "SCORE_MS2") is False and check_sqlite_table(con, "SCORE_IPF") is False and check_sqlite_table(con, "SCORE_PEPTIDE") is False and check_sqlite_table(con, "SCORE_PROTEIN") is False ):
-     
-      score_sql = ""
+    # output for merged but not scored pyprophet input
+    if (
+        check_sqlite_table(con, "SCORE_MS1") is False
+        and check_sqlite_table(con, "SCORE_MS2") is False
+        and check_sqlite_table(con, "SCORE_IPF") is False
+        and check_sqlite_table(con, "SCORE_PEPTIDE") is False
+        and check_sqlite_table(con, "SCORE_PROTEIN") is False
+    ):
 
-      if (check_sqlite_table(con, "FEATURE_MS1")):
-          score_sql = write_scores_sql_command(con, score_sql, "FEATURE_MS1", "var_ms1_")
+        score_sql = ""
 
-      if (check_sqlite_table(con, "FEATURE_MS2")):
-          score_sql = write_scores_sql_command(con, score_sql, "FEATURE_MS2", "var_ms2_")
+        if check_sqlite_table(con, "FEATURE_MS1"):
+            score_sql = write_scores_sql_command(
+                con, score_sql, "FEATURE_MS1", "var_ms1_"
+            )
 
-      # remove last comma from sql statement, since a "FROM" is following
-      if (len(score_sql) > 0):
-          score_sql = ", " + score_sql # add comma at the beginning to fit to statement
-          score_sql = score_sql[:-2] # remove additional space and comma from the end of the string
+        if check_sqlite_table(con, "FEATURE_MS2"):
+            score_sql = write_scores_sql_command(
+                con, score_sql, "FEATURE_MS2", "var_ms2_"
+            )
 
-      data = pd.read_sql_query("""
+        # remove last comma from sql statement, since a "FROM" is following
+        if len(score_sql) > 0:
+            score_sql = (
+                ", " + score_sql
+            )  # add comma at the beginning to fit to statement
+            score_sql = score_sql[
+                :-2
+            ]  # remove additional space and comma from the end of the string
+
+        data = pd.read_sql_query(
+            """
                     SELECT
                         RUN.ID AS id_run,
                         PEPTIDE.ID AS id_peptide,
@@ -59,7 +88,10 @@ def export_tsv(infile, outfile, format, outcsv, transition_quantification, max_t
                     LEFT JOIN FEATURE_MS1 ON FEATURE_MS1.FEATURE_ID = FEATURE.ID
                     LEFT JOIN FEATURE_MS2 ON FEATURE_MS2.FEATURE_ID = FEATURE.ID
                     ORDER BY transition_group_id
-                    """ % score_sql, con)
+                    """
+            % score_sql,
+            con,
+        )
 
     else:
 
@@ -68,8 +100,8 @@ def export_tsv(infile, outfile, format, outcsv, transition_quantification, max_t
             ipf_present = check_sqlite_table(con, "SCORE_IPF")
 
         # Main query for peptidoform IPF
-        if ipf_present and ipf=='peptidoform':
-            idx_query = '''
+        if ipf_present and ipf == "peptidoform":
+            idx_query = """
     CREATE INDEX IF NOT EXISTS idx_precursor_precursor_id ON PRECURSOR (ID);
     CREATE INDEX IF NOT EXISTS idx_precursor_peptide_mapping_precursor_id ON PRECURSOR_PEPTIDE_MAPPING (PRECURSOR_ID);
     CREATE INDEX IF NOT EXISTS idx_feature_precursor_id ON FEATURE (PRECURSOR_ID);
@@ -81,25 +113,25 @@ def export_tsv(infile, outfile, format, outcsv, transition_quantification, max_t
     CREATE INDEX IF NOT EXISTS idx_feature_run_id ON FEATURE (RUN_ID);
 
     CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
-    '''
+    """
             if check_sqlite_table(con, "FEATURE_MS1"):
-              idx_query += "CREATE INDEX IF NOT EXISTS idx_feature_ms1_feature_id ON FEATURE_MS1 (FEATURE_ID);"
+                idx_query += "CREATE INDEX IF NOT EXISTS idx_feature_ms1_feature_id ON FEATURE_MS1 (FEATURE_ID);"
             if check_sqlite_table(con, "FEATURE_MS2"):
-              idx_query += "CREATE INDEX IF NOT EXISTS idx_feature_ms2_feature_id ON FEATURE_MS2 (FEATURE_ID);"
+                idx_query += "CREATE INDEX IF NOT EXISTS idx_feature_ms2_feature_id ON FEATURE_MS2 (FEATURE_ID);"
             if check_sqlite_table(con, "SCORE_MS1"):
-              idx_query += "CREATE INDEX IF NOT EXISTS idx_score_ms1_feature_id ON SCORE_MS1 (FEATURE_ID);"
-              score_ms1_pep = "SCORE_MS1.PEP"
-              link_ms1 = "LEFT JOIN SCORE_MS1 ON SCORE_MS1.FEATURE_ID = FEATURE.ID"
+                idx_query += "CREATE INDEX IF NOT EXISTS idx_score_ms1_feature_id ON SCORE_MS1 (FEATURE_ID);"
+                score_ms1_pep = "SCORE_MS1.PEP"
+                link_ms1 = "LEFT JOIN SCORE_MS1 ON SCORE_MS1.FEATURE_ID = FEATURE.ID"
             else:
-              score_ms1_pep = "NULL"
-              link_ms1 = ""
+                score_ms1_pep = "NULL"
+                link_ms1 = ""
             if check_sqlite_table(con, "SCORE_MS2"):
-              idx_query += "CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);"
+                idx_query += "CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);"
             if check_sqlite_table(con, "SCORE_IPF"):
-              idx_query += "CREATE INDEX IF NOT EXISTS idx_score_ipf_feature_id ON SCORE_IPF (FEATURE_ID);"
-              idx_query += "CREATE INDEX IF NOT EXISTS idx_score_ipf_peptide_id ON SCORE_IPF (PEPTIDE_ID);"
+                idx_query += "CREATE INDEX IF NOT EXISTS idx_score_ipf_feature_id ON SCORE_IPF (FEATURE_ID);"
+                idx_query += "CREATE INDEX IF NOT EXISTS idx_score_ipf_peptide_id ON SCORE_IPF (PEPTIDE_ID);"
 
-            query = '''
+            query = """
     SELECT RUN.ID AS id_run,
           PEPTIDE.ID AS id_peptide,
           PEPTIDE_IPF.MODIFIED_SEQUENCE || '_' || PRECURSOR.ID AS transition_group_id,
@@ -144,10 +176,15 @@ def export_tsv(infile, outfile, format, outcsv, transition_quantification, max_t
     WHERE SCORE_MS2.QVALUE < %s AND SCORE_IPF.PEP < %s
     ORDER BY transition_group_id,
             peak_group_rank;
-    ''' % (score_ms1_pep, link_ms1, max_rs_peakgroup_qvalue, ipf_max_peptidoform_pep)
+    """ % (
+                score_ms1_pep,
+                link_ms1,
+                max_rs_peakgroup_qvalue,
+                ipf_max_peptidoform_pep,
+            )
         # Main query for augmented IPF
-        elif ipf_present and ipf=='augmented':
-            idx_query = '''
+        elif ipf_present and ipf == "augmented":
+            idx_query = """
     CREATE INDEX IF NOT EXISTS idx_precursor_precursor_id ON PRECURSOR (ID);
     CREATE INDEX IF NOT EXISTS idx_precursor_peptide_mapping_precursor_id ON PRECURSOR_PEPTIDE_MAPPING (PRECURSOR_ID);
     CREATE INDEX IF NOT EXISTS idx_feature_precursor_id ON FEATURE (PRECURSOR_ID);
@@ -159,25 +196,25 @@ def export_tsv(infile, outfile, format, outcsv, transition_quantification, max_t
     CREATE INDEX IF NOT EXISTS idx_feature_run_id ON FEATURE (RUN_ID);
 
     CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
-    '''
+    """
             if check_sqlite_table(con, "FEATURE_MS1"):
-              idx_query += "CREATE INDEX IF NOT EXISTS idx_feature_ms1_feature_id ON FEATURE_MS1 (FEATURE_ID);"
+                idx_query += "CREATE INDEX IF NOT EXISTS idx_feature_ms1_feature_id ON FEATURE_MS1 (FEATURE_ID);"
             if check_sqlite_table(con, "FEATURE_MS2"):
-              idx_query += "CREATE INDEX IF NOT EXISTS idx_feature_ms2_feature_id ON FEATURE_MS2 (FEATURE_ID);"
+                idx_query += "CREATE INDEX IF NOT EXISTS idx_feature_ms2_feature_id ON FEATURE_MS2 (FEATURE_ID);"
             if check_sqlite_table(con, "SCORE_MS1"):
-              idx_query += "CREATE INDEX IF NOT EXISTS idx_score_ms1_feature_id ON SCORE_MS1 (FEATURE_ID);"
-              score_ms1_pep = "SCORE_MS1.PEP"
-              link_ms1 = "LEFT JOIN SCORE_MS1 ON SCORE_MS1.FEATURE_ID = FEATURE.ID"
+                idx_query += "CREATE INDEX IF NOT EXISTS idx_score_ms1_feature_id ON SCORE_MS1 (FEATURE_ID);"
+                score_ms1_pep = "SCORE_MS1.PEP"
+                link_ms1 = "LEFT JOIN SCORE_MS1 ON SCORE_MS1.FEATURE_ID = FEATURE.ID"
             else:
-              score_ms1_pep = "NULL"
-              link_ms1 = ""
+                score_ms1_pep = "NULL"
+                link_ms1 = ""
             if check_sqlite_table(con, "SCORE_MS2"):
-              idx_query += "CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);"
+                idx_query += "CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);"
             if check_sqlite_table(con, "SCORE_IPF"):
-              idx_query += "CREATE INDEX IF NOT EXISTS idx_score_ipf_feature_id ON SCORE_IPF (FEATURE_ID);"
-              idx_query += "CREATE INDEX IF NOT EXISTS idx_score_ipf_peptide_id ON SCORE_IPF (PEPTIDE_ID);"
+                idx_query += "CREATE INDEX IF NOT EXISTS idx_score_ipf_feature_id ON SCORE_IPF (FEATURE_ID);"
+                idx_query += "CREATE INDEX IF NOT EXISTS idx_score_ipf_peptide_id ON SCORE_IPF (PEPTIDE_ID);"
 
-            query = '''
+            query = """
     SELECT RUN.ID AS id_run,
           PEPTIDE.ID AS id_peptide,
           PRECURSOR.ID AS transition_group_id,
@@ -217,8 +254,13 @@ def export_tsv(infile, outfile, format, outcsv, transition_quantification, max_t
     WHERE SCORE_MS2.QVALUE < %s
     ORDER BY transition_group_id,
             peak_group_rank;
-    ''' % (score_ms1_pep, link_ms1, max_rs_peakgroup_qvalue)
-            query_augmented = '''
+    """ % (
+                score_ms1_pep,
+                link_ms1,
+                max_rs_peakgroup_qvalue,
+            )
+            query_augmented = (
+                """
     SELECT FEATURE_ID AS id,
           MODIFIED_SEQUENCE AS ipf_FullUniModPeptideName,
           PRECURSOR_PEAKGROUP_PEP AS ipf_precursor_peakgroup_pep,
@@ -227,10 +269,12 @@ def export_tsv(infile, outfile, format, outcsv, transition_quantification, max_t
     FROM SCORE_IPF
     INNER JOIN PEPTIDE ON SCORE_IPF.PEPTIDE_ID = PEPTIDE.ID
     WHERE SCORE_IPF.PEP < %s;
-    ''' % ipf_max_peptidoform_pep
-      # Main query for standard OpenSWATH
+    """
+                % ipf_max_peptidoform_pep
+            )
+        # Main query for standard OpenSWATH
         else:
-            idx_query = '''
+            idx_query = """
     CREATE INDEX IF NOT EXISTS idx_precursor_precursor_id ON PRECURSOR (ID);
     CREATE INDEX IF NOT EXISTS idx_precursor_peptide_mapping_precursor_id ON PRECURSOR_PEPTIDE_MAPPING (PRECURSOR_ID);
     CREATE INDEX IF NOT EXISTS idx_feature_precursor_id ON FEATURE (PRECURSOR_ID);
@@ -242,15 +286,16 @@ def export_tsv(infile, outfile, format, outcsv, transition_quantification, max_t
     CREATE INDEX IF NOT EXISTS idx_feature_run_id ON FEATURE (RUN_ID);
 
     CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
-    '''
+    """
             if check_sqlite_table(con, "FEATURE_MS1"):
-              idx_query += "CREATE INDEX IF NOT EXISTS idx_feature_ms1_feature_id ON FEATURE_MS1 (FEATURE_ID);"
+                idx_query += "CREATE INDEX IF NOT EXISTS idx_feature_ms1_feature_id ON FEATURE_MS1 (FEATURE_ID);"
             if check_sqlite_table(con, "FEATURE_MS2"):
-              idx_query += "CREATE INDEX IF NOT EXISTS idx_feature_ms2_feature_id ON FEATURE_MS2 (FEATURE_ID);"
+                idx_query += "CREATE INDEX IF NOT EXISTS idx_feature_ms2_feature_id ON FEATURE_MS2 (FEATURE_ID);"
             if check_sqlite_table(con, "SCORE_MS2"):
-              idx_query += "CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);"
+                idx_query += "CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);"
 
-            query = '''
+            query = (
+                """
     SELECT RUN.ID AS id_run,
           PEPTIDE.ID AS id_peptide,
           PRECURSOR.ID AS transition_group_id,
@@ -287,33 +332,63 @@ def export_tsv(infile, outfile, format, outcsv, transition_quantification, max_t
     WHERE SCORE_MS2.QVALUE < %s
     ORDER BY transition_group_id,
             peak_group_rank;
-    ''' % max_rs_peakgroup_qvalue
+    """
+                % max_rs_peakgroup_qvalue
+            )
 
         # Execute main SQLite query
         click.echo("Info: Reading peak group-level results.")
-        con.executescript(idx_query) # Add indices
+        con.executescript(idx_query)  # Add indices
         data = pd.read_sql_query(query, con)
 
         # Augment OpenSWATH results with IPF scores
-        if ipf_present and ipf=='augmented':
-          data_augmented = pd.read_sql_query(query_augmented, con)
+        if ipf_present and ipf == "augmented":
+            data_augmented = pd.read_sql_query(query_augmented, con)
 
-          data_augmented = data_augmented.groupby('id').apply(lambda x: pd.Series({'ipf_FullUniModPeptideName': ";".join(x[x['ipf_peptidoform_pep'] == np.min(x['ipf_peptidoform_pep'])]['ipf_FullUniModPeptideName']), 'ipf_precursor_peakgroup_pep': x[x['ipf_peptidoform_pep'] == np.min(x['ipf_peptidoform_pep'])]['ipf_precursor_peakgroup_pep'].values[0], 'ipf_peptidoform_pep': x[x['ipf_peptidoform_pep'] == np.min(x['ipf_peptidoform_pep'])]['ipf_peptidoform_pep'].values[0], 'ipf_peptidoform_m_score': x[x['ipf_peptidoform_pep'] == np.min(x['ipf_peptidoform_pep'])]['ipf_peptidoform_m_score'].values[0]})).reset_index(level='id')
+            data_augmented = (
+                data_augmented.groupby("id")
+                .apply(
+                    lambda x: pd.Series(
+                        {
+                            "ipf_FullUniModPeptideName": ";".join(
+                                x[
+                                    x["ipf_peptidoform_pep"]
+                                    == np.min(x["ipf_peptidoform_pep"])
+                                ]["ipf_FullUniModPeptideName"]
+                            ),
+                            "ipf_precursor_peakgroup_pep": x[
+                                x["ipf_peptidoform_pep"]
+                                == np.min(x["ipf_peptidoform_pep"])
+                            ]["ipf_precursor_peakgroup_pep"].values[0],
+                            "ipf_peptidoform_pep": x[
+                                x["ipf_peptidoform_pep"]
+                                == np.min(x["ipf_peptidoform_pep"])
+                            ]["ipf_peptidoform_pep"].values[0],
+                            "ipf_peptidoform_m_score": x[
+                                x["ipf_peptidoform_pep"]
+                                == np.min(x["ipf_peptidoform_pep"])
+                            ]["ipf_peptidoform_m_score"].values[0],
+                        }
+                    )
+                )
+                .reset_index(level="id")
+            )
 
-          data = pd.merge(data, data_augmented, how='left', on='id')
+            data = pd.merge(data, data_augmented, how="left", on="id")
 
         # Append transition-level quantities
         if transition_quantification:
             if check_sqlite_table(con, "SCORE_TRANSITION"):
-                idx_transition_query = '''
+                idx_transition_query = """
     CREATE INDEX IF NOT EXISTS idx_feature_transition_transition_id ON FEATURE_TRANSITION (TRANSITION_ID);
     CREATE INDEX IF NOT EXISTS idx_transition_transition_id ON TRANSITION (ID);
 
     CREATE INDEX IF NOT EXISTS idx_feature_transition_transition_id_feature_id ON FEATURE_TRANSITION (TRANSITION_ID, FEATURE_ID);
     CREATE INDEX IF NOT EXISTS idx_score_transition_transition_id_feature_id ON SCORE_TRANSITION (TRANSITION_ID, FEATURE_ID);
     CREATE INDEX IF NOT EXISTS idx_feature_transition_feature_id ON FEATURE_TRANSITION (FEATURE_ID);
-    '''
-                transition_query = '''
+    """
+                transition_query = (
+                    """
     SELECT FEATURE_TRANSITION.FEATURE_ID AS id,
           GROUP_CONCAT(AREA_INTENSITY,';') AS aggr_Peak_Area,
           GROUP_CONCAT(APEX_INTENSITY,';') AS aggr_Peak_Apex,
@@ -323,15 +398,17 @@ def export_tsv(infile, outfile, format, outcsv, transition_quantification, max_t
     INNER JOIN SCORE_TRANSITION ON FEATURE_TRANSITION.TRANSITION_ID = SCORE_TRANSITION.TRANSITION_ID AND FEATURE_TRANSITION.FEATURE_ID = SCORE_TRANSITION.FEATURE_ID
     WHERE TRANSITION.DECOY == 0 AND SCORE_TRANSITION.PEP < %s
     GROUP BY FEATURE_TRANSITION.FEATURE_ID
-    ''' % max_transition_pep
+    """
+                    % max_transition_pep
+                )
             else:
-                idx_transition_query = '''
+                idx_transition_query = """
     CREATE INDEX IF NOT EXISTS idx_feature_transition_transition_id ON FEATURE_TRANSITION (TRANSITION_ID);
     CREATE INDEX IF NOT EXISTS idx_transition_transition_id ON TRANSITION (ID);
 
     CREATE INDEX IF NOT EXISTS idx_feature_transition_feature_id ON FEATURE_TRANSITION (FEATURE_ID);
-    '''
-                transition_query = '''
+    """
+                transition_query = """
     SELECT FEATURE_ID AS id,
           GROUP_CONCAT(AREA_INTENSITY,';') AS aggr_Peak_Area,
           GROUP_CONCAT(APEX_INTENSITY,';') AS aggr_Peak_Apex,
@@ -339,28 +416,33 @@ def export_tsv(infile, outfile, format, outcsv, transition_quantification, max_t
     FROM FEATURE_TRANSITION
     INNER JOIN TRANSITION ON FEATURE_TRANSITION.TRANSITION_ID = TRANSITION.ID
     GROUP BY FEATURE_ID
-    '''
+    """
             click.echo("Info: Reading transition-level results.")
-            con.executescript(idx_transition_query) # Add indices
+            con.executescript(idx_transition_query)  # Add indices
             data_transition = pd.read_sql_query(transition_query, con)
-            data = pd.merge(data, data_transition, how='left', on=['id'])
+            data = pd.merge(data, data_transition, how="left", on=["id"])
 
         # Append concatenated protein identifier
         click.echo("Info: Reading protein identifiers.")
-        con.executescript('''
+        con.executescript(
+            """
     CREATE INDEX IF NOT EXISTS idx_peptide_protein_mapping_protein_id ON PEPTIDE_PROTEIN_MAPPING (PROTEIN_ID);
     CREATE INDEX IF NOT EXISTS idx_protein_protein_id ON PROTEIN (ID);
 
     CREATE INDEX IF NOT EXISTS idx_peptide_protein_mapping_peptide_id ON PEPTIDE_PROTEIN_MAPPING (PEPTIDE_ID);
-    ''')
-        data_protein = pd.read_sql_query('''
+    """
+        )
+        data_protein = pd.read_sql_query(
+            """
     SELECT PEPTIDE_ID AS id_peptide,
           GROUP_CONCAT(PROTEIN.PROTEIN_ACCESSION,';') AS ProteinName
     FROM PEPTIDE_PROTEIN_MAPPING
     INNER JOIN PROTEIN ON PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID = PROTEIN.ID
     GROUP BY PEPTIDE_ID;
-    ''', con)
-        data = pd.merge(data, data_protein, how='inner', on=['id_peptide'])
+    """,
+            con,
+        )
+        data = pd.merge(data, data_protein, how="inner", on=["id_peptide"])
 
         # Append peptide error-rate control
         peptide_present = False
@@ -369,34 +451,54 @@ def export_tsv(infile, outfile, format, outcsv, transition_quantification, max_t
 
         if peptide_present and peptide:
             click.echo("Info: Reading peptide-level results.")
-            data_peptide_run = pd.read_sql_query('''
+            data_peptide_run = pd.read_sql_query(
+                """
     SELECT RUN_ID AS id_run,
           PEPTIDE_ID AS id_peptide,
           QVALUE AS m_score_peptide_run_specific
     FROM SCORE_PEPTIDE
     WHERE CONTEXT == 'run-specific';
-    ''', con)
+    """,
+                con,
+            )
             if len(data_peptide_run.index) > 0:
-                data = pd.merge(data, data_peptide_run, how='inner', on=['id_run','id_peptide'])
+                data = pd.merge(
+                    data, data_peptide_run, how="inner", on=["id_run", "id_peptide"]
+                )
 
-            data_peptide_experiment = pd.read_sql_query('''
+            data_peptide_experiment = pd.read_sql_query(
+                """
     SELECT RUN_ID AS id_run,
           PEPTIDE_ID AS id_peptide,
           QVALUE AS m_score_peptide_experiment_wide
     FROM SCORE_PEPTIDE
     WHERE CONTEXT == 'experiment-wide';
-    ''', con)
+    """,
+                con,
+            )
             if len(data_peptide_experiment.index) > 0:
-                data = pd.merge(data, data_peptide_experiment, on=['id_run','id_peptide'])
+                data = pd.merge(
+                    data, data_peptide_experiment, on=["id_run", "id_peptide"]
+                )
 
-            data_peptide_global = pd.read_sql_query('''
+            data_peptide_global = pd.read_sql_query(
+                """
     SELECT PEPTIDE_ID AS id_peptide,
           QVALUE AS m_score_peptide_global
     FROM SCORE_PEPTIDE
     WHERE CONTEXT == 'global';
-    ''', con)
+    """,
+                con,
+            )
             if len(data_peptide_global.index) > 0:
-                data = pd.merge(data, data_peptide_global[data_peptide_global['m_score_peptide_global'] < max_global_peptide_qvalue], on=['id_peptide'])
+                data = pd.merge(
+                    data,
+                    data_peptide_global[
+                        data_peptide_global["m_score_peptide_global"]
+                        < max_global_peptide_qvalue
+                    ],
+                    on=["id_peptide"],
+                )
 
         # Append protein error-rate control
         protein_present = False
@@ -405,13 +507,16 @@ def export_tsv(infile, outfile, format, outcsv, transition_quantification, max_t
 
         if protein_present and protein:
             click.echo("Info: Reading protein-level results.")
-            con.executescript('''
+            con.executescript(
+                """
     CREATE INDEX IF NOT EXISTS idx_peptide_protein_mapping_protein_id ON PEPTIDE_PROTEIN_MAPPING (PROTEIN_ID);
     CREATE INDEX IF NOT EXISTS idx_peptide_protein_mapping_peptide_id ON PEPTIDE_PROTEIN_MAPPING (PEPTIDE_ID);
     CREATE INDEX IF NOT EXISTS idx_score_protein_protein_id ON SCORE_PROTEIN (PROTEIN_ID);
     CREATE INDEX IF NOT EXISTS idx_score_protein_run_id ON SCORE_PROTEIN (RUN_ID);
-    ''')
-            data_protein_run = pd.read_sql_query('''
+    """
+            )
+            data_protein_run = pd.read_sql_query(
+                """
     SELECT RUN_ID AS id_run,
           PEPTIDE_ID AS id_peptide,
           MIN(QVALUE) AS m_score_protein_run_specific
@@ -420,17 +525,24 @@ def export_tsv(infile, outfile, format, outcsv, transition_quantification, max_t
     WHERE CONTEXT == 'run-specific'
     GROUP BY RUN_ID,
             PEPTIDE_ID;
-    ''', con)
+    """,
+                con,
+            )
             if len(data_protein_run.index) > 0:
-                data = pd.merge(data, data_protein_run, how='inner', on=['id_run','id_peptide'])
+                data = pd.merge(
+                    data, data_protein_run, how="inner", on=["id_run", "id_peptide"]
+                )
 
-            con.executescript('''
+            con.executescript(
+                """
     CREATE INDEX IF NOT EXISTS idx_peptide_protein_mapping_protein_id ON PEPTIDE_PROTEIN_MAPPING (PROTEIN_ID);
     CREATE INDEX IF NOT EXISTS idx_peptide_protein_mapping_peptide_id ON PEPTIDE_PROTEIN_MAPPING (PEPTIDE_ID);
     CREATE INDEX IF NOT EXISTS idx_score_protein_protein_id ON SCORE_PROTEIN (PROTEIN_ID);
     CREATE INDEX IF NOT EXISTS idx_score_protein_run_id ON SCORE_PROTEIN (RUN_ID);
-    ''')
-            data_protein_experiment = pd.read_sql_query('''
+    """
+            )
+            data_protein_experiment = pd.read_sql_query(
+                """
     SELECT RUN_ID AS id_run,
           PEPTIDE_ID AS id_peptide,
           MIN(QVALUE) AS m_score_protein_experiment_wide
@@ -439,45 +551,89 @@ def export_tsv(infile, outfile, format, outcsv, transition_quantification, max_t
     WHERE CONTEXT == 'experiment-wide'
     GROUP BY RUN_ID,
             PEPTIDE_ID;
-    ''', con)
+    """,
+                con,
+            )
             if len(data_protein_experiment.index) > 0:
-                data = pd.merge(data, data_protein_experiment, how='inner', on=['id_run','id_peptide'])
+                data = pd.merge(
+                    data,
+                    data_protein_experiment,
+                    how="inner",
+                    on=["id_run", "id_peptide"],
+                )
 
-            con.executescript('''
+            con.executescript(
+                """
     CREATE INDEX IF NOT EXISTS idx_peptide_protein_mapping_protein_id ON PEPTIDE_PROTEIN_MAPPING (PROTEIN_ID);
     CREATE INDEX IF NOT EXISTS idx_peptide_protein_mapping_peptide_id ON PEPTIDE_PROTEIN_MAPPING (PEPTIDE_ID);
     CREATE INDEX IF NOT EXISTS idx_score_protein_protein_id ON SCORE_PROTEIN (PROTEIN_ID);
-    ''')
-            data_protein_global = pd.read_sql_query('''
+    """
+            )
+            data_protein_global = pd.read_sql_query(
+                """
     SELECT PEPTIDE_ID AS id_peptide,
           MIN(QVALUE) AS m_score_protein_global
     FROM PEPTIDE_PROTEIN_MAPPING
     INNER JOIN SCORE_PROTEIN ON PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID = SCORE_PROTEIN.PROTEIN_ID
     WHERE CONTEXT == 'global'
     GROUP BY PEPTIDE_ID;
-    ''', con)
+    """,
+                con,
+            )
             if len(data_protein_global.index) > 0:
-                data = pd.merge(data, data_protein_global[data_protein_global['m_score_protein_global'] < max_global_protein_qvalue], how='inner', on=['id_peptide'])
+                data = pd.merge(
+                    data,
+                    data_protein_global[
+                        data_protein_global["m_score_protein_global"]
+                        < max_global_protein_qvalue
+                    ],
+                    how="inner",
+                    on=["id_peptide"],
+                )
 
     if outcsv:
         sep = ","
     else:
         sep = "\t"
 
-    if format == 'legacy_split':
-        data = data.drop(['id_run','id_peptide'], axis=1)
-        data.groupby('filename').apply(lambda x: x.to_csv(os.path.basename(x['filename'].values[0]) + '.tsv', sep=sep, index=False))
-    elif format == 'legacy_merged':
-        data.drop(['id_run','id_peptide'], axis=1).to_csv(outfile, sep=sep, index=False)
-    elif format == 'matrix':
+    if format == "legacy_split":
+        data = data.drop(["id_run", "id_peptide"], axis=1)
+        data.groupby("filename").apply(
+            lambda x: x.to_csv(
+                os.path.basename(x["filename"].values[0]) + ".tsv", sep=sep, index=False
+            )
+        )
+    elif format == "legacy_merged":
+        data.drop(["id_run", "id_peptide"], axis=1).to_csv(
+            outfile, sep=sep, index=False
+        )
+    elif format == "matrix":
         # select top ranking peak group only
-        data = data.iloc[data.groupby(['run_id','transition_group_id']).apply(lambda x: x['m_score'].idxmin())]
+        data = data.iloc[
+            data.groupby(["run_id", "transition_group_id"]).apply(
+                lambda x: x["m_score"].idxmin()
+            )
+        ]
         # restructure dataframe to matrix
-        data = data[['transition_group_id','Sequence','FullPeptideName','ProteinName','filename','Intensity']]
-        data = data.pivot_table(index=['transition_group_id','Sequence','FullPeptideName','ProteinName'], columns='filename', values='Intensity')
+        data = data[
+            [
+                "transition_group_id",
+                "Sequence",
+                "FullPeptideName",
+                "ProteinName",
+                "filename",
+                "Intensity",
+            ]
+        ]
+        data = data.pivot_table(
+            index=["transition_group_id", "Sequence", "FullPeptideName", "ProteinName"],
+            columns="filename",
+            values="Intensity",
+        )
         data.to_csv(outfile, sep=sep, index=True)
 
     con.close()
+
 
 def export_score_plots(infile):
 
@@ -485,7 +641,8 @@ def export_score_plots(infile):
 
     if check_sqlite_table(con, "SCORE_MS2"):
         outfile = infile.split(".osw")[0] + "_ms2_score_plots.pdf"
-        table_ms2 = pd.read_sql_query('''
+        table_ms2 = pd.read_sql_query(
+            """
 SELECT *,
        RUN_ID || '_' || PRECURSOR_ID AS GROUP_ID
 FROM FEATURE_MS2
@@ -512,12 +669,15 @@ WHERE RANK == 1
 ORDER BY RUN_ID,
          PRECURSOR.ID ASC,
          FEATURE.EXP_RT ASC;
-''', con)
+""",
+            con,
+        )
         plot_scores(table_ms2, outfile)
 
     if check_sqlite_table(con, "SCORE_MS1"):
         outfile = infile.split(".osw")[0] + "_ms1_score_plots.pdf"
-        table_ms1 = pd.read_sql_query('''
+        table_ms1 = pd.read_sql_query(
+            """
 SELECT *,
        RUN_ID || '_' || PRECURSOR_ID AS GROUP_ID
 FROM FEATURE_MS1
@@ -537,12 +697,15 @@ WHERE RANK == 1
 ORDER BY RUN_ID,
          PRECURSOR.ID ASC,
          FEATURE.EXP_RT ASC;
-''', con)
+""",
+            con,
+        )
         plot_scores(table_ms1, outfile)
 
     if check_sqlite_table(con, "SCORE_TRANSITION"):
         outfile = infile.split(".osw")[0] + "_transition_score_plots.pdf"
-        table_transition = pd.read_sql_query('''
+        table_transition = pd.read_sql_query(
+            """
 SELECT TRANSITION.DECOY AS DECOY,
        FEATURE_TRANSITION.*,
        PRECURSOR.CHARGE AS VAR_PRECURSOR_CHARGE,
@@ -568,7 +731,9 @@ ORDER BY RUN_ID,
          PRECURSOR.ID,
          FEATURE.EXP_RT,
          TRANSITION.ID;
-''', con)
+""",
+            con,
+        )
         plot_scores(table_transition, outfile)
 
     con.close()

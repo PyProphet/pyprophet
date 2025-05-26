@@ -11,9 +11,11 @@ import numpy as np
 import click
 from loguru import logger
 
-
-from ._config import RunnerIOConfig, ErrorEstimationConfig
-from .stats import (
+from .data_handling import prepare_data_table, Experiment
+from .classifiers import LDALearner, SVMLearner, XGBLearner
+from .semi_supervised import StandardSemiSupervisedLearner
+from .._config import RunnerIOConfig, ErrorEstimationConfig
+from ..stats import (
     lookup_values_from_error_table,
     error_statistics,
     mean_and_std_dev,
@@ -21,9 +23,6 @@ from .stats import (
     summary_err_table,
     posterior_chromatogram_hypotheses_fast,
 )
-from .data_handling import prepare_data_table, Experiment
-from .classifiers import LDALearner, SVMLearner, XGBLearner
-from .semi_supervised import StandardSemiSupervisedLearner
 
 
 try:

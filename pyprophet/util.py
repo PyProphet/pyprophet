@@ -1,9 +1,11 @@
+import multiprocessing
 from pathlib import Path
 import sys
 import ast
 from importlib.metadata import version
 from datetime import datetime
 import platform
+import numpy as np
 import psutil
 import click
 from loguru import logger
@@ -68,12 +70,6 @@ class AdvancedHelpCommand(click.Command):
         ctx.obj["show_advanced"] = True
         click.echo(ctx.get_help(), color=ctx.color)
         ctx.exit()
-
-    def get_help_record(self, ctx):
-        # Skip for helphelp option itself
-        if self.name == "helphelp":
-            return None
-        return super().get_help_record(ctx)
 
     def format_options(self, ctx, formatter):
         ctx.ensure_object(dict)
@@ -143,7 +139,7 @@ class AdvancedHelpCommand(click.Command):
 
         if opts:
             with formatter.section("Options"):
-                formatter.write_dl(opts)
+                formatter.write_dl(opts, col_max=35, col_spacing=6)
 
 
 class CombinedGroup(GlobalLogLevelGroup, AdvancedHelpGroup):
@@ -266,3 +262,30 @@ def write_logfile(log_level, log_file, log_header=None):
         level=log_level,
         rotation="1000 MB",
     )
+
+
+# Parameter transformation functions
+def transform_pi0_lambda(ctx, param, value):
+    if value[1] == 0 and value[2] == 0:
+        pi0_lambda = value[0]
+    elif 0 <= value[0] < 1 and value[0] <= value[1] <= 1 and 0 < value[2] < 1:
+        pi0_lambda = np.arange(value[0], value[1], value[2])
+    else:
+        raise click.ClickException(
+            "Wrong input values for pi0_lambda. pi0_lambda must be within [0,1)."
+        )
+    return pi0_lambda
+
+
+def transform_threads(ctx, param, value):
+    if value == -1:
+        value = multiprocessing.cpu_count()
+    return value
+
+
+def transform_subsample_ratio(ctx, param, value):
+    if value < 0 or value > 1:
+        raise click.ClickException(
+            "Wrong input values for subsample_ratio. subsample_ratio must be within [0,1]."
+        )
+    return value

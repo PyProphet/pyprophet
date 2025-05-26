@@ -1,6 +1,7 @@
 import sys
 import os
 import click
+from loguru import logger
 import pandas as pd
 import numpy as np
 import polars as pl
@@ -57,9 +58,12 @@ def statistics_report(
     summary_table = summary_err_table(error_stat)
 
     # print summary table
-    click.echo("=" * 80)
-    click.echo(summary_table)
-    click.echo("=" * 80)
+    logger.opt(raw=True).info("=" * 80)
+    logger.opt(raw=True).info("\n")
+    logger.opt(raw=True).info(summary_table)
+    logger.opt(raw=True).info("\n")
+    logger.opt(raw=True).info("=" * 80)
+    logger.opt(raw=True).info("\n")
 
     p_values, s_values, peps, q_values = lookup_values_from_error_table(
         data["score"].values, error_stat

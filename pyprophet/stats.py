@@ -1,26 +1,25 @@
 from __future__ import division
 
+import os
+from collections import namedtuple
+
 import numpy as np
 import scipy as sp
 import pandas as pd
-import math
 import scipy.stats
 import scipy.special
-import multiprocessing
+from statsmodels.nonparametric.kde import KDEUnivariate
 import click
 from loguru import logger
-import os
 
-from .optimized import (
+
+from .scoring.optimized import (
     find_nearest_matches as _find_nearest_matches,
     count_num_positives,
     single_chromatogram_hypothesis_fast,
 )
 from .report import plot_hist, main_score_selection_report
-from statsmodels.nonparametric.kde import KDEUnivariate
-from collections import namedtuple
 
-# from .config import CONFIG
 
 try:
     profile
@@ -33,15 +32,6 @@ def _ff(a):
 
 
 def find_nearest_matches(x, y):
-    # num_processes = CONFIG.get("num_processes")
-    # if num_processes > 1:
-    #     pool = multiprocessing.Pool(processes=num_processes)
-    #     batch_size = int(math.ceil(len(y) / num_processes))
-    #     parts = [(x, y[i:i + batch_size]) for i in range(0, len(y),
-    #                                                      batch_size)]
-    #     res = pool.map(_ff, parts)
-    #     res_par = np.hstack(res)
-    #     return res_par
     return _find_nearest_matches(x, y)
 
 
