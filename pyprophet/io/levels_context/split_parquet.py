@@ -8,15 +8,14 @@ import duckdb
 import click
 from loguru import logger
 
-from .._base import BaseReader, BaseWriter
+from .._base import BaseSplitParquetReader, BaseSplitParquetWriter
 from ..._config import LevelContextIOConfig
 from ..util import (
-    print_parquet_tree,
     get_parquet_column_names,
 )
 
 
-class SplitParquetReader(BaseReader):
+class SplitParquetReader(BaseSplitParquetReader):
     """
     Class for reading and processing data from OpenSWATH results stored in a directoy containing split Parquet files.
 
@@ -41,15 +40,6 @@ class SplitParquetReader(BaseReader):
 
     def __init__(self, config: LevelContextIOConfig):
         super().__init__(config)
-        self.config = config
-
-        if config.file_type not in ("parquet_split", "parquet_split_multi"):
-            raise click.ClickException(
-                f"SplitParquetReader requires 'parquet_split' or 'parquet_split_multi' input, got '{config.file_type}' instead."
-            )
-
-        # Flag to indicate whether the input is a multi-run directory
-        self._is_multi_run = config.file_type == "parquet_split_multi"
 
     def read(self) -> pd.DataFrame:
         con = duckdb.connect()
@@ -71,83 +61,6 @@ class SplitParquetReader(BaseReader):
                 raise click.ClickException(f"Unsupported level: {level}")
         finally:
             con.close()
-
-    def _init_duckdb_views(self, con):
-        base_dir = self.infile
-
-        # Gather files from multiple runs
-        precursor_files = glob.glob(
-            os.path.join(base_dir, "*.oswpq", "precursors_features.parquet")
-        )
-
-        # If no multi-run structure, check single run input directory
-        if not precursor_files:
-            precursor_path = os.path.join(base_dir, "precursors_features.parquet")
-            if os.path.exists(precursor_path):
-                precursor_files = [precursor_path]
-
-        # print_parquet_tree(base_dir, precursor_files, transition_files, alignment_file)
-
-        if not precursor_files:
-            raise click.ClickException("Error: No precursor Parquet files found.")
-
-        # Create TEMP table of sampled precursor IDs (if needed)
-        if self.subsample_ratio < 1.0:
-            logger.info(
-                f"Subsampling data for semi-supervised learning. Ratio: {self.subsample_ratio:.2f}"
-            )
-            con.execute(
-                f"""
-                CREATE TEMP TABLE sampled_precursor_ids AS
-                SELECT DISTINCT PRECURSOR_ID
-                FROM read_parquet({precursor_files})
-                USING SAMPLE {self.subsample_ratio * 100}%
-                """
-            )
-            n = con.execute("SELECT COUNT(*) FROM sampled_precursor_ids").fetchone()[0]
-            logger.info(f"Sampled {n} precursor IDs")
-
-        # Create view: precursors
-        if self.subsample_ratio < 1.0:
-            logger.trace("Creating 'precursors' view with sampled precursor IDs")
-            con.execute(
-                f"""
-                CREATE VIEW precursors AS
-                SELECT *
-                FROM read_parquet({precursor_files})
-                WHERE PRECURSOR_ID IN (SELECT PRECURSOR_ID FROM sampled_precursor_ids)
-                """
-            )
-        else:
-            logger.trace("Creating 'precursors' view with full input")
-            con.execute(
-                f"CREATE VIEW precursors AS SELECT * FROM read_parquet({precursor_files})"
-            )
-
-    def _get_columns_by_prefix(self, parquet_file, prefix):
-        """
-        Returns columns that start with `prefix` from one of the parquet files.
-        In multi-run mode, uses the first run's file as a representative.
-        """
-        if self._is_multi_run:
-            candidate = glob.glob(
-                os.path.join(self.config.infile, "*.oswpq", parquet_file)
-            )
-            if not candidate:
-                raise click.ClickException(
-                    f"Could not find '{parquet_file}' in any '.oswpq' subdirectory of '{self.config.infile}'."
-                )
-            path = candidate[0]
-        else:
-            path = os.path.join(self.config.infile, parquet_file)
-            if not os.path.exists(path):
-                raise click.ClickException(f"File '{path}' does not exist.")
-
-        cols = get_parquet_column_names(path)
-        if cols is None:
-            raise click.ClickException(f"Failed to read schema or columns from: {path}")
-
-        return [c for c in cols if c.startswith(prefix)]
 
     def _read_pyp_peptide(self, con) -> pd.DataFrame:
         cfg = self.config  # LevelContextIOConfig instance
@@ -282,7 +195,7 @@ class SplitParquetReader(BaseReader):
         return df
 
 
-class SplitParquetWriter(BaseWriter):
+class SplitParquetWriter(BaseSplitParquetWriter):
     """
     Class for writing OpenSWATH results to a directory containing split Parquet files.
 
@@ -300,22 +213,6 @@ class SplitParquetWriter(BaseWriter):
 
     def __init__(self, config: LevelContextIOConfig):
         super().__init__(config)
-
-        if self.file_type not in ("parquet_split", "parquet_split_multi"):
-            raise click.ClickException(
-                f"SplitParquetWriter requires 'parquet_split' or 'parquet_split_multi' input, got '{self.file_type}' instead."
-            )
-
-        if self.level not in ("peptide", "protein", "gene"):
-            raise click.ClickException(
-                f"SplitParquetWriter levels_context only supports peptide, protein, or gene levels, got '{self.level}' instead."
-            )
-
-        self.context_level_id_map = {
-            "peptide": "peptide_id",
-            "protein": "protein_id",
-            "gene": "gene_id",
-        }
 
     def save_results(self, result):
 

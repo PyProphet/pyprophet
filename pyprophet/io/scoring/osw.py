@@ -7,11 +7,11 @@ import pandas as pd
 import click
 from loguru import logger
 from ..util import check_sqlite_table, check_duckdb_table
-from .._base import BaseReader, BaseWriter, BaseIOConfig
+from .._base import BaseOSWReader, BaseOSWWriter
 from ..._config import RunnerIOConfig
 
 
-class OSWReader(BaseReader):
+class OSWReader(BaseOSWReader):
     """
     Class for reading and processing data from an OpenSWATH workflow OSW-sqlite based file.
 
@@ -524,7 +524,7 @@ class OSWReader(BaseReader):
         return self._finalize_feature_table(df, self.config.runner.ss_main_score)
 
 
-class OSWWriter(BaseWriter):
+class OSWWriter(BaseOSWWriter):
     """
     Class for writing OpenSWATH results to an OSW-sqlite based file.
 

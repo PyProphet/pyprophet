@@ -7,11 +7,11 @@ import duckdb
 import click
 from loguru import logger
 from ..util import get_parquet_column_names
-from .._base import BaseReader, BaseWriter
+from .._base import BaseParquetReader, BaseParquetWriter
 from ..._config import LevelContextIOConfig
 
 
-class ParquetReader(BaseReader):
+class ParquetReader(BaseParquetReader):
     """
     Class for reading and processing data from OpenSWATH results stored in Parquet format.
 
@@ -54,13 +54,6 @@ class ParquetReader(BaseReader):
                 raise click.ClickException(f"Unsupported level: {level}")
         finally:
             con.close()
-
-    def _init_duckdb_views(self, con):
-        con.execute(f"CREATE VIEW data AS SELECT * FROM read_parquet('{self.infile}')")
-
-    def _get_columns_by_prefix(self, parquet_file, prefix):
-        cols = get_parquet_column_names(parquet_file)
-        return [c for c in cols if c.startswith(prefix)]
 
     def _read_pyp_peptide(self, con) -> pd.DataFrame:
         cfg = self.config  # LevelContextIOConfig instance
@@ -175,7 +168,7 @@ class ParquetReader(BaseReader):
         return df
 
 
-class ParquetWriter(BaseWriter):
+class ParquetWriter(BaseParquetWriter):
     """
     Class for writing OpenSWATH results to a Parquet file.
 
@@ -193,12 +186,6 @@ class ParquetWriter(BaseWriter):
 
     def __init__(self, config: LevelContextIOConfig):
         super().__init__(config)
-
-        self.context_level_id_map = {
-            "peptide": "peptide_id",
-            "protein": "protein_id",
-            "gene": "gene_id",
-        }
 
     def save_results(self, result):
         if self.infile != self.outfile:

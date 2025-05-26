@@ -1,11 +1,15 @@
 from abc import ABC, abstractmethod
 import sys
 import os
+import glob
 import pickle
+import sqlite3
+import duckdb
 import pandas as pd
 import click
 from loguru import logger
 
+from .util import print_parquet_tree, get_parquet_column_names
 from .._base import BaseIOConfig
 from ..report import save_report
 
@@ -452,3 +456,400 @@ class BaseWriter(ABC):
                 logger.opt(exception=e, depth=1).critical(f"Critical error: {str(e)}")
 
             sys.exit(1)
+
+
+class BaseOSWReader(BaseReader):
+    """
+    Class for reading and processing data from an OpenSWATH workflow OSW-sqlite based file.
+
+    The OSWReader class provides methods to read different levels of data from the file and process it accordingly.
+    It supports reading data for semi-supervised learning, IPF analysis, context level analysis.
+
+    Attributes:
+        infile (str): Input file path.
+        outfile (str): Output file path.
+        classifier (str): Classifier used for semi-supervised learning.
+        level (str): Level used in semi-supervised learning (e.g., 'ms1', 'ms2', 'ms1ms2', 'transition', 'alignment'), or context level used peptide/protein/gene inference (e.g., 'global', 'experiment-wide', 'run-specific').
+        glyco (bool): Flag indicating whether analysis is glycoform-specific.
+
+    Methods:
+        read(): Read data from the input file based on the alogorithm.
+    """
+
+    def __init__(self, config: BaseIOConfig):
+        super().__init__(config)
+
+    def read(self) -> pd.DataFrame:
+        """
+        Abstract method to be implemented by subclasses to read data from OSW format for a specific algorithm.
+        """
+        raise NotImplementedError(
+            "The read method must be implemented in subclasses of BaseOSWReader."
+        )
+
+
+class BaseOSWWriter(BaseWriter):
+    """
+    Class for writing OpenSWATH results to an OSW-sqlite based file.
+
+    Attributes:
+        infile (str): Input file path.
+        outfile (str): Output file path.
+        classifier (str): Classifier used for semi-supervised learning.
+        level (str): Level used in semi-supervised learning (e.g., 'ms1', 'ms2', 'ms1ms2', 'transition', 'alignment'), or context level used peptide/protein/gene inference (e.g., 'global', 'experiment-wide', 'run-specific').
+        glyco (bool): Flag indicating whether analysis is glycoform-specific.
+
+    Methods:
+        save_results(result, pi0): Save the results to the output file based on the module using this class.
+        save_weights(weights): Save the weights to the output file.
+    """
+
+    def __init__(self, config: BaseIOConfig):
+        super().__init__(config)
+
+    def save_results(self, result, pi0):
+        """
+        Abstract method to save scoring results and statistical outputs.
+        """
+        raise NotImplementedError(
+            "The save_results method must be implemented in subclasses of BaseOSWWriter."
+        )
+
+
+class BaseParquetReader(BaseReader):
+    """
+    Class for reading and processing data from OpenSWATH results stored in Parquet format.
+
+    The ParquetReader class provides methods to read different levels of data from the file and process it accordingly.
+    It supports reading data for semi-supervised learning, IPF analysis, context level analysis.
+
+    This assumes that the input file contains precursor and transition data.
+
+    Attributes:
+        infile (str): Input file path.
+        outfile (str): Output file path.
+        classifier (str): Classifier used for semi-supervised learning.
+        level (str): Level used in semi-supervised learning (e.g., 'ms1', 'ms2', 'ms1ms2', 'transition', 'alignment'), or context level used peptide/protein/gene inference (e.g., 'global', 'experiment-wide', 'run-specific').
+        glyco (bool): Flag indicating whether analysis is glycoform-specific.
+
+    Methods:
+        read(): Read data from the input file based on the alogorithm.
+    """
+
+    def __init__(self, config: BaseIOConfig):
+        super().__init__(config)
+
+        if self.config.context == "ipf" and config.propagate_signal_across_runs:
+            # We make the assumption that the alignment file is in the same directory as the input file
+            self.alignment_file = os.path.join(
+                os.path.dirname(self.infile), "feature_alignment.parquet"
+            )
+            if not os.path.exists(self.alignment_file):
+                raise click.ClickException(
+                    f"To use the --propagate-signal-across-runs option, "
+                    f"the alignment file {self.alignment_file} must exist."
+                )
+
+    def read(self) -> pd.DataFrame:
+        """
+        Abstract method to be implemented by subclasses to read data from Parquet format for a specific algorithm.
+        """
+        raise NotImplementedError(
+            "The read method must be implemented in subclasses of BaseParquetReader."
+        )
+
+    def _init_duckdb_views(self, con):
+        # Create TEMP table of sampled precursors IDs (if needed)
+        if self.subsample_ratio < 1.0:
+            logger.info(
+                f"Subsampling {self.subsample_ratio * 100}% data for semi-supervised learning."
+            )
+            con.execute(
+                f"""
+                CREATE TEMP TABLE sampled_precursor_ids AS
+                SELECT DISTINCT PRECURSOR_ID
+                FROM read_parquet({self.infile})
+                USING SAMPLE {self.subsample_ratio * 100}%
+                """
+            )
+            n = con.execute("SELECT COUNT(*) FROM sampled_precursor_ids").fetchone()[0]
+            logger.info(f"Sampled {n} precursor IDs")
+
+            con.execute(
+                f"CREATE VIEW data AS SELECT * FROM read_parquet('{self.infile}') WHERE PRECURSOR_ID IN (SELECT PRECURSOR_ID FROM sampled_precursor_ids)"
+            )
+        else:
+            con.execute(
+                f"CREATE VIEW data AS SELECT * FROM read_parquet('{self.infile}')"
+            )
+
+        if self.context == "ipf" and self.config.propagate_signal_across_runs:
+            con.execute(
+                f"CREATE VIEW alignment AS SELECT * FROM read_parquet('{self.alignment_file}')"
+            )
+
+    def _get_columns_by_prefix(self, parquet_file, prefix):
+        cols = get_parquet_column_names(parquet_file)
+        return [c for c in cols if c.startswith(prefix)]
+
+
+class BaseParquetWriter(BaseWriter):
+    """
+    Class for writing OpenSWATH results to a Parquet file.
+
+    Attributes:
+        infile (str): Input file path.
+        outfile (str): Output file path.
+        classifier (str): Classifier used for semi-supervised learning.
+        level (str): Level used in semi-supervised learning (e.g., 'ms1', 'ms2', 'ms1ms2', 'transition', 'alignment'), or context level used peptide/protein/gene inference (e.g., 'global', 'experiment-wide', 'run-specific').
+        glyco (bool): Flag indicating whether analysis is glycoform-specific.
+
+    Methods:
+        save_results(result, pi0): Save the results to the output file based on the module using this class.
+        save_weights(weights): Save the weights to the output file.
+    """
+
+    def __init__(self, config: BaseIOConfig):
+        super().__init__(config)
+
+        if self.context == "levels_context":
+            self.context_level_id_map = {
+                "peptide": "peptide_id",
+                "protein": "protein_id",
+                "gene": "gene_id",
+            }
+
+    def save_results(self, result, pi0):
+        """
+        Abstract method to save scoring results and statistical outputs.
+        """
+        raise NotImplementedError(
+            "The save_results method must be implemented in subclasses of ParquetWriter."
+        )
+
+
+class BaseSplitParquetReader(BaseReader):
+    """
+    Class for reading and processing data from OpenSWATH results stored in a directoy containing split Parquet files.
+
+    The ParquetReader class provides methods to read different levels of data from the split parquet files and process it accordingly.
+    It supports reading data for semi-supervised learning, IPF analysis, context level analysis.
+
+    This assumes that the input infile path is a directory containing the following files:
+    - precursors_features.parquet
+    - transition_features.parquet
+    - feature_alignment.parquet (optional)
+
+    Attributes:
+        infile (str): Input file path.
+        outfile (str): Output file path.
+        classifier (str): Classifier used for semi-supervised learning.
+        level (str): Level used in semi-supervised learning (e.g., 'ms1', 'ms2', 'ms1ms2', 'transition', 'alignment'), or context level used peptide/protein/gene inference (e.g., 'global', 'experiment-wide', 'run-specific').
+        glyco (bool): Flag indicating whether analysis is glycoform-specific.
+
+    Methods:
+        read(): Read data from the input file based on the alogorithm.
+    """
+
+    def __init__(self, config: BaseIOConfig):
+        super().__init__(config)
+        self.config = config
+
+        if config.file_type not in ("parquet_split", "parquet_split_multi"):
+            raise click.ClickException(
+                f"SplitParquetReader requires 'parquet_split' or 'parquet_split_multi' input, got '{config.file_type}' instead."
+            )
+
+        # Flag to indicate whether the input is a multi-run directory
+        self._is_multi_run = config.file_type == "parquet_split_multi"
+
+    def read(self) -> pd.DataFrame:
+        """
+        Abstract method to be implemented by subclasses to read data from splti parquet format for a specific algorithm.
+        """
+        raise NotImplementedError(
+            "The read method must be implemented in subclasses of BaseSplitParquetReader."
+        )
+
+    def _init_duckdb_views(self, con):
+        """
+        Initialize DuckDB views for the split Parquet files.
+        """
+        base_dir = self.infile
+
+        # Gather files from multiple runs
+        precursor_files = glob.glob(
+            os.path.join(base_dir, "*.oswpq", "precursors_features.parquet")
+        )
+        transition_files = glob.glob(
+            os.path.join(base_dir, "*.oswpq", "transition_features.parquet")
+        )
+        alignment_file = os.path.join(base_dir, "feature_alignment.parquet")
+
+        # If no multi-run structure, check single run input directory
+        if not precursor_files:
+            precursor_path = os.path.join(base_dir, "precursors_features.parquet")
+            if os.path.exists(precursor_path):
+                precursor_files = [precursor_path]
+        if not transition_files:
+            transition_path = os.path.join(base_dir, "transition_features.parquet")
+            if os.path.exists(transition_path):
+                transition_files = [transition_path]
+
+        if self.context in ("score_learn", "ipf", "levels_context"):
+            print_parquet_tree(
+                base_dir, precursor_files, transition_files, alignment_file, 5
+            )
+
+        if not precursor_files:
+            raise click.ClickException("Error: No precursor Parquet files found.")
+
+        # Create TEMP table of sampled precursor IDs (if needed)
+        if self.subsample_ratio < 1.0:
+            logger.info(
+                f"Subsampling data for semi-supervised learning. Ratio: {self.subsample_ratio:.2f}"
+            )
+            con.execute(
+                f"""
+                CREATE TEMP TABLE sampled_precursor_ids AS
+                SELECT DISTINCT PRECURSOR_ID
+                FROM read_parquet({precursor_files})
+                USING SAMPLE {self.subsample_ratio * 100}%
+                """
+            )
+            n = con.execute("SELECT COUNT(*) FROM sampled_precursor_ids").fetchone()[0]
+            logger.info(f"Sampled {n} precursor IDs")
+
+        # Create view: precursors
+        if self.subsample_ratio < 1.0:
+            logger.trace("Creating 'precursors' view with sampled precursor IDs")
+            con.execute(
+                f"""
+                CREATE VIEW precursors AS
+                SELECT *
+                FROM read_parquet({precursor_files})
+                WHERE PRECURSOR_ID IN (SELECT PRECURSOR_ID FROM sampled_precursor_ids)
+                """
+            )
+        else:
+            logger.trace("Creating 'precursors' view with full input")
+            con.execute(
+                f"CREATE VIEW precursors AS SELECT * FROM read_parquet({precursor_files})"
+            )
+
+        # Create view: transition
+        if transition_files and self.config.context in (
+            "score_learn",
+            "score_apply",
+            "ipf",
+        ):
+            if self.subsample_ratio < 1.0:
+                logger.trace("Creating 'transition' view with sampled precursor IDs")
+                con.execute(
+                    f"""
+                    CREATE VIEW transition AS
+                    SELECT *
+                    FROM read_parquet({transition_files})
+                    WHERE PRECURSOR_ID IN (SELECT PRECURSOR_ID FROM sampled_precursor_ids)
+                    """
+                )
+            else:
+                logger.trace("Creating 'transition' view with full input")
+                con.execute(
+                    f"CREATE VIEW transition AS SELECT * FROM read_parquet({transition_files})"
+                )
+
+        # Create view: feature_alignment
+        if os.path.exists(alignment_file) and self.config.context in (
+            "score_learn",
+            "score_apply",
+            "ipf",
+        ):
+            if self.subsample_ratio < 1.0:
+                logger.trace(
+                    "Creating 'feature_alignment' view with sampled precursor IDs"
+                )
+                con.execute(
+                    f"""
+                    CREATE VIEW feature_alignment AS
+                    SELECT *
+                    FROM read_parquet('{alignment_file}')
+                    WHERE PRECURSOR_ID IN (SELECT PRECURSOR_ID FROM sampled_precursor_ids)
+                    """
+                )
+            else:
+                logger.trace("Creating 'feature_alignment' view with full input")
+                con.execute(
+                    f"CREATE VIEW feature_alignment AS SELECT * FROM read_parquet('{alignment_file}')"
+                )
+
+    def _get_columns_by_prefix(self, parquet_file, prefix):
+        """
+        Returns columns that start with `prefix` from one of the parquet files.
+        In multi-run mode, uses the first run's file as a representative.
+        """
+        if self._is_multi_run:
+            candidate = glob.glob(
+                os.path.join(self.config.infile, "*.oswpq", parquet_file)
+            )
+            if not candidate:
+                raise click.ClickException(
+                    f"Could not find '{parquet_file}' in any '.oswpq' subdirectory of '{self.config.infile}'."
+                )
+            path = candidate[0]
+        else:
+            path = os.path.join(self.config.infile, parquet_file)
+            if not os.path.exists(path):
+                raise click.ClickException(f"File '{path}' does not exist.")
+
+        cols = get_parquet_column_names(path)
+        logger.trace(f"Columns in {path}: {cols}")
+        if cols is None:
+            raise click.ClickException(f"Failed to read schema or columns from: {path}")
+
+        return [c for c in cols if c.startswith(prefix)]
+
+
+class BaseSplitParquetWriter(BaseWriter):
+    """
+    Class for writing OpenSWATH results to a directory containing split Parquet files.
+
+    Attributes:
+        infile (str): Input file path.
+        outfile (str): Output file path.
+        classifier (str): Classifier used for semi-supervised learning.
+        level (str): Level used in semi-supervised learning (e.g., 'ms1', 'ms2', 'ms1ms2', 'transition', 'alignment'), or context level used peptide/protein/gene inference (e.g., 'global', 'experiment-wide', 'run-specific').
+        glyco (bool): Flag indicating whether analysis is glycoform-specific.
+
+    Methods:
+        save_results(result, pi0): Save the results to the output file based on the module using this class.
+        save_weights(weights): Save the weights to the output file.
+    """
+
+    def __init__(self, config: BaseIOConfig):
+        super().__init__(config)
+
+        if self.file_type not in ("parquet_split", "parquet_split_multi"):
+            raise click.ClickException(
+                f"SplitParquetWriter requires 'parquet_split' or 'parquet_split_multi' input, got '{self.file_type}' instead."
+            )
+
+        if self.context == "levels_context":
+            if self.level not in ("peptide", "protein", "gene"):
+                raise click.ClickException(
+                    f"SplitParquetWriter levels_context only supports peptide, protein, or gene levels, got '{self.level}' instead."
+                )
+
+            self.context_level_id_map = {
+                "peptide": "peptide_id",
+                "protein": "protein_id",
+                "gene": "gene_id",
+            }
+
+    def save_results(self, result, pi0=None):
+        """
+        Abstract method to be implemented by subclasses to save scoring results and statistical outputs.
+        """
+        raise NotImplementedError(
+            "The save_results method must be implemented in subclasses of BaseSplitParquetWriter."
+        )

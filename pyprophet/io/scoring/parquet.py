@@ -6,11 +6,11 @@ import duckdb
 import click
 from loguru import logger
 from ..util import get_parquet_column_names
-from .._base import BaseReader, BaseWriter, RowCountMismatchError
+from .._base import BaseParquetReader, BaseParquetWriter, RowCountMismatchError
 from ..._config import RunnerIOConfig
 
 
-class ParquetReader(BaseReader):
+class ParquetReader(BaseParquetReader):
     """
     Class for reading and processing data from OpenSWATH results stored in Parquet format.
 
@@ -45,35 +45,6 @@ class ParquetReader(BaseReader):
             feature_table = self._merge_ms1ms2_features(con, feature_table, ms1_cols)
 
         return self._finalize_feature_table(feature_table, ss_main_score)
-
-    def _init_duckdb_views(self, con):
-        # Create TEMP table of sampled precursors IDs (if needed)
-        if self.subsample_ratio < 1.0:
-            logger.info(
-                f"Subsampling {self.subsample_ratio * 100}% data for semi-supervised learning."
-            )
-            con.execute(
-                f"""
-                CREATE TEMP TABLE sampled_precursor_ids AS
-                SELECT DISTINCT PRECURSOR_ID
-                FROM read_parquet({self.infile})
-                USING SAMPLE {self.subsample_ratio * 100}%
-                """
-            )
-            n = con.execute("SELECT COUNT(*) FROM sampled_precursor_ids").fetchone()[0]
-            logger.info(f"Sampled {n} precursor IDs")
-
-            con.execute(
-                f"CREATE VIEW data AS SELECT * FROM read_parquet('{self.infile}') WHERE PRECURSOR_ID IN (SELECT PRECURSOR_ID FROM sampled_precursor_ids)"
-            )
-        else:
-            con.execute(
-                f"CREATE VIEW data AS SELECT * FROM read_parquet('{self.infile}')"
-            )
-
-    def _get_columns_by_prefix(self, parquet_file, prefix):
-        cols = get_parquet_column_names(parquet_file)
-        return [c for c in cols if c.startswith(prefix)]
 
     def _fetch_feature_table(self, con):
         if self.level in ("ms2", "ms1ms2"):
@@ -230,7 +201,7 @@ class ParquetReader(BaseReader):
         return pd.merge(df, ms1_df, how="left", on="FEATURE_ID")
 
 
-class ParquetWriter(BaseWriter):
+class ParquetWriter(BaseParquetWriter):
     """
     Class for writing OpenSWATH results to a Parquet file.
 

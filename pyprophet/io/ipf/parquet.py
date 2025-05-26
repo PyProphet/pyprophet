@@ -7,11 +7,11 @@ import duckdb
 import click
 from loguru import logger
 from ..util import get_parquet_column_names
-from .._base import BaseReader, BaseWriter
+from .._base import BaseParquetReader, BaseParquetWriter
 from ..._config import IPFIOConfig
 
 
-class ParquetReader(BaseReader):
+class ParquetReader(BaseParquetReader):
     """
     Class for reading and processing data from OpenSWATH results stored in Parquet format.
 
@@ -62,18 +62,6 @@ class ParquetReader(BaseReader):
                 raise click.ClickException(f"Unsupported level: {level}")
         finally:
             con.close()
-
-    def _init_duckdb_views(self, con):
-        con.execute(f"CREATE VIEW data AS SELECT * FROM read_parquet('{self.infile}')")
-
-        if self.config.propagate_signal_across_runs:
-            con.execute(
-                f"CREATE VIEW alignment AS SELECT * FROM read_parquet('{self.alignment_file}')"
-            )
-
-    def _get_columns_by_prefix(self, parquet_file, prefix):
-        cols = get_parquet_column_names(parquet_file)
-        return [c for c in cols if c.startswith(prefix)]
 
     def _read_pyp_peakgroup_precursor(self, con) -> pd.DataFrame:
         cfg = self.config
@@ -266,7 +254,7 @@ class ParquetReader(BaseReader):
         return df
 
 
-class ParquetWriter(BaseWriter):
+class ParquetWriter(BaseParquetWriter):
     """
     Class for writing OpenSWATH results to a Parquet file.
 
