@@ -1,3 +1,4 @@
+from pathlib import Path
 import sys
 import ast
 from importlib.metadata import version
@@ -11,8 +12,8 @@ from loguru import logger
 class GlobalLogLevelGroup(click.Group):
     def invoke(self, ctx):
         log_level = ctx.params.get("log_level", "INFO").upper()
-        setup_logger(log_level=log_level)
-        ctx.obj = {"LOG_LEVEL": log_level}
+        header = setup_logger(log_level=log_level)
+        ctx.obj = {"LOG_LEVEL": log_level, "LOG_HEADER": header}
         return super().invoke(ctx)
 
 
@@ -211,23 +212,35 @@ def setup_logger(log_level):
     if _LOGGER_INITIALIZED:
         return
 
-    execution_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    system_info = get_system_info()
-    cli_command = get_execution_context()
+    # simple logger for header info
+    header_logger = logger.bind(simple=True)
+    header_logger.remove()
+    header_logger.add(
+        sys.stdout,
+        format="{message}",
+        level=log_level,
+        filter=lambda record: "simple" in record["extra"],
+    )
 
-    # Log header with project and system info
-    click.echo(f"PyProphet v{version('pyprophet')}")
-    click.echo(f"Execution time: {execution_time}")
-    click.echo(f"System: {system_info}")
-    click.echo(f"Command: {cli_command}\n")
+    # Log header info
+    header = (
+        f"PyProphet v{version('pyprophet')}\n"
+        f"Execution time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+        f"System: {get_system_info()}\n"
+        f"Command: {get_execution_context()}\n"
+    )
+    header_logger.info(header)
 
-    logger.remove()  # Remove default logger
+    # Main console logger
+    # logger.remove()  # Remove default logger
     logger.add(sys.stdout, colorize=True, format=formatter, level=log_level)
 
     _LOGGER_INITIALIZED = True
 
+    return header
 
-def write_logfile(log_level, log_file):
+
+def write_logfile(log_level, log_file, log_header=None):
     def formatter(record):
         # Format with module, function, and line number
         mod_func_line = f"{record['module']}::{record['function']}:{record['line']}"
@@ -237,6 +250,14 @@ def write_logfile(log_level, log_file):
             f"{mod_func_line: <45} ] "
             f"<level>{record['message']}</level>\n"
         )
+
+    log_file = Path(log_file)
+    if log_file.exists():
+        log_file.unlink()
+
+    if log_header:
+        with log_file.open("w") as f:
+            f.write(log_header)
 
     logger.add(
         log_file,

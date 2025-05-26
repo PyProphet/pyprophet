@@ -491,7 +491,11 @@ def score(
         main_score_selection_report,
     )
 
-    write_logfile(ctx.obj["LOG_LEVEL"], f"{config.prefix}_pyp_score_{level}.log")
+    write_logfile(
+        ctx.obj["LOG_LEVEL"],
+        f"{config.prefix}_pyp_score_{level}.log",
+        ctx.obj["LOG_HEADER"],
+    )
 
     # Validate file type and subsample ratio, subsample_ratio is currently only applicateble for "parquet_split", "parquet_split_multi". If this combination is not met, throw warning and set subsample_ratio to 1.0
     if (
@@ -618,7 +622,10 @@ def score(
     type=float,
     help="Maximum PEP to consider for propagating signal across runs for aligned features.",
 )
+@click.pass_context
+@logger.catch(reraise=True)
 def ipf(
+    ctx,
     infile,
     outfile,
     ipf_ms1_scoring,
@@ -660,7 +667,9 @@ def ipf(
         ipf_max_alignment_pep,
         across_run_confidence_threshold,
     )
-
+    write_logfile(
+        ctx.obj["LOG_LEVEL"], f"{config.prefix}_pyp_ipf.log", ctx.obj["LOG_HEADER"]
+    )
     infer_peptidoforms(config)
 
 
@@ -842,7 +851,10 @@ def levels_context():
     type=click.Choice(["normal", "protan", "deutran", "tritan"]),
     help="Color palette to use in reports.",
 )
+@click.pass_context
+@logger.catch(reraise=True)
 def peptide(
+    ctx,
     infile,
     outfile,
     context,
@@ -890,7 +902,11 @@ def peptide(
         None,
         None,
     )
-
+    write_logfile(
+        ctx.obj["LOG_LEVEL"],
+        f"{config.prefix}_pyp_levels_context_peptide_{context}.log",
+        ctx.obj["LOG_HEADER"],
+    )
     infer_peptides(config)
 
 
@@ -922,7 +938,10 @@ def peptide(
     help="Number of d-score cutoffs to build grid coordinates for local FDR calculation.",
 )
 @shared_statistics_options
+@click.pass_context
+@logger.catch(reraise=True)
 def glycopeptide(
+    ctx,
     infile,
     outfile,
     context,
@@ -966,7 +985,11 @@ def glycopeptide(
         density_estimator,
         grid_size,
     )
-
+    write_logfile(
+        ctx.obj["LOG_LEVEL"],
+        f"{config.prefix}_pyp_levels_context_glycopeptide_{context}.log",
+        ctx.obj["LOG_HEADER"],
+    )
     infer_glycopeptides(config)
 
 
@@ -1004,7 +1027,10 @@ def glycopeptide(
     type=click.Choice(["normal", "protan", "deutran", "tritan"]),
     help="Color palette to use in reports.",
 )
+@click.pass_context
+@logger.catch(reraise=True)
 def gene(
+    ctx,
     infile,
     outfile,
     context,
@@ -1052,7 +1078,11 @@ def gene(
         None,
         None,
     )
-
+    write_logfile(
+        ctx.obj["LOG_LEVEL"],
+        f"{config.prefix}_pyp_levels_context_gene_{context}.log",
+        ctx.obj["LOG_HEADER"],
+    )
     infer_genes(config)
 
 
@@ -1090,7 +1120,10 @@ def gene(
     type=click.Choice(["normal", "protan", "deutran", "tritan"]),
     help="Color palette to use in reports.",
 )
+@click.pass_context
+@logger.catch(reraise=True)
 def protein(
+    ctx,
     infile,
     outfile,
     context,
@@ -1138,7 +1171,11 @@ def protein(
         None,
         None,
     )
-
+    write_logfile(
+        ctx.obj["LOG_LEVEL"],
+        f"{config.prefix}_pyp_levels_context_protein_{context}.log",
+        ctx.obj["LOG_HEADER"],
+    )
     infer_proteins(config)
 
 
