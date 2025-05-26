@@ -1088,7 +1088,7 @@ def convert_osw_to_parquet(
             ),
             feature_transition_cols_sql=feature_transition_cols_sql,
         )
-        logger.info(f"Writing transition data to temporary table...")
+        logger.info("Writing transition data to temporary table...")
         conn.execute(f"INSERT INTO temp_table {transition_query}")
 
         # Step 4: Export the Data to Parquet
