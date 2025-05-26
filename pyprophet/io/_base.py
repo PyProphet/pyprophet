@@ -416,14 +416,12 @@ class BaseWriter(ABC):
             RowCountMismatchError: If the row count of the resulting join doesn't match the original row count.
         """
 
-        # Retrieve the row count of the original Parquet file
         original_row_count = self._get_parquet_row_count(con, target_file)
 
         logger.debug(
             f"Prior to appending scores, {target_file} has {original_row_count} entries"
         )
 
-        # Construct the validation query
         validate_query = f"""
             SELECT 
                 COUNT(*) AS row_count
@@ -437,7 +435,6 @@ class BaseWriter(ABC):
 
         logger.trace(f"Row Entry validation query:\n{validate_query}")
 
-        # Get the row count after the join
         result = con.execute(validate_query).fetchone()
         resulting_row_count = result[0]
 
@@ -449,11 +446,9 @@ class BaseWriter(ABC):
                 "Appending scores resulted in a different number of entries than the original input file. This is unexpected behaviour."
             )
 
-            # Log the error with the exception and stack trace
             try:
                 raise RowCountMismatchError(error_message)
             except RowCountMismatchError as e:
                 logger.opt(exception=e, depth=1).critical(f"Critical error: {str(e)}")
 
-            # Optionally stop execution
             sys.exit(1)
