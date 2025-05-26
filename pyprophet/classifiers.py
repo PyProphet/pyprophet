@@ -129,6 +129,7 @@ class SVMLearner(LinearLearner):
         self.weights = None
         self.C = C
         self.max_iter = max_iter
+        self.class_weight = None
         self.autotune = autotune
 
     def tune(
@@ -149,7 +150,14 @@ class SVMLearner(LinearLearner):
         y[X0.shape[0] :] = 1.0
 
         # Set the parameter grid for C and max_iter
-        param_grid = {"C": [0.1, 1.0, 10.0], "max_iter": [1000, 2000, 5000]}
+        param_grid = {
+            "C": [0.1, 1.0, 10.0],
+            "max_iter": [1000, 2000, 5000],
+            "class_weight": [
+                {1: neg, 0: pos} for neg in (0.1, 1, 10) for pos in (0.1, 1, 10)
+            ]
+            + ["balanced"],
+        }
 
         logger.info("Tuning hyperparameters for LinearSVC.")
 
@@ -166,14 +174,18 @@ class SVMLearner(LinearLearner):
         # Perform the grid search
         grid_search.fit(X, y)
 
+        best_params_str = [
+            f"{key}: {str(value).replace('{', '[').replace('}', ']')} | "
+            for key, value in grid_search.best_params_.items()
+        ]
+
         # Log the best parameters
-        logger.info(
-            f"Best hyperparameters found: {[f'{key}: {value} | ' for key, value in grid_search.best_params_.items()]}"
-        )
+        logger.info(f"Best hyperparameters found: {best_params_str}")
 
         # Set the best parameters found
         self.C = grid_search.best_params_["C"]
         self.max_iter = grid_search.best_params_["max_iter"]
+        self.class_weight = grid_search.best_params_["class_weight"]
 
         return self
 
