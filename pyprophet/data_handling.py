@@ -396,7 +396,10 @@ class Experiment(object):
         # Update the DataFrame with the scaled features
         for i, col in enumerate(score_columns):
             logger.trace(
-                f"Scaling column {col}: min={scaled_features[:, i].min()}, max={scaled_features[:, i].max()}, mean={scaled_features[:, i].mean()}, std={scaled_features[:, i].std()}"
+                f"Column {col} original range: min={feature_matrix[:, i].min()}, max={feature_matrix[:, i].max()}, mean={feature_matrix[:, i].mean()}, std={feature_matrix[:, i].std()}"
+            )
+            logger.trace(
+                f"Column {col} scaled range: min={scaled_features[:, i].min()}, max={scaled_features[:, i].max()}, mean={scaled_features[:, i].mean()}, std={scaled_features[:, i].std()}"
             )
             self.df[col] = scaled_features[:, i]
 
