@@ -14,7 +14,7 @@ import pickle
 
 
 from ._config import RunnerIOConfig
-from .io.util import setup_logger, check_sqlite_table
+from .io.util import check_sqlite_table
 from .io.dispatcher import ReaderDispatcher, WriterDispatcher
 from .pyprophet import PyProphet
 from .glyco.scoring import partial_score, combined_score
@@ -262,10 +262,9 @@ class PyProphetWeightApplier(PyProphetRunner):
             "parquet_split",
             "parquet_split_multi",
         ):
-            if self.classifier == "LDA":
+            if self.classifier in ("LDA", "SVM"):
                 try:
                     self.persisted_weights = pd.read_csv(apply_weights, sep=",")
-                    # Filter level column for current level
                     self.persisted_weights = self.persisted_weights[
                         self.persisted_weights["level"] == self.level
                     ]
@@ -280,7 +279,7 @@ class PyProphetWeightApplier(PyProphetRunner):
                 with open(apply_weights, "rb") as file:
                     self.persisted_weights = pickle.load(file)
         elif self.config.file_type == "osw":
-            if self.classifier == "LDA":
+            if self.classifier in ("LDA", "SVM"):
                 try:
                     con = sqlite3.connect(apply_weights)
 
