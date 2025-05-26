@@ -280,6 +280,10 @@ class PyProphet:
                 else:
                     raise click.ClickException(
                         "Scores in weights file do not match data."
+                        f"Current data scores: {score_columns}\n"
+                        f"weights file scores: {loaded_weights['score'].values}"
+                        f"length current data scores: {len(score_columns)}\n"
+                        f"length weights file scores: {len(loaded_weights['score'].values)}"
                     )
             elif self.rc.classifier == "XGBoost":
                 weights = loaded_weights
@@ -372,10 +376,19 @@ class PyProphet:
         if self.rc.classifier == "LDA":
             weights = final_classifier.get_parameters()
             classifier_table = pd.DataFrame({"score": score_columns, "weight": weights})
+            for feat, weight in sorted(
+                zip(classifier_table["score"], classifier_table["weight"]),
+                key=lambda x: x[1],  # Sort by the weight (second element)
+                reverse=True,
+            ):
+                logger.info(f"Weight of {feat}: {weight}")
         elif self.rc.classifier == "SVM":
-            classifier_table = final_classifier.get_parameters()
-            feat_weights = final_classifier.get_weights(score_columns)
-            for feat, weight in zip(feat_weights["feature"], feat_weights["weight"]):
+            classifier_table = final_classifier.get_weights(score_columns)
+            for feat, weight in sorted(
+                zip(classifier_table["score"], classifier_table["weight"]),
+                key=lambda x: x[1],  # Sort by the weight (second element)
+                reverse=True,
+            ):
                 logger.info(f"Weight of {feat}: {weight}")
         else:
             classifier_table = final_classifier.get_parameters()
