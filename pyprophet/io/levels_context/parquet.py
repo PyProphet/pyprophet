@@ -87,7 +87,7 @@ class ParquetReader(BaseReader):
                 PRECURSOR_DECOY AS DECOY,
                 SCORE_MS2_SCORE AS SCORE,
                 '{cfg.context_fdr}' AS CONTEXT
-            FROM precursors p
+            FROM data p
             QUALIFY ROW_NUMBER() OVER (PARTITION BY {group_id} ORDER BY SCORE_MS2_SCORE DESC) = 1
         """
 
@@ -114,7 +114,7 @@ class ParquetReader(BaseReader):
         query = f"""
             with one_peptide_proteins AS (
                 SELECT PEPTIDE_ID
-                FROM precursors
+                FROM data
                 WHERE PROTEIN_ID IS NOT NULL
                 GROUP BY PEPTIDE_ID
                 HAVING COUNT(DISTINCT PROTEIN_ID) = 1
@@ -126,7 +126,7 @@ class ParquetReader(BaseReader):
                 PRECURSOR_DECOY AS DECOY,
                 SCORE_MS2_SCORE AS SCORE,
                 '{cfg.context_fdr}' AS CONTEXT
-            FROM precursors p
+            FROM data p
             JOIN one_peptide_proteins opp ON p.PEPTIDE_ID = opp.PEPTIDE_ID
             QUALIFY ROW_NUMBER() OVER (PARTITION BY {group_id} ORDER BY SCORE_MS2_SCORE DESC) = 1
         """
@@ -154,7 +154,7 @@ class ParquetReader(BaseReader):
         query = f"""
             WITH one_gene_peptides AS (
                 SELECT PEPTIDE_ID
-                FROM precursors
+                FROM data
                 WHERE GENE_ID IS NOT NULL
                 GROUP BY PEPTIDE_ID
                 HAVING COUNT(DISTINCT GENE_ID) = 1
@@ -166,7 +166,7 @@ class ParquetReader(BaseReader):
                 PRECURSOR_DECOY AS DECOY,
                 SCORE_MS2_SCORE AS SCORE,
                 '{cfg.context_fdr}' AS CONTEXT
-            FROM precursors p
+            FROM data p
             JOIN one_gene_peptides ogp ON p.PEPTIDE_ID = ogp.PEPTIDE_ID
             QUALIFY ROW_NUMBER() OVER (PARTITION BY {group_id} ORDER BY SCORE_MS2_SCORE DESC) = 1
         """
@@ -204,7 +204,7 @@ class ParquetWriter(BaseWriter):
         if self.infile != self.outfile:
             copyfile(self.infile, self.outfile)
 
-        file_path = os.path.join(self.outfile, "precursors_features.parquet")
+        file_path = self.outfile
 
         context = self.config.context_fdr
         context_level_id = self.context_level_id_map.get(self.level)
