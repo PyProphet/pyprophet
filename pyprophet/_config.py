@@ -41,6 +41,23 @@ class ErrorEstimationConfig:
     lfdr_adj: float = 1.5
     lfdr_eps: float = np.power(10.0, -8)
 
+    def __str__(self):
+        return (
+            f"ErrorEstimationConfig(\nparametric={self.parametric}\npfdr={self.pfdr}\n"
+            f"pi0_lambda={self.pi0_lambda}\npi0_method='{self.pi0_method}'\n"
+            f"pi0_smooth_df={self.pi0_smooth_df}\npi0_smooth_log_pi0={self.pi0_smooth_log_pi0}\n"
+            f"lfdr_truncate={self.lfdr_truncate}\nlfdr_monotone={self.lfdr_monotone}\n"
+            f"lfdr_transformation='{self.lfdr_transformation}'\nlfdr_adj={self.lfdr_adj}\n"
+            f"lfdr_eps={self.lfdr_eps})"
+        )
+
+    def __repr__(self):
+        return (
+            f"ErrorEstimationConfig(parametric={self.parametric}, pfdr={self.pfdr}, "
+            f"pi0_lambda={self.pi0_lambda}, pi0_method='{self.pi0_method}', "
+            f"lfdr_transformation='{self.lfdr_transformation}')"
+        )
+
 
 @dataclass
 class RunnerConfig:
@@ -144,6 +161,76 @@ class RunnerConfig:
         else:
             self.ss_use_dynamic_main_score = False
 
+    def __str__(self):
+        parts = [
+            f"RunnerConfig(",
+            f"  classifier='{self.classifier}'",
+            f"  autotune={self.autotune}",
+            f"  ss_main_score='{self.ss_main_score}'",
+            f"  main_score_selection_report={self.main_score_selection_report}",
+        ]
+
+        # Conditionally add XGBoost-specific parameters
+        if self.classifier == "XGBoost":
+            parts.extend(
+                [
+                    f"  xgb_hyperparams={self.xgb_hyperparams}",
+                    f"  xgb_params={self.xgb_params}",
+                    f"  xgb_params_space={self.xgb_params_space}",
+                ]
+            )
+
+        parts.extend(
+            [
+                f"  xeval_fraction={self.xeval_fraction}",
+                f"  xeval_num_iter={self.xeval_num_iter}",
+                f"  ss_initial_fdr={self.ss_initial_fdr}",
+                f"  ss_iteration_fdr={self.ss_iteration_fdr}",
+                f"  ss_num_iter={self.ss_num_iter}",
+                f"  ss_score_filter={self.ss_score_filter}",
+                f"  ss_scale_features={self.ss_scale_features}",
+                f"  ss_use_dynamic_main_score={self.ss_use_dynamic_main_score}",
+                f"  group_id='{self.group_id}'",
+                f"  error_estimation_config={self.error_estimation_config}",
+                f"  ipf_max_peakgroup_rank={self.ipf_max_peakgroup_rank}",
+                f"  ipf_max_peakgroup_pep={self.ipf_max_peakgroup_pep}",
+                f"  ipf_max_transition_isotope_overlap={self.ipf_max_transition_isotope_overlap}",
+                f"  ipf_min_transition_sn={self.ipf_min_transition_sn}",
+            ]
+        )
+
+        # Conditionally add glyco-specific parameters
+        if self.glyco:
+            parts.extend(
+                [
+                    f"  glyco={self.glyco}",
+                    f"  density_estimator='{self.density_estimator}'",
+                    f"  grid_size={self.grid_size}",
+                ]
+            )
+
+        parts.extend(
+            [
+                f"  add_alignment_features={self.add_alignment_features}",
+                f"  tric_chromprob={self.tric_chromprob}",
+                f"  threads={self.threads}",
+                f"  test={self.test}",
+                f"  color_palette='{self.color_palette}'",
+                ")",
+            ]
+        )
+
+        return "\n".join(parts)
+
+    def __repr__(self):
+        return (
+            f"RunnerConfig(classifier='{self.classifier}', autotune={self.autotune}, "
+            f"ss_main_score='{self.ss_main_score}', xeval_fraction={self.xeval_fraction}, "
+            f"xeval_num_iter={self.xeval_num_iter}, ss_initial_fdr={self.ss_initial_fdr}, "
+            f"ss_iteration_fdr={self.ss_iteration_fdr}, ss_num_iter={self.ss_num_iter}, "
+            f"group_id='{self.group_id}', glyco={self.glyco}, threads={self.threads})"
+        )
+
 
 @dataclass
 class RunnerIOConfig(BaseIOConfig):
@@ -166,6 +253,20 @@ class RunnerIOConfig(BaseIOConfig):
     def __post_init__(self):
         super().__post_init__()
         self.extra_writes = dict(self._extra_writes())
+
+    def __str__(self):
+        return (
+            f"RunnerIOConfig(infile='{self.infile}'\noutfile='{self.outfile}'\n"
+            f"file_type='{self.file_type}'\nsubsample_ratio={self.subsample_ratio}\n"
+            f"level='{self.level}'\ncontext='{self.context}'\nprefix='{self.prefix}'\n"
+            f"runner={self.runner}\nextra_writes={self.extra_writes})"
+        )
+
+    def __repr__(self):
+        return (
+            f"RunnerIOConfig(infile='{self.infile}', outfile='{self.outfile}', "
+            f"level='{self.level}', context='{self.context}', runner={self.runner})"
+        )
 
     def to_kwargs(self) -> Dict[str, Any]:
         return {
