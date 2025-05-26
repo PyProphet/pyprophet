@@ -44,3 +44,17 @@ class BaseIOConfig:
         else:
             self.file_type = "tsv"
         self.prefix = os.path.splitext(self.outfile)[0]
+
+    def __str__(self):
+        return (
+            f"BaseIOConfig(\ninfile='{self.infile}'\noutfile='{self.outfile}'\n"
+            f"file_type='{self.file_type}'\nsubsample_ratio={self.subsample_ratio}\n"
+            f"level='{self.level}'\ncontext='{self.context}'\nprefix='{self.prefix}')"
+        )
+
+    def __repr__(self):
+        return (
+            f"BaseIOConfig(infile='{self.infile}', outfile='{self.outfile}', "
+            f"subsample_ratio={self.subsample_ratio}, level='{self.level}', "
+            f"context='{self.context}')"
+        )
