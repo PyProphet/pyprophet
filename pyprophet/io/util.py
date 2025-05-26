@@ -1,41 +1,15 @@
 import os
 import sys
+from pathlib import Path
+from importlib.metadata import version
+from datetime import datetime
 from collections import defaultdict
+import platform
+import psutil
 import click
 from loguru import logger
 import pyarrow.parquet as pq
 from pyarrow.lib import ArrowInvalid, ArrowIOError
-
-
-_LOGGER_INITIALIZED = False  # Module-level flag
-
-
-def setup_logger(log_level):
-    def formatter(record):
-        # Format with module, function, and line number
-        # mod_func_line = f"{record['module']}::{record['function']}:{record['line']}"
-        # return (
-        #     f"[ <green>{record['time']:YYYY-MM-DD at HH:mm:ss}</green> | "
-        #     f"<level>{record['level']: <7}</level> | "
-        #     f"{mod_func_line: <37} ] "
-        #     f"<level>{record['message']}</level>\n"
-        # )
-        mod_func_line = f"{record['module']}::{record['line']}"
-        return (
-            f"[ <green>{record['time']:YYYY-MM-DD at HH:mm:ss}</green> | "
-            f"<level>{record['level']: <7}</level> | "
-            f"{mod_func_line: <27} ] "
-            f"<level>{record['message']}</level>\n"
-        )
-
-    global _LOGGER_INITIALIZED
-    if _LOGGER_INITIALIZED:
-        return
-
-    logger.remove()  # Remove default logger
-    logger.add(sys.stdout, colorize=True, format=formatter, level=log_level)
-
-    _LOGGER_INITIALIZED = True
 
 
 def is_sqlite_file(filename):
