@@ -59,17 +59,22 @@ def cli(ctx, log_level):
     """
 
 
+# Semi-supervised learning and scoring of OpenSWATH results
 cli.add_command(score_command, name="score")
 
-levels_context = create_levels_context_group()
-cli.add_command(levels_context)
-
+# Inference of peptidoforms / glycoforms
 cli.add_command(ipf_command, name="ipf")
 cli.add_command(glycoform_command, name="glycoform")
 
+# Levels contexts for peptide/protein/gene infernce
+levels_context = create_levels_context_group()
+cli.add_command(levels_context)
+
+# Exporters for OpenSWATH results
 exporters = create_export_group()
 cli.add_command(exporters, name="export")
 
+# Merging of OpenSWATH files
 mergers = create_merge_group()
 cli.add_command(mergers, name="merge")
 
