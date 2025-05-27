@@ -1,7 +1,7 @@
-import pandas as pd
 import numpy as np
-from scipy.stats import rankdata
+import pandas as pd
 from loguru import logger
+from scipy.stats import rankdata
 
 from ._config import IPFIOConfig
 from .io.dispatcher import ReaderDispatcher, WriterDispatcher
@@ -182,9 +182,7 @@ def prepare_transition_bm(
     # initialize priors
     data.loc[data.peptide_id != -1, "prior"] = (
         1 - data.loc[data.peptide_id != -1, "precursor_peakgroup_pep"]
-    ) / data.loc[
-        data.peptide_id != -1, "num_peptidoforms"
-    ]  # potential peptidoforms
+    ) / data.loc[data.peptide_id != -1, "num_peptidoforms"]  # potential peptidoforms
     data.loc[data.peptide_id == -1, "prior"] = data.loc[
         data.peptide_id == -1, "precursor_peakgroup_pep"
     ]  # h0

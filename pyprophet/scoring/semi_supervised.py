@@ -1,11 +1,11 @@
-import numpy as np
 import click
+import numpy as np
 from loguru import logger
 
-from .data_handling import Experiment, update_chosen_main_score_in_table
-from .classifiers import AbstractLearner, SVMLearner, XGBLearner
 from .._config import RunnerIOConfig
 from ..stats import find_cutoff
+from .classifiers import AbstractLearner, SVMLearner, XGBLearner
+from .data_handling import Experiment, update_chosen_main_score_in_table
 
 try:
     profile
@@ -14,7 +14,6 @@ except NameError:
 
 
 class AbstractSemiSupervisedLearner(object):
-
     def __init__(self, xeval_fraction, xeval_num_iter, test):
         self.xeval_fraction = xeval_fraction
         self.xeval_num_iter = xeval_num_iter
@@ -112,7 +111,6 @@ class AbstractSemiSupervisedLearner(object):
 
 
 class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
-
     def __init__(
         self,
         inner_learner,

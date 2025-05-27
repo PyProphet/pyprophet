@@ -1,20 +1,20 @@
 import abc
-
 import os
-import time
-import warnings
 import pickle
 import sqlite3
-import click
-from loguru import logger
-import pandas as pd
+import time
+import warnings
 
-from .pyprophet import PyProphet
+import click
+import pandas as pd
+from loguru import logger
+
 from .._config import RunnerIOConfig
-from ..io.util import check_sqlite_table
-from ..io.dispatcher import ReaderDispatcher, WriterDispatcher
-from ..glyco.scoring import partial_score, combined_score
+from ..glyco.scoring import combined_score, partial_score
 from ..glyco.stats import ErrorStatisticsCalculator
+from ..io.dispatcher import ReaderDispatcher, WriterDispatcher
+from ..io.util import check_sqlite_table
+from .pyprophet import PyProphet
 
 try:
     profile
@@ -25,7 +25,6 @@ except NameError:
 
 
 class PyProphetRunner(object):
-
     __metaclass__ = abc.ABCMeta
 
     """Base class for workflow of command line tool
@@ -73,7 +72,6 @@ class PyProphetRunner(object):
         pass
 
     def run(self):
-
         self.check_cols = [self.runner_config.group_id, "run_id", "decoy"]
 
         if self.glyco and self.level in ["ms2", "ms1ms2"]:
@@ -221,7 +219,6 @@ class PyProphetRunner(object):
 
 
 class PyProphetLearner(PyProphetRunner):
-
     def run_algo(self, part=None):
         if self.glyco:
             if (
@@ -245,7 +242,6 @@ class PyProphetLearner(PyProphetRunner):
 
 
 class PyProphetWeightApplier(PyProphetRunner):
-
     def __init__(self, apply_weights: str, config: RunnerIOConfig):
         super(PyProphetWeightApplier, self).__init__(config)
 

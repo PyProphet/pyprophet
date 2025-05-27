@@ -1,13 +1,10 @@
-import pandas as pd
-import numpy as np
 import random
-import click
-from loguru import logger
-import sys
-import os
-import multiprocessing
-from sklearn.preprocessing import StandardScaler
 
+import click
+import numpy as np
+import pandas as pd
+from loguru import logger
+from sklearn.preprocessing import StandardScaler
 
 from ..stats import mean_and_std_dev
 from .optimized import find_top_ranked, rank
@@ -295,7 +292,6 @@ def update_chosen_main_score_in_table(train, score_columns, use_as_main_score):
 
 
 class Experiment(object):
-
     @profile
     def __init__(self, df):
         self.df = df.copy()

@@ -1,29 +1,29 @@
 from __future__ import division
 
+import multiprocessing
+import operator
 import os
 import time
-import operator
-import multiprocessing
 from collections import namedtuple
 from contextlib import contextmanager
-import pandas as pd
-import numpy as np
+
 import click
+import numpy as np
+import pandas as pd
 from loguru import logger
 
-from .data_handling import prepare_data_table, Experiment
-from .classifiers import LDALearner, SVMLearner, XGBLearner
-from .semi_supervised import StandardSemiSupervisedLearner
-from .._config import RunnerIOConfig, ErrorEstimationConfig
+from .._config import ErrorEstimationConfig, RunnerIOConfig
 from ..stats import (
-    lookup_values_from_error_table,
     error_statistics,
-    mean_and_std_dev,
     final_err_table,
-    summary_err_table,
+    lookup_values_from_error_table,
+    mean_and_std_dev,
     posterior_chromatogram_hypotheses_fast,
+    summary_err_table,
 )
-
+from .classifiers import LDALearner, SVMLearner, XGBLearner
+from .data_handling import Experiment, prepare_data_table
+from .semi_supervised import StandardSemiSupervisedLearner
 
 try:
     profile
@@ -81,7 +81,6 @@ def calculate_params_for_d_score(classifier, experiment):
 
 
 class Scorer(object):
-
     def __init__(
         self,
         classifier,
@@ -95,7 +94,6 @@ class Scorer(object):
         color_palette,
         level,
     ):
-
         self.classifier = classifier
         self.score_columns = score_columns
         self.mu, self.nu = calculate_params_for_d_score(classifier, experiment)
@@ -138,7 +136,6 @@ class Scorer(object):
         self.decoy_scores = experiment.get_top_decoy_peaks().df["d_score"]
 
     def score(self, table):
-
         prepared_table, __, used_var_column_ids = prepare_data_table(
             table,
             self.ss_score_filter,

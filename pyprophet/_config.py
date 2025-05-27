@@ -163,7 +163,7 @@ class RunnerConfig:
 
     def __str__(self):
         parts = [
-            f"RunnerConfig(",
+            "RunnerConfig(",
             f"  classifier='{self.classifier}'",
             f"  autotune={self.autotune}",
             f"  ss_main_score='{self.ss_main_score}'",
@@ -438,15 +438,18 @@ class RunnerIOConfig(BaseIOConfig):
         yield "full_stat_path", os.path.join(self.prefix + "_full_stat.csv")
         yield "trained_weights_path", os.path.join(self.prefix + "_weights.csv")
         yield "trained_model_path_ms1", os.path.join(self.prefix + "_ms1_model.bin")
-        yield "trained_model_path_ms1ms2", os.path.join(
-            self.prefix + "_ms1ms2_model.bin"
+        yield (
+            "trained_model_path_ms1ms2",
+            os.path.join(self.prefix + "_ms1ms2_model.bin"),
         )
         yield "trained_model_path_ms2", os.path.join(self.prefix + "_ms2_model.bin")
-        yield "trained_model_path_transition", os.path.join(
-            self.prefix + "_transition_model.bin"
+        yield (
+            "trained_model_path_transition",
+            os.path.join(self.prefix + "_transition_model.bin"),
         )
-        yield "trained_model_path_alignment", os.path.join(
-            self.prefix + "_alignment_model.bin"
+        yield (
+            "trained_model_path_alignment",
+            os.path.join(self.prefix + "_alignment_model.bin"),
         )
         yield "report_path", os.path.join(self.prefix + "_report.pdf")
 

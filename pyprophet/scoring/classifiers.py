@@ -1,27 +1,25 @@
-from typing import List
 import inspect
+from typing import List
 
 import numpy as np
 import pandas as pd
-from loguru import logger
-
-from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
-from sklearn.svm import LinearSVC
-from sklearn.model_selection import (
-    GridSearchCV,
-    train_test_split,
-    cross_val_score,
-    KFold,
-)
 import xgboost as xgb
 from hyperopt import tpe
 from hyperopt.fmin import fmin
+from loguru import logger
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from sklearn.model_selection import (
+    GridSearchCV,
+    KFold,
+    cross_val_score,
+    train_test_split,
+)
+from sklearn.svm import LinearSVC
 
 from .data_handling import Experiment
 
 
 class AbstractLearner(object):
-
     def learn(self, decoy_peaks, target_peaks, use_main_score=True):
         raise NotImplementedError()
 
@@ -40,7 +38,6 @@ class AbstractLearner(object):
 
 
 class LinearLearner(AbstractLearner):
-
     def score(self, peaks, use_main_score):
         X = peaks.get_feature_matrix(use_main_score)
         result = np.dot(X, self.get_parameters()).astype(np.float32)
@@ -88,7 +85,6 @@ class LinearLearner(AbstractLearner):
 
 
 class LDALearner(LinearLearner):
-
     def __init__(self):
         self.classifier = None
         self.scalings = None
@@ -224,7 +220,6 @@ class SVMLearner(LinearLearner):
 
 
 class XGBLearner(AbstractLearner):
-
     def __init__(
         self, autotune, xgb_hyperparams, xgb_params, xgb_params_space, threads
     ):
