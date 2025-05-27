@@ -1,10 +1,16 @@
 import os
+from pathlib import Path
 import shutil
 import time
 import click
 from loguru import logger
 
-from .util import CombinedGroup, AdvancedHelpCommand, write_logfile
+from .util import (
+    CombinedGroup,
+    AdvancedHelpCommand,
+    write_logfile,
+    measure_memory_usage_and_time,
+)
 
 from ..export import (
     export_tsv as _export_tsv,
@@ -21,6 +27,8 @@ from ..export_parquet import (
     convert_sqmass_to_parquet,
 )
 
+from ..export_report import export_scored_report as _export_scored_report
+
 
 def create_export_group():
     @click.group(name="export", cls=CombinedGroup)
@@ -35,6 +43,7 @@ def create_export_group():
     export.add_command(export_compound, name="compound")
     export.add_command(export_glyco, name="glyco")
     export.add_command(export_score_plots, name="score-plots")
+    export.add_command(export_scored_report, name="score-report")
 
     return export
 
@@ -130,6 +139,7 @@ def create_export_group():
     type=float,
     help="[format: matrix/legacy] Filter results to maximum global protein-level q-value.",
 )
+@measure_memory_usage_and_time
 def export_tsv(
     infile,
     outfile,
@@ -253,6 +263,7 @@ def export_tsv(
     type=int,
     help="Compression level to use for parquet file.",
 )
+@measure_memory_usage_and_time
 def export_parquet(
     infile,
     outfile,
@@ -272,13 +283,10 @@ def export_parquet(
     # Check if the input file has an .osw extension
     if infile.endswith(".osw"):
         if scoring_format:
-            click.echo("Info: Will export OSW to parquet scoring format")
+            logger.info("Will export OSW to parquet scoring format")
             if os.path.exists(outfile):
-                click.echo(
-                    click.style(
-                        f"Warn: {outfile} already exists, will overwrite/delete",
-                        fg="yellow",
-                    )
+                logger.warning(
+                    f"Warn: {outfile} already exists, will overwrite/delete in 10 seconds",
                 )
 
                 time.sleep(10)
@@ -289,8 +297,8 @@ def export_parquet(
                     os.remove(outfile)
 
             if split_transition_data:
-                click.echo(
-                    f"Info: {outfile} will be a directory containing a separate precursors_features.parquet and a transition_features.parquet"
+                logger.info(
+                    f"{outfile} will be a directory containing a separate precursors_features.parquet and a transition_features.parquet"
                 )
 
             start = time.time()
@@ -303,11 +311,11 @@ def export_parquet(
                 split_runs=split_runs,
             )
             end = time.time()
-            click.echo(f"Info: {outfile} written in {end-start:.4f} seconds.")
+            logger.info(f"{outfile} written in {end-start:.4f} seconds.")
 
         else:
             if transitionLevel:
-                click.echo("Info: Will export transition level data")
+                logger.info("Will export transition level data")
             if outfile is None:
                 outfile = infile.split(".osw")[0] + ".parquet"
             if os.path.exists(outfile):
@@ -316,7 +324,7 @@ def export_parquet(
                 )
                 if not overwrite:
                     raise click.ClickException(f"Aborting: {outfile} already exists!")
-            click.echo("Info: Parquet file will be written to {}".format(outfile))
+            logger.info("Parquet file will be written to {}".format(outfile))
             export_to_parquet(
                 os.path.abspath(infile),
                 os.path.abspath(outfile),
@@ -325,12 +333,10 @@ def export_parquet(
                 noDecoys,
             )
     elif infile.endswith(".sqmass") or infile.endswith(".sqMass"):
-        click.echo("Info: Will export sqMass to parquet")
+        logger.info("Will export sqMass to parquet")
         if os.path.exists(outfile):
-            click.echo(
-                click.style(
-                    f"Warn: {outfile} already exists, will overwrite", fg="yellow"
-                )
+            logger.info(
+                f"Warn: {outfile} already exists, will overwrite",
             )
         start = time.time()
         convert_sqmass_to_parquet(
@@ -341,7 +347,7 @@ def export_parquet(
             compression_level=compression_level,
         )
         end = time.time()
-        click.echo(f"Info: {outfile} written in {end-start:.4f} seconds.")
+        logger.info(f"{outfile} written in {end-start:.4f} seconds.")
     else:
         raise click.ClickException("Input file must be of type .osw or .sqmass/.sqMass")
 
@@ -384,6 +390,7 @@ def export_parquet(
     type=float,
     help="[format: matrix/legacy] Filter results to maximum run-specific peak group-level q-value.",
 )
+@measure_memory_usage_and_time
 def export_compound(infile, outfile, format, outcsv, max_rs_peakgroup_qvalue):
     """
     Export Compound TSV/CSV tables
@@ -484,6 +491,7 @@ def export_compound(infile, outfile, format, outcsv, max_rs_peakgroup_qvalue):
     type=float,
     help="[format: matrix/legacy] Filter results to maximum global glycopeptide-level q-value.",
 )
+@measure_memory_usage_and_time
 def export_glyco(
     infile,
     outfile,
@@ -544,6 +552,7 @@ def export_glyco(
     show_default=True,
     help="Export glycoform score plots.",
 )
+@measure_memory_usage_and_time
 def export_score_plots(infile, glycoform):
     """
     Export score plots
@@ -555,3 +564,23 @@ def export_score_plots(infile, glycoform):
             export_glyco_score_plots(infile)
     else:
         raise click.ClickException("Input file must be of type .osw")
+
+
+# Export score plots
+@click.command(name="score-report", cls=AdvancedHelpCommand)
+@click.option(
+    "--in",
+    "infile",
+    required=True,
+    type=click.Path(exists=True),
+    help="PyProphet OSW input file.",
+)
+@measure_memory_usage_and_time
+def export_scored_report(infile):
+    """
+    Export report with scored results from a PyProphet input file.
+    """
+    # Get file prefix (path/basename without extension), extension may be .osw, .parquet, or .tsv.
+    outfile = Path(infile).stem + "_score_plots.pdf"
+    logger.info(f"Exporting score plots to {outfile}")
+    _export_scored_report(infile, outfile)

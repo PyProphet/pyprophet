@@ -1,7 +1,7 @@
 import click
 from loguru import logger
 
-from .util import write_logfile
+from .util import write_logfile, measure_memory_usage_and_time
 from .._config import IPFIOConfig
 from ..ipf import infer_peptidoforms
 from ..glyco.glycoform import infer_glycoforms
@@ -97,6 +97,7 @@ from ..glyco.glycoform import infer_glycoforms
     help="Maximum PEP to consider for propagating signal across runs for aligned features.",
 )
 @click.pass_context
+@measure_memory_usage_and_time
 @logger.catch(reraise=True)
 def ipf(
     ctx,

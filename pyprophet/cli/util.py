@@ -4,6 +4,8 @@ import sys
 import ast
 from importlib.metadata import version
 from datetime import datetime
+import time
+import tracemalloc
 import platform
 import numpy as np
 import psutil
@@ -385,3 +387,62 @@ def shared_statistics_options(func):
     for option in reversed(options):
         func = option(func)
     return func
+
+
+def format_bytes(size):
+    for unit in ["B", "KB", "MB", "GB"]:
+        if size < 1024.0:
+            return f"{size:.2f} {unit}"
+        size /= 1024.0
+    return f"{size:.2f} TB"
+
+
+def format_time(seconds):
+    """Format the time in seconds into a human-readable format."""
+    days = int(seconds // 86400)
+    hours = int((seconds % 86400) // 3600)
+    minutes = int((seconds % 3600) // 60)
+    seconds = seconds % 60
+    if days > 0:
+        return f"{days} days, {hours} hours, {minutes} minutes, {seconds:.2f} seconds"
+    elif hours > 0:
+        return f"{hours} hours, {minutes} minutes, {seconds:.2f} seconds"
+    elif minutes > 0:
+        return f"{minutes} minutes, {seconds:.2f} seconds"
+    else:
+        return f"{seconds:.2f} seconds"
+
+
+def measure_memory_usage_and_time(func):
+    def wrapper(*args, **kwargs):
+        # Start timing
+        start_at = time.time()
+
+        # Start memory tracking
+        tracemalloc.start()
+
+        # Call the original function
+        result = func(*args, **kwargs)
+
+        # Stop memory tracking
+        snapshot = tracemalloc.take_snapshot()
+        top_stats = snapshot.statistics("lineno")
+
+        # Stop timing
+        end_at = time.time()
+        elapsed_time = end_at - start_at
+        formatted_time = format_time(elapsed_time)
+
+        # Get the maximum memory used during execution
+        max_memory = max(stat.size for stat in top_stats)
+        formatted_memory = format_bytes(max_memory)
+
+        # Log the time and memory usage together
+        logger.info(
+            f"{func.__name__} completed in {formatted_time}. Peak memory usage: {formatted_memory}"
+        )
+
+        # Return the result of the function
+        return result
+
+    return wrapper

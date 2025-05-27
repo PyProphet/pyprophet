@@ -4,7 +4,12 @@ import time
 import click
 from loguru import logger
 
-from .util import CombinedGroup, AdvancedHelpCommand, write_logfile
+from .util import (
+    CombinedGroup,
+    AdvancedHelpCommand,
+    write_logfile,
+    measure_memory_usage_and_time,
+)
 
 from ..levels_contexts import (
     merge_osw as _merge_osw,
@@ -54,6 +59,7 @@ def create_merge_group():
     is_flag=True,
     help="Merge OSW output files that have already been scored.",
 )
+@measure_memory_usage_and_time
 def merge_osw(infiles, outfile, same_run, templatefile, merged_post_scored_runs):
     """
     Merge multiple OSW files and (for large experiments, it is recommended to subsample first).
@@ -82,6 +88,7 @@ def merge_osw(infiles, outfile, same_run, templatefile, merged_post_scored_runs)
     is_flag=True,
     help="If the input is of type split_parquet / split_parquet_multi, merge the separate transition files into a single file as well.",
 )
+@measure_memory_usage_and_time
 def merge_parquet(infiles, outfile, merge_transitions):
     """
     Merge multiple parquet files.

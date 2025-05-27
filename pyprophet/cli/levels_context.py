@@ -6,6 +6,7 @@ from .util import (
     AdvancedHelpCommand,
     shared_statistics_options,
     write_logfile,
+    measure_memory_usage_and_time,
 )
 from .._config import LevelContextIOConfig
 from ..levels_contexts import (
@@ -66,6 +67,7 @@ def create_levels_context_group():
     help="Color palette to use in reports.",
 )
 @click.pass_context
+@measure_memory_usage_and_time
 @logger.catch(reraise=True)
 def peptide(
     ctx,
@@ -153,6 +155,7 @@ def peptide(
 )
 @shared_statistics_options
 @click.pass_context
+@measure_memory_usage_and_time
 @logger.catch(reraise=True)
 def glycopeptide(
     ctx,
@@ -242,6 +245,7 @@ def glycopeptide(
     help="Color palette to use in reports.",
 )
 @click.pass_context
+@measure_memory_usage_and_time
 @logger.catch(reraise=True)
 def gene(
     ctx,
@@ -335,6 +339,7 @@ def gene(
     help="Color palette to use in reports.",
 )
 @click.pass_context
+@measure_memory_usage_and_time
 @logger.catch(reraise=True)
 def protein(
     ctx,
