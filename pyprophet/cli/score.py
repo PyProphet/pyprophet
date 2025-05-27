@@ -7,6 +7,7 @@ from .util import (
     shared_statistics_options,
     write_logfile,
     transform_threads,
+    measure_memory_usage_and_time,
 )
 from .._config import RunnerIOConfig
 from ..scoring.runner import PyProphetLearner, PyProphetWeightApplier
@@ -236,6 +237,7 @@ from ..scoring.runner import PyProphetLearner, PyProphetWeightApplier
     hidden=True,
 )
 @click.pass_context
+@measure_memory_usage_and_time
 @logger.catch(reraise=True)
 def score(
     ctx,
