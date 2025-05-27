@@ -1,24 +1,20 @@
-import sys
 import os
+import sqlite3
+from shutil import copyfile
+
 import click
 from loguru import logger
-import pandas as pd
-import numpy as np
-import polars as pl
-import sqlite3
 
-from .stats import (
-    error_statistics,
-    lookup_values_from_error_table,
-    final_err_table,
-    summary_err_table,
-)
-from .report import save_report
-from shutil import copyfile
 from ._config import LevelContextIOConfig
+from .glyco.stats import statistics_report as glyco_statistics_report
 from .io.dispatcher import ReaderDispatcher, WriterDispatcher
 from .io.util import check_sqlite_table
-from .glyco.stats import statistics_report as glyco_statistics_report
+from .stats import (
+    error_statistics,
+    final_err_table,
+    lookup_values_from_error_table,
+    summary_err_table,
+)
 
 
 def statistics_report(
@@ -36,7 +32,6 @@ def statistics_report(
     lfdr_eps,
     writer,
 ):
-
     error_stat, pi0 = error_statistics(
         data[data.decoy == 0]["score"],
         data[data.decoy == 1]["score"],
@@ -305,42 +300,40 @@ def subsample_osw(infile, outfile, subsample_ratio, test):
     )
     multiple_runs = True if n_runs > 1 else False
     if multiple_runs:
-        click.echo("Warn: There are %s runs in %s" % (n_runs, infile))
+        click.echo(f"Warn: There are {n_runs} runs in {infile}")
     conn.close()
 
     conn = sqlite3.connect(outfile)
     c = conn.cursor()
 
     c.executescript(
-        """
+        f"""
 PRAGMA synchronous = OFF;
 
-ATTACH DATABASE "%s" AS sdb;
+ATTACH DATABASE "{infile}" AS sdb;
 
 CREATE TABLE RUN AS SELECT * FROM sdb.RUN;
 
 DETACH DATABASE sdb;
 """
-        % infile
     )
-    click.echo("Info: Propagated runs of file %s to %s." % (infile, outfile))
+    click.echo(f"Info: Propagated runs of file {infile} to {outfile}.")
 
     if subsample_ratio >= 1.0:
         c.executescript(
-            """
-ATTACH DATABASE "%s" AS sdb; 
+            f"""
+    ATTACH DATABASE "{infile}" AS sdb;
 
-CREATE TABLE FEATURE AS SELECT * FROM sdb.FEATURE; 
+    CREATE TABLE FEATURE AS SELECT * FROM sdb.FEATURE;
 
-DETACH DATABASE sdb;
-"""
-            % infile
+    DETACH DATABASE sdb;
+    """
         )
     else:
         if test:
             c.executescript(
-                """
-ATTACH DATABASE "%s" AS sdb;
+                f"""
+ATTACH DATABASE "{infile}" AS sdb;
 
 CREATE TABLE FEATURE AS 
 SELECT *
@@ -349,17 +342,16 @@ WHERE PRECURSOR_ID IN
     (SELECT ID
      FROM sdb.PRECURSOR
      LIMIT
-       (SELECT ROUND(%s*COUNT(DISTINCT ID))
+       (SELECT ROUND({subsample_ratio}*COUNT(DISTINCT ID))
         FROM sdb.PRECURSOR));
 
 DETACH DATABASE sdb;
 """
-                % (infile, subsample_ratio)
             )
         else:
             c.executescript(
-                """
-ATTACH DATABASE "%s" AS sdb;
+                f"""
+ATTACH DATABASE "{infile}" AS sdb;
 
 CREATE TABLE FEATURE AS 
 SELECT *
@@ -369,22 +361,19 @@ WHERE PRECURSOR_ID IN
      FROM sdb.PRECURSOR
      ORDER BY RANDOM()
      LIMIT
-       (SELECT ROUND(%s*COUNT(DISTINCT ID))
+       (SELECT ROUND({subsample_ratio}*COUNT(DISTINCT ID))
         FROM sdb.PRECURSOR));
 
 DETACH DATABASE sdb;
 """
-                % (infile, subsample_ratio)
             )
-    click.echo(
-        "Info: Subsampled generic features of file %s to %s." % (infile, outfile)
-    )
+    click.echo(f"Info: Subsampled generic features of file {infile} to {outfile}.")
 
     if ms1_present:
         if subsample_ratio >= 1.0:
             c.executescript(
-                """
-ATTACH DATABASE "%s" AS sdb;
+                f"""
+ATTACH DATABASE "{infile}" AS sdb;
 
 CREATE TABLE FEATURE_MS1 AS 
 SELECT *
@@ -392,12 +381,11 @@ FROM sdb.FEATURE_MS1;
 
 DETACH DATABASE sdb;
 """
-                % infile
             )
         else:
             c.executescript(
-                """
-ATTACH DATABASE "%s" AS sdb;
+                f"""
+ATTACH DATABASE "{infile}" AS sdb;
 
 CREATE TABLE FEATURE_MS1 AS 
 SELECT *
@@ -408,17 +396,14 @@ WHERE sdb.FEATURE_MS1.FEATURE_ID IN
 
 DETACH DATABASE sdb;
 """
-                % infile
             )
-        click.echo(
-            "Info: Subsampled MS1 features of file %s to %s." % (infile, outfile)
-        )
+        click.echo(f"Info: Subsampled MS1 features of file {infile} to {outfile}.")
 
     if ms2_present:
         if subsample_ratio >= 1.0:
             c.executescript(
-                """
-ATTACH DATABASE "%s" AS sdb;
+                f"""
+ATTACH DATABASE "{infile}" AS sdb;
 
 CREATE TABLE FEATURE_MS2 AS 
 SELECT *
@@ -426,12 +411,11 @@ FROM sdb.FEATURE_MS2;
 
 DETACH DATABASE sdb;
 """
-                % infile
             )
         else:
             c.executescript(
-                """
-ATTACH DATABASE "%s" AS sdb;
+                f"""
+ATTACH DATABASE "{infile}" AS sdb;
 
 CREATE TABLE FEATURE_MS2 AS 
 SELECT *
@@ -442,17 +426,14 @@ WHERE sdb.FEATURE_MS2.FEATURE_ID IN
 
 DETACH DATABASE sdb;
 """
-                % infile
             )
-        click.echo(
-            "Info: Subsampled MS2 features of file %s to %s." % (infile, outfile)
-        )
+        click.echo(f"Info: Subsampled MS2 features of file {infile} to {outfile}.")
 
     if transition_present:
         if subsample_ratio >= 1.0:
             c.executescript(
-                """
-ATTACH DATABASE "%s" AS sdb;
+                f"""
+ATTACH DATABASE "{infile}" AS sdb;
 
 CREATE TABLE FEATURE_TRANSITION AS 
 SELECT *
@@ -460,12 +441,11 @@ FROM sdb.FEATURE_TRANSITION;
 
 DETACH DATABASE sdb;
 """
-                % infile
             )
         else:
             c.executescript(
-                """
-ATTACH DATABASE "%s" AS sdb;
+                f"""
+ATTACH DATABASE "{infile}" AS sdb;
 
 CREATE TABLE FEATURE_TRANSITION AS 
 SELECT *
@@ -476,18 +456,17 @@ WHERE sdb.FEATURE_TRANSITION.FEATURE_ID IN
 
 DETACH DATABASE sdb;
 """
-                % infile
             )
         click.echo(
-            "Info: Subsampled transition features of file %s to %s." % (infile, outfile)
+            f"Info: Subsampled transition features of file {infile} to {outfile}."
         )
 
     if multiple_runs:
         c.executescript(
-            """
+            f"""
 PRAGMA synchronous = OFF;
 
-ATTACH DATABASE "%s" AS sdb;
+ATTACH DATABASE "{infile}" AS sdb;
 
 CREATE TABLE PRECURSOR AS 
 SELECT * 
@@ -498,55 +477,49 @@ WHERE sdb.PRECURSOR.ID IN
 
 DETACH DATABASE sdb;
 """
-            % infile
         )
         click.echo(
-            "Info: Subsampled precursor table of file %s to %s. For scoring merged subsampled file."
-            % (infile, outfile)
+            f"Info: Subsampled precursor table of file {infile} to {outfile}. For scoring merged subsampled file."
         )
 
         c.executescript(
-            """
-PRAGMA synchronous = OFF;
+            f"""
+    PRAGMA synchronous = OFF;
 
-ATTACH DATABASE "%s" AS sdb;
+    ATTACH DATABASE "{infile}" AS sdb;
 
-CREATE TABLE TRANSITION_PRECURSOR_MAPPING AS 
-SELECT * 
-FROM sdb.TRANSITION_PRECURSOR_MAPPING
-WHERE sdb.TRANSITION_PRECURSOR_MAPPING.PRECURSOR_ID IN
-    (SELECT ID
-     FROM PRECURSOR);
+    CREATE TABLE TRANSITION_PRECURSOR_MAPPING AS 
+    SELECT * 
+    FROM sdb.TRANSITION_PRECURSOR_MAPPING
+    WHERE sdb.TRANSITION_PRECURSOR_MAPPING.PRECURSOR_ID IN
+        (SELECT ID
+         FROM PRECURSOR);
 
-DETACH DATABASE sdb;
-"""
-            % infile
+    DETACH DATABASE sdb;
+    """
         )
         click.echo(
-            "Info: Subsampled transition_precursor_mapping table of file %s to %s. For scoring merged subsampled file."
-            % (infile, outfile)
+            f"Info: Subsampled transition_precursor_mapping table of file {infile} to {outfile}. For scoring merged subsampled file."
         )
 
         c.executescript(
-            """
-PRAGMA synchronous = OFF;
+            f"""
+    PRAGMA synchronous = OFF;
 
-ATTACH DATABASE "%s" AS sdb;
+    ATTACH DATABASE "{infile}" AS sdb;
 
-CREATE TABLE TRANSITION AS 
-SELECT * 
-FROM sdb.TRANSITION
-WHERE sdb.TRANSITION.ID IN
-    (SELECT TRANSITION_PRECURSOR_MAPPING.TRANSITION_ID
-     FROM TRANSITION_PRECURSOR_MAPPING);
+    CREATE TABLE TRANSITION AS 
+    SELECT * 
+    FROM sdb.TRANSITION
+    WHERE sdb.TRANSITION.ID IN
+        (SELECT TRANSITION_PRECURSOR_MAPPING.TRANSITION_ID
+         FROM TRANSITION_PRECURSOR_MAPPING);
 
-DETACH DATABASE sdb;
-"""
-            % infile
+    DETACH DATABASE sdb;
+    """
         )
         click.echo(
-            "Info: Subsampled transition table of file %s to %s. For scoring merged subsampled file."
-            % (infile, outfile)
+            f"Info: Subsampled transition table of file {infile} to {outfile}. For scoring merged subsampled file."
         )
 
     conn.commit()
@@ -572,10 +545,10 @@ def reduce_osw(infile, outfile):
     c = conn.cursor()
 
     c.executescript(
-        """
+        f"""
 PRAGMA synchronous = OFF;
 
-ATTACH DATABASE "%s" AS sdb;
+ATTACH DATABASE "{infile}" AS sdb;
 
 CREATE TABLE RUN(ID INT PRIMARY KEY NOT NULL,
                  FILENAME TEXT NOT NULL);
@@ -605,7 +578,6 @@ WHERE ID IN
     (SELECT FEATURE_ID
      FROM SCORE_MS2);
 """
-        % infile
     )
 
     conn.commit()
@@ -644,7 +616,7 @@ def merge_osws(infiles, outfile, templatefile, same_run):
         runid, rname = result[0]
 
     c.executescript(
-        """
+        f"""
 PRAGMA synchronous = OFF;
 
 DROP TABLE IF EXISTS RUN;
@@ -669,7 +641,7 @@ DROP TABLE IF EXISTS SCORE_PROTEIN;
 
 DROP TABLE IF EXISTS SCORE_IPF;
 
-ATTACH DATABASE "%s" AS sdb;
+ATTACH DATABASE "{infiles[0]}" AS sdb;
 
 CREATE TABLE RUN AS SELECT * FROM sdb.RUN LIMIT 0;
 
@@ -683,7 +655,6 @@ CREATE TABLE FEATURE_TRANSITION AS SELECT * FROM sdb.FEATURE_TRANSITION LIMIT 0;
 
 DETACH DATABASE sdb;
 """
-        % (infiles[0])
     )
 
     conn.commit()
@@ -696,25 +667,24 @@ DETACH DATABASE sdb;
         # Only create a single run entry (all files are presumably from the same run)
         if same_run:
             c.executescript(
-                """INSERT INTO RUN (ID, FILENAME) VALUES (%s, '%s')""" % (runid, rname)
+                f"""INSERT INTO RUN (ID, FILENAME) VALUES ({runid}, '{rname}')"""
             )
             break
         else:
             c.executescript(
-                """
-ATTACH DATABASE "%s" AS sdb;
+                f"""
+    ATTACH DATABASE "{infile}" AS sdb;
 
-INSERT INTO RUN SELECT * FROM sdb.RUN;
+    INSERT INTO RUN SELECT * FROM sdb.RUN;
 
-DETACH DATABASE sdb;
-"""
-                % infile
+    DETACH DATABASE sdb;
+    """
             )
 
         conn.commit()
         conn.close()
 
-        click.echo("Info: Merged runs of file %s to %s." % (infile, outfile))
+        click.echo(f"Info: Merged runs of file {infile} to {outfile}.")
 
     # Now merge the run-specific data into the output file:
     #   Note: only tables FEATURE, FEATURE_MS1, FEATURE_MS2 and FEATURE_TRANSITION are run-specific
@@ -723,29 +693,26 @@ DETACH DATABASE sdb;
         c = conn.cursor()
 
         c.executescript(
-            """
-ATTACH DATABASE "%s" AS sdb; 
+            f"""
+    ATTACH DATABASE "{infile}" AS sdb; 
 
-INSERT INTO FEATURE SELECT * FROM sdb.FEATURE; 
+    INSERT INTO FEATURE SELECT * FROM sdb.FEATURE; 
 
-DETACH DATABASE sdb;
-"""
-            % infile
+    DETACH DATABASE sdb;
+    """
         )
 
         conn.commit()
         conn.close()
 
-        click.echo(
-            "Info: Merged generic features of file %s to %s." % (infile, outfile)
-        )
+        click.echo(f"Info: Merged generic features of file {infile} to {outfile}.")
 
     if same_run:
         conn = sqlite3.connect(outfile)
         c = conn.cursor()
 
         # Fix run id assuming we only have a single run
-        c.executescript("""UPDATE FEATURE SET RUN_ID = %s""" % runid)
+        c.executescript(f"""UPDATE FEATURE SET RUN_ID = {runid}""")
 
         conn.commit()
         conn.close()
@@ -753,70 +720,64 @@ DETACH DATABASE sdb;
     for infile in infiles:
         conn = sqlite3.connect(outfile)
         c = conn.cursor()
-
         c.executescript(
-            """
-ATTACH DATABASE "%s" AS sdb;
+            f"""
+    ATTACH DATABASE "{infile}" AS sdb;
 
-INSERT INTO FEATURE_MS1
-SELECT *
-FROM sdb.FEATURE_MS1;
+    INSERT INTO FEATURE_MS1
+    SELECT *
+    FROM sdb.FEATURE_MS1;
 
-DETACH DATABASE sdb;
-"""
-            % infile
+    DETACH DATABASE sdb;
+    """
         )
 
         conn.commit()
         conn.close()
 
-        click.echo("Info: Merged MS1 features of file %s to %s." % (infile, outfile))
+        click.echo(f"Info: Merged MS1 features of file {infile} to {outfile}.")
 
     for infile in infiles:
         conn = sqlite3.connect(outfile)
         c = conn.cursor()
 
         c.executescript(
-            """
-ATTACH DATABASE "%s" AS sdb;
+            f"""
+    ATTACH DATABASE "{infile}" AS sdb;
 
-INSERT INTO FEATURE_MS2
-SELECT *
-FROM sdb.FEATURE_MS2;
+    INSERT INTO FEATURE_MS2
+    SELECT *
+    FROM sdb.FEATURE_MS2;
 
-DETACH DATABASE sdb;
-"""
-            % infile
+    DETACH DATABASE sdb;
+    """
         )
 
         conn.commit()
         conn.close()
 
-        click.echo("Info: Merged MS2 features of file %s to %s." % (infile, outfile))
+        click.echo(f"Info: Merged MS2 features of file {infile} to {outfile}.")
 
     for infile in infiles:
         conn = sqlite3.connect(outfile)
         c = conn.cursor()
 
         c.executescript(
-            """
-ATTACH DATABASE "%s" AS sdb;
+            f"""
+    ATTACH DATABASE "{infile}" AS sdb;
 
-INSERT INTO FEATURE_TRANSITION
-SELECT *
-FROM sdb.FEATURE_TRANSITION;
+    INSERT INTO FEATURE_TRANSITION
+    SELECT *
+    FROM sdb.FEATURE_TRANSITION;
 
-DETACH DATABASE sdb;
-"""
-            % infile
+    DETACH DATABASE sdb;
+    """
         )
 
         conn.commit()
         conn.close()
 
-        click.echo(
-            "Info: Merged transition features of file %s to %s." % (infile, outfile)
-        )
+        click.echo(f"Info: Merged transition features of file {infile} to {outfile}.")
 
     click.echo("Info: All OSWS files were merged.")
 
@@ -882,42 +843,38 @@ CREATE TABLE FEATURE(ID INT PRIMARY KEY NOT NULL,
         # Only create a single run entry (all files are presumably from the same run)
         if same_run:
             c.executescript(
-                """INSERT INTO RUN (ID, FILENAME) VALUES (%s, '%s')""" % (runid, rname)
+                f"""INSERT INTO RUN (ID, FILENAME) VALUES ({runid}, '{rname}')"""
             )
             break
         else:
             c.executescript(
-                'ATTACH DATABASE "%s" AS sdb; INSERT INTO RUN SELECT * FROM sdb.RUN; DETACH DATABASE sdb;'
-                % infile
+                f'ATTACH DATABASE "{infile}" AS sdb; INSERT INTO RUN SELECT * FROM sdb.RUN; DETACH DATABASE sdb;'
             )
 
         conn.commit()
         conn.close()
 
-        click.echo("Info: Merged runs of file %s to %s." % (infile, outfile))
+        click.echo(f"Info: Merged runs of file {infile} to {outfile}.")
 
     for infile in infiles:
         conn = sqlite3.connect(outfile)
         c = conn.cursor()
 
         c.executescript(
-            'ATTACH DATABASE "%s" AS sdb; INSERT INTO FEATURE SELECT * FROM sdb.FEATURE; DETACH DATABASE sdb;'
-            % infile
+            f'ATTACH DATABASE "{infile}" AS sdb; INSERT INTO FEATURE SELECT * FROM sdb.FEATURE; DETACH DATABASE sdb;'
         )
 
         conn.commit()
         conn.close()
 
-        click.echo(
-            "Info: Merged generic features of file %s to %s." % (infile, outfile)
-        )
+        click.echo(f"Info: Merged generic features of file {infile} to {outfile}.")
 
     if same_run:
         conn = sqlite3.connect(outfile)
         c = conn.cursor()
 
         # Fix run id assuming we only have a single run
-        c.executescript("""UPDATE FEATURE SET RUN_ID = %s""" % runid)
+        c.executescript(f"""UPDATE FEATURE SET RUN_ID = {runid}""")
 
         conn.commit()
         conn.close()
@@ -927,14 +884,13 @@ CREATE TABLE FEATURE(ID INT PRIMARY KEY NOT NULL,
         c = conn.cursor()
 
         c.executescript(
-            'ATTACH DATABASE "%s" AS sdb; INSERT INTO SCORE_MS2 SELECT * FROM sdb.SCORE_MS2; DETACH DATABASE sdb;'
-            % infile
+            f'ATTACH DATABASE "{infile}" AS sdb; INSERT INTO SCORE_MS2 SELECT * FROM sdb.SCORE_MS2; DETACH DATABASE sdb;'
         )
 
         conn.commit()
         conn.close()
 
-        click.echo("Info: Merged MS2 scores of file %s to %s." % (infile, outfile))
+        click.echo(f"Info: Merged MS2 scores of file {infile} to {outfile}.")
 
     click.echo("Info: All reduced OSWR files were merged.")
 
@@ -992,10 +948,10 @@ def merge_oswps(infiles, outfile, templatefile, same_run):
     else:
         create_feature_alignment_query = ""
 
-    click.echo("""First File input: %s""" % (infiles[0]))
+    click.echo(f"First File input: {infiles[0]}")
 
     c.executescript(
-        """
+        f"""
     PRAGMA synchronous = OFF;
     DROP TABLE IF EXISTS RUN;
     DROP TABLE IF EXISTS FEATURE;
@@ -1011,18 +967,16 @@ def merge_oswps(infiles, outfile, templatefile, same_run):
     DROP TABLE IF EXISTS SCORE_PEPTIDE;
     DROP TABLE IF EXISTS SCORE_PROTEIN;
     DROP TABLE IF EXISTS SCORE_IPF;
-    ATTACH DATABASE "%s" AS sdb;
+    ATTACH DATABASE "{infiles[0]}" AS sdb;
     CREATE TABLE RUN AS SELECT * FROM sdb.RUN LIMIT 0;
     CREATE TABLE FEATURE AS SELECT * FROM sdb.FEATURE LIMIT 0;
     CREATE TABLE FEATURE_MS1 AS SELECT * FROM sdb.FEATURE_MS1 LIMIT 0;
     CREATE TABLE FEATURE_MS2 AS SELECT * FROM sdb.FEATURE_MS2 LIMIT 0;
-    CREATE TABLE FEATURE_TRANSITION AS SELECT * FROM sdb.FEATURE_TRANSITION
-    LIMIT 0;
-    %s
-    %s
+    CREATE TABLE FEATURE_TRANSITION AS SELECT * FROM sdb.FEATURE_TRANSITION LIMIT 0;
+    {create_feature_alignment_query}
+    {create_scores_query}
     DETACH DATABASE sdb;
     """
-        % (infiles[0], create_feature_alignment_query, create_scores_query)
     )
 
     conn.commit()
@@ -1035,23 +989,22 @@ def merge_oswps(infiles, outfile, templatefile, same_run):
         # Only create a single run entry (all files are presumably from the same run)
         if same_run:
             c.executescript(
-                """INSERT INTO RUN (ID, FILENAME) VALUES (%s, '%s')""" % (runid, rname)
+                f"""INSERT INTO RUN (ID, FILENAME) VALUES ({runid}, '{rname}')"""
             )
             break
         else:
             c.executescript(
-                """
-    ATTACH DATABASE "%s" AS sdb;
-    INSERT INTO RUN SELECT * FROM sdb.RUN;
-    DETACH DATABASE sdb;
-    """
-                % infile
+                f"""
+        ATTACH DATABASE "{infile}" AS sdb;
+        INSERT INTO RUN SELECT * FROM sdb.RUN;
+        DETACH DATABASE sdb;
+        """
             )
 
         conn.commit()
         conn.close()
 
-        click.echo("Info: Merged runs of file %s to %s." % (infile, outfile))
+        click.echo(f"Info: Merged runs of file {infile} to {outfile}.")
 
     # Now merge the run-specific data into the output file:
     #   Note: only tables FEATURE, FEATURE_MS1, FEATURE_MS2 and FEATURE_TRANSITION are run-specific
@@ -1060,27 +1013,24 @@ def merge_oswps(infiles, outfile, templatefile, same_run):
         c = conn.cursor()
 
         c.executescript(
-            """
-    ATTACH DATABASE "%s" AS sdb; 
-    INSERT INTO FEATURE SELECT * FROM sdb.FEATURE; 
-    DETACH DATABASE sdb;
-    """
-            % infile
+            f"""
+        ATTACH DATABASE "{infile}" AS sdb; 
+        INSERT INTO FEATURE SELECT * FROM sdb.FEATURE; 
+        DETACH DATABASE sdb;
+        """
         )
 
         conn.commit()
         conn.close()
 
-        click.echo(
-            "Info: Merged generic features of file %s to %s." % (infile, outfile)
-        )
+        click.echo(f"Info: Merged generic features of file {infile} to {outfile}.")
 
     if same_run:
         conn = sqlite3.connect(outfile)
         c = conn.cursor()
 
         # Fix run id assuming we only have a single run
-        c.executescript("""UPDATE FEATURE SET RUN_ID = %s""" % runid)
+        c.executescript(f"UPDATE FEATURE SET RUN_ID = {runid}")
 
         conn.commit()
         conn.close()
@@ -1090,66 +1040,60 @@ def merge_oswps(infiles, outfile, templatefile, same_run):
         c = conn.cursor()
 
         c.executescript(
-            """
-    ATTACH DATABASE "%s" AS sdb;
+            f"""
+    ATTACH DATABASE "{infile}" AS sdb;
     INSERT INTO FEATURE_MS1
     SELECT *
     FROM sdb.FEATURE_MS1;
     DETACH DATABASE sdb;
     """
-            % infile
         )
 
         conn.commit()
         conn.close()
 
-        click.echo("Info: Merged MS1 features of file %s to %s." % (infile, outfile))
+        click.echo(f"Info: Merged MS1 features of file {infile} to {outfile}.")
 
     for infile in infiles:
         conn = sqlite3.connect(outfile)
         c = conn.cursor()
 
         c.executescript(
-            """
-    ATTACH DATABASE "%s" AS sdb;
-    INSERT INTO FEATURE_MS2
-    SELECT *
-    FROM sdb.FEATURE_MS2;
-    DETACH DATABASE sdb;
-    """
-            % infile
+            f"""
+        ATTACH DATABASE "{infile}" AS sdb;
+        INSERT INTO FEATURE_MS2
+        SELECT *
+        FROM sdb.FEATURE_MS2;
+        DETACH DATABASE sdb;
+        """
         )
 
         conn.commit()
         conn.close()
 
-        click.echo("Info: Merged MS2 features of file %s to %s." % (infile, outfile))
+        click.echo(f"Info: Merged MS2 features of file {infile} to {outfile}.")
 
     for infile in infiles:
         conn = sqlite3.connect(outfile)
         c = conn.cursor()
 
         c.executescript(
-            """
-    ATTACH DATABASE "%s" AS sdb;
-    INSERT INTO FEATURE_TRANSITION
-    SELECT *
-    FROM sdb.FEATURE_TRANSITION;
-    DETACH DATABASE sdb;
-    """
-            % infile
+            f"""
+        ATTACH DATABASE "{infile}" AS sdb;
+        INSERT INTO FEATURE_TRANSITION
+        SELECT *
+        FROM sdb.FEATURE_TRANSITION;
+        DETACH DATABASE sdb;
+        """
         )
 
         conn.commit()
         conn.close()
 
-        click.echo(
-            "Info: Merged transition features of file %s to %s." % (infile, outfile)
-        )
+        click.echo(f"Info: Merged transition features of file {infile} to {outfile}.")
 
     if feature_alignment_tables_present:
         for infile in infiles:
-
             # Check if the infile contains the feature_alignment table
             conn = sqlite3.connect(infile)
             feature_alignment_present = check_sqlite_table(conn, "FEATURE_ALIGNMENT")
@@ -1160,31 +1104,26 @@ def merge_oswps(infiles, outfile, templatefile, same_run):
                 c = conn.cursor()
 
                 c.executescript(
-                    """
-            ATTACH DATABASE "%s" AS sdb;
+                    f"""
+            ATTACH DATABASE "{infile}" AS sdb;
             INSERT INTO FEATURE_ALIGNMENT
             SELECT *
             FROM sdb.FEATURE_ALIGNMENT;
             DETACH DATABASE sdb;
             """
-                    % infile
                 )
 
                 conn.commit()
                 conn.close()
 
                 click.echo(
-                    "Info: Merged feature alignment tables of file %s to %s."
-                    % (infile, outfile)
+                    f"Info: Merged feature alignment tables of file {infile} to {outfile}."
                 )
             else:
-                click.echo(
-                    "Warn: No feature alignment table found in file %s." % (infile)
-                )
+                click.echo(f"Warn: No feature alignment table found in file {infile}.")
 
         # Merge FEATURE_MS2_ALIGNMENT
         for infile in infiles:
-
             conn = sqlite3.connect(infile)
             feature_ms2_alignment_present = check_sqlite_table(
                 conn, "FEATURE_MS2_ALIGNMENT"
@@ -1196,31 +1135,28 @@ def merge_oswps(infiles, outfile, templatefile, same_run):
                 c = conn.cursor()
 
                 c.executescript(
-                    """
-            ATTACH DATABASE "%s" AS sdb;
+                    f"""
+            ATTACH DATABASE "{infile}" AS sdb;
             INSERT INTO FEATURE_MS2_ALIGNMENT
             SELECT *
             FROM sdb.FEATURE_MS2_ALIGNMENT;
             DETACH DATABASE sdb;
             """
-                    % infile
                 )
 
                 conn.commit()
                 conn.close()
 
                 click.echo(
-                    "Info: Merged feature MS2 alignment tables of file %s to %s."
-                    % (infile, outfile)
+                    f"Info: Merged feature MS2 alignment tables of file {infile} to {outfile}."
                 )
             else:
                 click.echo(
-                    "Warn: No feature MS2 alignment table found in file %s." % (infile)
+                    f"Warn: No feature MS2 alignment table found in file {infile}."
                 )
 
         # Merge FEATURE_TRANSITION_ALIGNMENT
         for infile in infiles:
-
             conn = sqlite3.connect(infile)
             feature_transition_alignment_present = check_sqlite_table(
                 conn, "FEATURE_TRANSITION_ALIGNMENT"
@@ -1232,27 +1168,24 @@ def merge_oswps(infiles, outfile, templatefile, same_run):
                 c = conn.cursor()
 
                 c.executescript(
-                    """
-                ATTACH DATABASE "%s" AS sdb;
+                    f"""
+                ATTACH DATABASE "{infile}" AS sdb;
                 INSERT INTO FEATURE_TRANSITION_ALIGNMENT
                 SELECT *
                 FROM sdb.FEATURE_TRANSITION_ALIGNMENT;
                 DETACH DATABASE sdb;
                 """
-                    % infile
                 )
 
                 conn.commit()
                 conn.close()
 
                 click.echo(
-                    "Info: Merged feature transition alignment tables of file %s to %s."
-                    % (infile, outfile)
+                    f"Info: Merged feature transition alignment tables of file {infile} to {outfile}."
                 )
             else:
                 click.echo(
-                    "Warn: No feature transition alignment table found in file %s."
-                    % (infile)
+                    f"Warn: No feature transition alignment table found in file {infile}."
                 )
 
     for infile in infiles:
@@ -1261,22 +1194,19 @@ def merge_oswps(infiles, outfile, templatefile, same_run):
             c = conn.cursor()
 
             c.executescript(
-                """
-    ATTACH DATABASE "%s" AS sdb;
-    INSERT INTO %s
+                f"""
+    ATTACH DATABASE "{infile}" AS sdb;
+    INSERT INTO {score_tbl}
     SELECT *
-    FROM sdb.%s;
+    FROM sdb.{score_tbl};
     DETACH DATABASE sdb;
     """
-                % (infile, score_tbl, score_tbl)
             )
 
             conn.commit()
             conn.close()
 
-            click.echo(
-                "Info: Merged %s table of file %s to %s." % (score_tbl, infile, outfile)
-            )
+            click.echo(f"Info: Merged {score_tbl} table of file {infile} to {outfile}.")
 
     ## Vacuum to clean and re-write rootpage indexes
     conn = sqlite3.connect(outfile)
@@ -1287,7 +1217,7 @@ def merge_oswps(infiles, outfile, templatefile, same_run):
     conn.commit()
     conn.close()
 
-    click.echo("Info: Cleaned and re-wrote indexing meta-data for %s.: " % (outfile))
+    click.echo(f"Info: Cleaned and re-wrote indexing meta-data for {outfile}.")
 
     click.echo("Info: All Post-Scored OSWS files were merged.")
 
@@ -1324,7 +1254,7 @@ def backpropagate_oswr(infile, outfile, apply_scores):
         )
 
     # copy across the tables
-    script.append('ATTACH DATABASE "{}" AS sdb;'.format(apply_scores))
+    script.append(f'ATTACH DATABASE "{apply_scores}" AS sdb;')
     insert_table_fmt = "INSERT INTO {0}\nSELECT *\nFROM sdb.{0};"
     if peptide_present:
         script.append(insert_table_fmt.format("SCORE_PEPTIDE"))
