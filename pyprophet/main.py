@@ -1,41 +1,34 @@
-import sys
-import os
 import pathlib
-import shutil
-import time
 import sqlite3
-import pandas as pd
+
 import click
-from loguru import logger
+import pandas as pd
 from tabulate import tabulate
 
+from .cli.export import create_export_group
+from .cli.ipy import (
+    glycoform as glycoform_command,
+)
+from .cli.ipy import (
+    ipf as ipf_command,
+)
+from .cli.levels_context import create_levels_context_group
+from .cli.merge import create_merge_group
+from .cli.score import score as score_command
 from .cli.util import (
     CombinedGroup,
     PythonLiteralOption,
-    write_logfile,
-    transform_threads,
     transform_subsample_ratio,
+    transform_threads,
 )
-from .cli.score import score as score_command
-from .cli.levels_context import create_levels_context_group
-from .cli.ipy import (
-    ipf as ipf_command,
-    glycoform as glycoform_command,
-)
-from .cli.export import create_export_group
-from .cli.merge import create_merge_group
-
-from ._config import BaseIOConfig
-from .io._base import BaseSplitParquetWriter
+from .filter import filter_osw, filter_sqmass
 from .io.util import check_sqlite_table
 from .levels_contexts import (
-    subsample_osw,
-    reduce_osw,
-    merge_osw as _merge_osw,
     backpropagate_oswr,
+    reduce_osw,
+    subsample_osw,
 )
 from .split import split_merged_parquet, split_osw
-from .filter import filter_sqmass, filter_osw
 
 try:
     profile
@@ -329,7 +322,7 @@ def filter(
         [pathlib.PurePosixPath(file).suffix.lower() == ".sqmass" for file in sqldbfiles]
     ):
         if infile is None and len(keep_naked_peptides) == 0:
-            click.ClickException(
+            raise click.ClickException(
                 "If you are filtering sqMass files, you need to provide a PyProphet file via `--in` flag or you need to provide a list of naked peptide sequences to filter for."
             )
         filter_sqmass(
@@ -356,7 +349,7 @@ def filter(
             run_ids,
         )
     else:
-        click.ClickException(
+        raise click.ClickException(
             f"There seems to be something wrong with the input sqlite db files. Make sure they are all either sqMass files or all OSW files, these are mutually exclusive.\nYour input files: {sqldbfiles}"
         )
 
@@ -387,17 +380,9 @@ def statistics(infile):
             )
 
             click.echo(
-                "Total peakgroups (q-value<%s): %s"
-                % (
-                    qt,
-                    len(
-                        peakgroups[peakgroups["QVALUE"] < qt][
-                            ["FEATURE_ID"]
-                        ].drop_duplicates()
-                    ),
-                )
+                f"Total peakgroups (q-value<{qt}): {len(peakgroups[peakgroups['QVALUE'] < qt]['FEATURE_ID'].drop_duplicates())}"
             )
-            click.echo("Total peakgroups per run (q-value<%s):" % qt)
+            click.echo(f"Total peakgroups per run (q-value<{qt}):")
             click.echo(
                 tabulate(
                     peakgroups[peakgroups["QVALUE"] < qt]
@@ -420,15 +405,7 @@ def statistics(infile):
             )
 
             click.echo(
-                "Total peptides (global context) (q-value<%s): %s"
-                % (
-                    qt,
-                    len(
-                        peptides_global[peptides_global["QVALUE"] < qt][
-                            ["PEPTIDE_ID"]
-                        ].drop_duplicates()
-                    ),
-                )
+                f"Total peptides (global context) (q-value<{qt}): {len(peptides_global[peptides_global['QVALUE'] < qt]['PEPTIDE_ID'].drop_duplicates())}"
             )
             click.echo(
                 tabulate(
@@ -452,15 +429,7 @@ def statistics(infile):
             )
 
             click.echo(
-                "Total proteins (global context) (q-value<%s): %s"
-                % (
-                    qt,
-                    len(
-                        proteins_global[proteins_global["QVALUE"] < qt][
-                            ["PROTEIN_ID"]
-                        ].drop_duplicates()
-                    ),
-                )
+                f"Total proteins (global context) (q-value<{qt}): {len(proteins_global[proteins_global['QVALUE'] < qt]['PROTEIN_ID'].drop_duplicates())}"
             )
             click.echo(
                 tabulate(
