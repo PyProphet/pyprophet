@@ -853,3 +853,60 @@ class BaseSplitParquetWriter(BaseWriter):
         raise NotImplementedError(
             "The save_results method must be implemented in subclasses of BaseSplitParquetWriter."
         )
+
+    def merge_files(
+        self,
+        merge_transitions: bool = False,
+    ):
+        """
+        Merges the precursors_features.parquet and transition_features.parquet files from all subdirectories into one single file each.
+        """
+        base_dir = self.infile
+
+        if merge_transitions:
+            out_dir = self.outfile
+            os.makedirs(out_dir, exist_ok=True)
+            output_file = os.path.join(out_dir, "precursors_features.parquet")
+            output_file_transitions = os.path.join(
+                out_dir, "transition_features.parquet"
+            )
+        else:
+            output_file = self.outfile
+
+        con = duckdb.connect()
+
+        # Use glob to find all precursors and transition features files
+        precursors_files = glob.glob(
+            os.path.join(base_dir, "**", "precursors_features.parquet"), recursive=True
+        )
+        transition_files = glob.glob(
+            os.path.join(base_dir, "**", "transition_features.parquet"), recursive=True
+        )
+
+        # Merge precursors features into one parquet file
+        if precursors_files:
+            logger.info(
+                f"Merging {len(precursors_files)} precursors features files into {output_file}..."
+            )
+            precursors_query = f"""
+                COPY (
+                    SELECT * FROM read_parquet([{','.join([f"'{file}'" for file in precursors_files])}])
+                ) TO '{output_file}' (FORMAT 'parquet')
+            """
+            logger.trace(f"Precursors merge query:\n{precursors_query}")
+            con.execute(precursors_query)
+
+        # Merge transition features into one parquet file (optional)
+        if merge_transitions:
+            logger.info(
+                f"Merging {len(transition_files)} transition features files into {output_file_transitions}..."
+            )
+            transitions_query = f"""
+                COPY (
+                    SELECT * FROM read_parquet([{','.join([f"'{file}'" for file in transition_files])}])
+                ) TO '{output_file_transitions}' (FORMAT 'parquet')
+            """
+            con.execute(transitions_query)
+
+        con.close()
+        logger.success("Merging complete.")
