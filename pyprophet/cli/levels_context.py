@@ -24,6 +24,9 @@ def create_levels_context_group():
         pass
 
     levels_context.add_command(peptide, name="peptide")
+    levels_context.add_command(glycopeptide, name="glycopeptide")
+    levels_context.add_command(gene, name="gene")
+    levels_context.add_command(protein, name="protein")
 
     return levels_context
 
