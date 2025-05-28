@@ -357,7 +357,6 @@ class BaseWriter(ABC):
         trained_weights_path = self.config.extra_writes.get("trained_weights_path")
 
         if trained_weights_path is not None:
-
             if os.path.exists(trained_weights_path):
                 existing_df = pd.read_csv(trained_weights_path, sep=",")
                 existing_df = existing_df[existing_df["level"] != self.level]
@@ -568,7 +567,7 @@ class BaseParquetReader(BaseReader):
                 f"""
                 CREATE TEMP TABLE sampled_precursor_ids AS
                 SELECT DISTINCT PRECURSOR_ID
-                FROM read_parquet({self.infile})
+                FROM read_parquet('{self.infile}')
                 USING SAMPLE {self.subsample_ratio * 100}%
                 """
             )
@@ -890,7 +889,7 @@ class BaseSplitParquetWriter(BaseWriter):
             )
             precursors_query = f"""
                 COPY (
-                    SELECT * FROM read_parquet([{','.join([f"'{file}'" for file in precursors_files])}])
+                    SELECT * FROM read_parquet([{",".join([f"'{file}'" for file in precursors_files])}])
                 ) TO '{output_file}' (FORMAT 'parquet')
             """
             logger.trace(f"Precursors merge query:\n{precursors_query}")
@@ -903,7 +902,7 @@ class BaseSplitParquetWriter(BaseWriter):
             )
             transitions_query = f"""
                 COPY (
-                    SELECT * FROM read_parquet([{','.join([f"'{file}'" for file in transition_files])}])
+                    SELECT * FROM read_parquet([{",".join([f"'{file}'" for file in transition_files])}])
                 ) TO '{output_file_transitions}' (FORMAT 'parquet')
             """
             con.execute(transitions_query)
