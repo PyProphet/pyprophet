@@ -431,6 +431,13 @@ class ParquetWriter(BaseParquetWriter):
                     logger.opt(exception=e, depth=1).critical(
                         f"Critical error: {str(e)}"
                     )
+                    # Check for duplicate entries in the score df on the join column
+                    df_dups = df.groupby("FEATURE_ID").filter(lambda x: len(x) > 1)
+                    if not df_dups.empty:
+                        logger.error(
+                            f"Duplicate entries in score DataFrame on join column: {df_dups['FEATURE_ID'].unique()}"
+                        )
+
                 sys.exit(1)
 
             con.execute(
