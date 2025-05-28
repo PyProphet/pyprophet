@@ -1,20 +1,15 @@
 import os
-import sys
-from pathlib import Path
-from importlib.metadata import version
-from datetime import datetime
 from collections import defaultdict
-import platform
-import psutil
+
 import click
-from loguru import logger
 import pyarrow.parquet as pq
+from loguru import logger
 from pyarrow.lib import ArrowInvalid, ArrowIOError
 
 
 def is_sqlite_file(filename):
     # https://stackoverflow.com/questions/12932607/how-to-check-with-python-and-sqlite3-if-one-sqlite-database-file-exists
-    from os.path import isfile, getsize
+    from os.path import getsize, isfile
 
     if not isfile(filename):
         return False
@@ -113,7 +108,7 @@ def is_parquet_file(file_path):
     """
 
     # First check extension
-    if not os.path.splitext(file_path)[1].lower() in (".parquet", ".pq"):
+    if os.path.splitext(file_path)[1].lower() not in (".parquet", ".pq"):
         return False
 
     # Then verify it's actually a parquet file
@@ -171,7 +166,6 @@ def get_parquet_column_names(file_path):
 
 
 def print_parquet_tree(root_dir, precursors, transitions, alignment=None, max_runs=10):
-
     def group_by_run(files):
         grouped = defaultdict(list)
         for f in files:
