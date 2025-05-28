@@ -6,10 +6,10 @@ import pandas as pd
 from tabulate import tabulate
 
 from .cli.export import create_export_group
-from .cli.ipy import (
+from .cli.ipf import (
     glycoform as glycoform_command,
 )
-from .cli.ipy import (
+from .cli.ipf import (
     ipf as ipf_command,
 )
 from .cli.levels_context import create_levels_context_group
