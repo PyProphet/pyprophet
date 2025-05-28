@@ -34,6 +34,14 @@ class ParquetReader(BaseParquetReader):
         super().__init__(config)
 
     def read(self) -> pd.DataFrame:
+        """
+        Reads the feature table from the specified file path using DuckDB connection,
+        initializes DuckDB views, fetches the feature table, merges MS1 and MS2 features
+        if the level is "ms1ms2", and finalizes the feature table with the main score.
+
+        Returns:
+        pd.DataFrame: The finalized feature table with the main score.
+        """
         con = duckdb.connect()
         self._init_duckdb_views(con)
 
@@ -221,6 +229,13 @@ class ParquetWriter(BaseParquetWriter):
         super().__init__(config)
 
     def save_results(self, result, pi0):
+        """
+        Save the results to an output file, copying the input file if they are different.
+
+        Parameters:
+        - result: The result object containing scored tables.
+        - pi0: The pi0 value to be used in writing the PDF report.
+        """
         if self.infile != self.outfile:
             copyfile(self.infile, self.outfile)
 
@@ -284,7 +299,7 @@ class ParquetWriter(BaseParquetWriter):
             con.execute(
                 f"""
                 INSERT INTO output_table
-                SELECT {select_old}, {','.join([f'NULL AS {col}' for col in new_score_cols])}
+                SELECT {select_old}, {",".join([f"NULL AS {col}" for col in new_score_cols])}
                 FROM (SELECT * 
                     FROM read_parquet('{target_file}') t
                     WHERE t.TRANSITION_ID IS NULL
@@ -389,7 +404,7 @@ class ParquetWriter(BaseParquetWriter):
             con.execute(
                 f"""
                 INSERT INTO output_table
-                SELECT {select_old}, {','.join([f'NULL AS {col}' for col in new_score_cols])}
+                SELECT {select_old}, {",".join([f"NULL AS {col}" for col in new_score_cols])}
                 FROM (SELECT *
                     FROM read_parquet('{target_file}') p
                     WHERE p.TRANSITION_ID IS NOT NULL

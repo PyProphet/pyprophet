@@ -40,6 +40,12 @@ class SplitParquetReader(BaseSplitParquetReader):
         super().__init__(config)
 
     def read(self) -> pd.DataFrame:
+        """
+        Reads and processes data from a DuckDB connection to generate a final feature table based on the specified level and main score.
+
+        Returns:
+            pd.DataFrame: Final feature table with the specified main score.
+        """
         con = duckdb.connect()
         self._init_duckdb_views(con)
 
@@ -202,6 +208,13 @@ class SplitParquetWriter(BaseSplitParquetWriter):
         super().__init__(config)
 
     def save_results(self, result, pi0):
+        """
+        Save the results of scoring to parquet files based on the specified level.
+
+        Parameters:
+        - result: The result object containing scored tables.
+        - pi0: The pi0 value used in scoring.
+        """
         df = result.scored_tables
         level = self.level
 

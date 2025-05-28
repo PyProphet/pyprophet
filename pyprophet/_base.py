@@ -11,7 +11,7 @@ from .io.util import (
 @dataclass
 class BaseIOConfig:
     """
-    Base configuration class for I/O-related metadata.
+    Base configuration class for I/O-related metadata and common attributes used across algorithms.
 
     Attributes:
         infile (str): Path to the input file (e.g., .osw, .parquet).
@@ -20,7 +20,7 @@ class BaseIOConfig:
         subsample_ratio (float): Subsampling ratio for large data.
         level (str): Scoring level (e.g., 'ms1', 'ms2', 'transition', 'alignment').
         context (str): Context or mode in which the reader/writer operates
-                       (e.g., 'score', 'ipf', 'level_context').
+                       (e.g., 'score_learn', 'score_apply', 'ipf', 'level_context').
         prefix (str): Automatically derived from outfile (e.g., 'results/output' for 'results/output.osw').
     """
 
@@ -33,6 +33,9 @@ class BaseIOConfig:
     prefix: str = field(init=False)
 
     def __post_init__(self):
+        """
+        Initialize the file_type and prefix attributes based on the input file.
+        """
         if is_sqlite_file(self.infile):
             self.file_type = "osw"
         elif is_parquet_file(self.infile):

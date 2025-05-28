@@ -33,6 +33,13 @@ class OSWReader(BaseOSWReader):
         super().__init__(config)
 
     def read(self) -> pd.DataFrame:
+        """
+        Reads the data for scoring from the specified file using DuckDB if available,
+        falling back to SQLite if DuckDB is not available.
+
+        Returns:
+        pd.DataFrame: The data read from the file.
+        """
         self._create_indexes()
         try:
             con = duckdb.connect()
@@ -82,6 +89,18 @@ class OSWReader(BaseOSWReader):
             )
 
     def _read_using_duckdb(self, con):
+        """
+        Read features from SQLite using DuckDB based on the specified level.
+
+        Parameters:
+        - con: Connection to the DuckDB database.
+
+        Returns:
+        - Features based on the specified level.
+
+        Raises:
+        - click.ClickException: If the specified level is unsupported.
+        """
         level = self.level
         if level in ("ms2", "ms1ms2"):
             return self._fetch_ms2_features_duckdb(con)
@@ -95,6 +114,18 @@ class OSWReader(BaseOSWReader):
             raise click.ClickException(f"Unsupported level: {level}")
 
     def _read_using_sqlite(self, con):
+        """
+        Read features from SQLite database based on the specified level.
+
+        Parameters:
+        - con: SQLite connection object
+
+        Returns:
+        - Features based on the specified level
+
+        Raises:
+        - click.ClickException: If the specified level is unsupported
+        """
         level = self.level
         if level in ("ms2", "ms1ms2"):
             return self._fetch_ms2_features_sqlite(con)
@@ -544,6 +575,16 @@ class OSWWriter(BaseOSWWriter):
         super().__init__(config)
 
     def save_results(self, result, pi0):
+        """
+        Save the results to the output file based on the specified level and glyco flag.
+
+        Parameters:
+        - result: The result object containing scored tables.
+        - pi0: The pi0 value.
+
+        Returns:
+        None
+        """
         if self.infile != self.outfile:
             copyfile(self.infile, self.outfile)
 
@@ -645,6 +686,11 @@ class OSWWriter(BaseOSWWriter):
         self._write_pdf_report(result, pi0)
 
     def save_weights(self, weights):
+        """
+        Save the weights to a SQLite database based on the classifier type.
+        If classifier is "LDA", weights are saved to PYPROPHET_WEIGHTS table.
+        If classifier is "XGBoost", weights are saved to PYPROPHET_XGB or GLYCOPEPTIDEPROPHET_XGB table based on glyco and level.
+        """
         if self.classifier == "LDA":
             weights["level"] = self.level
             con = sqlite3.connect(self.outfile)

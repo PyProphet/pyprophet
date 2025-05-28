@@ -11,8 +11,8 @@ class TSVReader(BaseReader):
     """
     Class for reading and processing data from OpenSWATH results stored in a tsv format.
 
-    The TSVReader class provides methods to read different levels of data from the split parquet files and process it accordingly.
-    It supports reading data for semi-supervised learning, IPF analysis, context level analysis.
+    The TSVReader class provides methods to read different levels of data from tsv feature format.
+    It supports reading data for semi-supervised learning only.
 
     Attributes:
         infile (str): Input file path.
@@ -42,7 +42,7 @@ class TSVWriter(BaseWriter):
         infile (str): Input file path.
         outfile (str): Output file path.
         classifier (str): Classifier used for semi-supervised learning.
-        level (str): Level used in semi-supervised learning (e.g., 'ms1', 'ms2', 'ms1ms2', 'transition', 'alignment'), or context level used peptide/protein/gene inference (e.g., 'global', 'experiment-wide', 'run-specific').
+        level (str): Level used in semi-supervised learning (e.g., 'ms1', 'ms2', 'ms1ms2', 'transition', 'alignment').
         glyco (bool): Flag indicating whether analysis is glycoform-specific.
 
     Methods:
@@ -54,6 +54,9 @@ class TSVWriter(BaseWriter):
         super().__init__(config)
 
     def save_results(self, result, pi0):
+        """
+        Save the results of the scoring process to specified paths including summary statistics, final statistics, scored tables, and a report. The report includes various statistics such as cutoffs, svalues, qvalues, pvalues, and additional parameters like pi0 and color palette.
+        """
         summ_stat_path = self.config.extra_writes.get("summ_stat_path")
         if summ_stat_path is not None:
             result.summary_statistics.to_csv(summ_stat_path, sep=",", index=False)

@@ -104,7 +104,7 @@ class RunnerConfig:
     """
 
     # Scoring / classifier options
-    classifier: str = "LDA"
+    classifier: Literal["LDA", "SVM", "XGBoost"] = "LDA"
     autotune: bool = False
     ss_main_score: str = "auto"
     main_score_selection_report: bool = False
@@ -456,6 +456,23 @@ class RunnerIOConfig(BaseIOConfig):
 
 @dataclass
 class IPFIOConfig(BaseIOConfig):
+    """
+    Configuration for Inference of Peptidoforms (IPF).
+
+    Attributes:
+        ipf_ms1_scoring (bool): Use MS1 precursor data for IPF.
+        ipf_ms2_scoring (bool): Use MS2 precursor data for IPF.
+        ipf_h0 (bool): Include possibility that peak groups are not covered by the peptidoform space (null hypothesis H0).
+        ipf_grouped_fdr (bool): [Experimental] Compute grouped FDR instead of pooled FDR to support heterogeneous peptidoform counts per peak group.
+        ipf_max_precursor_pep (float): Maximum PEP to consider scored precursors in IPF.
+        ipf_max_peakgroup_pep (float): Maximum PEP to consider scored peak groups in IPF.
+        ipf_max_precursor_peakgroup_pep (float): Maximum BHM layer 1 integrated precursor-peakgroup PEP to consider in IPF.
+        ipf_max_transition_pep (float): Maximum PEP to consider scored transitions in IPF.
+        propagate_signal_across_runs (bool): Propagate signal across runs (requires alignment step).
+        ipf_max_alignment_pep (float): Maximum PEP to consider for good alignments.
+        across_run_confidence_threshold (float): Maximum PEP threshold for propagating signal across runs for aligned features.
+    """
+
     ipf_ms1_scoring: bool = True
     ipf_ms2_scoring: bool = True
     ipf_h0: bool = True
@@ -513,6 +530,39 @@ class IPFIOConfig(BaseIOConfig):
 
 @dataclass
 class LevelContextIOConfig(BaseIOConfig):
+    """
+    Configuration for level-based context inference (e.g., peptide, protein, gene, glycopeptide)
+    with FDR estimation and visualization options.
+
+    Attributes:
+        context_fdr (Literal["global", "experiment-wide", "run-specific"]):
+            FDR estimation context scope:
+            - "global": Controls FDR across all runs and experiments.
+            - "experiment-wide": Controls FDR within the same experiment.
+            - "run-specific": Controls FDR independently for each run.
+
+        error_estimation_config (ErrorEstimationConfig):
+            Configuration for p-value and local FDR estimation. Includes options like:
+            - Parametric vs non-parametric estimation
+            - Pi₀ estimation method and smoothing
+            - Local FDR transformations and truncation
+            These are derived from `--parametric`, `--pi0_method`, `--lfdr_transformation`, etc.
+
+        color_palette (Literal["normal", "protan", "deutran", "tritan"]):
+            Color scheme to use in PDF reports or plots. Useful for accessibility.
+            Options include normal vision and common types of color blindness.
+
+        density_estimator (Literal["kde", "gmm"]):
+            Only used for glycopeptide-level inference.
+            Defines the method for score density estimation:
+            - "kde": Kernel Density Estimation.
+            - "gmm": Gaussian Mixture Model.
+
+        grid_size (int):
+            Used in glycopeptide-level inference.
+            Defines the number of grid cutoffs to build coordinates for local FDR calculation.
+    """
+
     # level: Literal["peptide", "glycopeptide", "protein", "gene"] = "peptide"
     context_fdr: Literal["global", "experiment-wide", "run-specific"] = "global"
     error_estimation_config: ErrorEstimationConfig = field(

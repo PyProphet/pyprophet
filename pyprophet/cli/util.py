@@ -14,6 +14,10 @@ from loguru import logger
 
 
 class GlobalLogLevelGroup(click.Group):
+    """
+    Custom click Group class for setting global log level and header.
+    """
+
     def invoke(self, ctx):
         log_level = ctx.params.get("log_level", "INFO").upper()
         header = setup_logger(log_level=log_level)
@@ -22,6 +26,10 @@ class GlobalLogLevelGroup(click.Group):
 
 
 class AdvancedHelpGroup(click.Group):
+    """
+    Custom click Group class that adds a --helphelp option to show advanced help with all options.
+    """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Add group-level helphelp
@@ -50,6 +58,11 @@ class AdvancedHelpGroup(click.Group):
 
 
 class AdvancedHelpCommand(click.Command):
+    """
+    Custom Click command class that adds an option to show advanced help with all options.
+    This class extends the Click Command class and overrides methods to handle displaying advanced help.
+    """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Add helphelp option to every command
@@ -108,7 +121,7 @@ class AdvancedHelpCommand(click.Command):
                     types = " ".join([t.name.upper() for t in param.type.types])
                     opt_decl += f" <{types}>..."
                 elif isinstance(param.type, click.Choice):
-                    opt_decl += f' [{"/".join(param.type.choices)}]'
+                    opt_decl += f" [{'/'.join(param.type.choices)}]"
                 elif hasattr(param.type, "name"):
                     if param.type.name in ["integer", "float", "boolean"]:
                         opt_decl += f" {param.type.name.upper()}"
@@ -145,7 +158,7 @@ class AdvancedHelpCommand(click.Command):
 
 
 class CombinedGroup(GlobalLogLevelGroup, AdvancedHelpGroup):
-    """Combines both functionalities"""
+    """Combines GlobalLogLevelGroup and AdvancedHelpGroup."""
 
     def invoke(self, ctx):
         # Initialize context
@@ -179,7 +192,7 @@ def get_system_info():
         f"OS: {platform.system()} {platform.release()} | "
         f"Python: {platform.python_version()} | "
         f"CPU: {psutil.cpu_count()} cores | "
-        f"RAM: {psutil.virtual_memory().total / (1024 ** 3):.1f} GB"
+        f"RAM: {psutil.virtual_memory().total / (1024**3):.1f} GB"
     )
 
 
