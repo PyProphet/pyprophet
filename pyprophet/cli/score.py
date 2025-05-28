@@ -54,7 +54,7 @@ from ..scoring.runner import PyProphetLearner, PyProphetWeightApplier
 @click.option(
     "--apply_weights",
     type=click.Path(exists=True),
-    help="Apply PyProphet score weights file instead of semi-supervised learning.",
+    help="Apply PyProphet score weights file (*.csv/*.bin) instead of semi-supervised learning.",
 )
 @click.option(
     "--xeval_fraction",
@@ -112,7 +112,7 @@ from ..scoring.runner import PyProphetLearner, PyProphetWeightApplier
     "--ss_scale_features/--no-ss_scale_features",
     default=False,
     show_default=True,
-    help="Scale features before semi-supervised learning.",
+    help="Scale / standardize features to unit variance before semi-supervised learning.",
 )
 # Statistics
 @click.option(
