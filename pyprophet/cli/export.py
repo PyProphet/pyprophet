@@ -200,11 +200,11 @@ def export_tsv(
     help="Output parquet file.",
 )
 @click.option(
-    "--oswfile",
-    "oswfile",
+    "--pqpfile",
+    "pqpfile",
     required=False,
     type=click.Path(exists=False),
-    help="PyProphet OSW file. Only required when converting sqMass to parquet.",
+    help="PyProphet PQP file. Only required when converting sqMass to parquet.",
 )
 @click.option(
     "--transitionLevel",
@@ -267,7 +267,7 @@ def export_tsv(
 def export_parquet(
     infile,
     outfile,
-    oswfile,
+    pqpfile,
     transitionLevel,
     onlyFeatures,
     noDecoys,
@@ -311,7 +311,7 @@ def export_parquet(
                 split_runs=split_runs,
             )
             end = time.time()
-            logger.info(f"{outfile} written in {end-start:.4f} seconds.")
+            logger.info(f"{outfile} written in {end - start:.4f} seconds.")
 
         else:
             if transitionLevel:
@@ -342,12 +342,12 @@ def export_parquet(
         convert_sqmass_to_parquet(
             infile,
             outfile,
-            oswfile,
+            pqpfile,
             compression_method=compression,
             compression_level=compression_level,
         )
         end = time.time()
-        logger.info(f"{outfile} written in {end-start:.4f} seconds.")
+        logger.info(f"{outfile} written in {end - start:.4f} seconds.")
     else:
         raise click.ClickException("Input file must be of type .osw or .sqmass/.sqMass")
 
