@@ -428,14 +428,66 @@ class ParquetWriter(BaseParquetWriter):
                 try:
                     raise RowCountMismatchError(error_message)
                 except RowCountMismatchError as e:
-                    logger.opt(exception=e, depth=1).critical(
-                        f"Critical error: {str(e)}"
-                    )
-                    # Check for duplicate entries in the score df on the join column
-                    df_dups = df.groupby("FEATURE_ID").filter(lambda x: len(x) > 1)
+                    logger.opt(exception=e, depth=1).critical(str(e))
+
+                    # Check for duplicate entries in the score DataFrame on the join column
+                    df_dups = df[df.duplicated("FEATURE_ID", keep=False)]
                     if not df_dups.empty:
                         logger.error(
-                            f"Duplicate entries in score DataFrame on join column: {df_dups['FEATURE_ID'].unique()}"
+                            f"Duplicate FEATURE_IDs in score DataFrame: {df_dups['FEATURE_ID'].nunique()} unique duplicated keys"
+                        )
+                        logger.debug(df_dups.head())
+
+                    # Diagnose join fanout
+                    logger.warning("Running diagnostics for join explosion...")
+
+                    try:
+                        original_keys = con.execute(
+                            f"SELECT FEATURE_ID FROM read_parquet('{target_file}')"
+                        ).fetch_df()
+                    except Exception as db_err:
+                        logger.error(f"Failed to fetch FEATURE_ID from {target_file}")
+                        logger.opt(exception=db_err).debug(
+                            f"Exception during original_table fetch.\n{db_err}"
+                        )
+                        original_keys = pd.DataFrame(columns=["FEATURE_ID"])
+
+                    score_keys = df[["FEATURE_ID"]].copy()
+
+                    original_counts = original_keys["FEATURE_ID"].value_counts()
+                    score_counts = score_keys["FEATURE_ID"].value_counts()
+
+                    merged_counts = (
+                        original_counts.rename("original_count")
+                        .to_frame()
+                        .join(score_counts.rename("score_count"), how="outer")
+                        .fillna(0)
+                        .astype(int)
+                    )
+                    merged_counts["product"] = (
+                        merged_counts["original_count"] * merged_counts["score_count"]
+                    )
+                    merged_counts["fanout"] = (
+                        merged_counts["product"] > merged_counts["original_count"]
+                    )
+
+                    problematic = merged_counts[merged_counts["fanout"]].sort_values(
+                        "product", ascending=False
+                    )
+
+                    if not problematic.empty:
+                        logger.error(
+                            f"{len(problematic)} FEATURE_IDs are causing join explosion. Showing top offenders:\n"
+                            f"{problematic.head(10)}"
+                        )
+                        diagnostic_file = "row_mismatch_diagnostics.csv"
+                        problematic.to_csv(diagnostic_file)
+                        logger.info(
+                            f"Wrote row mismatch diagnostics to {diagnostic_file}"
+                        )
+                    else:
+                        logger.warning(
+                            "No join fanout detected. The issue may lie elsewhere."
                         )
 
                 sys.exit(1)
