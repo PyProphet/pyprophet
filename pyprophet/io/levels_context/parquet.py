@@ -81,6 +81,7 @@ class ParquetReader(BaseParquetReader):
                 SCORE_MS2_SCORE AS SCORE,
                 '{cfg.context_fdr}' AS CONTEXT
             FROM data p
+            WHERE SCORE_MS2_SCORE IS NOT NULL
             QUALIFY ROW_NUMBER() OVER (PARTITION BY {group_id} ORDER BY SCORE_MS2_SCORE DESC) = 1
         """
 
@@ -120,6 +121,7 @@ class ParquetReader(BaseParquetReader):
                 SCORE_MS2_SCORE AS SCORE,
                 '{cfg.context_fdr}' AS CONTEXT
             FROM data p
+            WHERE SCORE_MS2_SCORE IS NOT NULL
             JOIN one_peptide_proteins opp ON p.PEPTIDE_ID = opp.PEPTIDE_ID
             QUALIFY ROW_NUMBER() OVER (PARTITION BY {group_id} ORDER BY SCORE_MS2_SCORE DESC) = 1
         """
@@ -160,6 +162,7 @@ class ParquetReader(BaseParquetReader):
                 SCORE_MS2_SCORE AS SCORE,
                 '{cfg.context_fdr}' AS CONTEXT
             FROM data p
+            WHERE SCORE_MS2_SCORE IS NOT NULL
             JOIN one_gene_peptides ogp ON p.PEPTIDE_ID = ogp.PEPTIDE_ID
             QUALIFY ROW_NUMBER() OVER (PARTITION BY {group_id} ORDER BY SCORE_MS2_SCORE DESC) = 1
         """

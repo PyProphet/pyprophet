@@ -67,7 +67,6 @@ def handle_plot_errors(func):
 
 
 def color_blind_friendly(color_palette):
-
     color_dict = {
         "normal": ["#F5793A", "#0F2080"],
         "protan": ["#AE9C45", "#052955"],
@@ -335,7 +334,6 @@ class PlotGenerator:
         )
 
         if cutoffs is not None:
-
             s_value_cutoff = svalues[argmin(abs(qvalues - 0.01))]
             d_cutoff_at_1_pcnt = cutoffs[svalues == s_value_cutoff][-1]
             ax.axvline(x=d_cutoff_at_1_pcnt, color="grey", linestyle="--", linewidth=2)
@@ -395,10 +393,11 @@ class PlotGenerator:
                 )
                 ax.legend(loc=2)
             except Exception as e:
+                n_nans = f"Number of NaNs in top_targets:\n{np.isnan(top_targets).sum()}\ntop_decoys: {np.isnan(top_decoys).sum()}"
                 ax.text(
                     0.5,
                     0.5,
-                    f"Could not plot densities:\n{str(e)}",
+                    f"Could not plot densities:\n{str(e)}\n{n_nans}",
                     ha="center",
                     va="center",
                     color="red",
@@ -707,7 +706,6 @@ def save_report(
 
 
 def plot_scores(df, out, color_palette="normal"):
-
     if plt is None:
         raise ImportError(
             "Error: The matplotlib package is required to create a report."
@@ -1460,7 +1458,6 @@ def post_scoring_report(df, outfile, color_palette="normal"):
 
 
 def plot_hist(x, title, xlabel, ylabel, pdf_path="histogram_plot.png"):
-
     if plt is not None:
         # Clear figures
         plt.close("all")
@@ -1486,7 +1483,6 @@ def main_score_selection_report(
     pdf_path="main_score_selection_report.pdf",
     worker_num=1,
 ):
-
     if plt is None:
         raise ImportError(
             "Error: The matplotlib package is required to create a report."

@@ -174,17 +174,16 @@ class OSWReader(BaseOSWReader):
                     {run_id} AS RUN_ID,
                     {group_id} AS GROUP_ID,
                     PEPTIDE.ID AS PEPTIDE_ID,
-                    PRECURSOR.DECOY,
+                    PRECURSOR.DECOY AS DECOY,
                     SCORE_MS2.SCORE AS SCORE,
-                    {cfg.context_fdr} AS CONTEXT
+                    '{cfg.context_fdr}' AS CONTEXT
                 FROM osw.PEPTIDE
                 INNER JOIN osw.PRECURSOR_PEPTIDE_MAPPING ON PEPTIDE.ID = PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID
                 INNER JOIN osw.PRECURSOR ON PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID = PRECURSOR.ID
                 INNER JOIN osw.FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID
                 INNER JOIN osw.SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
-                GROUP BY GROUP_ID
-                HAVING MAX(SCORE)
-                ORDER BY SCORE DESC
+                WHERE SCORE_MS2.SCORE IS NOT NULL
+                QUALIFY ROW_NUMBER() OVER (PARTITION BY {group_id} ORDER BY SCORE DESC) = 1
             """
 
         df = con.execute(query).fetchdf()
@@ -227,6 +226,9 @@ class OSWReader(BaseOSWReader):
         INNER JOIN osw.SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
         INNER JOIN osw.SCORE_MS2_PART_PEPTIDE ON FEATURE.ID = SCORE_MS2_PART_PEPTIDE.FEATURE_ID
         INNER JOIN osw.SCORE_MS2_PART_GLYCAN ON FEATURE.ID = SCORE_MS2_PART_GLYCAN.FEATURE_ID
+        WHERE SCORE_MS2.SCORE IS NOT NULL 
+        AND SCORE_MS2_PART_PEPTIDE.SCORE IS NOT NULL
+        AND SCORE_MS2_PART_GLYCAN.SCORE IS NOT NULL
         GROUP BY GROUP_ID
         HAVING MAX(d_score_combined)
         ORDER BY d_score_combined DESC
@@ -274,6 +276,7 @@ class OSWReader(BaseOSWReader):
         INNER JOIN osw.PRECURSOR ON PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID = PRECURSOR.ID
         INNER JOIN osw.FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID
         INNER JOIN osw.SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
+        WHERE SCORE_MS2.SCORE IS NOT NULL
         GROUP BY GROUP_ID
         HAVING MAX(SCORE)
         ORDER BY SCORE DESC
@@ -321,6 +324,7 @@ class OSWReader(BaseOSWReader):
         INNER JOIN osw.PRECURSOR ON PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID = PRECURSOR.ID
         INNER JOIN osw.FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID
         INNER JOIN osw.SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
+        WHERE SCORE_MS2.SCORE IS NOT NULL
         GROUP BY GROUP_ID
         HAVING MAX(SCORE)
         ORDER BY SCORE DESC
@@ -354,9 +358,9 @@ class OSWReader(BaseOSWReader):
                     {run_id} AS RUN_ID,
                     {group_id} AS GROUP_ID,
                     PEPTIDE.ID AS PEPTIDE_ID,
-                    PRECURSOR.DECOY,
+                    PRECURSOR.DECOY AS DECOY,
                     SCORE_MS2.SCORE AS SCORE,
-                    {cfg.context_fdr} AS CONTEXT
+                   '{cfg.context_fdr}' AS CONTEXT
                 FROM PEPTIDE
                 INNER JOIN PRECURSOR_PEPTIDE_MAPPING ON PEPTIDE.ID = PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID
                 INNER JOIN PRECURSOR ON PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID = PRECURSOR.ID
