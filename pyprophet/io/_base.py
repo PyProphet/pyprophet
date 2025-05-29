@@ -218,16 +218,16 @@ class BaseWriter(ABC):
             # For parquet files, there may be multiple proteins that map to the same peptide
             score_cols.insert(2, "protein_id")
 
-            # Check if protein_id column is collapsed, if it is, we need to explode it
-            if (
-                df["protein_id"]
-                .apply(lambda x: isinstance(x, (list, np.ndarray)) and len(x) > 1)
-                .any()
-            ):
-                logger.info(
-                    "Exploding protein_id column to handle multiple proteins per feature."
-                )
-                df = df.explode("protein_id")
+            # # Check if protein_id column is collapsed, if it is, we need to explode it
+            # if (
+            #     df["protein_id"]
+            #     .apply(lambda x: isinstance(x, (list, np.ndarray)) and len(x) > 1)
+            #     .any()
+            # ):
+            #     logger.info(
+            #         "Exploding protein_id column to handle multiple proteins per feature."
+            #     )
+            df = df.explode("protein_id")
 
         if level == "transition":
             score_cols.insert(1, "ipf_peptide_id")

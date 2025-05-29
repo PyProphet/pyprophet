@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 import os
+import copy
 from .io.util import (
     is_sqlite_file,
     is_parquet_file,
@@ -46,7 +47,11 @@ class BaseIOConfig:
             self.file_type = "parquet_split_multi"
         else:
             self.file_type = "tsv"
-        self.prefix = os.path.splitext(self.outfile)[0]
+        self.prefix = os.path.splitext(
+            self.outfile
+        )[
+            0
+        ]  # TODO: use pathlib instead to avoid potential cases where the outfile is a directory (split_parquet) file.oswpq/, which would result the prefix in being file.oswpq instead of file
 
     def __str__(self):
         return (
@@ -61,3 +66,9 @@ class BaseIOConfig:
             f"subsample_ratio={self.subsample_ratio}, level='{self.level}', "
             f"context='{self.context}')"
         )
+
+    def copy(self):
+        """
+        Return a deep copy of the config object.
+        """
+        return copy.deepcopy(self)
