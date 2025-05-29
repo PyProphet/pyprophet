@@ -221,7 +221,7 @@ class SplitParquetWriter(BaseSplitParquetWriter):
         """
         df = result.scored_tables
         level = self.level
-        print(df)
+
         file_map = {
             "ms2": "precursors_features.parquet",
             "ms1ms2": "precursors_features.parquet",
