@@ -208,6 +208,14 @@ class BaseWriter(ABC):
             score_cols.insert(2, "h_score")
             score_cols.insert(3, "h0_score")
 
+        if level in ("ms1", "ms2", "ms1ms2") and self.config.file_type in (
+            "parquet",
+            "parquet_split",
+            "parquet_split_multi",
+        ):
+            # For parquet files, there may be multiple proteins that map to the same peptide
+            score_cols.insert(2, "protein_id")
+
         if level == "transition":
             score_cols.insert(1, "ipf_peptide_id")
             score_cols.insert(2, "transition_id")
@@ -229,6 +237,12 @@ class BaseWriter(ABC):
             key_cols = {"FEATURE_ID", "IPF_PEPTIDE_ID", "TRANSITION_ID"}
         elif level == "alignment":
             key_cols = {"ALIGNMENT_ID", "FEATURE_ID", "DECOY"}
+        elif level in ("ms1", "ms2", "ms1ms2") and self.config.file_type in (
+            "parquet",
+            "parquet_split",
+            "parquet_split_multi",
+        ):
+            key_cols = {"FEATURE_ID", "PROTEIN_ID"}
         else:
             key_cols = {"FEATURE_ID"}
 

@@ -91,6 +91,7 @@ class ParquetReader(BaseParquetReader):
                 SELECT
                     p.RUN_ID,
                     p.PRECURSOR_ID,
+                    p.PROTEIN_ID,
                     p.PRECURSOR_CHARGE,
                     p.FEATURE_ID,
                     p.EXP_RT,
@@ -102,6 +103,7 @@ class ParquetReader(BaseParquetReader):
                     SELECT
                         RUN_ID,
                         PRECURSOR_ID,
+                        PROTEIN_ID,
                         PRECURSOR_CHARGE,
                         FEATURE_ID,
                         EXP_RT,
@@ -132,7 +134,7 @@ class ParquetReader(BaseParquetReader):
 
     def _fetch_ms1_features(self, con, feature_cols):
         cols_sql = ", ".join([f"p.{col}" for col in feature_cols])
-        query = f"""SELECT DISTINCT p.RUN_ID, p.PRECURSOR_ID, p.PRECURSOR_CHARGE, p.FEATURE_ID,
+        query = f"""SELECT DISTINCT p.RUN_ID, p.PRECURSOR_ID, p.PROTEIN_ID, p.PRECURSOR_CHARGE, p.FEATURE_ID,
                         p.EXP_RT, p.PRECURSOR_DECOY AS DECOY, {cols_sql},
                         p.RUN_ID || '_' || p.PRECURSOR_ID AS GROUP_ID
                     FROM data p
@@ -265,7 +267,14 @@ class ParquetWriter(BaseParquetWriter):
         new_score_cols = [
             col
             for col in df.columns
-            if col not in ("FEATURE_ID", "TRANSITION_ID", "ALIGNMENT_ID", "DECOY")
+            if col
+            not in (
+                "FEATURE_ID",
+                "PROTEIN_ID",
+                "TRANSITION_ID",
+                "ALIGNMENT_ID",
+                "DECOY",
+            )
         ]
         new_score_sql = ", ".join([f"s.{col}" for col in new_score_cols])
 
@@ -395,7 +404,7 @@ class ParquetWriter(BaseParquetWriter):
                     FROM read_parquet('{target_file}') p
                     WHERE p.TRANSITION_ID IS NULL
                     ) AS p
-                LEFT JOIN scores s ON p.FEATURE_ID = s.FEATURE_ID
+                LEFT JOIN scores s ON p.FEATURE_ID = s.FEATURE_ID AND s.PROTEIN_ID = p.PROTEIN_ID
                 
             """
             )
@@ -439,7 +448,7 @@ class ParquetWriter(BaseParquetWriter):
                         logger.debug(df_dups.head())
 
                     # Diagnose join fanout
-                    logger.warning("Running diagnostics for join explosion...")
+                    logger.error("Running diagnostics for join explosion...")
 
                     try:
                         original_keys = con.execute(

@@ -105,7 +105,7 @@ class SplitParquetReader(BaseSplitParquetReader):
 
     def _fetch_ms2_features(self, con, feature_cols):
         cols_sql = ", ".join([f"p.{col}" for col in feature_cols])
-        query = f"""SELECT p.RUN_ID, p.PRECURSOR_ID, p.PRECURSOR_CHARGE, p.FEATURE_ID,
+        query = f"""SELECT p.RUN_ID, p.PRECURSOR_ID, p.PROTEIN_ID, p.PRECURSOR_CHARGE, p.FEATURE_ID,
                         p.EXP_RT, p.PRECURSOR_DECOY AS DECOY, {cols_sql},
                         COALESCE(t.TRANSITION_COUNT, 0) AS TRANSITION_COUNT,
                         p.RUN_ID || '_' || p.PRECURSOR_ID AS GROUP_ID
@@ -129,7 +129,7 @@ class SplitParquetReader(BaseSplitParquetReader):
 
     def _fetch_ms1_features(self, con, feature_cols):
         cols_sql = ", ".join([f"p.{col}" for col in feature_cols])
-        query = f"""SELECT DISTINCT p.RUN_ID, p.PRECURSOR_ID, p.PRECURSOR_CHARGE, p.FEATURE_ID,
+        query = f"""SELECT DISTINCT p.RUN_ID, p.PRECURSOR_ID, p.PROTEIN_ID, p.PRECURSOR_CHARGE, p.FEATURE_ID,
                         p.EXP_RT, p.PRECURSOR_DECOY AS DECOY, {cols_sql},
                         p.RUN_ID || '_' || p.PRECURSOR_ID AS GROUP_ID
                     FROM precursors p
@@ -303,6 +303,7 @@ class SplitParquetWriter(BaseSplitParquetWriter):
             if col
             not in (
                 "FEATURE_ID",
+                "PROTEIN_ID",
                 "TRANSITION_ID",
                 "IPF_PEPTIDE_ID",
                 "ALIGNMENT_ID",
@@ -312,7 +313,7 @@ class SplitParquetWriter(BaseSplitParquetWriter):
         new_score_sql = ", ".join([f"s.{col}" for col in new_score_cols])
 
         prefix = "p"
-        join_on = "p.FEATURE_ID = s.FEATURE_ID"
+        join_on = "p.FEATURE_ID = s.FEATURE_ID AND p.PROTEIN_ID = s.PROTEIN_ID"
         key_cols = "p.FEATURE_ID"
         if self.level == "transition":
             prefix = "t"
