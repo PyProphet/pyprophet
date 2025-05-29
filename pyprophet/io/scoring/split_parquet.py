@@ -125,6 +125,9 @@ class SplitParquetReader(BaseSplitParquetReader):
             .pl()
             .rename({col: col.replace("FEATURE_MS2_", "") for col in feature_cols})
         )
+
+        df = self._collapse_protein_ids(df)
+
         return df.to_pandas()
 
     def _fetch_ms1_features(self, con, feature_cols):
@@ -140,6 +143,7 @@ class SplitParquetReader(BaseSplitParquetReader):
             .pl()
             .rename({col: col.replace("FEATURE_MS1_", "") for col in feature_cols})
         )
+        df = self._collapse_protein_ids(df)
         return df.to_pandas()
 
     def _fetch_transition_features(self, con, feature_cols):
@@ -217,7 +221,7 @@ class SplitParquetWriter(BaseSplitParquetWriter):
         """
         df = result.scored_tables
         level = self.level
-
+        print(df)
         file_map = {
             "ms2": "precursors_features.parquet",
             "ms1ms2": "precursors_features.parquet",

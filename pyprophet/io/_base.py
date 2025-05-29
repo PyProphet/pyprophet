@@ -6,6 +6,8 @@ import pickle
 import sqlite3
 import duckdb
 import pandas as pd
+import polars as pl
+import numpy as np
 import click
 from loguru import logger
 
@@ -215,6 +217,17 @@ class BaseWriter(ABC):
         ):
             # For parquet files, there may be multiple proteins that map to the same peptide
             score_cols.insert(2, "protein_id")
+
+            # Check if protein_id column is collapsed, if it is, we need to explode it
+            if (
+                df["protein_id"]
+                .apply(lambda x: isinstance(x, (list, np.ndarray)) and len(x) > 1)
+                .any()
+            ):
+                logger.info(
+                    "Exploding protein_id column to handle multiple proteins per feature."
+                )
+                df = df.explode("protein_id")
 
         if level == "transition":
             score_cols.insert(1, "ipf_peptide_id")
@@ -605,6 +618,51 @@ class BaseParquetReader(BaseReader):
         cols = get_parquet_column_names(parquet_file)
         return [c for c in cols if c.startswith(prefix)]
 
+    def _collapse_protein_ids(self, df):
+        """
+        Collapse protein IDs to avoid duplicating feature data in the DataFrame.
+
+        Parameters:
+        - df (DataFrame): Input DataFrame containing feature data.
+
+        Returns:
+        - DataFrame: DataFrame with collapsed protein IDs.
+
+        Example:
+        df = _collapse_protein_ids(df)
+        """
+        org_shape = df.shape
+        # Handle cases where there may be multiple proteins mapping to a peptide with the same feature ID.
+        # We collapse the protein IDs to avoid duplicating feature data
+        df = (
+            df.group_by(["GROUP_ID", "FEATURE_ID"])
+            .agg(
+                [
+                    pl.col("PROTEIN_ID").unique().alias("PROTEIN_ID"),
+                    *[
+                        pl.col(c).first()
+                        for c in df.columns
+                        if c not in {"GROUP_ID", "FEATURE_ID", "PROTEIN_ID"}
+                    ],
+                ]
+            )
+            .sort(["RUN_ID", "PRECURSOR_ID", "EXP_RT"])
+        )
+        collapsed_shape = df.shape
+
+        if org_shape != collapsed_shape:
+            logger.info(
+                f"Collapsed {org_shape[0] - collapsed_shape[0]} of {org_shape[0]} rows due to multiple proteins mapping to the same feature ID."
+            )
+
+        # print(
+        #     df.filter(
+        #         pl.col("PRECURSOR_ID").is_in([7012])
+        #         & pl.col("FEATURE_ID").is_in([33731659783088])
+        #     )
+        # )
+        return df
+
 
 class BaseParquetWriter(BaseWriter):
     """
@@ -821,6 +879,51 @@ class BaseSplitParquetReader(BaseReader):
             raise click.ClickException(f"Failed to read schema or columns from: {path}")
 
         return [c for c in cols if c.startswith(prefix)]
+
+    def _collapse_protein_ids(self, df):
+        """
+        Collapse protein IDs to avoid duplicating feature data in the DataFrame.
+
+        Parameters:
+        - df (DataFrame): Input DataFrame containing feature data.
+
+        Returns:
+        - DataFrame: DataFrame with collapsed protein IDs.
+
+        Example:
+        df = _collapse_protein_ids(df)
+        """
+        org_shape = df.shape
+        # Handle cases where there may be multiple proteins mapping to a peptide with the same feature ID.
+        # We collapse the protein IDs to avoid duplicating feature data
+        df = (
+            df.group_by(["GROUP_ID", "FEATURE_ID"])
+            .agg(
+                [
+                    pl.col("PROTEIN_ID").unique().alias("PROTEIN_ID"),
+                    *[
+                        pl.col(c).first()
+                        for c in df.columns
+                        if c not in {"GROUP_ID", "FEATURE_ID", "PROTEIN_ID"}
+                    ],
+                ]
+            )
+            .sort(["RUN_ID", "PRECURSOR_ID", "EXP_RT"])
+        )
+        collapsed_shape = df.shape
+
+        if org_shape != collapsed_shape:
+            logger.info(
+                f"Collapsed {org_shape[0] - collapsed_shape[0]} of {org_shape[0]} rows due to multiple proteins mapping to the same feature ID."
+            )
+
+        # print(
+        #     df.filter(
+        #         pl.col("PRECURSOR_ID").is_in([7012])
+        #         & pl.col("FEATURE_ID").is_in([33731659783088])
+        #     )
+        # )
+        return df
 
 
 class BaseSplitParquetWriter(BaseWriter):
