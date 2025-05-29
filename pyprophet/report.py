@@ -651,6 +651,13 @@ def save_report(
             # Check how many runs there are
             n_runs = df["run_id"].nunique()
 
+            if df["run_id"].isna().all() and level in (
+                "peptide",
+                "protein",
+                "gene",
+            ):
+                df["run_id"] = "global"
+
             if n_runs > 1:
                 skip_quant_dist = level in ("peptide", "protein", "gene")
                 skip_quant_corr = skip_quant_dist
@@ -660,7 +667,6 @@ def save_report(
                     "protein",
                     "gene",
                 ):
-                    df["run_id"] = "global"
                     skip_consistency = skip_jaccard = True
                 else:
                     skip_consistency = skip_jaccard = False
