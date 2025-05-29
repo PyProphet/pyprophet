@@ -756,6 +756,8 @@ class BaseSplitParquetReader(BaseReader):
             os.path.join(base_dir, "*.oswpq", "transition_features.parquet")
         )
         alignment_file = os.path.join(base_dir, "feature_alignment.parquet")
+        if not os.path.exists(alignment_file):
+            alignment_file = None
 
         # If no multi-run structure, check single run input directory
         if not precursor_files:
