@@ -648,46 +648,54 @@ def save_report(
                 logger.warning("Unknown level specified. Defaulting to precursor_id.")
                 id_key = "precursor_id"
 
-            skip_quant_dist = level in ("peptide", "protein", "gene")
-            skip_quant_corr = skip_quant_dist
+            # Check how many runs there are
+            n_runs = df["run_id"].nunique()
 
-            if df["run_id"].isna().all() and level in ("peptide", "protein", "gene"):
-                df["run_id"] = "global"
-                skip_consistency = skip_jaccard = True
-            else:
-                skip_consistency = skip_jaccard = False
+            if n_runs > 1:
+                skip_quant_dist = level in ("peptide", "protein", "gene")
+                skip_quant_corr = skip_quant_dist
 
-            filtered_df = filter_identifications(df, id_key, 0.05)
+                if df["run_id"].isna().all() and level in (
+                    "peptide",
+                    "protein",
+                    "gene",
+                ):
+                    df["run_id"] = "global"
+                    skip_consistency = skip_jaccard = True
+                else:
+                    skip_consistency = skip_jaccard = False
 
-            # First set of plots
-            try:
-                fig, axes = plt.subplots(2, 2, figsize=(12, 10))
-                plotter.add_id_barplot(axes[0, 0], filtered_df, id_key)
-                if not skip_consistency:
-                    plotter.plot_identification_consistency(
-                        axes[0, 1], filtered_df, id_key
-                    )
-                if not skip_quant_dist:
-                    plotter.add_violinplot(axes[1, 0], filtered_df, id_key)
-                    plotter.plot_cv_distribution(axes[1, 1], filtered_df, id_key)
-                plt.tight_layout()
-                pdf.savefig(fig)
-                plt.close(fig)
-            except Exception as e:
-                logger.error(f"Failed to generate first set of plots: {str(e)}")
+                filtered_df = filter_identifications(df, id_key, 0.05)
 
-            # Second set of plots
-            try:
-                fig, axes = plt.subplots(2, 1, figsize=(10, 12))
-                if not skip_jaccard:
-                    plotter.plot_jaccard_similarity(axes[0], filtered_df, id_key)
-                if not skip_quant_corr:
-                    plotter.plot_intensity_correlation(axes[1], filtered_df, id_key)
-                plt.tight_layout()
-                pdf.savefig(fig)
-                plt.close(fig)
-            except Exception as e:
-                logger.error(f"Failed to generate second set of plots: {str(e)}")
+                # First set of plots
+                try:
+                    fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+                    plotter.add_id_barplot(axes[0, 0], filtered_df, id_key)
+                    if not skip_consistency:
+                        plotter.plot_identification_consistency(
+                            axes[0, 1], filtered_df, id_key
+                        )
+                    if not skip_quant_dist:
+                        plotter.add_violinplot(axes[1, 0], filtered_df, id_key)
+                        plotter.plot_cv_distribution(axes[1, 1], filtered_df, id_key)
+                    plt.tight_layout()
+                    pdf.savefig(fig)
+                    plt.close(fig)
+                except Exception as e:
+                    logger.error(f"Failed to generate first set of plots: {str(e)}")
+
+                # Second set of plots
+                try:
+                    fig, axes = plt.subplots(2, 1, figsize=(10, 12))
+                    if not skip_jaccard:
+                        plotter.plot_jaccard_similarity(axes[0], filtered_df, id_key)
+                    if not skip_quant_corr:
+                        plotter.plot_intensity_correlation(axes[1], filtered_df, id_key)
+                    plt.tight_layout()
+                    pdf.savefig(fig)
+                    plt.close(fig)
+                except Exception as e:
+                    logger.error(f"Failed to generate second set of plots: {str(e)}")
 
             # Summary tables
             try:
