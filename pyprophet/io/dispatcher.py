@@ -1,3 +1,19 @@
+"""
+This module provides dispatcher classes for routing I/O configurations to the appropriate
+reader and writer implementations.
+
+The dispatchers determine the correct implementation based on the file type and context
+(e.g., scoring, IPF, or levels context). Supported file types include:
+- OSW
+- Parquet
+- Split Parquet
+- TSV (for scoring only)
+
+Classes:
+- ReaderDispatcher: Routes configurations to the appropriate reader implementation.
+- WriterDispatcher: Routes configurations to the appropriate writer implementation.
+"""
+
 from loguru import logger
 
 

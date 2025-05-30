@@ -1,3 +1,42 @@
+"""
+This module provides abstract base classes and utility classes for reading and writing
+data in various formats (e.g., OSW, Parquet, Split Parquet) used in the OpenSWATH workflow.
+
+The module defines the following:
+- Abstract base classes (`BaseReader`, `BaseWriter`) for implementing custom readers and writers.
+- Concrete base classes for specific file formats, such as OSW and Parquet.
+- Utility methods for handling data validation, column preparation, and file merging.
+
+Classes:
+    - RowCountMismatchError: Custom exception for row count mismatches during data processing.
+    - BaseReader: Abstract base class for implementing readers for different data formats.
+    - BaseWriter: Abstract base class for implementing writers for different data formats.
+    - BaseOSWReader: Reader class for OSW (SQLite-based) files.
+    - BaseOSWWriter: Writer class for OSW (SQLite-based) files.
+    - BaseParquetReader: Reader class for Parquet files.
+    - BaseParquetWriter: Writer class for Parquet files.
+    - BaseSplitParquetReader: Reader class for split Parquet files (multi-run support).
+    - BaseSplitParquetWriter: Writer class for split Parquet files (multi-run support).
+
+Key Features:
+    - Abstract methods (`read`, `save_results`) enforce implementation in subclasses.
+    - Support for semi-supervised learning, IPF analysis, and context-level inference.
+    - Validation of row counts to ensure data consistency during processing.
+    - Utility methods for handling Parquet-specific operations, such as collapsing protein IDs.
+
+Usage:
+    This module is intended to be extended by specific implementations for reading and writing
+    data in the OpenSWATH workflow. Subclasses must implement the abstract methods to handle
+    specific file formats and processing requirements.
+
+Dependencies:
+    - pandas
+    - polars
+    - duckdb
+    - click
+    - loguru
+"""
+
 from abc import ABC, abstractmethod
 import sys
 import os
