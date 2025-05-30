@@ -230,8 +230,11 @@ class BaseWriter(ABC):
             df = df.explode("protein_id")
 
         if level == "transition":
-            score_cols.insert(1, "ipf_peptide_id")
-            score_cols.insert(2, "transition_id")
+            if self.file_type in ("parquet", "parquet_split", "parquet_split_multi"):
+                score_cols.insert(1, "ipf_peptide_id")
+                score_cols.insert(2, "transition_id")
+            else:
+                score_cols.insert(1, "transition_id")
 
         if level == "alignment":
             score_cols.insert(2, "alignment_id")
@@ -247,7 +250,10 @@ class BaseWriter(ABC):
             df = df.rename(columns={"PEAK_GROUP_RANK": "RANK"})
 
         if level == "transition":
-            key_cols = {"FEATURE_ID", "IPF_PEPTIDE_ID", "TRANSITION_ID"}
+            if self.file_type in ("parquet", "parquet_split", "parquet_split_multi"):
+                key_cols = {"FEATURE_ID", "IPF_PEPTIDE_ID", "TRANSITION_ID"}
+            else:
+                key_cols = {"FEATURE_ID", "TRANSITION_ID"}
         elif level == "alignment":
             key_cols = {"ALIGNMENT_ID", "FEATURE_ID", "DECOY"}
         elif level in ("ms1", "ms2", "ms1ms2") and self.config.file_type in (
@@ -272,6 +278,8 @@ class BaseWriter(ABC):
     ) -> list[str]:
         """
         Get the columns to keep in the DataFrame by removing existing score columns. Mainly for Parquet files.
+
+        Note: this method itself does not remove the columns, it just returns a list of columns to keep that does not include the existing score columns.
         """
         drop_cols = [col for col in existing_cols if col.startswith(score_prefix)]
         if drop_cols:
