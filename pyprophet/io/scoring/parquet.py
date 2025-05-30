@@ -153,7 +153,7 @@ class ParquetReader(BaseParquetReader):
         cols_sql = ", ".join([f"t.{col}" for col in feature_cols])
         cols_sql_inner = ", ".join([f"{col}" for col in feature_cols])
         rc = self.config.runner
-        query = f"""SELECT t.TRANSITION_DECOY AS DECOY, t.FEATURE_ID, t.IPF_PEPTIDE_ID, t.TRANSITION_ID,
+        query = f"""SELECT t.TRANSITION_DECOY AS DECOY, t.RUN_ID, t.FEATURE_ID, t.IPF_PEPTIDE_ID, t.TRANSITION_ID,
                         {cols_sql}, p.PRECURSOR_CHARGE, t.TRANSITION_CHARGE,
                         p.RUN_ID || '_' || t.FEATURE_ID || '_' || t.TRANSITION_ID AS GROUP_ID
                     FROM (
@@ -274,6 +274,7 @@ class ParquetWriter(BaseParquetWriter):
                 "FEATURE_ID",
                 "PROTEIN_ID",
                 "TRANSITION_ID",
+                "IPF_PEPTIDE_ID",
                 "ALIGNMENT_ID",
                 "DECOY",
             )
@@ -282,14 +283,7 @@ class ParquetWriter(BaseParquetWriter):
 
         if self.level == "transition":
             prefix = "t"
-            join_on = (
-                "t.FEATURE_ID = s.FEATURE_ID AND t.TRANSITION_ID = s.TRANSITION_ID"
-            )
-            if "IPF_PEPTIDE_ID" in df.columns:
-                join_on += " AND t.IPF_PEPTIDE_ID = s.IPF_PEPTIDE_ID"
-            key_cols = "t.FEATURE_ID, t.TRANSITION_ID" + (
-                ", t.IPF_PEPTIDE_ID" if "IPF_PEPTIDE_ID" in df.columns else ""
-            )
+            join_on = "t.FEATURE_ID = s.FEATURE_ID AND t.TRANSITION_ID = s.TRANSITION_ID AND t.IPF_PEPTIDE_ID = s.IPF_PEPTIDE_ID"
             select_old = ", ".join([f"{prefix}.{col}" for col in keep_columns])
 
             # Create temp table with target schema

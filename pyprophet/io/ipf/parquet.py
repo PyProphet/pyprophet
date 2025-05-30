@@ -311,7 +311,7 @@ class ParquetWriter(BaseParquetWriter):
             con,
             target_file,
             "p.FEATURE_ID, p.IPF_PEPTIDE_ID",
-            "ON p.FEATURE_ID = s.FEATURE_ID AND p.IPF_PEPTIDE_ID = s.PEPTIDE_ID",
+            "p.FEATURE_ID = s.FEATURE_ID AND p.IPF_PEPTIDE_ID = s.PEPTIDE_ID",
             "p",
         )
 
