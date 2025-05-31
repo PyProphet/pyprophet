@@ -1,3 +1,29 @@
+"""
+This module defines configuration classes for various aspects of the scoring,
+error estimation, and inference processes in PyProphet.
+
+The configurations are implemented using Python's `dataclass` to provide a
+structured and type-safe way to manage parameters. These configurations are
+used to control the behavior of different components, such as scoring,
+classifier setup, error estimation, and I/O operations.
+
+Classes:
+    - ErrorEstimationConfig: Configuration for global and local FDR (false discovery rate) estimation.
+    - RunnerConfig: Configuration for scoring, classifier setup, learning parameters, and optional features.
+    - RunnerIOConfig: Wrapper configuration class for I/O and runner parameters.
+    - IPFIOConfig: Configuration for Inference of Peptidoforms (IPF).
+    - LevelContextIOConfig: Configuration for level-based context inference (e.g., peptide, protein, gene).
+
+Attributes:
+    - These classes include attributes for controlling various aspects of the pipeline,
+      such as classifier type, hyperparameter tuning, error estimation methods,
+      and input/output file handling.
+
+Usage:
+    These configuration classes are typically instantiated with default values
+    or populated from command-line arguments using the `from_cli_args` class methods.
+"""
+
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Literal, Union
 import os
@@ -581,8 +607,8 @@ class LevelContextIOConfig(BaseIOConfig):
         outfile,
         subsample_ratio,
         level,
-        context,  # context of module
-        context_fdr,
+        context,  # context of algorithm module (score_learn, score_apply, ipf, levels_context)
+        context_fdr,  # context for levels_context, global, experiment-wide, run-specific
         parametric,
         pfdr,
         pi0_lambda,
@@ -628,3 +654,56 @@ class LevelContextIOConfig(BaseIOConfig):
             density_estimator=density_estimator,
             grid_size=grid_size,
         )
+
+
+@dataclass
+class ExportIOConfig(BaseIOConfig):
+    """
+    Configuration for exporting results to various formats.
+
+    Attributes:
+        export_format (Literal["legacy_merged", "legacy_split", "parquet", "split_parquet"]):
+            Format for exporting results.
+            - "matrix": Single TSV file with merged results in matrix format.
+            - "legacy_merged": Single TSV file with merged results.
+            - "legacy_split": Split TSV files for each run.
+            - "parquet": Single Parquet file with merged results.
+            - "parquet_split": Split Parquet files for each run.
+        out_type (Literal["tsv", "csv"]): Output file type for exported results.
+        transition_quantification (bool): Report aggregated transition-level quantification.
+        max_transition_pep (float): Maximum PEP to retain scored transitions for quantification (requires transition-level scoring).
+        ipf (Literal["peptidoform", "augmented", "disable"]): Should IPF results be reported if present?
+            - "peptidoform": Report results on peptidoform-level,
+            - "augmented": Augment OpenSWATH results with IPF scores,
+            - "disable": Ignore IPF results'
+        ipf_max_peptidoform_pep (float): IPF: Filter results to maximum run-specific peptidoform-level PEP.
+        max_rs_peakgroup_qvalue (float): Filter results to maximum run-specific peak group-level q-value.
+        peptide (bool): Append peptide-level error-rate estimates if available.
+        max_global_peptide_qvalue (float): Filter results to maximum global peptide-level q-value.
+        protein (bool): Append protein-level error-rate estimates if available.
+        max_global_protein_qvalue (float): Filter results to maximum global protein-level q-value.
+
+        # Quantification matrix options
+        top_n (int): Number of top intense features to use for summarization
+        consistent_top (bool): Whether to use same top features across all runs
+        normalization (Literal["none", "median", "medianmedian", "quantile"]): Normalization method
+    """
+
+    export_format: Literal[
+        "matrix", "legacy_merged", "legacy_split", "parquet", "split_parquet"
+    ] = "legacy_merged"
+    out_type: Literal["tsv", "csv"] = "tsv"
+    transition_quantification: bool = False
+    max_transition_pep: float = 0.7
+    ipf: Literal["peptidoform", "augmented", "disable"] = "peptidoform"
+    ipf_max_peptidoform_pep: float = 0.4
+    max_rs_peakgroup_qvalue: float = 0.05
+    peptide: bool = True
+    max_global_peptide_qvalue: float = 0.01
+    protein: bool = True
+    max_global_protein_qvalue: float = 0.01
+
+    # Quantification matrix options
+    top_n: int = 3
+    consistent_top: bool = True
+    normalization: Literal["none", "median", "medianmedian", "quantile"] = "none"

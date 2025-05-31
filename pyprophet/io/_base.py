@@ -52,6 +52,7 @@ from loguru import logger
 
 from .util import print_parquet_tree, get_parquet_column_names
 from .._base import BaseIOConfig
+from .._config import ExportIOConfig
 from ..report import save_report
 
 
@@ -116,6 +117,10 @@ class BaseReader(ABC):
         """
         raise NotImplementedError("Subclasses must implement 'read'.")
 
+    # ----------------------------
+    # Shared Scoring Methods
+    # ----------------------------
+
     def _finalize_feature_table(self, df, ss_main_score):
         """
         Finalize the feature table for semi-supervised scoring.
@@ -174,6 +179,19 @@ class BaseWriter(ABC):
         """
         self.config = config
 
+    def __post_init__(self):
+        """
+        Post-initialization method to set up variables for IO specific config
+        """
+        if isinstance(self.config, ExportIOConfig):
+            # Quantification matrix normalization methods
+            self.normalization_methods = {
+                "median": self._median_normalize,
+                "medianmedian": self._median_median_normalize,
+                "quantile": self._quantile_normalize,
+                "none": lambda x: x,
+            }
+
     @property
     def context(self):
         return self.config.context
@@ -202,6 +220,10 @@ class BaseWriter(ABC):
     def glyco(self):
         return self.config.runner.glyco
 
+    # ----------------------------
+    # Shared Common Methods
+    # ----------------------------
+
     @abstractmethod
     def save_results(self, result, pi0):
         """
@@ -212,6 +234,97 @@ class BaseWriter(ABC):
             pi0: Estimated pi0 value from FDR statistics.
         """
         raise NotImplementedError("Subclasses must implement 'save_results'.")
+
+    def _get_columns_to_keep(
+        self, existing_cols: list[str], score_prefix: str
+    ) -> list[str]:
+        """
+        Get the columns to keep in the DataFrame by removing existing score columns. Mainly for Parquet files.
+
+        Note: this method itself does not remove the columns, it just returns a list of columns to keep that does not include the existing score columns.
+        """
+        drop_cols = [col for col in existing_cols if col.startswith(score_prefix)]
+        if drop_cols:
+            logger.warning(
+                f"Warn: Dropping existing {score_prefix} columns.",
+            )
+
+        return [col for col in existing_cols if not col.startswith(score_prefix)]
+
+    def _get_parquet_row_count(self, con, target_file: str) -> int:
+        """
+        Get the row count of a Parquet file.
+
+        Parameters:
+            con: DuckDB connection object
+            target_file: Path to the Parquet file
+
+        Returns:
+            int: Row count of the Parquet file
+        """
+        query = f"SELECT COUNT(*) FROM read_parquet('{target_file}')"
+        row_count = con.execute(query).fetchone()[0]
+        return row_count
+
+    def _validate_row_count_after_join(
+        self, con, target_file: str, key_cols: str, join_on: str, prefix: str
+    ):
+        """
+        Validates the row count after performing a join operation on a Parquet file.
+
+        This is important, because we would not expect the appending of scores to change the number of rows in the input Parquet file.
+
+        Parameters:
+            con: DuckDB connection object
+            target_file: Path to the Parquet file
+            key_cols: The key columns for the join operation
+            join_on: The condition for the join operation
+            prefix: The prefix (table alias) used for the Parquet file in the query
+
+        Raises:
+            RowCountMismatchError: If the row count of the resulting join doesn't match the original row count.
+        """
+
+        original_row_count = self._get_parquet_row_count(con, target_file)
+
+        logger.debug(
+            f"Prior to appending scores, {target_file} has {original_row_count} entries"
+        )
+
+        validate_query = f"""
+            SELECT 
+                COUNT(*) AS row_count
+            FROM (
+                SELECT {key_cols}
+                FROM read_parquet('{target_file}') {prefix}
+                LEFT JOIN scores s
+                ON {join_on}
+            ) AS subquery
+        """
+
+        logger.trace(f"Row Entry validation query:\n{validate_query}")
+
+        result = con.execute(validate_query).fetchone()
+        resulting_row_count = result[0]
+
+        # If row count mismatch occurs, raise an error and log it
+        if resulting_row_count != original_row_count:
+            error_message = (
+                f"There was an issue with appending scores to {target_file}.\n"
+                f"Row count mismatch: Original rows {original_row_count} ≠ Resulting rows {resulting_row_count}.\n"
+                "Appending scores resulted in a different number of entries than the original input file. This is unexpected behaviour."
+            )
+
+            try:
+                raise RowCountMismatchError(error_message)
+            except RowCountMismatchError as e:
+                logger.opt(exception=e, depth=1).critical(f"Critical error: {str(e)}")
+
+            sys.exit(1)
+
+    # ----------------------------
+    # Shared Scoring Methods
+    # ----------------------------
 
     def save_weights(self, weights):
         """
@@ -312,22 +425,6 @@ class BaseWriter(ABC):
         }
         return df.rename(columns=rename_map)
 
-    def _get_columns_to_keep(
-        self, existing_cols: list[str], score_prefix: str
-    ) -> list[str]:
-        """
-        Get the columns to keep in the DataFrame by removing existing score columns. Mainly for Parquet files.
-
-        Note: this method itself does not remove the columns, it just returns a list of columns to keep that does not include the existing score columns.
-        """
-        drop_cols = [col for col in existing_cols if col.startswith(score_prefix)]
-        if drop_cols:
-            logger.warning(
-                f"Warn: Dropping existing {score_prefix} columns.",
-            )
-
-        return [col for col in existing_cols if not col.startswith(score_prefix)]
-
     def _write_pdf_report(self, result, pi0):
         """
         Write a PDF report if the scoring results contain final statistics.
@@ -393,34 +490,6 @@ class BaseWriter(ABC):
         )
         logger.success(f"{pdf_path} written.")
 
-    def _write_levels_context_pdf_report(self, data, stat_table, pi0):
-        """
-        Write a PDF report for levels context.
-        """
-        context = self.config.context_fdr
-        prefix = self.config.prefix
-        analyte = self.config.level
-        if context == "run-specific":
-            prefix = prefix + "_" + str(data["run_id"].unique()[0])
-
-        pdf_path = os.path.join(prefix + "_" + context + "_" + analyte + "_report.pdf")
-        title = prefix + "_" + context + "_" + analyte + "-level error-rate control"
-        save_report(
-            pdf_path,
-            title,
-            data[data.decoy == 1]["score"].values,
-            data[data.decoy == 0]["score"].values,
-            stat_table["cutoff"].values,
-            stat_table["svalue"].values,
-            stat_table["qvalue"].values,
-            data[data.decoy == 0]["p_value"].values,
-            pi0,
-            self.config.color_palette,
-            analyte,
-            data,
-        )
-        logger.success(f"{pdf_path} written.")
-
     def _save_tsv_weights(self, weights):
         """
         Save the model weights to a TSV file, ensuring no duplicate levels.
@@ -459,76 +528,265 @@ class BaseWriter(ABC):
         else:
             logger.error(f"Trained model path {trained_weights_path} not found. ")
 
-    def _get_parquet_row_count(self, con, target_file: str) -> int:
-        """
-        Get the row count of a Parquet file.
+    # ----------------------------
+    # Shared Levels Context Methods
+    # ----------------------------
 
-        Parameters:
-            con: DuckDB connection object
-            target_file: Path to the Parquet file
+    def _write_levels_context_pdf_report(self, data, stat_table, pi0):
+        """
+        Write a PDF report for levels context.
+        """
+        context = self.config.context_fdr
+        prefix = self.config.prefix
+        analyte = self.config.level
+        if context == "run-specific":
+            prefix = prefix + "_" + str(data["run_id"].unique()[0])
+
+        pdf_path = os.path.join(prefix + "_" + context + "_" + analyte + "_report.pdf")
+        title = prefix + "_" + context + "_" + analyte + "-level error-rate control"
+        save_report(
+            pdf_path,
+            title,
+            data[data.decoy == 1]["score"].values,
+            data[data.decoy == 0]["score"].values,
+            stat_table["cutoff"].values,
+            stat_table["svalue"].values,
+            stat_table["qvalue"].values,
+            data[data.decoy == 0]["p_value"].values,
+            pi0,
+            self.config.color_palette,
+            analyte,
+            data,
+        )
+        logger.success(f"{pdf_path} written.")
+
+    # ----------------------------
+    # Shared Export Methods
+    # ----------------------------
+
+    def export_results(self, data: pd.DataFrame):
+        """
+        Save the results to the output file based on the export format.
+
+        Args:
+            data: DataFrame containing the data to be exported
+        """
+        cfg = self.config
+
+        sep = "," if cfg.out_type == "csv" else "\t"
+
+        if cfg.export_format == "legacy_split":
+            data = data.drop(["id_run", "id_peptide"], axis=1)
+            data.groupby("filename").apply(
+                lambda x: x.to_csv(
+                    os.path.basename(x["filename"].values[0]) + f".{cfg.out_type}",
+                    sep=sep,
+                    index=False,
+                )
+            )
+        elif cfg.export_format == "legacy_merged":
+            data.drop(["id_run", "id_peptide"], axis=1).to_csv(
+                cfg.outfile, sep=sep, index=False
+            )
+        else:
+            raise ValueError(f"Unsupported export format: {cfg.export_format}")
+
+    def export_quant_matrix(self, data: pd.DataFrame) -> pd.DataFrame:
+        """
+        Export quantification matrix at specified level with optional normalization.
+
+        Args:
+            data: Input DataFrame with quantification data
 
         Returns:
-            int: Row count of the Parquet file
+            pd.DataFrame: Matrix with normalized intensities
         """
-        query = f"SELECT COUNT(*) FROM read_parquet('{target_file}')"
-        row_count = con.execute(query).fetchone()[0]
-        return row_count
-
-    def _validate_row_count_after_join(
-        self, con, target_file: str, key_cols: str, join_on: str, prefix: str
-    ):
-        """
-        Validates the row count after performing a join operation on a Parquet file.
-
-        This is important, because we would not expect the appending of scores to change the number of rows in the input Parquet file.
-
-        Parameters:
-            con: DuckDB connection object
-            target_file: Path to the Parquet file
-            key_cols: The key columns for the join operation
-            join_on: The condition for the join operation
-            prefix: The prefix (table alias) used for the Parquet file in the query
-
-        Raises:
-            RowCountMismatchError: If the row count of the resulting join doesn't match the original row count.
-        """
-
-        original_row_count = self._get_parquet_row_count(con, target_file)
-
-        logger.debug(
-            f"Prior to appending scores, {target_file} has {original_row_count} entries"
-        )
-
-        validate_query = f"""
-            SELECT 
-                COUNT(*) AS row_count
-            FROM (
-                SELECT {key_cols}
-                FROM read_parquet('{target_file}') {prefix}
-                LEFT JOIN scores s
-                ON {join_on}
-            ) AS subquery
-        """
-
-        logger.trace(f"Row Entry validation query:\n{validate_query}")
-
-        result = con.execute(validate_query).fetchone()
-        resulting_row_count = result[0]
-
-        # If row count mismatch occurs, raise an error and log it
-        if resulting_row_count != original_row_count:
-            error_message = (
-                f"There was an issue with appending scores to {target_file}.\n"
-                f"Row count mismatch: Original rows {original_row_count} ≠ Resulting rows {resulting_row_count}.\n"
-                "Appending scores resulted in a different number of entries than the original input file. This is unexpected behaviour."
+        level = self.level
+        normalization = self.config.normalization
+        # Validate input
+        if level not in ["precursor", "peptide", "protein", "gene"]:
+            raise ValueError(
+                "Invalid level. Choose from: precursor, peptide, protein, gene"
             )
 
-            try:
-                raise RowCountMismatchError(error_message)
-            except RowCountMismatchError as e:
-                logger.opt(exception=e, depth=1).critical(f"Critical error: {str(e)}")
+        if normalization not in self.normalization_methods:
+            raise ValueError(
+                f"Invalid normalization. Choose from: {list(self.normalization_methods.keys())}"
+            )
 
-            sys.exit(1)
+        # Get the appropriate summarization method
+        summarizer = getattr(self, f"_summarize_{level}_level")
+        matrix = summarizer(data, self.config.top_n, self.config.consistent_top)
+
+        # Apply normalization
+        if normalization != "none":
+            matrix = self.normalization_methods[normalization](matrix)
+
+        return matrix
+
+    def _summarize_precursor_level(
+        self, data: pd.DataFrame, _top_n: int, _consistent_top: bool
+    ) -> pd.DataFrame:
+        """
+        Create precursor-level matrix (no summarization needed).
+        Just select top peak group per precursor.
+        """
+        # Select top ranking peak group only
+        data = data.iloc[
+            data.groupby(["run_id", "transition_group_id"]).apply(
+                lambda x: x["m_score"].idxmin()
+            )
+        ]
+
+        # Create matrix
+        matrix = data.pivot_table(
+            index=["transition_group_id", "Sequence", "FullPeptideName", "ProteinName"],
+            columns="filename",
+            values="Intensity",
+        )
+        return matrix
+
+    def _summarize_peptide_level(
+        self, data: pd.DataFrame, top_n: int, consistent_top: bool
+    ) -> pd.DataFrame:
+        """
+        Summarize to peptide level using top N precursors.
+        """
+        # First get top peak group per precursor
+        data = data.iloc[
+            data.groupby(["run_id", "transition_group_id"]).apply(
+                lambda x: x["m_score"].idxmin()
+            )
+        ]
+
+        # Get top precursors for each peptide
+        if consistent_top:
+            # Use precursors with highest median intensity across all runs
+            median_intensity = (
+                data.groupby(["transition_group_id", "Sequence", "FullPeptideName"])[
+                    "Intensity"
+                ]
+                .median()
+                .reset_index()
+            )
+
+            top_precursors = (
+                median_intensity.groupby("Sequence", "FullPeptideName")
+                .apply(lambda x: x.nlargest(top_n, "Intensity")["transition_group_id"])
+                .reset_index()["transition_group_id"]
+            )
+
+            data = data[data["transition_group_id"].isin(top_precursors)]
+        else:
+            # Select top precursors per run individually
+            data = (
+                data.groupby(["run_id", "Sequence", "FullPeptideName"])
+                .apply(lambda x: x.nlargest(top_n, "Intensity"))
+                .reset_index(drop=True)
+            )
+
+        # Summarize by peptide (mean of top precursors)
+        peptide_matrix = (
+            data.groupby(["Sequence", "FullPeptideName", "filename"])["Intensity"]
+            .mean()
+            .unstack()
+        )
+        return peptide_matrix
+
+    def _summarize_protein_level(
+        self, data: pd.DataFrame, top_n: int, consistent_top: bool
+    ) -> pd.DataFrame:
+        """
+        Summarize to protein level using top N peptides.
+        """
+        # First summarize to peptide level
+        peptide_matrix = self._summarize_peptide_level(
+            data, top_n=top_n, consistent_top=consistent_top
+        )
+
+        # Need to get protein annotations - get from original data
+        protein_map = data.drop_duplicates(
+            ["FullPeptideName", "ProteinName"]
+        ).set_index("FullPeptideName")["ProteinName"]
+
+        # Split protein groups and explode (one row per protein)
+        protein_matrix = peptide_matrix.copy()
+        protein_matrix["ProteinName"] = protein_matrix.index.map(protein_map)
+        protein_matrix = protein_matrix.explode("ProteinName")
+
+        if consistent_top:
+            # Use peptides with highest median intensity across all runs
+            median_intensity = protein_matrix.median(axis=1)
+            top_peptides = (
+                protein_matrix.groupby("ProteinName")
+                .apply(lambda x: x.nlargest(top_n, median_intensity).index)
+                .explode()
+            )
+
+            protein_matrix = protein_matrix.loc[top_peptides]
+
+        # Summarize by protein (mean of top peptides)
+        protein_matrix = protein_matrix.groupby("ProteinName").mean()
+        return protein_matrix
+
+    def _summarize_gene_level(
+        self, data: pd.DataFrame, top_n: int, consistent_top: bool
+    ) -> pd.DataFrame:
+        """
+        Summarize to gene level using top N proteins.
+        """
+        # First summarize to peptide level
+        peptide_matrix = self._summarize_peptide_level(
+            data, top_n=top_n, consistent_top=consistent_top
+        )
+
+        # Need to get gene annotations - get from original data
+        gene_map = data.drop_duplicates(["FullPeptideName", "Gene"]).set_index(
+            "FullPeptideName"
+        )["Gene"]
+
+        # Split protein groups and explode (one row per protein)
+        gene_matrix = peptide_matrix.copy()
+        gene_matrix["Gene"] = gene_matrix.index.map(gene_map)
+        gene_matrix = gene_matrix.explode("Gene")
+
+        if consistent_top:
+            # Use peptides with highest median intensity across all runs
+            median_intensity = gene_matrix.median(axis=1)
+            top_peptides = (
+                gene_matrix.groupby("Gene")
+                .apply(lambda x: x.nlargest(top_n, median_intensity).index)
+                .explode()
+            )
+
+            gene_matrix = gene_matrix.loc[top_peptides]
+
+        # Summarize by gene (mean of top peptides)
+        gene_matrix = gene_matrix.groupby("Gene").mean()
+        return gene_matrix
+
+    def _median_normalize(self, matrix: pd.DataFrame) -> pd.DataFrame:
+        """Median normalization (per sample)"""
+        return matrix.div(matrix.median(axis=0), axis=1)
+
+    def _median_median_normalize(self, matrix: pd.DataFrame) -> pd.DataFrame:
+        """Median of medians normalization"""
+        sample_medians = matrix.median(axis=0)
+        global_median = sample_medians.median()
+        return matrix.div(sample_medians, axis=1) * global_median
+
+    def _quantile_normalize(self, matrix: pd.DataFrame) -> pd.DataFrame:
+        """Quantile normalization"""
+        try:
+            from sklearn.preprocessing import quantile_transform
+
+            # Transpose to normalize samples (columns) together
+            normalized = quantile_transform(matrix.T, copy=True).T
+            return pd.DataFrame(normalized, index=matrix.index, columns=matrix.columns)
+        except ImportError as exc:
+            raise ImportError(
+                "scikit-learn is required for quantile normalization"
+            ) from exc
 
 
 class BaseOSWReader(BaseReader):
