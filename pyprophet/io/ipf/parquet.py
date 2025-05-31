@@ -24,7 +24,7 @@ class ParquetReader(BaseParquetReader):
         infile (str): Input file path.
         outfile (str): Output file path.
         classifier (str): Classifier used for semi-supervised learning.
-        level (str): Level used in semi-supervised learning (e.g., 'ms1', 'ms2', 'ms1ms2', 'transition', 'alignment'), or context level used peptide/protein/gene inference (e.g., 'global', 'experiment-wide', 'run-specific').
+        level (str): Level of data to extract for IPF. ["peakgroup_precursor", "transition", "alignment"].
         glyco (bool): Flag indicating whether analysis is glycoform-specific.
 
     Methods:
