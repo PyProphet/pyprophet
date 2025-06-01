@@ -6,7 +6,7 @@ import pandas as pd
 import polars as pl
 from loguru import logger
 
-from .io.util import check_sqlite_table
+from ..io.util import check_sqlite_table
 
 
 def load_sqlite_scanner(conn: duckdb.DuckDBPyConnection):

@@ -36,7 +36,7 @@ CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);
         idx_query += "CREATE INDEX IF NOT EXISTS idx_score_ms2_part_glycan_feature_id ON SCORE_MS2_PART_GLYCAN (FEATURE_ID);"
 
     if max_rs_peakgroup_qvalue is not None:
-        qvalue_filter = "WHERE SCORE_MS2.QVALUE < %s" % max_rs_peakgroup_qvalue
+        qvalue_filter = "WHERE SCORE_MS2.Q_VALUE < %s" % max_rs_peakgroup_qvalue
     else:
         qvalue_filter = ""
 
@@ -72,7 +72,7 @@ SELECT RUN.ID AS id_run,
        SCORE_MS2.RANK AS peak_group_rank,
        SCORE_MS2.SCORE AS d_score,
        SCORE_MS2.PEP AS pep,
-       SCORE_MS2.QVALUE AS m_score,
+       SCORE_MS2.Q_VALUE AS m_score,
        SCORE_MS2_PART_PEPTIDE.SCORE AS d_score_peptide,
        SCORE_MS2_PART_PEPTIDE.PEP AS pep_peptide,
        SCORE_MS2_PART_GLYCAN.SCORE AS d_score_glycan,
@@ -96,9 +96,7 @@ LEFT JOIN SCORE_MS2_PART_GLYCAN ON SCORE_MS2_PART_GLYCAN.FEATURE_ID = FEATURE.ID
 %s
 ORDER BY transition_group_id,
          peak_group_rank;
-""" % (
-        qvalue_filter
-    )
+""" % (qvalue_filter)
 
     con.executescript(idx_query)
     data = pd.read_sql_query(query, con)
@@ -183,7 +181,7 @@ GROUP BY FEATURE_ID
 def glycopeptide_report(con, max_global_glycopeptide_qvalue):
     if max_global_glycopeptide_qvalue is not None:
         qvalue_filter = (
-            "AND SCORE_GLYCOPEPTIDE.QVALUE < %s" % max_global_glycopeptide_qvalue
+            "AND SCORE_GLYCOPEPTIDE.Q_VALUE < %s" % max_global_glycopeptide_qvalue
         )
     else:
         qvalue_filter = ""
@@ -201,7 +199,7 @@ def glycopeptide_report(con, max_global_glycopeptide_qvalue):
             if part == "total":
                 part_suffix = ""
                 table_part_suffix = ""
-                m_score = ", QVALUE AS m_score_glycopeptide%s%s" % (
+                m_score = ", Q_VALUE AS m_score_glycopeptide%s%s" % (
                     part_suffix,
                     context_suffix,
                 )
@@ -302,7 +300,7 @@ GLYCAN_GLYCOFORM.GLYCAN_STRUCT
 """
 
     if max_rs_peakgroup_qvalue is not None:
-        ms2_qvalue_filter = "AND SCORE_MS2.QVALUE < %s" % max_rs_peakgroup_qvalue
+        ms2_qvalue_filter = "AND SCORE_MS2.Q_VALUE < %s" % max_rs_peakgroup_qvalue
     else:
         ms2_qvalue_filter = ""
     if max_glycoform_pep is not None:
@@ -311,7 +309,7 @@ GLYCAN_GLYCOFORM.GLYCAN_STRUCT
         glycoform_pep_filter = ""
     if max_glycoform_qvalue is not None:
         glycoform_qvalue_filter = (
-            "AND SCORE_GLYCOFORM.QVALUE < %s" % max_glycoform_qvalue
+            "AND SCORE_GLYCOFORM.Q_VALUE < %s" % max_glycoform_qvalue
         )
     else:
         glycoform_qvalue_filter = ""
@@ -350,10 +348,10 @@ SELECT RUN.ID AS id_run,
        SCORE_MS2.PEP AS ms2_pep,
        SCORE_GLYCOFORM.PRECURSOR_PEAKGROUP_PEP AS precursor_pep,
        SCORE_GLYCOFORM.PEP AS glycoform_pep,
-       SCORE_GLYCOFORM.QVALUE AS m_score,
+       SCORE_GLYCOFORM.Q_VALUE AS m_score,
        SCORE_MS2.RANK AS peak_group_rank,
        SCORE_MS2.SCORE AS d_score,
-       SCORE_MS2.QVALUE AS ms2_m_score,
+       SCORE_MS2.Q_VALUE AS ms2_m_score,
        SCORE_MS2_PART_PEPTIDE.SCORE AS d_score_peptide,
        SCORE_MS2_PART_PEPTIDE.PEP AS ms2_pep_peptide,
        SCORE_MS2_PART_GLYCAN.SCORE AS d_score_glycan,
@@ -445,7 +443,6 @@ def export_tsv(
     glycopeptide=True,
     max_global_glycopeptide_qvalue=0.01,
 ):
-
     osw = sqlite3.connect(infile)
 
     click.echo("Info: Reading peak group-level results.")
