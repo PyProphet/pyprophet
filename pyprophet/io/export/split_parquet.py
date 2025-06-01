@@ -122,7 +122,7 @@ class SplitParquetReader(BaseSplitParquetReader):
                 {feature_vars_sql}
             FROM precursors p
             WHERE p.PROTEIN_ID IS NOT NULL  -- Filter to precursor rows
-            ORDER BY p.transition_group_id
+            ORDER BY transition_group_id
         """
         return con.execute(query).fetchdf()
 
@@ -168,7 +168,7 @@ class SplitParquetReader(BaseSplitParquetReader):
             WHERE p.PROTEIN_ID IS NOT NULL
             AND p.SCORE_MS2_Q_VALUE < {self.config.max_rs_peakgroup_qvalue} 
             AND p.SCORE_IPF_PEP < {self.config.ipf_max_peptidoform_pep}
-            ORDER BY p.transition_group_id, p.peak_group_rank
+            ORDER BY transition_group_id, peak_group_rank
         """
         return con.execute(query).fetchdf()
 
@@ -211,7 +211,7 @@ class SplitParquetReader(BaseSplitParquetReader):
             FROM precursors p
             WHERE p.PROTEIN_ID IS NOT NULL
             AND p.SCORE_MS2_Q_VALUE < {self.config.max_rs_peakgroup_qvalue}
-            ORDER BY p.transition_group_id, p.peak_group_rank
+            ORDER BY transition_group_id, p.peak_group_rank
         """
         data = con.execute(query).fetchdf()
 
@@ -291,7 +291,7 @@ class SplitParquetReader(BaseSplitParquetReader):
             FROM precursors p
             WHERE p.PROTEIN_ID IS NOT NULL
             AND p.SCORE_MS2_Q_VALUE < {self.config.max_rs_peakgroup_qvalue}
-            ORDER BY p.transition_group_id, p.peak_group_rank
+            ORDER BY transition_group_id, peak_group_rank
         """
         return con.execute(query).fetchdf()
 
