@@ -102,4 +102,4 @@ You can find more information on the sqMass format and the schema from OpenMS's 
 Parquet Format (*.parquet*)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-PyProphet supports conveting the OpenSWATH SQLite format (*.sqMass*) to a parquet format, for better storage. You can use the :program:`export parquet` subcommand to convert the OpenSWATH SQLite format (*.sqMass*) to a parquet format. 
+PyProphet supports converting the OpenSWATH SQLite format (*.sqMass*) to a parquet format, for better storage. You can use the :program:`export parquet` subcommand to convert the OpenSWATH SQLite format (*.sqMass*) to a parquet format. 
