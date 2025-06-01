@@ -636,8 +636,8 @@ class OSWWriter(BaseOSWWriter):
                 "RUN_ID",
                 context_level_id.upper(),
                 "SCORE",
-                "PVALUE",
-                "QVALUE",
+                "P_VALUE",
+                "Q_VALUE",
                 "PEP",
             ]
 
@@ -646,6 +646,6 @@ class OSWWriter(BaseOSWWriter):
                 con,
                 index=False,
                 dtype={"RUN_ID": "INTEGER"},
-                if_exists="replace",
+                if_exists="append",
             )
             con.close()
