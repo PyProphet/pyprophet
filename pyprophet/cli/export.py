@@ -209,7 +209,7 @@ def export_tsv(
     "--out",
     "outfile",
     type=click.Path(exists=False),
-    help="Output TSV/CSV (legacy_split, legacy_merged) file.",
+    help="Output TSV/CSV file.",
 )
 @click.option(
     "--level",
@@ -286,7 +286,7 @@ def export_tsv(
     "consistent_top",
     default=True,
     show_default=True,
-    help="[format: matrix/legacy] UWhether to use same top features across all runs",
+    help="[format: matrix/legacy] Whether to use same top features across all runs",
 )
 @click.option(
     "--normalization",
