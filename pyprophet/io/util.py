@@ -40,7 +40,8 @@ Usage:
 
 import os
 from collections import defaultdict
-
+import sqlite3
+import duckdb
 import click
 import pandas as pd
 import pyarrow.parquet as pq
@@ -125,6 +126,36 @@ def write_scores_sql_command(con, score_sql, feature_name, var_replacement):
             feature_name + "." + score_name_sql + " AS " + score_names_lower[i] + ", "
         )
     return score_sql
+
+
+def get_table_columns(sqlite_file: str, table: str) -> list:
+    """
+    Retrieve the column names of a table in a SQLite database file.
+
+    Parameters:
+    - sqlite_file (str): Path to the SQLite database file.
+    - table (str): Name of the table to retrieve column names from.
+
+    Returns:
+    - list: List of column names in the specified table.
+    """
+    with sqlite3.connect(sqlite_file) as conn:
+        return [row[1] for row in conn.execute(f"PRAGMA table_info({table})")]
+
+
+def get_table_columns_with_types(sqlite_file: str, table: str) -> list:
+    """
+    Get the columns and their types for a given table in a SQLite database file.
+
+    Parameters:
+    - sqlite_file (str): The path to the SQLite database file.
+    - table (str): The name of the table to retrieve columns and types from.
+
+    Returns:
+    - list: A list of tuples where each tuple contains the column name and its data type.
+    """
+    with sqlite3.connect(sqlite_file) as conn:
+        return [(row[1], row[2]) for row in conn.execute(f"PRAGMA table_info({table})")]
 
 
 def check_duckdb_table(con, schema: str, table: str) -> bool:
@@ -215,6 +246,29 @@ def is_valid_multi_split_parquet_dir(path):
             return False
 
     return True
+
+
+def load_sqlite_scanner(conn: duckdb.DuckDBPyConnection):
+    """
+    Ensures the `sqlite_scanner` extension is installed and loaded in DuckDB.
+    """
+    try:
+        conn.execute("LOAD sqlite_scanner")
+    except Exception as e:
+        if "Extension 'sqlite_scanner' not found" in str(e):
+            try:
+                conn.execute("INSTALL sqlite_scanner")
+                conn.execute("LOAD sqlite_scanner")
+            except Exception as install_error:
+                if "already installed but the origin is different" in str(
+                    install_error
+                ):
+                    conn.execute("FORCE INSTALL sqlite_scanner")
+                    conn.execute("LOAD sqlite_scanner")
+                else:
+                    raise install_error
+        else:
+            raise e
 
 
 def get_parquet_column_names(file_path):

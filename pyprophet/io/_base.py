@@ -38,6 +38,7 @@ Dependencies:
 """
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 import sys
 import os
 import glob
@@ -64,6 +65,7 @@ class RowCountMismatchError(Exception):
     pass
 
 
+@dataclass
 class BaseReader(ABC):
     """
     Abstract base class for implementing readers that load data from different sources (OSW, Parquet, etc.).
@@ -165,6 +167,7 @@ class BaseReader(ABC):
         return df
 
 
+@dataclass
 class BaseWriter(ABC):
     """
     Abstract base class for implementing writers that save results to various output formats.
@@ -178,6 +181,7 @@ class BaseWriter(ABC):
             config (BaseIOConfig): Configuration object containing output details.
         """
         self.config = config
+        self.__post_init__()
 
     def __post_init__(self):
         """
@@ -577,6 +581,10 @@ class BaseWriter(ABC):
 
         if cfg.export_format == "legacy_split":
             data = data.drop(["id_run", "id_peptide"], axis=1)
+            # filename might contain archive extensions, so we need to remove these
+            data["filename"] = data["filename"].apply(
+                lambda x: os.path.splitext(os.path.basename(x))[0]
+            )
             data.groupby("filename").apply(
                 lambda x: x.to_csv(
                     os.path.basename(x["filename"].values[0]) + f".{cfg.out_type}",
@@ -598,9 +606,10 @@ class BaseWriter(ABC):
         Args:
             data: Input DataFrame with quantification data
 
-        Returns:
-            pd.DataFrame: Matrix with normalized intensities
         """
+        cfg = self.config
+
+        sep = "," if cfg.out_type == "csv" else "\t"
         level = self.level
         normalization = self.config.normalization
         # Validate input
@@ -620,9 +629,15 @@ class BaseWriter(ABC):
 
         # Apply normalization
         if normalization != "none":
-            matrix = self.normalization_methods[normalization](matrix)
+            # Set non-numeric columns as index
+            non_numeric_cols = list(matrix.select_dtypes(exclude="number").columns)
 
-        return matrix
+            if len(non_numeric_cols) > 0:
+                matrix = matrix.set_index(non_numeric_cols)
+            matrix = self.normalization_methods[normalization](matrix)
+            matrix = matrix.reset_index()
+
+        matrix.to_csv(self.config.outfile, sep=sep, index=False)
 
     def _summarize_precursor_level(
         self, data: pd.DataFrame, _top_n: int, _consistent_top: bool
@@ -637,13 +652,19 @@ class BaseWriter(ABC):
                 lambda x: x["m_score"].idxmin()
             )
         ]
-
+        logger.info("Summarizing to precursor level.")
         # Create matrix
         matrix = data.pivot_table(
-            index=["transition_group_id", "Sequence", "FullPeptideName", "ProteinName"],
+            index=[
+                "transition_group_id",
+                "Sequence",
+                "FullPeptideName",
+                "Charge",
+                "ProteinName",
+            ],
             columns="filename",
             values="Intensity",
-        )
+        ).reset_index()
         return matrix
 
     def _summarize_peptide_level(
@@ -658,9 +679,10 @@ class BaseWriter(ABC):
                 lambda x: x["m_score"].idxmin()
             )
         ]
-
+        logger.info("Summarizing to peptide level.")
         # Get top precursors for each peptide
         if consistent_top:
+            logger.info("Using consistent top precursors across all runs.")
             # Use precursors with highest median intensity across all runs
             median_intensity = (
                 data.groupby(["transition_group_id", "Sequence", "FullPeptideName"])[
@@ -671,13 +693,14 @@ class BaseWriter(ABC):
             )
 
             top_precursors = (
-                median_intensity.groupby("Sequence", "FullPeptideName")
+                median_intensity.groupby(["Sequence", "FullPeptideName"])
                 .apply(lambda x: x.nlargest(top_n, "Intensity")["transition_group_id"])
                 .reset_index()["transition_group_id"]
             )
 
             data = data[data["transition_group_id"].isin(top_precursors)]
         else:
+            logger.info("Using top precursors per run individually.")
             # Select top precursors per run individually
             data = (
                 data.groupby(["run_id", "Sequence", "FullPeptideName"])
@@ -690,7 +713,7 @@ class BaseWriter(ABC):
             data.groupby(["Sequence", "FullPeptideName", "filename"])["Intensity"]
             .mean()
             .unstack()
-        )
+        ).reset_index()
         return peptide_matrix
 
     def _summarize_protein_level(
@@ -704,6 +727,8 @@ class BaseWriter(ABC):
             data, top_n=top_n, consistent_top=consistent_top
         )
 
+        logger.info("Summarizing to protein level.")
+
         # Need to get protein annotations - get from original data
         protein_map = data.drop_duplicates(
             ["FullPeptideName", "ProteinName"]
@@ -711,66 +736,98 @@ class BaseWriter(ABC):
 
         # Split protein groups and explode (one row per protein)
         protein_matrix = peptide_matrix.copy()
-        protein_matrix["ProteinName"] = protein_matrix.index.map(protein_map)
+        protein_matrix = protein_matrix.merge(
+            protein_map.reset_index(),
+            left_on="FullPeptideName",
+            right_on="FullPeptideName",
+            how="left",
+        )
         protein_matrix = protein_matrix.explode("ProteinName")
 
         if consistent_top:
-            # Use peptides with highest median intensity across all runs
-            median_intensity = protein_matrix.median(axis=1)
-            top_peptides = (
-                protein_matrix.groupby("ProteinName")
-                .apply(lambda x: x.nlargest(top_n, median_intensity).index)
-                .explode()
+            # Calculate median intensity for each peptide-protein combination
+            protein_matrix["median_intensity"] = protein_matrix.select_dtypes(
+                include="number"
+            ).median(axis=1)
+
+            # Get top N peptides per protein based on median intensity
+            top_peptides = protein_matrix.groupby("ProteinName").apply(
+                lambda x: x.nlargest(top_n, "median_intensity")
             )
 
-            protein_matrix = protein_matrix.loc[top_peptides]
+            # Flatten the multi-index and select the top peptides
+            top_peptides = top_peptides.droplevel(0)
+            protein_matrix = protein_matrix.loc[top_peptides.index]
+
+            # Drop the median_intensity column as it is no longer needed
+            protein_matrix = protein_matrix.drop(columns=["median_intensity"])
 
         # Summarize by protein (mean of top peptides)
-        protein_matrix = protein_matrix.groupby("ProteinName").mean()
+        protein_matrix = (
+            protein_matrix.groupby("ProteinName").mean(numeric_only=True).reset_index()
+        )
+
         return protein_matrix
 
     def _summarize_gene_level(
         self, data: pd.DataFrame, top_n: int, consistent_top: bool
     ) -> pd.DataFrame:
         """
-        Summarize to gene level using top N proteins.
+        Summarize to gene level using top N peptides.
         """
         # First summarize to peptide level
         peptide_matrix = self._summarize_peptide_level(
             data, top_n=top_n, consistent_top=consistent_top
         )
 
+        logger.info("Summarizing to gene level.")
+
         # Need to get gene annotations - get from original data
         gene_map = data.drop_duplicates(["FullPeptideName", "Gene"]).set_index(
             "FullPeptideName"
         )["Gene"]
 
-        # Split protein groups and explode (one row per protein)
+        # Split gene groups and explode (one row per gene)
         gene_matrix = peptide_matrix.copy()
-        gene_matrix["Gene"] = gene_matrix.index.map(gene_map)
+        gene_matrix = gene_matrix.merge(
+            gene_map.reset_index(),
+            left_on="FullPeptideName",
+            right_on="FullPeptideName",
+            how="left",
+        )
         gene_matrix = gene_matrix.explode("Gene")
 
         if consistent_top:
-            # Use peptides with highest median intensity across all runs
-            median_intensity = gene_matrix.median(axis=1)
-            top_peptides = (
-                gene_matrix.groupby("Gene")
-                .apply(lambda x: x.nlargest(top_n, median_intensity).index)
-                .explode()
+            # Calculate median intensity for each peptide-gene combination
+            gene_matrix["median_intensity"] = gene_matrix.select_dtypes(
+                include="number"
+            ).median(axis=1)
+
+            # Get top N peptides per gene based on median intensity
+            top_peptides = gene_matrix.groupby("Gene").apply(
+                lambda x: x.nlargest(top_n, "median_intensity")
             )
 
-            gene_matrix = gene_matrix.loc[top_peptides]
+            # Flatten the multi-index and select the top peptides
+            top_peptides = top_peptides.droplevel(0)
+            gene_matrix = gene_matrix.loc[top_peptides.index]
+
+            # Drop the median_intensity column as it is no longer needed
+            gene_matrix = gene_matrix.drop(columns=["median_intensity"])
 
         # Summarize by gene (mean of top peptides)
-        gene_matrix = gene_matrix.groupby("Gene").mean()
+        gene_matrix = gene_matrix.groupby("Gene").mean(numeric_only=True).reset_index()
+
         return gene_matrix
 
     def _median_normalize(self, matrix: pd.DataFrame) -> pd.DataFrame:
         """Median normalization (per sample)"""
+        logger.info("Applying median normalization.")
         return matrix.div(matrix.median(axis=0), axis=1)
 
     def _median_median_normalize(self, matrix: pd.DataFrame) -> pd.DataFrame:
         """Median of medians normalization"""
+        logger.info("Applying median of medians normalization.")
         sample_medians = matrix.median(axis=0)
         global_median = sample_medians.median()
         return matrix.div(sample_medians, axis=1) * global_median
@@ -780,6 +837,7 @@ class BaseWriter(ABC):
         try:
             from sklearn.preprocessing import quantile_transform
 
+            logger.info("Applying quantile normalization.")
             # Transpose to normalize samples (columns) together
             normalized = quantile_transform(matrix.T, copy=True).T
             return pd.DataFrame(normalized, index=matrix.index, columns=matrix.columns)
@@ -789,6 +847,7 @@ class BaseWriter(ABC):
             ) from exc
 
 
+@dataclass
 class BaseOSWReader(BaseReader):
     """
     Class for reading and processing data from an OpenSWATH workflow OSW-sqlite based file.
@@ -819,6 +878,7 @@ class BaseOSWReader(BaseReader):
         )
 
 
+@dataclass
 class BaseOSWWriter(BaseWriter):
     """
     Class for writing OpenSWATH results to an OSW-sqlite based file.
@@ -847,6 +907,7 @@ class BaseOSWWriter(BaseWriter):
         )
 
 
+@dataclass
 class BaseParquetReader(BaseReader):
     """
     Class for reading and processing data from OpenSWATH results stored in Parquet format.
@@ -969,6 +1030,7 @@ class BaseParquetReader(BaseReader):
         return df
 
 
+@dataclass
 class BaseParquetWriter(BaseWriter):
     """
     Class for writing OpenSWATH results to a Parquet file.
@@ -1004,6 +1066,7 @@ class BaseParquetWriter(BaseWriter):
         )
 
 
+@dataclass
 class BaseSplitParquetReader(BaseReader):
     """
     Class for reading and processing data from OpenSWATH results stored in a directoy containing split Parquet files.
@@ -1234,6 +1297,7 @@ class BaseSplitParquetReader(BaseReader):
         return df
 
 
+@dataclass
 class BaseSplitParquetWriter(BaseWriter):
     """
     Class for writing OpenSWATH results to a directory containing split Parquet files.

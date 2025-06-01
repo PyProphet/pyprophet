@@ -3,12 +3,20 @@ import pickle
 from shutil import copyfile
 import sqlite3
 from typing import Literal
+import re
 import duckdb
 import pandas as pd
 import numpy as np
 import click
 from loguru import logger
-from ..util import check_sqlite_table, check_duckdb_table, write_scores_sql_command
+from ..util import (
+    check_sqlite_table,
+    check_duckdb_table,
+    write_scores_sql_command,
+    load_sqlite_scanner,
+    get_table_columns,
+    get_table_columns_with_types,
+)
 from .._base import BaseOSWReader, BaseOSWWriter
 from ..._config import ExportIOConfig
 
@@ -115,15 +123,19 @@ class OSWReader(BaseOSWReader):
         cfg = self.config
 
         if self._is_unscored_file(con):
+            logger.info("Reading unscored data from Parquet file.")
             return self._read_unscored_data(con)
 
         ipf_present = self._check_ipf_presence(con, cfg)
 
         if ipf_present and cfg.ipf == "peptidoform":
+            logger.info("Reading peptidoform IPF data from Parquet file.")
             data = self._read_peptidoform_data(con, cfg)
         elif ipf_present and cfg.ipf == "augmented":
+            logger.info("Reading augmented data with IPF from Parquet file.")
             data = self._read_augmented_data(con, cfg)
         else:
+            logger.info("Reading standard OpenSWATH data from Parquet file.")
             data = self._read_standard_data(con, cfg)
 
         # Apply common augmentations to all scored data types
@@ -230,7 +242,7 @@ class OSWReader(BaseOSWReader):
                   SCORE_IPF.PEP AS ipf_pep,
                   SCORE_MS2.RANK AS peak_group_rank,
                   SCORE_MS2.SCORE AS d_score,
-                  SCORE_MS2.QVALUE AS ms2_m_score,
+                  SCORE_MS2.Q_VALUE AS ms2_m_score,
                   SCORE_IPF.QVALUE AS m_score
             FROM PRECURSOR
             INNER JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
@@ -243,7 +255,7 @@ class OSWReader(BaseOSWReader):
             LEFT JOIN SCORE_MS2 ON SCORE_MS2.FEATURE_ID = FEATURE.ID
             LEFT JOIN SCORE_IPF ON SCORE_IPF.FEATURE_ID = FEATURE.ID
             INNER JOIN PEPTIDE AS PEPTIDE_IPF ON SCORE_IPF.PEPTIDE_ID = PEPTIDE_IPF.ID
-            WHERE SCORE_MS2.QVALUE < {cfg.max_rs_peakgroup_qvalue} AND SCORE_IPF.PEP < {cfg.ipf_max_peptidoform_pep}
+            WHERE SCORE_MS2.Q_VALUE < {cfg.max_rs_peakgroup_qvalue} AND SCORE_IPF.PEP < {cfg.ipf_max_peptidoform_pep}
             ORDER BY transition_group_id, peak_group_rank;
         """
         return pd.read_sql_query(query, con)
@@ -277,7 +289,7 @@ class OSWReader(BaseOSWReader):
                   FEATURE.RIGHT_WIDTH AS rightWidth,
                   SCORE_MS2.RANK AS peak_group_rank,
                   SCORE_MS2.SCORE AS d_score,
-                  SCORE_MS2.QVALUE AS m_score,
+                  SCORE_MS2.Q_VALUE AS m_score,
                   {score_ms1_pep} AS ms1_pep,
                   SCORE_MS2.PEP AS ms2_pep
             FROM PRECURSOR
@@ -289,7 +301,7 @@ class OSWReader(BaseOSWReader):
             LEFT JOIN FEATURE_MS2 ON FEATURE_MS2.FEATURE_ID = FEATURE.ID
             {link_ms1}
             LEFT JOIN SCORE_MS2 ON SCORE_MS2.FEATURE_ID = FEATURE.ID
-            WHERE SCORE_MS2.QVALUE < {cfg.max_rs_peakgroup_qvalue}
+            WHERE SCORE_MS2.Q_VALUE < {cfg.max_rs_peakgroup_qvalue}
             ORDER BY transition_group_id, peak_group_rank;
         """
         data = pd.read_sql_query(query, con)
@@ -325,7 +337,7 @@ class OSWReader(BaseOSWReader):
                   FEATURE.RIGHT_WIDTH AS rightWidth,
                   SCORE_MS2.RANK AS peak_group_rank,
                   SCORE_MS2.SCORE AS d_score,
-                  SCORE_MS2.QVALUE AS m_score
+                  SCORE_MS2.Q_VALUE AS m_score
             FROM PRECURSOR
             INNER JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
             INNER JOIN PEPTIDE ON PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
@@ -334,7 +346,7 @@ class OSWReader(BaseOSWReader):
             LEFT JOIN FEATURE_MS1 ON FEATURE_MS1.FEATURE_ID = FEATURE.ID
             LEFT JOIN FEATURE_MS2 ON FEATURE_MS2.FEATURE_ID = FEATURE.ID
             LEFT JOIN SCORE_MS2 ON SCORE_MS2.FEATURE_ID = FEATURE.ID
-            WHERE SCORE_MS2.QVALUE < {cfg.max_rs_peakgroup_qvalue}
+            WHERE SCORE_MS2.Q_VALUE < {cfg.max_rs_peakgroup_qvalue}
             ORDER BY transition_group_id, peak_group_rank;
         """
         return pd.read_sql_query(query, con)
@@ -342,14 +354,18 @@ class OSWReader(BaseOSWReader):
     def _augment_data(self, data, con, cfg):
         """Apply common data augmentations to the base dataset."""
         if cfg.transition_quantification:
+            logger.info("Adding transition-level quantification data.")
             data = self._add_transition_data(data, con, cfg)
 
+        logger.info("Adding protein information.")
         data = self._add_protein_data(data, con)
 
         if cfg.peptide:
+            logger.info("Adding peptide error rate data.")
             data = self._add_peptide_data(data, con, cfg)
 
         if cfg.protein:
+            logger.info("Adding protein error rate data.")
             data = self._add_protein_error_data(data, con, cfg)
 
         return data
@@ -430,7 +446,7 @@ class OSWReader(BaseOSWReader):
                   FEATURE.RIGHT_WIDTH AS rightWidth,
                   SCORE_MS2.RANK AS peak_group_rank,
                   SCORE_MS2.SCORE AS d_score,
-                  SCORE_MS2.QVALUE AS m_score
+                  SCORE_MS2.Q_VALUE AS m_score
             FROM PRECURSOR
             INNER JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
             INNER JOIN PEPTIDE ON PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
@@ -439,7 +455,7 @@ class OSWReader(BaseOSWReader):
             LEFT JOIN FEATURE_MS1 ON FEATURE_MS1.FEATURE_ID = FEATURE.ID
             LEFT JOIN FEATURE_MS2 ON FEATURE_MS2.FEATURE_ID = FEATURE.ID
             LEFT JOIN SCORE_MS2 ON SCORE_MS2.FEATURE_ID = FEATURE.ID
-            WHERE SCORE_MS2.QVALUE < {cfg.max_rs_peakgroup_qvalue}
+            WHERE SCORE_MS2.Q_VALUE < {cfg.max_rs_peakgroup_qvalue}
             ORDER BY transition_group_id, peak_group_rank;
         """
         return pd.read_sql_query(query, con)
@@ -496,7 +512,7 @@ class OSWReader(BaseOSWReader):
             """
             SELECT RUN_ID AS id_run,
                   PEPTIDE_ID AS id_peptide,
-                  QVALUE AS m_score_peptide_run_specific
+                  Q_VALUE AS m_score_peptide_run_specific
             FROM SCORE_PEPTIDE
             WHERE CONTEXT == 'run-specific';
         """,
@@ -512,7 +528,7 @@ class OSWReader(BaseOSWReader):
             """
             SELECT RUN_ID AS id_run,
                   PEPTIDE_ID AS id_peptide,
-                  QVALUE AS m_score_peptide_experiment_wide
+                  Q_VALUE AS m_score_peptide_experiment_wide
             FROM SCORE_PEPTIDE
             WHERE CONTEXT == 'experiment-wide';
         """,
@@ -525,7 +541,7 @@ class OSWReader(BaseOSWReader):
         data_peptide_global = pd.read_sql_query(
             """
             SELECT PEPTIDE_ID AS id_peptide,
-                  QVALUE AS m_score_peptide_global
+                  Q_VALUE AS m_score_peptide_global
             FROM SCORE_PEPTIDE
             WHERE CONTEXT == 'global';
         """,
@@ -553,7 +569,7 @@ class OSWReader(BaseOSWReader):
             """
             SELECT RUN_ID AS id_run,
                   PEPTIDE_ID AS id_peptide,
-                  MIN(QVALUE) AS m_score_protein_run_specific
+                  MIN(Q_VALUE) AS m_score_protein_run_specific
             FROM PEPTIDE_PROTEIN_MAPPING
             INNER JOIN SCORE_PROTEIN ON PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID = SCORE_PROTEIN.PROTEIN_ID
             WHERE CONTEXT == 'run-specific'
@@ -571,7 +587,7 @@ class OSWReader(BaseOSWReader):
             """
             SELECT RUN_ID AS id_run,
                   PEPTIDE_ID AS id_peptide,
-                  MIN(QVALUE) AS m_score_protein_experiment_wide
+                  MIN(Q_VALUE) AS m_score_protein_experiment_wide
             FROM PEPTIDE_PROTEIN_MAPPING
             INNER JOIN SCORE_PROTEIN ON PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID = SCORE_PROTEIN.PROTEIN_ID
             WHERE CONTEXT == 'experiment-wide'
@@ -591,7 +607,7 @@ class OSWReader(BaseOSWReader):
         data_protein_global = pd.read_sql_query(
             """
             SELECT PEPTIDE_ID AS id_peptide,
-                  MIN(QVALUE) AS m_score_protein_global
+                  MIN(Q_VALUE) AS m_score_protein_global
             FROM PEPTIDE_PROTEIN_MAPPING
             INNER JOIN SCORE_PROTEIN ON PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID = SCORE_PROTEIN.PROTEIN_ID
             WHERE CONTEXT == 'global'
@@ -620,3 +636,642 @@ class OSWWriter(BaseOSWWriter):
 
     def __init__(self, config: ExportIOConfig):
         super().__init__(config)
+
+    def export(self) -> None:
+        """Main entry point for writing data based on configured format"""
+        if self.config.export_format in ["parquet", "parquet_split"]:
+            self._write_parquet()
+        else:
+            raise ValueError(
+                f"Unsupported OSW export format: {self.config.export_format}. "
+                "Supported formats are 'parquet' and 'parquet_split'."
+            )
+
+    def _write_parquet(self) -> None:
+        """Handle parquet export based on configuration"""
+        if self.config.file_type != "osw":
+            raise ValueError("Parquet export only supported from OSW files")
+
+        if self.config.export_format == "parquet_split":
+            self._convert_to_split_parquet()
+        else:
+            self._convert_to_single_parquet()
+
+    def _convert_to_split_parquet(self) -> None:
+        """Convert OSW to split parquet format"""
+        conn = duckdb.connect(":memory:")
+        load_sqlite_scanner(conn)
+
+        try:
+            # Prepare column information
+            column_info = self._prepare_column_info(conn)
+
+            if self.config.split_runs:
+                self._export_split_by_run(conn, column_info)
+            else:
+                self._export_combined(conn, column_info)
+
+        finally:
+            conn.close()
+
+    def _convert_to_single_parquet(self) -> None:
+        """Convert OSW to single parquet file"""
+        conn = duckdb.connect(":memory:")
+        load_sqlite_scanner(conn)
+
+        try:
+            # Prepare column information
+            column_info = self._prepare_column_info(conn)
+            self._export_single_file(conn, column_info)
+        finally:
+            conn.close()
+
+    def _prepare_column_info(self, conn) -> dict:
+        """Prepare column information and table checks"""
+        with sqlite3.connect(self.config.infile) as sql_conn:
+            table_names = set(
+                row[0]
+                for row in sql_conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                ).fetchall()
+            )
+
+            column_info = {
+                "gene_tables_exist": {"PEPTIDE_GENE_MAPPING", "GENE"}.issubset(
+                    table_names
+                ),
+                "precursor_columns": get_table_columns(self.config.infile, "PRECURSOR"),
+                "transition_columns": get_table_columns(
+                    self.config.infile, "TRANSITION"
+                ),
+                "feature_columns": get_table_columns(self.config.infile, "FEATURE"),
+                "feature_ms2_alignment_exists": check_sqlite_table(
+                    sql_conn, "FEATURE_MS2_ALIGNMENT"
+                ),
+                "has_library_drift_time": "LIBRARY_DRIFT_TIME"
+                in get_table_columns(self.config.infile, "PRECURSOR"),
+                "has_annotation": "ANNOTATION"
+                in get_table_columns(self.config.infile, "TRANSITION"),
+                "has_im": "EXP_IM" in get_table_columns(self.config.infile, "FEATURE"),
+                "feature_ms1_cols": [
+                    col
+                    for col in get_table_columns_with_types(
+                        self.config.infile, "FEATURE_MS1"
+                    )
+                    if col[0] != "FEATURE_ID"
+                ],
+                "feature_ms2_cols": [
+                    col
+                    for col in get_table_columns_with_types(
+                        self.config.infile, "FEATURE_MS2"
+                    )
+                    if col[0] != "FEATURE_ID"
+                ],
+                "feature_transition_cols": [
+                    col
+                    for col in get_table_columns_with_types(
+                        self.config.infile, "FEATURE_TRANSITION"
+                    )
+                    if col[0] not in ["FEATURE_ID", "TRANSITION_ID"]
+                ],
+            }
+
+        return column_info
+
+    def _export_split_by_run(self, conn, column_info: dict) -> None:
+        """Export data split by run into separate directories"""
+        os.makedirs(self.config.outfile, exist_ok=True)
+
+        # Get run information
+        run_df = conn.execute(
+            f"SELECT ID, FILENAME FROM sqlite_scan('{self.config.infile}', 'RUN')"
+        ).fetchdf()
+        run_df["BASENAME"] = run_df["FILENAME"].apply(
+            lambda x: re.sub(r"\.[^.]*$", "", os.path.basename(x))
+        )
+        logger.info(f"Found {len(run_df)} runs to export.")
+
+        # Export each run
+        for _, row in run_df.iterrows():
+            run_id = row["ID"]
+            run_name = row["BASENAME"]
+            run_dir = os.path.join(self.config.outfile, f"{run_name}.oswpq")
+            os.makedirs(run_dir, exist_ok=True)
+
+            logger.info(f"Exporting run: {run_name} to {run_dir}")
+
+            # Export precursor data
+            precursor_path = os.path.join(run_dir, "precursors_features.parquet")
+            precursor_query = (
+                self._build_precursor_query(column_info)
+                + f"\nWHERE FEATURE.RUN_ID = {run_id}"
+            )
+            logger.info(f"Exporting precursor data to {precursor_path}")
+            self._execute_copy_query(conn, precursor_query, precursor_path)
+
+            # Export transition data
+            transition_path = os.path.join(run_dir, "transition_features.parquet")
+            transition_query_run = (
+                self._build_transition_query(column_info)
+                + f"\nWHERE FEATURE.RUN_ID = {run_id}"
+            )
+            transition_query_null = (
+                self._build_transition_query(column_info)
+                + "\nWHERE FEATURE.RUN_ID IS NULL"
+            )
+            combined_transition_query = (
+                f"{transition_query_run}\nUNION ALL\n{transition_query_null}"
+            )
+            logger.info(f"Exporting transition data to {transition_path}")
+            self._execute_copy_query(conn, combined_transition_query, transition_path)
+
+        # Export alignment data if exists
+        if column_info["feature_ms2_alignment_exists"]:
+            logger.info("Exporting alignment data for all runs")
+            self._export_alignment_data(conn)
+
+    def _export_combined(self, conn, column_info: dict) -> None:
+        """Export combined data (all runs together)"""
+        os.makedirs(self.config.outfile, exist_ok=True)
+
+        # Export precursor data
+        precursor_path = os.path.join(
+            self.config.outfile, "precursors_features.parquet"
+        )
+        logger.info(f"Exporting precursor data to {precursor_path}")
+        precursor_query = self._build_precursor_query(column_info)
+        self._execute_copy_query(conn, precursor_query, precursor_path)
+
+        # Export transition data
+        transition_path = os.path.join(
+            self.config.outfile, "transition_features.parquet"
+        )
+        logger.info(f"Exporting transition data to {transition_path}")
+        transition_query = self._build_transition_query(column_info)
+        self._execute_copy_query(conn, transition_query, transition_path)
+
+        # Export alignment data if exists
+        if column_info["feature_ms2_alignment_exists"]:
+            logger.info("Exporting alignment data")
+            self._export_alignment_data(conn)
+
+    def _export_single_file(self, conn, column_info: dict) -> None:
+        """Export all data to a single parquet file"""
+        # Create temp table with combined schema
+        logger.debug("Creating temporary table for combined export")
+        self._create_temp_table(conn, column_info)
+
+        # Insert precursor data
+        logger.debug("Inserting precursor data into temp table")
+        precursor_query = self._build_combined_precursor_query(column_info)
+        conn.execute(f"INSERT INTO temp_table {precursor_query}")
+
+        # Insert transition data
+        logger.debug("Inserting transition data into temp table")
+        transition_query = self._build_combined_transition_query(column_info)
+        conn.execute(f"INSERT INTO temp_table {transition_query}")
+
+        # Export to parquet
+        logger.info(f"Exporting combined data to {self.config.outfile}")
+        self._execute_copy_query(conn, "SELECT * FROM temp_table", self.config.outfile)
+
+        # Export alignment data if exists
+        if column_info["feature_ms2_alignment_exists"]:
+            alignment_path = (
+                os.path.splitext(self.config.outfile)[0] + "_feature_alignment.parquet"
+            )
+            logger.info(f"Exporting alignment data to {alignment_path}")
+            self._export_alignment_data(conn, alignment_path)
+
+    def _build_precursor_query(self, column_info: dict) -> str:
+        """Build SQL query for precursor data"""
+        feature_ms1_cols_sql = ", ".join(
+            f"FEATURE_MS1.{col[0]} AS FEATURE_MS1_{col[0]}"
+            for col in column_info["feature_ms1_cols"]
+        )
+
+        feature_ms2_cols_sql = ", ".join(
+            f"FEATURE_MS2.{col[0]} AS FEATURE_MS2_{col[0]}"
+            for col in column_info["feature_ms2_cols"]
+        )
+
+        return f"""
+            WITH normalized_peptides AS (
+                SELECT 
+                    ID AS PEPTIDE_ID,
+                    REPLACE(
+                        REPLACE(
+                            REPLACE(
+                                REPLACE(MODIFIED_SEQUENCE, '(UniMod:1)', '(Acetyl)'),
+                            '(UniMod:35)', '(Oxidation)'),
+                        '(UniMod:21)', '(Phospho)'),
+                    '(UniMod:4)', '(Carbamidomethyl)') AS NORMALIZED_SEQUENCE
+                FROM sqlite_scan('{self.config.infile}', 'PEPTIDE')
+            ),
+            ipf_groups AS (
+                SELECT 
+                    NORMALIZED_SEQUENCE,
+                    MIN(PEPTIDE_ID) AS IPF_PEPTIDE_ID
+                FROM normalized_peptides
+                GROUP BY NORMALIZED_SEQUENCE
+            ),
+            peptide_ipf_map AS (
+                SELECT 
+                    np.PEPTIDE_ID,
+                    g.IPF_PEPTIDE_ID
+                FROM normalized_peptides np
+                JOIN ipf_groups g USING (NORMALIZED_SEQUENCE)
+            ) 
+
+            SELECT 
+                PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID AS PROTEIN_ID,
+                PEPTIDE.ID AS PEPTIDE_ID,
+                pipf.IPF_PEPTIDE_ID AS IPF_PEPTIDE_ID,
+                PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID AS PRECURSOR_ID,
+                PROTEIN.PROTEIN_ACCESSION AS PROTEIN_ACCESSION,
+                PEPTIDE.UNMODIFIED_SEQUENCE,
+                PEPTIDE.MODIFIED_SEQUENCE,
+                PRECURSOR.TRAML_ID AS PRECURSOR_TRAML_ID,
+                PRECURSOR.GROUP_LABEL AS PRECURSOR_GROUP_LABEL,
+                PRECURSOR.PRECURSOR_MZ AS PRECURSOR_MZ,
+                PRECURSOR.CHARGE AS PRECURSOR_CHARGE,
+                PRECURSOR.LIBRARY_INTENSITY AS PRECURSOR_LIBRARY_INTENSITY,
+                PRECURSOR.LIBRARY_RT AS PRECURSOR_LIBRARY_RT,
+                {"PRECURSOR.LIBRARY_DRIFT_TIME" if column_info["has_library_drift_time"] else "NULL"} AS PRECURSOR_LIBRARY_DRIFT_TIME,
+                {"PEPTIDE_GENE_MAPPING.GENE_ID" if column_info["gene_tables_exist"] else "NULL"} AS GENE_ID,
+                {"GENE.GENE_NAME" if column_info["gene_tables_exist"] else "NULL"} AS GENE_NAME,
+                {"GENE.DECOY" if column_info["gene_tables_exist"] else "NULL"} AS GENE_DECOY,
+                PROTEIN.DECOY AS PROTEIN_DECOY,
+                PEPTIDE.DECOY AS PEPTIDE_DECOY,
+                PRECURSOR.DECOY AS PRECURSOR_DECOY,
+                FEATURE.RUN_ID AS RUN_ID,
+                RUN.FILENAME,
+                FEATURE.ID AS FEATURE_ID,
+                FEATURE.EXP_RT,
+                {"FEATURE.EXP_IM" if column_info["has_im"] else "NULL"} AS EXP_IM,
+                FEATURE.NORM_RT,
+                FEATURE.DELTA_RT,
+                FEATURE.LEFT_WIDTH,
+                FEATURE.RIGHT_WIDTH,
+                {feature_ms1_cols_sql},
+                {feature_ms2_cols_sql}
+            FROM sqlite_scan('{self.config.infile}', 'PRECURSOR') AS PRECURSOR
+            INNER JOIN sqlite_scan('{self.config.infile}', 'PRECURSOR_PEPTIDE_MAPPING') AS PRECURSOR_PEPTIDE_MAPPING 
+                ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
+            INNER JOIN sqlite_scan('{self.config.infile}', 'PEPTIDE') AS PEPTIDE 
+                ON PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
+            INNER JOIN peptide_ipf_map AS pipf
+                ON PEPTIDE.ID = pipf.PEPTIDE_ID
+            INNER JOIN sqlite_scan('{self.config.infile}', 'PEPTIDE_PROTEIN_MAPPING') AS PEPTIDE_PROTEIN_MAPPING 
+                ON PEPTIDE.ID = PEPTIDE_PROTEIN_MAPPING.PEPTIDE_ID
+            INNER JOIN sqlite_scan('{self.config.infile}', 'PROTEIN') AS PROTEIN 
+                ON PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID = PROTEIN.ID
+            {self._build_gene_joins(column_info)}
+            INNER JOIN sqlite_scan('{self.config.infile}', 'FEATURE') AS FEATURE 
+                ON FEATURE.PRECURSOR_ID = PRECURSOR.ID
+            INNER JOIN sqlite_scan('{self.config.infile}', 'FEATURE_MS1') AS FEATURE_MS1 
+                ON FEATURE.ID = FEATURE_MS1.FEATURE_ID
+            INNER JOIN sqlite_scan('{self.config.infile}', 'FEATURE_MS2') AS FEATURE_MS2 
+                ON FEATURE.ID = FEATURE_MS2.FEATURE_ID
+            INNER JOIN sqlite_scan('{self.config.infile}', 'RUN') AS RUN 
+                ON FEATURE.RUN_ID = RUN.ID
+            """
+
+    def _build_transition_query(self, column_info: dict) -> str:
+        """Build SQL query for transition data"""
+        feature_transition_cols_sql = ", ".join(
+            f"FEATURE_TRANSITION.{col[0]} AS FEATURE_TRANSITION_{col[0]}"
+            for col in column_info["feature_transition_cols"]
+        )
+
+        annotation = (
+            "TRANSITION.ANNOTATION"
+            if column_info["has_annotation"]
+            else "TRANSITION.TYPE || CAST(TRANSITION.ORDINAL AS VARCHAR) || '^' || CAST(TRANSITION.CHARGE AS VARCHAR)"
+        )
+
+        return f"""
+            SELECT 
+                FEATURE.RUN_ID AS RUN_ID,
+                TRANSITION_PEPTIDE_MAPPING.PEPTIDE_ID AS IPF_PEPTIDE_ID,
+                TRANSITION_PRECURSOR_MAPPING.PRECURSOR_ID AS PRECURSOR_ID,
+                TRANSITION.ID AS TRANSITION_ID,
+                TRANSITION.TRAML_ID AS TRANSITION_TRAML_ID,
+                TRANSITION.PRODUCT_MZ,
+                TRANSITION.CHARGE AS TRANSITION_CHARGE,
+                TRANSITION.TYPE AS TRANSITION_TYPE,
+                TRANSITION.ORDINAL AS TRANSITION_ORDINAL,
+                {annotation} AS ANNOTATION,
+                TRANSITION.DETECTING AS TRANSITION_DETECTING,
+                TRANSITION.LIBRARY_INTENSITY AS TRANSITION_LIBRARY_INTENSITY,
+                TRANSITION.DECOY AS TRANSITION_DECOY,
+                FEATURE.ID AS FEATURE_ID,
+                {feature_transition_cols_sql}
+            FROM sqlite_scan('{self.config.infile}', 'TRANSITION') AS TRANSITION
+            FULL JOIN sqlite_scan('{self.config.infile}', 'TRANSITION_PRECURSOR_MAPPING') AS TRANSITION_PRECURSOR_MAPPING 
+                ON TRANSITION.ID = TRANSITION_PRECURSOR_MAPPING.TRANSITION_ID
+            FULL JOIN sqlite_scan('{self.config.infile}', 'TRANSITION_PEPTIDE_MAPPING') AS TRANSITION_PEPTIDE_MAPPING 
+                ON TRANSITION.ID = TRANSITION_PEPTIDE_MAPPING.TRANSITION_ID
+            FULL JOIN sqlite_scan('{self.config.infile}', 'FEATURE_TRANSITION') AS FEATURE_TRANSITION 
+                ON TRANSITION.ID = FEATURE_TRANSITION.TRANSITION_ID
+            FULL JOIN (
+                SELECT ID, RUN_ID
+                FROM sqlite_scan('{self.config.infile}', 'FEATURE')
+            ) AS FEATURE
+                ON FEATURE_TRANSITION.FEATURE_ID = FEATURE.ID
+            """
+
+    def _build_combined_precursor_query(self, column_info: dict) -> str:
+        """Build combined precursor query for single file export"""
+        feature_ms1_cols_sql = ", ".join(
+            f"FEATURE_MS1.{col[0]} AS FEATURE_MS1_{col[0]}"
+            for col in column_info["feature_ms1_cols"]
+        )
+
+        feature_ms2_cols_sql = ", ".join(
+            f"FEATURE_MS2.{col[0]} AS FEATURE_MS2_{col[0]}"
+            for col in column_info["feature_ms2_cols"]
+        )
+
+        as_null_feature_transition_cols_sql = ", ".join(
+            f"NULL AS FEATURE_TRANSITION_{col[0]}"
+            for col in column_info["feature_transition_cols"]
+        )
+
+        return f"""
+            WITH normalized_peptides AS (
+                SELECT 
+                    ID AS PEPTIDE_ID,
+                    REPLACE(
+                        REPLACE(
+                            REPLACE(
+                                REPLACE(MODIFIED_SEQUENCE, '(UniMod:1)', '(Acetyl)'),
+                            '(UniMod:35)', '(Oxidation)'),
+                        '(UniMod:21)', '(Phospho)'),
+                    '(UniMod:4)', '(Carbamidomethyl)') AS NORMALIZED_SEQUENCE
+                FROM sqlite_scan('{self.config.infile}', 'PEPTIDE')
+            ),
+            ipf_groups AS (
+                SELECT 
+                    NORMALIZED_SEQUENCE,
+                    MIN(PEPTIDE_ID) AS IPF_PEPTIDE_ID
+                FROM normalized_peptides
+                GROUP BY NORMALIZED_SEQUENCE
+            ),
+            peptide_ipf_map AS (
+                SELECT 
+                    np.PEPTIDE_ID,
+                    g.IPF_PEPTIDE_ID
+                FROM normalized_peptides np
+                JOIN ipf_groups g USING (NORMALIZED_SEQUENCE)
+            ) 
+            
+            SELECT 
+                PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID AS PROTEIN_ID,
+                PEPTIDE.ID AS PEPTIDE_ID,
+                pipf.IPF_PEPTIDE_ID AS IPF_PEPTIDE_ID,
+                PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID AS PRECURSOR_ID,
+                PROTEIN.PROTEIN_ACCESSION AS PROTEIN_ACCESSION,
+                PEPTIDE.UNMODIFIED_SEQUENCE,
+                PEPTIDE.MODIFIED_SEQUENCE,
+                PRECURSOR.TRAML_ID AS PRECURSOR_TRAML_ID,
+                PRECURSOR.GROUP_LABEL AS PRECURSOR_GROUP_LABEL,
+                PRECURSOR.PRECURSOR_MZ AS PRECURSOR_MZ,
+                PRECURSOR.CHARGE AS PRECURSOR_CHARGE,
+                PRECURSOR.LIBRARY_INTENSITY AS PRECURSOR_LIBRARY_INTENSITY,
+                PRECURSOR.LIBRARY_RT AS PRECURSOR_LIBRARY_RT,
+                {"PRECURSOR.LIBRARY_DRIFT_TIME" if column_info["has_library_drift_time"] else "NULL"} AS PRECURSOR_LIBRARY_DRIFT_TIME,
+                {"PEPTIDE_GENE_MAPPING.GENE_ID" if column_info["gene_tables_exist"] else "NULL"} AS GENE_ID,
+                {"GENE.GENE_NAME" if column_info["gene_tables_exist"] else "NULL"} AS GENE_NAME,
+                {"GENE.DECOY" if column_info["gene_tables_exist"] else "NULL"} AS GENE_DECOY,
+                PROTEIN.DECOY AS PROTEIN_DECOY,
+                PEPTIDE.DECOY AS PEPTIDE_DECOY,
+                PRECURSOR.DECOY AS PRECURSOR_DECOY,
+                FEATURE.RUN_ID AS RUN_ID,
+                RUN.FILENAME,
+                FEATURE.ID AS FEATURE_ID,
+                FEATURE.EXP_RT,
+                {"FEATURE.EXP_IM" if column_info["has_im"] else "NULL"} AS EXP_IM,
+                FEATURE.NORM_RT,
+                FEATURE.DELTA_RT,
+                FEATURE.LEFT_WIDTH,
+                FEATURE.RIGHT_WIDTH,
+                {feature_ms1_cols_sql},
+                {feature_ms2_cols_sql},
+                NULL AS TRANSITION_ID,
+                NULL AS TRANSITION_TRAML_ID,
+                NULL AS PRODUCT_MZ,
+                NULL AS TRANSITION_CHARGE,
+                NULL AS TRANSITION_TYPE,
+                NULL AS TRANSITION_ORDINAL,
+                NULL AS ANNOTATION,
+                NULL AS TRANSITION_DETECTING,
+                NULL AS TRANSITION_LIBRARY_INTENSITY,
+                NULL AS TRANSITION_DECOY,
+                {as_null_feature_transition_cols_sql}
+            FROM sqlite_scan('{self.config.infile}', 'PRECURSOR') AS PRECURSOR
+            INNER JOIN sqlite_scan('{self.config.infile}', 'PRECURSOR_PEPTIDE_MAPPING') AS PRECURSOR_PEPTIDE_MAPPING 
+                ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
+            INNER JOIN sqlite_scan('{self.config.infile}', 'PEPTIDE') AS PEPTIDE 
+                ON PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
+            INNER JOIN peptide_ipf_map AS pipf
+                ON PEPTIDE.ID = pipf.PEPTIDE_ID
+            INNER JOIN sqlite_scan('{self.config.infile}', 'PEPTIDE_PROTEIN_MAPPING') AS PEPTIDE_PROTEIN_MAPPING 
+                ON PEPTIDE.ID = PEPTIDE_PROTEIN_MAPPING.PEPTIDE_ID
+            INNER JOIN sqlite_scan('{self.config.infile}', 'PROTEIN') AS PROTEIN 
+                ON PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID = PROTEIN.ID
+            {self._build_gene_joins(column_info)}
+            INNER JOIN sqlite_scan('{self.config.infile}', 'FEATURE') AS FEATURE 
+                ON FEATURE.PRECURSOR_ID = PRECURSOR.ID
+            INNER JOIN sqlite_scan('{self.config.infile}', 'FEATURE_MS1') AS FEATURE_MS1 
+                ON FEATURE.ID = FEATURE_MS1.FEATURE_ID
+            INNER JOIN sqlite_scan('{self.config.infile}', 'FEATURE_MS2') AS FEATURE_MS2 
+                ON FEATURE.ID = FEATURE_MS2.FEATURE_ID
+            INNER JOIN sqlite_scan('{self.config.infile}', 'RUN') AS RUN 
+                ON FEATURE.RUN_ID = RUN.ID
+            """
+
+    def _build_combined_transition_query(self, column_info: dict) -> str:
+        """Build combined transition query for single file export"""
+        as_null_feature_ms1_cols_sql = ", ".join(
+            f"NULL AS FEATURE_MS1_{col[0]}" for col in column_info["feature_ms1_cols"]
+        )
+
+        as_null_feature_ms2_cols_sql = ", ".join(
+            f"NULL AS FEATURE_MS2_{col[0]}" for col in column_info["feature_ms2_cols"]
+        )
+
+        feature_transition_cols_sql = ", ".join(
+            f"FEATURE_TRANSITION.{col[0]} AS FEATURE_TRANSITION_{col[0]}"
+            for col in column_info["feature_transition_cols"]
+        )
+
+        annotation = (
+            "TRANSITION.ANNOTATION"
+            if column_info["has_annotation"]
+            else "TRANSITION.TYPE || CAST(TRANSITION.ORDINAL AS VARCHAR) || '^' || CAST(TRANSITION.CHARGE AS VARCHAR)"
+        )
+
+        return f"""
+            SELECT
+                NULL AS PROTEIN_ID,
+                NULL AS PEPTIDE_ID,
+                TRANSITION_PEPTIDE_MAPPING.PEPTIDE_ID AS IPF_PEPTIDE_ID,
+                TRANSITION_PRECURSOR_MAPPING.PRECURSOR_ID AS PRECURSOR_ID,
+                NULL AS PROTEIN_ACCESSION,
+                NULL AS UNMODIFIED_SEQUENCE,
+                NULL AS MODIFIED_SEQUENCE,
+                NULL AS PRECURSOR_TRAML_ID,
+                NULL AS PRECURSOR_GROUP_LABEL,
+                NULL AS PRECURSOR_MZ,
+                NULL AS PRECURSOR_CHARGE,
+                NULL AS PRECURSOR_LIBRARY_INTENSITY,
+                NULL AS PRECURSOR_LIBRARY_RT,
+                NULL AS PRECURSOR_LIBRARY_DRIFT_TIME,
+                NULL AS GENE_ID,
+                NULL AS GENE_NAME,
+                NULL AS GENE_DECOY,
+                NULL AS PROTEIN_DECOY,
+                NULL AS PEPTIDE_DECOY,
+                NULL AS PRECURSOR_DECOY,
+                NULL AS RUN_ID,
+                NULL AS FILENAME,
+                FEATURE_TRANSITION.FEATURE_ID AS FEATURE_ID,
+                NULL AS EXP_RT,
+                NULL AS EXP_IM,
+                NULL as NORM_RT,
+                NULL AS DELTA_RT,
+                NULL AS LEFT_WIDTH,
+                NULL AS RIGHT_WIDTH,
+                {as_null_feature_ms1_cols_sql},
+                {as_null_feature_ms2_cols_sql},
+                TRANSITION.ID AS TRANSITION_ID,
+                TRANSITION.TRAML_ID AS TRANSITION_TRAML_ID,
+                TRANSITION.PRODUCT_MZ,
+                TRANSITION.CHARGE AS TRANSITION_CHARGE,
+                TRANSITION.TYPE AS TRANSITION_TYPE,
+                TRANSITION.ORDINAL AS TRANSITION_ORDINAL,
+                {annotation} AS ANNOTATION,
+                TRANSITION.DETECTING AS TRANSITION_DETECTING,
+                TRANSITION.LIBRARY_INTENSITY AS TRANSITION_LIBRARY_INTENSITY,
+                TRANSITION.DECOY AS TRANSITION_DECOY,
+                {feature_transition_cols_sql}
+            FROM sqlite_scan('{self.config.infile}', 'TRANSITION_PRECURSOR_MAPPING') AS TRANSITION_PRECURSOR_MAPPING 
+            INNER JOIN sqlite_scan('{self.config.infile}', 'TRANSITION') AS TRANSITION
+                ON TRANSITION_PRECURSOR_MAPPING.TRANSITION_ID = TRANSITION.ID
+            FULL JOIN sqlite_scan('{self.config.infile}', 'TRANSITION_PEPTIDE_MAPPING') AS TRANSITION_PEPTIDE_MAPPING 
+                ON TRANSITION.ID = TRANSITION_PEPTIDE_MAPPING.TRANSITION_ID
+            FULL JOIN sqlite_scan('{self.config.infile}', 'FEATURE_TRANSITION') AS FEATURE_TRANSITION 
+                ON TRANSITION.ID = FEATURE_TRANSITION.TRANSITION_ID
+            """
+
+    def _create_temp_table(self, conn, column_info: dict) -> None:
+        """Create temporary table with combined schema"""
+        feature_ms1_cols_types = ", ".join(
+            f"FEATURE_MS1_{col[0]} {col[1]}" for col in column_info["feature_ms1_cols"]
+        )
+
+        feature_ms2_cols_types = ", ".join(
+            f"FEATURE_MS2_{col[0]} {col[1]}" for col in column_info["feature_ms2_cols"]
+        )
+
+        feature_transition_cols_types = ", ".join(
+            f"FEATURE_TRANSITION_{col[0]} {col[1]}"
+            for col in column_info["feature_transition_cols"]
+        )
+
+        create_temp_table_query = f"""
+        CREATE TABLE temp_table (
+            PROTEIN_ID BIGINT,
+            PEPTIDE_ID BIGINT,
+            IPF_PEPTIDE_ID BIGINT,
+            PRECURSOR_ID BIGINT,
+            PROTEIN_ACCESSION TEXT,
+            UNMODIFIED_SEQUENCE TEXT,
+            MODIFIED_SEQUENCE TEXT,
+            PRECURSOR_TRAML_ID TEXT,
+            PRECURSOR_GROUP_LABEL TEXT,
+            PRECURSOR_MZ DOUBLE,
+            PRECURSOR_CHARGE INTEGER,
+            PRECURSOR_LIBRARY_INTENSITY DOUBLE,
+            PRECURSOR_LIBRARY_RT DOUBLE,
+            PRECURSOR_LIBRARY_DRIFT_TIME DOUBLE,
+            GENE_ID BIGINT,
+            GENE_NAME TEXT,
+            GENE_DECOY BOOLEAN,
+            PROTEIN_DECOY BOOLEAN,
+            PEPTIDE_DECOY BOOLEAN,
+            PRECURSOR_DECOY BOOLEAN,
+            RUN_ID BIGINT,
+            FILENAME TEXT,
+            FEATURE_ID BIGINT,
+            EXP_RT DOUBLE,
+            EXP_IM DOUBLE,
+            NORM_RT DOUBLE,
+            DELTA_RT DOUBLE,
+            LEFT_WIDTH DOUBLE,
+            RIGHT_WIDTH DOUBLE,
+            {feature_ms1_cols_types},
+            {feature_ms2_cols_types},
+            TRANSITION_ID BIGINT,
+            TRANSITION_TRAML_ID TEXT,
+            PRODUCT_MZ DOUBLE,
+            TRANSITION_CHARGE INTEGER,
+            TRANSITION_TYPE TEXT,
+            TRANSITION_ORDINAL INTEGER,
+            ANNOTATION TEXT,
+            TRANSITION_DETECTING BOOLEAN,
+            TRANSITION_LIBRARY_INTENSITY DOUBLE,
+            TRANSITION_DECOY BOOLEAN,
+            {feature_transition_cols_types}
+        );
+        """
+
+        conn.execute(create_temp_table_query)
+
+    def _export_alignment_data(self, conn, path: str = None) -> None:
+        """Export feature alignment data"""
+        if path is None:
+            path = os.path.join(self.config.outfile, "feature_alignment.parquet")
+
+        query = f"""
+        SELECT
+            ALIGNMENT_ID,
+            RUN_ID,
+            PRECURSOR_ID,
+            ALIGNED_FEATURE_ID AS FEATURE_ID,
+            REFERENCE_FEATURE_ID,
+            ALIGNED_RT,
+            REFERENCE_RT,
+            XCORR_COELUTION_TO_REFERENCE AS VAR_XCORR_COELUTION_TO_REFERENCE,
+            XCORR_SHAPE_TO_REFERENCE AS VAR_XCORR_SHAPE_TO_REFERENCE, 
+            MI_TO_REFERENCE AS VAR_MI_TO_REFERENCE, 
+            XCORR_COELUTION_TO_ALL AS VAR_XCORR_COELUTION_TO_ALL,  
+            XCORR_SHAPE_TO_ALL AS VAR_XCORR_SHAPE, 
+            MI_TO_ALL AS VAR_MI_TO_ALL, 
+            RETENTION_TIME_DEVIATION AS VAR_RETENTION_TIME_DEVIATION, 
+            PEAK_INTENSITY_RATIO AS VAR_PEAK_INTENSITY_RATIO,
+            LABEL AS DECOY
+        FROM sqlite_scan('{self.config.infile}', 'FEATURE_MS2_ALIGNMENT')
+        """
+
+        self._execute_copy_query(conn, query, path)
+
+    def _build_gene_joins(self, column_info: dict) -> str:
+        """Build gene join clauses if gene tables exist"""
+        if column_info["gene_tables_exist"]:
+            return f"""
+                LEFT JOIN sqlite_scan('{self.config.infile}', 'PEPTIDE_GENE_MAPPING') AS PEPTIDE_GENE_MAPPING 
+                    ON PEPTIDE.ID = PEPTIDE_GENE_MAPPING.PEPTIDE_ID 
+                LEFT JOIN sqlite_scan('{self.config.infile}', 'GENE') AS GENE 
+                    ON PEPTIDE_GENE_MAPPING.GENE_ID = GENE.ID
+            """
+        return ""
+
+    def _execute_copy_query(self, conn, query: str, path: str) -> None:
+        """Execute COPY query with configured compression settings"""
+        conn.execute(
+            f"COPY ({query}) TO '{path}' "
+            f"(FORMAT 'parquet', COMPRESSION '{self.config.compression_method}', "
+            f"COMPRESSION_LEVEL {self.config.compression_level})"
+        )

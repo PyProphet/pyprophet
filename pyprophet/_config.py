@@ -690,7 +690,7 @@ class ExportIOConfig(BaseIOConfig):
     """
 
     export_format: Literal[
-        "matrix", "legacy_merged", "legacy_split", "parquet", "split_parquet"
+        "matrix", "legacy_merged", "legacy_split", "parquet", "parquet_split"
     ] = "legacy_merged"
     out_type: Literal["tsv", "csv"] = "tsv"
     transition_quantification: bool = False
@@ -707,3 +707,9 @@ class ExportIOConfig(BaseIOConfig):
     top_n: int = 3
     consistent_top: bool = True
     normalization: Literal["none", "median", "medianmedian", "quantile"] = "none"
+
+    # Export to parquet
+    compression_method: Literal["none", "snappy", "gzip", "brotli", "zstd"] = "zstd"
+    compression_level: int = 11
+    split_transition_data: bool = True
+    split_runs: bool = False

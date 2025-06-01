@@ -1,33 +1,35 @@
 import os
-from pathlib import Path
 import shutil
 import time
+from pathlib import Path
+
 import click
 from loguru import logger
 
-from .util import (
-    CombinedGroup,
-    AdvancedHelpCommand,
-    write_logfile,
-    measure_memory_usage_and_time,
+from .._config import ExportIOConfig
+from ..export.export_compound import export_compound_tsv
+from ..export.export_parquet import (
+    convert_sqmass_to_parquet,
+    export_to_parquet,
 )
-
-from ..export import (
-    export_tsv as _export_tsv,
+from ..export.export_report import (
     export_score_plots as _export_score_plots,
 )
-from ..export_compound import export_compound_tsv
+from ..export.export_report import (
+    export_scored_report as _export_scored_report,
+)
 from ..glyco.export import (
-    export_tsv as export_glyco_tsv,
     export_score_plots as export_glyco_score_plots,
 )
-from ..export_parquet import (
-    export_to_parquet,
-    convert_osw_to_parquet,
-    convert_sqmass_to_parquet,
+from ..glyco.export import (
+    export_tsv as export_glyco_tsv,
 )
-
-from ..export_report import export_scored_report as _export_scored_report
+from ..io.dispatcher import ReaderDispatcher, WriterDispatcher
+from .util import (
+    AdvancedHelpCommand,
+    CombinedGroup,
+    measure_memory_usage_and_time,
+)
 
 
 def create_export_group():
@@ -39,6 +41,7 @@ def create_export_group():
         pass
 
     export.add_command(export_tsv, name="tsv")
+    export.add_command(export_matrix, name="matrix")
     export.add_command(export_parquet, name="parquet")
     export.add_command(export_compound, name="compound")
     export.add_command(export_glyco, name="glyco")
@@ -62,14 +65,14 @@ def create_export_group():
     "--out",
     "outfile",
     type=click.Path(exists=False),
-    help="Output TSV/CSV (matrix, legacy_split, legacy_merged) file.",
+    help="Output TSV/CSV (legacy_split, legacy_merged) file.",
 )
 @click.option(
     "--format",
-    default="legacy_split",
+    default="legacy_merged",
     show_default=True,
-    type=click.Choice(["matrix", "legacy_split", "legacy_merged"]),
-    help="Export format, either matrix, legacy_split/legacy_merged (mProphet/PyProphet) or score_plots format.",
+    type=click.Choice(["legacy_split", "legacy_merged"]),
+    help="Export format, either legacy_split/legacy_merged (mProphet/PyProphet).",
 )
 @click.option(
     "--csv/--no-csv",
@@ -166,21 +169,187 @@ def export_tsv(
     else:
         outfile = outfile
 
-    _export_tsv(
-        infile,
-        outfile,
-        format,
-        outcsv,
-        transition_quantification,
-        max_transition_pep,
-        ipf,
-        ipf_max_peptidoform_pep,
-        max_rs_peakgroup_qvalue,
-        peptide,
-        max_global_peptide_qvalue,
-        protein,
-        max_global_protein_qvalue,
+    config = ExportIOConfig(
+        infile=infile,
+        outfile=outfile,
+        subsample_ratio=1.0,  # Not used in export
+        level="export",
+        context="export",
+        export_format=format,
+        out_type="csv" if outcsv else "tsv",
+        transition_quantification=transition_quantification,
+        max_transition_pep=max_transition_pep,
+        ipf=ipf,
+        ipf_max_peptidoform_pep=ipf_max_peptidoform_pep,
+        max_rs_peakgroup_qvalue=max_rs_peakgroup_qvalue,
+        peptide=peptide,
+        max_global_peptide_qvalue=max_global_peptide_qvalue,
+        protein=protein,
+        max_global_protein_qvalue=max_global_protein_qvalue,
     )
+
+    reader = ReaderDispatcher.get_reader(config)
+    writer = WriterDispatcher.get_writer(config)
+
+    df = reader.read()
+    writer.export_results(df)
+
+
+# Export Quantification Matrix TSV
+@click.command(name="matrix", cls=AdvancedHelpCommand)
+# File handling
+@click.option(
+    "--in",
+    "infile",
+    required=True,
+    type=click.Path(exists=True),
+    help="PyProphet input file.",
+)
+@click.option(
+    "--out",
+    "outfile",
+    type=click.Path(exists=False),
+    help="Output TSV/CSV (legacy_split, legacy_merged) file.",
+)
+@click.option(
+    "--level",
+    default="peptide",
+    show_default=True,
+    type=click.Choice(["precursor", "peptide", "protein", "gene"]),
+    help="Export quantification level, either precursor, peptide, protein, or gene.",
+)
+@click.option(
+    "--csv/--no-csv",
+    "outcsv",
+    default=False,
+    show_default=True,
+    help="Export CSV instead of TSV file.",
+)
+# Context
+@click.option(
+    "--transition_quantification/--no-transition_quantification",
+    default=True,
+    show_default=True,
+    help="[format: legacy] Report aggregated transition-level quantification.",
+)
+@click.option(
+    "--max_transition_pep",
+    default=0.7,
+    show_default=True,
+    type=float,
+    help="[format: legacy] Maximum PEP to retain scored transitions for quantification (requires transition-level scoring).",
+)
+@click.option(
+    "--ipf",
+    default="peptidoform",
+    show_default=True,
+    type=click.Choice(["peptidoform", "augmented", "disable"]),
+    help='[format: matrix/legacy] Should IPF results be reported if present? "peptidoform": Report results on peptidoform-level, "augmented": Augment OpenSWATH results with IPF scores, "disable": Ignore IPF results',
+)
+@click.option(
+    "--ipf_max_peptidoform_pep",
+    default=0.4,
+    show_default=True,
+    type=float,
+    help="[format: matrix/legacy] IPF: Filter results to maximum run-specific peptidoform-level PEP.",
+)
+@click.option(
+    "--max_rs_peakgroup_qvalue",
+    default=0.05,
+    show_default=True,
+    type=float,
+    help="[format: matrix/legacy] Filter results to maximum run-specific peak group-level q-value.",
+)
+@click.option(
+    "--max_global_peptide_qvalue",
+    default=0.01,
+    show_default=True,
+    type=float,
+    help="[format: matrix/legacy] Filter results to maximum global peptide-level q-value.",
+)
+@click.option(
+    "--max_global_protein_qvalue",
+    default=0.01,
+    show_default=True,
+    type=float,
+    help="[format: matrix/legacy] Filter results to maximum global protein-level q-value.",
+)
+@click.option(
+    "--top_n",
+    default=3,
+    show_default=True,
+    type=int,
+    help="[format: matrix/legacy] Number of top intense features to use for summarization",
+)
+@click.option(
+    "--consistent_top/--no-consistent_top",
+    "consistent_top",
+    default=True,
+    show_default=True,
+    help="[format: matrix/legacy] UWhether to use same top features across all runs",
+)
+@click.option(
+    "--normalization",
+    default="none",
+    show_default=True,
+    type=click.Choice(["none", "median", "medianmedian", "quantile"]),
+    help="[format: matrix/legacy] Normalization method to apply to the quantification matrix.",
+)
+@measure_memory_usage_and_time
+def export_matrix(
+    infile,
+    outfile,
+    level,
+    outcsv,
+    transition_quantification,
+    max_transition_pep,
+    ipf,
+    ipf_max_peptidoform_pep,
+    max_rs_peakgroup_qvalue,
+    max_global_peptide_qvalue,
+    max_global_protein_qvalue,
+    top_n,
+    consistent_top,
+    normalization,
+):
+    """
+    Export Proteomics/Peptidoform Quantification Matrix
+    """
+    if outfile is None:
+        if outcsv:
+            outfile = infile.split(".osw")[0] + ".csv"
+        else:
+            outfile = infile.split(".osw")[0] + ".tsv"
+    else:
+        outfile = outfile
+
+    config = ExportIOConfig(
+        infile=infile,
+        outfile=outfile,
+        subsample_ratio=1.0,  # Not used in export
+        level=level,
+        context="export",
+        export_format="matrix",
+        out_type="csv" if outcsv else "tsv",
+        transition_quantification=transition_quantification,
+        max_transition_pep=max_transition_pep,
+        ipf=ipf,
+        ipf_max_peptidoform_pep=ipf_max_peptidoform_pep,
+        max_rs_peakgroup_qvalue=max_rs_peakgroup_qvalue,
+        peptide=True,
+        max_global_peptide_qvalue=max_global_peptide_qvalue,
+        protein=True,
+        max_global_protein_qvalue=max_global_protein_qvalue,
+        top_n=top_n,
+        consistent_top=consistent_top,
+        normalization=normalization,
+    )
+
+    reader = ReaderDispatcher.get_reader(config)
+    writer = WriterDispatcher.get_writer(config)
+
+    df = reader.read()
+    writer.export_quant_matrix(df)
 
 
 # Export to Parquet
@@ -301,17 +470,23 @@ def export_parquet(
                     f"{outfile} will be a directory containing a separate precursors_features.parquet and a transition_features.parquet"
                 )
 
-            start = time.time()
-            convert_osw_to_parquet(
-                infile,
-                outfile,
-                compression_method=compression,
-                compression_level=compression_level,
+            config = ExportIOConfig(
+                infile=infile,
+                outfile=outfile,
+                subsample_ratio=1.0,  # Not used in export
+                level="export",
+                context="export",
+                export_format="parquet"
+                if not split_transition_data
+                else "parquet_split",
                 split_transition_data=split_transition_data,
                 split_runs=split_runs,
+                compression_method=compression,
+                compression_level=compression_level,
             )
-            end = time.time()
-            logger.info(f"{outfile} written in {end - start:.4f} seconds.")
+
+            writer = WriterDispatcher.get_writer(config)
+            writer.export()
 
         else:
             if transitionLevel:
