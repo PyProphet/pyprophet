@@ -1138,7 +1138,7 @@ class BaseSplitParquetReader(BaseReader):
             if os.path.exists(transition_path):
                 transition_files = [transition_path]
 
-        if self.context in ("score_learn", "ipf", "levels_context"):
+        if self.context in ("score_learn", "ipf", "levels_context", "export"):
             print_parquet_tree(
                 base_dir, precursor_files, transition_files, print_alignment_file, 5
             )
@@ -1184,6 +1184,7 @@ class BaseSplitParquetReader(BaseReader):
             "score_learn",
             "score_apply",
             "ipf",
+            "export",
         ):
             if self.subsample_ratio < 1.0:
                 logger.trace("Creating 'transition' view with sampled precursor IDs")
