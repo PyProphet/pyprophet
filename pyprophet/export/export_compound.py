@@ -101,7 +101,7 @@ def export_compound_tsv(infile, outfile, format, outcsv, max_rs_peakgroup_qvalue
                                    FEATURE.RIGHT_WIDTH AS rightWidth,
                                    SCORE_MS1.RANK AS peak_group_rank,
                                    SCORE_MS1.SCORE AS d_score,
-                                   SCORE_MS1.Q_VALUE AS m_score
+                                   SCORE_MS1.QVALUE AS m_score
                                FROM PRECURSOR
                                INNER JOIN PRECURSOR_COMPOUND_MAPPING ON PRECURSOR.ID = PRECURSOR_COMPOUND_MAPPING.PRECURSOR_ID
                                INNER JOIN COMPOUND ON PRECURSOR_COMPOUND_MAPPING.COMPOUND_ID = COMPOUND.ID
@@ -110,7 +110,7 @@ def export_compound_tsv(infile, outfile, format, outcsv, max_rs_peakgroup_qvalue
                                LEFT JOIN FEATURE_MS1 ON FEATURE_MS1.FEATURE_ID = FEATURE.ID
                                LEFT JOIN FEATURE_MS2 ON FEATURE_MS2.FEATURE_ID = FEATURE.ID
                                LEFT JOIN SCORE_MS1 ON SCORE_MS1.FEATURE_ID = FEATURE.ID
-                               WHERE SCORE_MS1.Q_VALUE < %s
+                               WHERE SCORE_MS1.QVALUE < %s
                                ORDER BY transition_group_id,
                                         peak_group_rank;
                                """
@@ -145,7 +145,7 @@ def export_compound_tsv(infile, outfile, format, outcsv, max_rs_peakgroup_qvalue
                                    FEATURE.RIGHT_WIDTH AS rightWidth,
                                    SCORE_MS2.RANK AS peak_group_rank,
                                    SCORE_MS2.SCORE AS d_score,
-                                   SCORE_MS2.Q_VALUE AS m_score
+                                   SCORE_MS2.QVALUE AS m_score
                                FROM PRECURSOR
                                INNER JOIN PRECURSOR_COMPOUND_MAPPING ON PRECURSOR.ID = PRECURSOR_COMPOUND_MAPPING.PRECURSOR_ID
                                INNER JOIN COMPOUND ON PRECURSOR_COMPOUND_MAPPING.COMPOUND_ID = COMPOUND.ID
@@ -154,7 +154,7 @@ def export_compound_tsv(infile, outfile, format, outcsv, max_rs_peakgroup_qvalue
                                LEFT JOIN FEATURE_MS1 ON FEATURE_MS1.FEATURE_ID = FEATURE.ID
                                LEFT JOIN FEATURE_MS2 ON FEATURE_MS2.FEATURE_ID = FEATURE.ID
                                LEFT JOIN SCORE_MS2 ON SCORE_MS2.FEATURE_ID = FEATURE.ID
-                               WHERE SCORE_MS2.Q_VALUE < %s
+                               WHERE SCORE_MS2.QVALUE < %s
                                ORDER BY transition_group_id,
                                         peak_group_rank;
                                """
