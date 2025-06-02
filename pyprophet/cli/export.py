@@ -8,7 +8,6 @@ from loguru import logger
 
 from .._config import ExportIOConfig
 from ..export.export_compound import export_compound_tsv
-from ..export.export_parquet import convert_sqmass_to_parquet
 from ..export.export_report import (
     export_score_plots as _export_score_plots,
 )
