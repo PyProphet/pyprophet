@@ -12,6 +12,7 @@ from loguru import logger
 from ..util import (
     check_sqlite_table,
     check_duckdb_table,
+    unimod_to_codename,
     write_scores_sql_command,
     load_sqlite_scanner,
     get_table_columns,
@@ -763,7 +764,7 @@ class OSWWriter(BaseOSWWriter):
             # Export precursor data
             precursor_path = os.path.join(run_dir, "precursors_features.parquet")
             precursor_query = (
-                self._build_precursor_query(column_info)
+                self._build_precursor_query(conn, column_info)
                 + f"\nWHERE FEATURE.RUN_ID = {run_id}"
             )
             logger.info(f"Exporting precursor data to {precursor_path}")
@@ -799,7 +800,7 @@ class OSWWriter(BaseOSWWriter):
             self.config.outfile, "precursors_features.parquet"
         )
         logger.info(f"Exporting precursor data to {precursor_path}")
-        precursor_query = self._build_precursor_query(column_info)
+        precursor_query = self._build_precursor_query(conn, column_info)
         self._execute_copy_query(conn, precursor_query, precursor_path)
 
         # Export transition data
@@ -823,7 +824,7 @@ class OSWWriter(BaseOSWWriter):
 
         # Insert precursor data
         logger.debug("Inserting precursor data into temp table")
-        precursor_query = self._build_combined_precursor_query(column_info)
+        precursor_query = self._build_combined_precursor_query(conn, column_info)
         conn.execute(f"INSERT INTO temp_table {precursor_query}")
 
         # Insert transition data
@@ -843,7 +844,7 @@ class OSWWriter(BaseOSWWriter):
             logger.info(f"Exporting alignment data to {alignment_path}")
             self._export_alignment_data(conn, alignment_path)
 
-    def _build_precursor_query(self, column_info: dict) -> str:
+    def _build_precursor_query(self, conn, column_info: dict) -> str:
         """Build SQL query for precursor data"""
         feature_ms1_cols_sql = ", ".join(
             f"FEATURE_MS1.{col[0]} AS FEATURE_MS1_{col[0]}"
@@ -855,33 +856,72 @@ class OSWWriter(BaseOSWWriter):
             for col in column_info["feature_ms2_cols"]
         )
 
+        # First get the peptide table and process it with pyopenms
+        logger.info("Generating peptide unimod to codename mapping")
+        with sqlite3.connect(self.config.infile) as sql_conn:
+            peptide_df = pd.read_sql_query(
+                "SELECT ID, MODIFIED_SEQUENCE FROM PEPTIDE", sql_conn
+            )
+        peptide_df["codename"] = peptide_df["MODIFIED_SEQUENCE"].apply(
+            unimod_to_codename
+        )
+
+        # Create the merged mapping as you did in your example
+        unimod_mask = peptide_df["MODIFIED_SEQUENCE"].str.contains("UniMod")
+        merged_df = pd.merge(
+            peptide_df[unimod_mask][["codename", "ID"]],
+            peptide_df[~unimod_mask][["codename", "ID"]],
+            on="codename",
+            suffixes=("_unimod", "_codename"),
+            how="outer",
+        )
+
+        # Fill NaN values in the 'ID_codename' column with the 'ID_unimod' values
+        merged_df["ID_codename"] = merged_df["ID_codename"].fillna(
+            merged_df["ID_unimod"]
+        )
+        # Fill NaN values in the 'ID_unimod' column with the 'ID_codename' values
+        merged_df["ID_unimod"] = merged_df["ID_unimod"].fillna(merged_df["ID_codename"])
+
+        merged_df["ID_unimod"] = merged_df["ID_unimod"].astype(int)
+        merged_df["ID_codename"] = merged_df["ID_codename"].astype(int)
+
+        # Register peptide_ipf_map
+        conn.register(
+            "peptide_ipf_map",
+            merged_df.rename(
+                columns={"ID_unimod": "PEPTIDE_ID", "ID_codename": "IPF_PEPTIDE_ID"}
+            ),
+        )
+
         return f"""
-            WITH normalized_peptides AS (
-                SELECT 
-                    ID AS PEPTIDE_ID,
-                    REPLACE(
-                        REPLACE(
-                            REPLACE(
-                                REPLACE(MODIFIED_SEQUENCE, '(UniMod:1)', '(Acetyl)'),
-                            '(UniMod:35)', '(Oxidation)'),
-                        '(UniMod:21)', '(Phospho)'),
-                    '(UniMod:4)', '(Carbamidomethyl)') AS NORMALIZED_SEQUENCE
-                FROM sqlite_scan('{self.config.infile}', 'PEPTIDE')
-            ),
-            ipf_groups AS (
-                SELECT 
-                    NORMALIZED_SEQUENCE,
-                    MIN(PEPTIDE_ID) AS IPF_PEPTIDE_ID
-                FROM normalized_peptides
-                GROUP BY NORMALIZED_SEQUENCE
-            ),
-            peptide_ipf_map AS (
-                SELECT 
-                    np.PEPTIDE_ID,
-                    g.IPF_PEPTIDE_ID
-                FROM normalized_peptides np
-                JOIN ipf_groups g USING (NORMALIZED_SEQUENCE)
-            ) 
+            -- Need to map the unimod peptide ids to the ipf codename peptide ids. The section below is commented out, since it's limited to only the 4 common modifications. Have replaced it above with a more general approach that handles all modifications using pyopenms
+            --WITH normalized_peptides AS (
+            --    SELECT 
+            --        ID AS PEPTIDE_ID,
+            --        REPLACE(
+            --            REPLACE(
+            --                REPLACE(
+            --                    REPLACE(MODIFIED_SEQUENCE, '(UniMod:1)', '(Acetyl)'),
+            --                '(UniMod:35)', '(Oxidation)'),
+            --            '(UniMod:21)', '(Phospho)'),
+            --        '(UniMod:4)', '(Carbamidomethyl)') AS NORMALIZED_SEQUENCE
+            --    FROM sqlite_scan('{self.config.infile}', 'PEPTIDE')
+            --),
+            --ipf_groups AS (
+            --    SELECT 
+            --        NORMALIZED_SEQUENCE,
+            --        MIN(PEPTIDE_ID) AS IPF_PEPTIDE_ID
+            --    FROM normalized_peptides
+            --    GROUP BY NORMALIZED_SEQUENCE
+            --),
+            --peptide_ipf_map AS (
+            --    SELECT 
+            --        np.PEPTIDE_ID,
+            --        g.IPF_PEPTIDE_ID
+            --    FROM normalized_peptides np
+            --    JOIN ipf_groups g USING (NORMALIZED_SEQUENCE)
+            --) 
 
             SELECT 
                 PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID AS PROTEIN_ID,
@@ -981,7 +1021,7 @@ class OSWWriter(BaseOSWWriter):
                 ON FEATURE_TRANSITION.FEATURE_ID = FEATURE.ID
             """
 
-    def _build_combined_precursor_query(self, column_info: dict) -> str:
+    def _build_combined_precursor_query(self, conn, column_info: dict) -> str:
         """Build combined precursor query for single file export"""
         feature_ms1_cols_sql = ", ".join(
             f"FEATURE_MS1.{col[0]} AS FEATURE_MS1_{col[0]}"
@@ -998,33 +1038,72 @@ class OSWWriter(BaseOSWWriter):
             for col in column_info["feature_transition_cols"]
         )
 
+        # First get the peptide table and process it with pyopenms
+        logger.info("Generating peptide unimod to codename mapping")
+        with sqlite3.connect(self.config.infile) as sql_conn:
+            peptide_df = pd.read_sql_query(
+                "SELECT ID, MODIFIED_SEQUENCE FROM PEPTIDE", sql_conn
+            )
+        peptide_df["codename"] = peptide_df["MODIFIED_SEQUENCE"].apply(
+            unimod_to_codename
+        )
+
+        # Create the merged mapping as you did in your example
+        unimod_mask = peptide_df["MODIFIED_SEQUENCE"].str.contains("UniMod")
+        merged_df = pd.merge(
+            peptide_df[unimod_mask][["codename", "ID"]],
+            peptide_df[~unimod_mask][["codename", "ID"]],
+            on="codename",
+            suffixes=("_unimod", "_codename"),
+            how="outer",
+        )
+
+        # Fill NaN values in the 'ID_codename' column with the 'ID_unimod' values
+        merged_df["ID_codename"] = merged_df["ID_codename"].fillna(
+            merged_df["ID_unimod"]
+        )
+        # Fill NaN values in the 'ID_unimod' column with the 'ID_codename' values
+        merged_df["ID_unimod"] = merged_df["ID_unimod"].fillna(merged_df["ID_codename"])
+
+        merged_df["ID_unimod"] = merged_df["ID_unimod"].astype(int)
+        merged_df["ID_codename"] = merged_df["ID_codename"].astype(int)
+
+        # Register peptide_ipf_map
+        conn.register(
+            "peptide_ipf_map",
+            merged_df.rename(
+                columns={"ID_unimod": "PEPTIDE_ID", "ID_codename": "IPF_PEPTIDE_ID"}
+            ),
+        )
+
         return f"""
-            WITH normalized_peptides AS (
-                SELECT 
-                    ID AS PEPTIDE_ID,
-                    REPLACE(
-                        REPLACE(
-                            REPLACE(
-                                REPLACE(MODIFIED_SEQUENCE, '(UniMod:1)', '(Acetyl)'),
-                            '(UniMod:35)', '(Oxidation)'),
-                        '(UniMod:21)', '(Phospho)'),
-                    '(UniMod:4)', '(Carbamidomethyl)') AS NORMALIZED_SEQUENCE
-                FROM sqlite_scan('{self.config.infile}', 'PEPTIDE')
-            ),
-            ipf_groups AS (
-                SELECT 
-                    NORMALIZED_SEQUENCE,
-                    MIN(PEPTIDE_ID) AS IPF_PEPTIDE_ID
-                FROM normalized_peptides
-                GROUP BY NORMALIZED_SEQUENCE
-            ),
-            peptide_ipf_map AS (
-                SELECT 
-                    np.PEPTIDE_ID,
-                    g.IPF_PEPTIDE_ID
-                FROM normalized_peptides np
-                JOIN ipf_groups g USING (NORMALIZED_SEQUENCE)
-            ) 
+            -- Need to map the unimod peptide ids to the ipf codename peptide ids. The section below is commented out, since it's limited to only the 4 common modifications. Have replaced it above with a more general approach that handles all modifications using pyopenms
+            --WITH normalized_peptides AS (
+            --    SELECT 
+            --        ID AS PEPTIDE_ID,
+            --        REPLACE(
+            --            REPLACE(
+            --                REPLACE(
+            --                    REPLACE(MODIFIED_SEQUENCE, '(UniMod:1)', '(Acetyl)'),
+            --                '(UniMod:35)', '(Oxidation)'),
+            --            '(UniMod:21)', '(Phospho)'),
+            --        '(UniMod:4)', '(Carbamidomethyl)') AS NORMALIZED_SEQUENCE
+            --    FROM sqlite_scan('{self.config.infile}', 'PEPTIDE')
+            --),
+            --ipf_groups AS (
+            --    SELECT 
+            --        NORMALIZED_SEQUENCE,
+            --        MIN(PEPTIDE_ID) AS IPF_PEPTIDE_ID
+            --    FROM normalized_peptides
+            --    GROUP BY NORMALIZED_SEQUENCE
+            --),
+            --peptide_ipf_map AS (
+            --    SELECT 
+            --        np.PEPTIDE_ID,
+            --        g.IPF_PEPTIDE_ID
+            --    FROM normalized_peptides np
+            --    JOIN ipf_groups g USING (NORMALIZED_SEQUENCE)
+            --) 
             
             SELECT 
                 PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID AS PROTEIN_ID,
