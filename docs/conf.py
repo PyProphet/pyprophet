@@ -20,10 +20,11 @@ sys.path.insert(0, os.path.abspath(os.path.join("../pyprophet/")))
 sys.path.insert(0, os.path.abspath(os.path.join("../../pyprophet/")))
 
 
-print("PYTHON PATH:", sys.path)
-print("Working Directory:", os.getcwd())
+import logging
 
-
+logging.basicConfig(level=logging.INFO)  # Set up basic logging
+logging.debug("PYTHON PATH: %s", sys.path)
+logging.debug("Working Directory: %s", os.getcwd())
 def find_git_directory(start_path):
     """Find the full path to the nearest '.git' directory by climbing up the directory tree.
 
