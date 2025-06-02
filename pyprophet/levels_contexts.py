@@ -68,7 +68,7 @@ def statistics_report(
     data["q_value"] = q_values
     data["pep"] = peps
 
-    writer._write_levels_context_pdf_report(data, stat_table, pi0)
+    writer._write_levels_context_pdf_report(data.copy(), stat_table, pi0)
 
     return data
 
