@@ -151,7 +151,7 @@ class SplitParquetReader(BaseSplitParquetReader):
         rc = self.config.runner
         query = f"""SELECT t.TRANSITION_DECOY AS DECOY, t.RUN_ID, t.FEATURE_ID, t.IPF_PEPTIDE_ID, t.TRANSITION_ID, t.FEATURE_TRANSITION_AREA_INTENSITY AS AREA_INTENSITY,
                         {cols_sql}, p.PRECURSOR_CHARGE, t.TRANSITION_CHARGE,
-                        p.RUN_ID || '_' || t.FEATURE_ID || '_' || t.TRANSITION_ID AS GROUP_ID
+                        p.RUN_ID || '_' || t.FEATURE_ID || '_' || t.PRECURSOR_ID || '_' || t.TRANSITION_ID AS GROUP_ID
                     FROM transition t
                     INNER JOIN precursors p ON t.PRECURSOR_ID = p.PRECURSOR_ID AND t.FEATURE_ID = p.FEATURE_ID
                     WHERE p.SCORE_MS2_PEAK_GROUP_RANK <= {rc.ipf_max_peakgroup_rank}
@@ -168,6 +168,7 @@ class SplitParquetReader(BaseSplitParquetReader):
                 {col: col.replace("FEATURE_TRANSITION_", "") for col in feature_cols}
             )
         )
+        df = self._collapse_ipf_peptide_ids(df)
         return df.to_pandas()
 
     def _fetch_alignment_features(self, con, feature_cols):
@@ -189,6 +190,15 @@ class SplitParquetReader(BaseSplitParquetReader):
         cols_sql = ", ".join([f"p.{col}" for col in feature_cols])
         query = f"SELECT DISTINCT p.FEATURE_ID, {cols_sql} FROM precursors p"
         ms1_df = con.execute(query).df()
+
+        feature_cols = ms1_df.columns.tolist()
+        feature_cols.remove("FEATURE_ID")
+        ms1_df = ms1_df.rename(
+            columns={
+                col: col.replace("FEATURE_MS1_VAR_", "VAR_MS1_") for col in feature_cols
+            }
+        )
+
         return pd.merge(df, ms1_df, how="left", on="FEATURE_ID")
 
 

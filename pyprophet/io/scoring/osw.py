@@ -331,7 +331,7 @@ class OSWReader(BaseOSWReader):
             """
             SELECT * 
             FROM transition_table 
-            ORDER BY RUN_ID, PRECURSOR_ID, EXP_RT, TRANSITION_ID
+            ORDER BY RUN_ID, FEATURE_ID, PRECURSOR_ID, EXP_RT, TRANSITION_ID
             """
         ).fetchdf()
 

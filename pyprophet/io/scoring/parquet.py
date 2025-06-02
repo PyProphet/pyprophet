@@ -1,6 +1,7 @@
 import sys
 from shutil import copyfile
 import pandas as pd
+import polars as pl
 import pyarrow as pa
 import duckdb
 import click
@@ -155,7 +156,7 @@ class ParquetReader(BaseParquetReader):
         rc = self.config.runner
         query = f"""SELECT t.TRANSITION_DECOY AS DECOY, t.RUN_ID, t.FEATURE_ID, t.IPF_PEPTIDE_ID, t.TRANSITION_ID,
                         {cols_sql}, p.PRECURSOR_CHARGE, t.TRANSITION_CHARGE,
-                        p.RUN_ID || '_' || t.FEATURE_ID || '_' || t.TRANSITION_ID AS GROUP_ID
+                        p.RUN_ID || '_' || t.FEATURE_ID || '_' || t.PRECURSOR_ID || '_' || t.TRANSITION_ID AS GROUP_ID
                     FROM (
                         SELECT
                             RUN_ID,
@@ -175,11 +176,13 @@ class ParquetReader(BaseParquetReader):
                             SELECT DISTINCT PRECURSOR_ID, PRECURSOR_CHARGE, PRECURSOR_DECOY, RUN_ID, FEATURE_ID, EXP_RT, SCORE_MS2_PEP, SCORE_MS2_PEAK_GROUP_RANK
                             FROM data
                             WHERE MODIFIED_SEQUENCE IS NOT NULL
+                            AND RUN_ID IS NOT NULL
                         ) sub
                     ) AS p ON t.PRECURSOR_ID = p.PRECURSOR_ID AND t.FEATURE_ID = p.FEATURE_ID
                     WHERE p.SCORE_MS2_PEAK_GROUP_RANK <= {rc.ipf_max_peakgroup_rank}
                         AND p.SCORE_MS2_PEP <= {rc.ipf_max_peakgroup_pep}
                         AND p.PRECURSOR_DECOY = 0
+                        AND p.RUN_ID IS NOT NULL
                         AND t.FEATURE_TRANSITION_VAR_ISOTOPE_OVERLAP_SCORE <= {rc.ipf_max_transition_isotope_overlap}
                         AND t.FEATURE_TRANSITION_VAR_LOG_SN_SCORE > {rc.ipf_min_transition_sn}
                     ORDER BY t.RUN_ID, t.PRECURSOR_ID, p.EXP_RT, t.TRANSITION_ID"""
@@ -189,7 +192,10 @@ class ParquetReader(BaseParquetReader):
             .rename(
                 {col: col.replace("FEATURE_TRANSITION_", "") for col in feature_cols}
             )
+            # Convert DECOY to 0 and 1
+            .with_columns(pl.col("DECOY").cast(pl.Int8).alias("DECOY"))
         )
+        df = self._collapse_ipf_peptide_ids(df)
         return df.to_pandas()
 
     def _fetch_alignment_features(self, con, feature_cols):
@@ -210,6 +216,15 @@ class ParquetReader(BaseParquetReader):
         cols_sql = ", ".join([f"p.{col}" for col in feature_cols])
         query = f"SELECT DISTINCT p.FEATURE_ID, {cols_sql} FROM data p WHERE TRANSITION_ID IS NULL"
         ms1_df = con.execute(query).df()
+
+        feature_cols = ms1_df.columns.tolist()
+        feature_cols.remove("FEATURE_ID")
+        ms1_df = ms1_df.rename(
+            columns={
+                col: col.replace("FEATURE_MS1_VAR_", "VAR_MS1_") for col in feature_cols
+            }
+        )
+
         return pd.merge(df, ms1_df, how="left", on="FEATURE_ID")
 
 

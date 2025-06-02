@@ -1336,6 +1336,42 @@ class BaseSplitParquetReader(BaseReader):
         # )
         return df
 
+    def _collapse_ipf_peptide_ids(self, df):
+        """
+        Collapse IPF peptide IDs to avoid duplicating feature data in the DataFrame.
+
+        Parameters:
+        - df (DataFrame): Input DataFrame containing feature data.
+
+        Returns:
+        - DataFrame: DataFrame with collapsed IPF peptide IDs.
+        """
+        org_shape = df.shape
+        # Handle cases where there may be multiple peptides mapping to a precursor with the same feature ID.
+        # We collapse the IPF peptide IDs to avoid duplicating feature data
+        df = (
+            df.group_by(["GROUP_ID", "FEATURE_ID"])
+            .agg(
+                [
+                    pl.col("IPF_PEPTIDE_ID").unique().alias("IPF_PEPTIDE_ID"),
+                    *[
+                        pl.col(c).first()
+                        for c in df.columns
+                        if c not in {"GROUP_ID", "FEATURE_ID", "IPF_PEPTIDE_ID"}
+                    ],
+                ]
+            )
+            .sort(["RUN_ID", "TRANSITION_ID"])
+        )
+        collapsed_shape = df.shape
+
+        if org_shape != collapsed_shape:
+            logger.info(
+                f"Collapsed {org_shape[0] - collapsed_shape[0]} of {org_shape[0]} rows due to multiple transitions features mapping to different peptidoforms."
+            )
+
+        return df
+
 
 @dataclass
 class BaseSplitParquetWriter(BaseWriter):
