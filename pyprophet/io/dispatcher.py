@@ -21,6 +21,7 @@ from .._config import ExportIOConfig, IPFIOConfig, LevelContextIOConfig, RunnerI
 # Export I/O
 from .export.osw import OSWReader as ExportOSWReader
 from .export.osw import OSWWriter as ExportOSWWriter
+from .export.sqmass import SqMassWriter as ExportSqMassWriter
 from .export.parquet import (
     ParquetReader as ExportParquetReader,
 )
@@ -189,6 +190,8 @@ class WriterDispatcher:
         """
         if config.file_type == "osw":
             return WriterDispatcher._get_osw_writer(config)
+        if config.file_type == "sqmass":
+            return WriterDispatcher._get_sqmass_writer(config)
         elif config.file_type == "parquet":
             return WriterDispatcher._get_parquet_writer(config)
         elif config.file_type in ("parquet_split", "parquet_split_multi"):
@@ -208,6 +211,13 @@ class WriterDispatcher:
             return LevelContextOSWWriter(config)
         elif isinstance(config, ExportIOConfig):
             return ExportOSWWriter(config)
+        else:
+            raise ValueError(f"Unsupported config context: {type(config).__name__}")
+
+    @staticmethod
+    def _get_sqmass_writer(config):
+        if isinstance(config, ExportIOConfig):
+            return ExportSqMassWriter(config)
         else:
             raise ValueError(f"Unsupported config context: {type(config).__name__}")
 

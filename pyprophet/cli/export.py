@@ -8,10 +8,7 @@ from loguru import logger
 
 from .._config import ExportIOConfig
 from ..export.export_compound import export_compound_tsv
-from ..export.export_parquet import (
-    convert_sqmass_to_parquet,
-    export_to_parquet,
-)
+from ..export.export_parquet import convert_sqmass_to_parquet
 from ..export.export_report import (
     export_score_plots as _export_score_plots,
 )
@@ -474,7 +471,7 @@ def export_parquet(
                 infile=infile,
                 outfile=outfile,
                 subsample_ratio=1.0,  # Not used in export
-                level="export",
+                level="osw",
                 context="export",
                 export_format="parquet"
                 if not split_transition_data
@@ -500,29 +497,27 @@ def export_parquet(
                 if not overwrite:
                     raise click.ClickException(f"Aborting: {outfile} already exists!")
             logger.info("Parquet file will be written to {}".format(outfile))
-            export_to_parquet(
-                os.path.abspath(infile),
-                os.path.abspath(outfile),
-                transitionLevel,
-                onlyFeatures,
-                noDecoys,
-            )
+            # Old export placeholder
     elif infile.endswith(".sqmass") or infile.endswith(".sqMass"):
         logger.info("Will export sqMass to parquet")
         if os.path.exists(outfile):
             logger.info(
                 f"Warn: {outfile} already exists, will overwrite",
             )
-        start = time.time()
-        convert_sqmass_to_parquet(
-            infile,
-            outfile,
-            pqpfile,
+        config = ExportIOConfig(
+            infile=infile,
+            outfile=outfile,
+            subsample_ratio=1.0,  # Not used in export
+            level="sqmass",
+            context="export",
+            export_format="parquet",
+            pqp_file=pqpfile,
             compression_method=compression,
             compression_level=compression_level,
         )
-        end = time.time()
-        logger.info(f"{outfile} written in {end - start:.4f} seconds.")
+
+        writer = WriterDispatcher.get_writer(config)
+        writer.export()
     else:
         raise click.ClickException("Input file must be of type .osw or .sqmass/.sqMass")
 
