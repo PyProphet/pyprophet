@@ -1,12 +1,11 @@
-import os
 import re
 import sqlite3
+
 import duckdb
 import pandas as pd
 import polars as pl
-from loguru import logger
 
-from ..io.util import check_sqlite_table
+from pyprophet.io.util import check_sqlite_table, check_table_column_exists
 
 
 def load_sqlite_scanner(conn: duckdb.DuckDBPyConnection):
@@ -30,16 +29,6 @@ def load_sqlite_scanner(conn: duckdb.DuckDBPyConnection):
                     raise install_error
         else:
             raise e
-
-
-def get_table_columns(sqlite_file: str, table: str) -> list:
-    with sqlite3.connect(sqlite_file) as conn:
-        return [row[1] for row in conn.execute(f"PRAGMA table_info({table})")]
-
-
-def get_table_columns_with_types(sqlite_file: str, table: str) -> list:
-    with sqlite3.connect(sqlite_file) as conn:
-        return [(row[1], row[2]) for row in conn.execute(f"PRAGMA table_info({table})")]
 
 
 def getPeptideProteinScoreTable(conndb, level):
@@ -204,7 +193,6 @@ def export_to_parquet(
     ## features
     columns["FEATURE"] = [
         "EXP_RT",
-        "EXP_IM",
         "NORM_RT",
         "DELTA_RT",
         "LEFT_WIDTH",
@@ -213,14 +201,21 @@ def export_to_parquet(
     columns["FEATURE_MS2"] = [
         "FEATURE_ID",
         "AREA_INTENSITY",
-        "TOTAL_AREA_INTENSITY",
+        # "TOTAL_AREA_INTENSITY", # Older versions of OSW may not have this
         "APEX_INTENSITY",
-        "TOTAL_MI",
+        # "TOTAL_MI",
     ] + getVarColumnNames(con, "FEATURE_MS2")
     columns["FEATURE_MS1"] = ["APEX_INTENSITY", "AREA_INTENSITY"] + getVarColumnNames(
         con, "FEATURE_MS1"
     )
+
+    if check_table_column_exists(infile, "FEATURE_MS2", "TOTAL_AREA_INTENSITY"):
+        columns["FEATURE_MS2"].insert(2, "TOTAL_AREA_INTENSITY")
+    if check_table_column_exists(infile, "FEATURE_MS1", "TOTAL_MI"):
+        columns["FEATURE_MS2"].insert(4, "TOTAL_MI")
+
     if hasIm:
+        columns["FEATURE"].insert(1, "EXP_IM")
         imColumns = ["EXP_IM", "DELTA_IM"]
         columns["FEATURE_MS2"] = columns["FEATURE_MS2"] + imColumns
         columns["FEATURE_MS1"] = columns["FEATURE_MS1"] + imColumns
@@ -385,11 +380,12 @@ def export_to_parquet(
         {decoyExclude}
         {featureLvlSuffix}
         """
+
     condb.sql(query).write_parquet(outfile)
 
 
 def convert_sqmass_to_parquet(
-    infile, outfile, oswfile, compression_method="zstd", compression_level=11
+    infile, outfile, pqpfile, compression_method="zstd", compression_level=11
 ):
     """
     Convert a SQMass sqlite file to Parquet format
@@ -397,26 +393,26 @@ def convert_sqmass_to_parquet(
 
     xic_conn = duckdb.connect(database=infile, read_only=True)
     load_sqlite_scanner(xic_conn)
-    osw_conn = duckdb.connect(database=oswfile, read_only=True)
-    load_sqlite_scanner(osw_conn)
+    pqp_conn = duckdb.connect(database=pqpfile, read_only=True)
+    load_sqlite_scanner(pqp_conn)
 
     query = """
     SELECT
-    PRECURSOR.ID AS PRECURSOR_ID,
-    TRANSITION.ID AS TRANSITION_ID,
-    PEPTIDE.MODIFIED_SEQUENCE,
-    PRECURSOR.CHARGE AS PRECURSOR_CHARGE,
-    TRANSITION.CHARGE AS PRODUCT_CHARGE,
-    TRANSITION.DETECTING AS DETECTING_TRANSITION,
-    PRECURSOR.DECOY AS PRECURSOR_DECOY,
-    TRANSITION.DECOY AS PRODUCT_DECOY,
+        PRECURSOR.ID AS PRECURSOR_ID,
+        TRANSITION.ID AS TRANSITION_ID,
+        PEPTIDE.MODIFIED_SEQUENCE,
+        PRECURSOR.CHARGE AS PRECURSOR_CHARGE,
+        TRANSITION.CHARGE AS PRODUCT_CHARGE,
+        TRANSITION.DETECTING AS DETECTING_TRANSITION,
+        PRECURSOR.DECOY AS PRECURSOR_DECOY,
+        TRANSITION.DECOY AS PRODUCT_DECOY,
     FROM PRECURSOR
     INNER JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
     INNER JOIN PEPTIDE ON PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
     INNER JOIN TRANSITION_PRECURSOR_MAPPING ON PRECURSOR.ID = TRANSITION_PRECURSOR_MAPPING.PRECURSOR_ID
     INNER JOIN TRANSITION ON TRANSITION_PRECURSOR_MAPPING.TRANSITION_ID = TRANSITION.ID
     """
-    osw_df = osw_conn.execute(query).pl()
+    pqp_df = pqp_conn.execute(query).pl()
 
     query = """
     SELECT
@@ -430,7 +426,7 @@ def convert_sqmass_to_parquet(
     chrom_df = xic_conn.execute(query).pl()
 
     xic_conn.close()
-    osw_conn.close()
+    pqp_conn.close()
 
     chrom_df_prec = (
         chrom_df.filter(chrom_df["NATIVE_ID"].str.contains("_Precursor_i\\d+"))
@@ -451,7 +447,7 @@ def convert_sqmass_to_parquet(
 
     # Join osw_df and chrom_df_prec on PRECURSOR_ID
     chrom_df_prec_m = (
-        osw_df.select(
+        pqp_df.select(
             ["PRECURSOR_ID", "MODIFIED_SEQUENCE", "PRECURSOR_CHARGE", "PRECURSOR_DECOY"]
         )
         .unique()
@@ -482,7 +478,7 @@ def convert_sqmass_to_parquet(
         )
     )
 
-    chrom_df_trans_m = osw_df.join(
+    chrom_df_trans_m = pqp_df.join(
         chrom_df_trans,
         left_on="TRANSITION_ID",
         right_on="TRANSITION_ID",
