@@ -515,9 +515,14 @@ class PlotGenerator:
             if summary.empty:
                 continue
             summary_rows = summary.round(2).astype(str).values.tolist()
-            logger.info(
-                f"Summary for {thresh_label}:\n{pd.DataFrame(summary_rows).rename(columns={0: 'run_id', 1: 'num_ids', 2: 'min_area', 3: 'mean_area', 4: 'max_area'})}"
+            logger.opt(raw=True, colors=True).info("=" * 80)
+            logger.opt(raw=True, colors=True).info(f"\n  Summary for {thresh_label}:\n")
+            logger.opt(raw=True, colors=True).info("=" * 80)
+            logger.opt(raw=True, colors=True).info("\n")
+            logger.opt(raw=True, colors=True).info(
+                f"{pd.DataFrame(summary_rows).rename(columns={0: 'run_id', 1: 'num_ids', 2: 'min_area', 3: 'mean_area', 4: 'max_area'})}"
             )
+            logger.opt(raw=True, colors=True).info("\n")
             table_blocks.append((thresh_label, summary_rows))
 
         # Layout
