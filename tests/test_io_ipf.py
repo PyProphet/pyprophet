@@ -31,7 +31,7 @@ def create_reader_config(level, infile, outfile):
     )
 
 
-def compare_dataframes(df1, df2, cols):
+def compare_dataframes(df1, df2, cols, sort_cols):
     """
     Compare two pandas DataFrames based on the selected columns.
 
@@ -47,8 +47,8 @@ def compare_dataframes(df1, df2, cols):
     - None
     """
     # Sort both dataframes by the same columns
-    df1_sorted = df1.sort_values(by=["feature_id"]).reset_index(drop=True)
-    df2_sorted = df2.sort_values(by=["feature_id"]).reset_index(drop=True)
+    df1_sorted = df1.sort_values(by=sort_cols).reset_index(drop=True)
+    df2_sorted = df2.sort_values(by=sort_cols).reset_index(drop=True)
 
     # Ensure that both dataframes are non-empty
     assert not df1_sorted.empty, "First dataframe is empty"
@@ -77,6 +77,7 @@ def get_comparison_columns(level):
             "transition_id",
             "pep",
             "peptide_id",
+            "bmask",
             "num_peptidoforms",
         ]
 
@@ -299,4 +300,21 @@ def test_compare_readers(
             cols
         ]
 
-        compare_dataframes(df_primary_sorted, df_comp_sorted, cols)
+        if level == "transition":
+            sort_cols = [
+                "feature_id",
+                "transition_id",
+                "pep",
+                "peptide_id",
+                "bmask",
+                "num_peptidoforms",
+            ]
+        else:
+            sort_cols = [
+                "feature_id",
+                "ms2_peakgroup_pep",
+                "ms1_precursor_pep",
+                "ms2_precursor_pep",
+            ]
+
+        compare_dataframes(df_primary_sorted, df_comp_sorted, cols, sort_cols)
