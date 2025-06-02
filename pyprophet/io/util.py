@@ -18,6 +18,7 @@ Functions:
     - get_parquet_column_names(file_path): Retrieves column names from a Parquet file without reading the entire file.
     - print_parquet_tree(root_dir, precursors, transitions, alignment=None, max_runs=10):
       Prints the structure of Parquet files in a tree-like format.
+    - unimod_to_codename(seq): Converts a sequence with unimod modifications to a codename.
 
 Key Features:
     - SQLite Utilities: Functions for validating SQLite files, checking table existence, and creating indexes.
@@ -29,6 +30,7 @@ Dependencies:
     - collections (defaultdict)
     - click
     - pandas
+    - pyopenms
     - pyarrow.parquet
     - loguru
 
@@ -45,6 +47,7 @@ import duckdb
 import click
 import pandas as pd
 import pyarrow.parquet as pq
+import pyopenms as poms
 from loguru import logger
 from pyarrow.lib import ArrowInvalid, ArrowIOError
 
@@ -329,3 +332,13 @@ def print_parquet_tree(root_dir, precursors, transitions, alignment=None, max_ru
 
     if alignment:
         click.echo(f"    └── 📄 {os.path.basename(alignment)}")
+
+
+def unimod_to_codename(seq):
+    """
+    Convert a sequence with unimod modifications to a codename.
+    This is a placeholder function; actual implementation may vary.
+    """
+    seq_poms = poms.AASequence.fromString(seq)
+    codename = seq_poms.toString()
+    return codename
