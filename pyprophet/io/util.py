@@ -1,10 +1,11 @@
 """
-This module provides utility functions for handling SQLite databases, Parquet files,
+This module provides utility functions for handling tsv files, SQLite databases, Parquet files,
 and directory structures. It includes functions for file validation, schema inspection,
 and logging of file structures, which are commonly used in workflows involving
 data processing and analysis.
 
 Functions:
+    - is_tsv_file(file_path): Checks if a file is likely a TSV file based on its extension and content.
     - is_sqlite_file(filename): Checks if a file is a valid SQLite database.
     - check_sqlite_table(con, table): Verifies if a table exists in a SQLite database.
     - write_scores_sql_command(con, score_sql, feature_name, var_replacement):
@@ -50,6 +51,36 @@ import pyarrow.parquet as pq
 import pyopenms as poms
 from loguru import logger
 from pyarrow.lib import ArrowInvalid, ArrowIOError
+
+
+def is_tsv_file(file_path):
+    """
+    Checks if a file is likely a TSV file based on extension and content.
+
+    Args:
+        file_path (str): The path to the file.
+
+    Returns:
+        bool: True if the file is likely a TSV file, False otherwise.
+    """
+    if not os.path.exists(file_path):
+        print(f"Error: File not found at {file_path}")
+        return False
+
+    if not file_path.lower().endswith(".tsv") and not file_path.lower().endswith(
+        ".txt"
+    ):
+        return False
+
+    try:
+        with open(file_path, "r", encoding="utf-8") as file:
+            for line in file:
+                if "\t" in line:
+                    return True  # Found tab character, likely a TSV
+        return False  # No tab character found
+    except Exception as e:
+        print(f"Error reading file: {e}")
+        return False
 
 
 def is_sqlite_file(filename):
