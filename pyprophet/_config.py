@@ -25,7 +25,7 @@ Usage:
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Literal, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 import os
 from hyperopt import hp
 import numpy as np
@@ -687,6 +687,15 @@ class ExportIOConfig(BaseIOConfig):
         top_n (int): Number of top intense features to use for summarization
         consistent_top (bool): Whether to use same top features across all runs
         normalization (Literal["none", "median", "medianmedian", "quantile"]): Normalization method
+
+        # OSW: Export to parquet
+        compression_method (Literal["none", "snappy", "gzip", "brotli", "zstd"]): Compression method for parquet files.
+        compression_level (int): Compression level for parquet files (0-9).
+        split_transition_data (bool): Split precursor data and transition data into separate files.
+        split_runs (bool): Split data by runs
+
+        # SqMass: Export to parquet
+        pqp_file (Optional[str]): Path to PQP file for precursor/transition mapping.
     """
 
     export_format: Literal[
@@ -708,8 +717,11 @@ class ExportIOConfig(BaseIOConfig):
     consistent_top: bool = True
     normalization: Literal["none", "median", "medianmedian", "quantile"] = "none"
 
-    # Export to parquet
+    # OSW: Export to parquet
     compression_method: Literal["none", "snappy", "gzip", "brotli", "zstd"] = "zstd"
     compression_level: int = 11
     split_transition_data: bool = True
     split_runs: bool = False
+
+    # SqMass: Export to parquet
+    pqp_file: Optional[str] = None  # Path to PQP file for precursor/transition mapping
