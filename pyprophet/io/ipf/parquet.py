@@ -168,9 +168,12 @@ class ParquetReader(BaseParquetReader):
         FROM data
         WHERE TRANSITION_TYPE != ''
         AND TRANSITION_DECOY = 0
+        AND SCORE_TRANSITION_SCORE IS NOT NULL
         AND SCORE_TRANSITION_PEP < {pep_threshold}
         """
         evidence = con.execute(query).df().rename(columns=str.lower)
+        print("Transition evidence table:")
+        print(evidence.sort_values(by=["feature_id", "transition_id"]))
 
         # Bitmask table: transition-peptidoform presence
         query = """
@@ -178,32 +181,43 @@ class ParquetReader(BaseParquetReader):
         FROM data
         WHERE TRANSITION_TYPE != ''
         AND TRANSITION_DECOY = 0
+        AND SCORE_TRANSITION_SCORE IS NOT NULL
         AND IPF_PEPTIDE_ID IS NOT NULL
         """
         bitmask = con.execute(query).df().rename(columns=str.lower)
+        print("Transition bitmask table:")
+        print(bitmask.sort_values(by=["transition_id", "peptide_id"]))
 
         # Peptidoform count per feature
         query = """
         SELECT FEATURE_ID, COUNT(DISTINCT IPF_PEPTIDE_ID) AS NUM_PEPTIDOFORMS
         FROM data
         WHERE TRANSITION_TYPE != ''
+        AND TRANSITION_ID IS NOT NULL
         AND TRANSITION_DECOY = 0
+        AND SCORE_TRANSITION_SCORE IS NOT NULL
         AND IPF_PEPTIDE_ID IS NOT NULL
         GROUP BY FEATURE_ID
         ORDER BY FEATURE_ID
         """
         num_peptidoforms = con.execute(query).df().rename(columns=str.lower)
+        print("Transition peptidoform count table:")
+        print(num_peptidoforms.sort_values(by=["feature_id", "num_peptidoforms"]))
 
         # Peptidoform mapping: (feature_id, peptide_id)
         query = """
         SELECT DISTINCT FEATURE_ID, IPF_PEPTIDE_ID AS PEPTIDE_ID
         FROM data
-        WHERE TRANSITION_TYPE != ''
+        WHERE TRANSITION_ID IS NOT NULL
+        AND TRANSITION_TYPE != ''
         AND TRANSITION_DECOY = 0
+        AND SCORE_TRANSITION_SCORE IS NOT NULL
         AND IPF_PEPTIDE_ID IS NOT NULL
         ORDER BY FEATURE_ID
         """
         peptidoforms = con.execute(query).df().rename(columns=str.lower)
+        print("Transition peptidoform mapping table:")
+        print(peptidoforms.sort_values(by=["feature_id", "peptide_id"]))
 
         # Add h0 (decoy) peptide_id = -1 if enabled
         if ipf_h0:

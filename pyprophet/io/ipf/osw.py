@@ -457,7 +457,7 @@ class OSWReader(BaseOSWReader):
                 INNER JOIN TRANSITION_PEPTIDE_MAPPING ON TRANSITION.ID = TRANSITION_PEPTIDE_MAPPING.TRANSITION_ID
                 WHERE TRANSITION.TYPE != ''
                 AND TRANSITION.DECOY = 0
-                GROUP BY FEATURE_ID
+                GROUP BY FEATURE_ID, SCORE_TRANSITION.TRANSITION_ID
             """,
             "peptidoforms": """
                 SELECT DISTINCT FEATURE_ID, PEPTIDE_ID
