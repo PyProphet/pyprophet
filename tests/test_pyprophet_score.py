@@ -189,7 +189,7 @@ class OSWTestStrategy(TestStrategy):
             if kwargs.get("xgboost"):
                 level_cmd += " --classifier=XGBoost"
             if kwargs.get("xgboost_tune"):
-                level_cmd += " --xgb_autotune"
+                level_cmd += " --autotune"
             if kwargs.get("score_filter"):
                 level_cmd = self.config.add_score_filter(level_cmd, level)
 
@@ -245,7 +245,7 @@ class ParquetTestStrategy(TestStrategy):
             if kwargs.get("xgboost"):
                 level_cmd += " --classifier=XGBoost"
             if kwargs.get("xgboost_tune"):
-                level_cmd += " --xgb_autotune"
+                level_cmd += " --autotune"
             if kwargs.get("score_filter"):
                 level_cmd = self.config.add_score_filter(level_cmd, level)
 
@@ -334,7 +334,7 @@ class SplitParquetTestStrategy(TestStrategy):
             if kwargs.get("xgboost"):
                 level_cmd += " --classifier=XGBoost"
             if kwargs.get("xgboost_tune"):
-                level_cmd += " --xgb_autotune"
+                level_cmd += " --autotune"
             if kwargs.get("score_filter"):
                 level_cmd = self.config.add_score_filter(level_cmd, level)
 
@@ -439,7 +439,7 @@ class MultiSplitParquetTestStrategy(TestStrategy):
             if kwargs.get("xgboost"):
                 level_cmd += " --classifier=XGBoost"
             if kwargs.get("xgboost_tune"):
-                level_cmd += " --xgb_autotune"
+                level_cmd += " --autotune"
             if kwargs.get("score_filter"):
                 level_cmd = self.config.add_score_filter(level_cmd, level)
 
