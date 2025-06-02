@@ -135,12 +135,12 @@ def get_table_columns(sqlite_file: str, table: str) -> list:
     """
     Retrieve the column names of a table in a SQLite database file.
 
-    Parameters:
-    - sqlite_file (str): Path to the SQLite database file.
-    - table (str): Name of the table to retrieve column names from.
+    Args:
+        sqlite_file (str): Path to the SQLite database file.
+        table (str): Name of the table to retrieve column names from.
 
     Returns:
-    - list: List of column names in the specified table.
+        list: List of column names in the specified table.
     """
     with sqlite3.connect(sqlite_file) as conn:
         return [row[1] for row in conn.execute(f"PRAGMA table_info({table})")]
@@ -150,15 +150,32 @@ def get_table_columns_with_types(sqlite_file: str, table: str) -> list:
     """
     Get the columns and their types for a given table in a SQLite database file.
 
-    Parameters:
-    - sqlite_file (str): The path to the SQLite database file.
-    - table (str): The name of the table to retrieve columns and types from.
+    Args:
+        sqlite_file (str): The path to the SQLite database file.
+        table (str): The name of the table to retrieve columns and types from.
 
     Returns:
-    - list: A list of tuples where each tuple contains the column name and its data type.
+        list: A list of tuples where each tuple contains the column name and its data type.
     """
     with sqlite3.connect(sqlite_file) as conn:
         return [(row[1], row[2]) for row in conn.execute(f"PRAGMA table_info({table})")]
+
+
+def check_table_column_exists(sqlite_file: str, table: str, column: str) -> bool:
+    """
+    Check if a specific column exists in a table of a SQLite database file.
+
+    Args:
+        sqlite_file (str): Path to the SQLite database file.
+        table (str): Name of the table to check.
+        column (str): Name of the column to check for existence.
+
+    Returns:
+        bool: True if the column exists, False otherwise.
+    """
+    with sqlite3.connect(sqlite_file) as conn:
+        columns = get_table_columns(sqlite_file, table)
+        return column in columns
 
 
 def check_duckdb_table(con, schema: str, table: str) -> bool:
