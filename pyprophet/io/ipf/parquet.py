@@ -172,8 +172,6 @@ class ParquetReader(BaseParquetReader):
         AND SCORE_TRANSITION_PEP < {pep_threshold}
         """
         evidence = con.execute(query).df().rename(columns=str.lower)
-        print("Transition evidence table:")
-        print(evidence.sort_values(by=["feature_id", "transition_id"]))
 
         # Bitmask table: transition-peptidoform presence
         query = """
@@ -185,8 +183,6 @@ class ParquetReader(BaseParquetReader):
         AND IPF_PEPTIDE_ID IS NOT NULL
         """
         bitmask = con.execute(query).df().rename(columns=str.lower)
-        print("Transition bitmask table:")
-        print(bitmask.sort_values(by=["transition_id", "peptide_id"]))
 
         # Peptidoform count per feature
         query = """
@@ -201,8 +197,6 @@ class ParquetReader(BaseParquetReader):
         ORDER BY FEATURE_ID
         """
         num_peptidoforms = con.execute(query).df().rename(columns=str.lower)
-        print("Transition peptidoform count table:")
-        print(num_peptidoforms.sort_values(by=["feature_id", "num_peptidoforms"]))
 
         # Peptidoform mapping: (feature_id, peptide_id)
         query = """
@@ -216,8 +210,6 @@ class ParquetReader(BaseParquetReader):
         ORDER BY FEATURE_ID
         """
         peptidoforms = con.execute(query).df().rename(columns=str.lower)
-        print("Transition peptidoform mapping table:")
-        print(peptidoforms.sort_values(by=["feature_id", "peptide_id"]))
 
         # Add h0 (decoy) peptide_id = -1 if enabled
         if ipf_h0:
@@ -232,6 +224,7 @@ class ParquetReader(BaseParquetReader):
             trans_pf, bitmask, how="left", on=["transition_id", "peptide_id"]
         ).fillna(0)
         result = pd.merge(trans_pf_bm, num_peptidoforms, how="inner", on="feature_id")
+        result = result.drop_duplicates()
 
         logger.info(f"Loaded {len(result)} transition-peptidoform entries")
         return result

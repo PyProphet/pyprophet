@@ -254,6 +254,8 @@ class SplitParquetReader(BaseSplitParquetReader):
         ).fillna(0)
         result = pd.merge(trans_pf_bm, num_peptidoforms, how="inner", on="feature_id")
 
+        result = result.drop_duplicates()
+
         logger.info(f"Loaded {len(result)} transition-peptidoform entries")
         return result
 

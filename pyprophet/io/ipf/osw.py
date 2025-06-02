@@ -503,7 +503,7 @@ class OSWReader(BaseOSWReader):
         ).fillna(0)
         data = pd.merge(trans_pf_bm, num_peptidoforms, how="inner", on="feature_id")
 
-        return data
+        return data.drop_duplicates()
 
     def _fetch_alignment_features_sqlite(self, con):
         pep_threshold = self.config.ipf_max_alignment_pep
