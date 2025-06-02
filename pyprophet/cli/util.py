@@ -1,9 +1,11 @@
+from functools import wraps
 import multiprocessing
 from pathlib import Path
 import sys
 import ast
 from importlib.metadata import version
 from datetime import datetime
+import threading
 import time
 import tracemalloc
 import platform
@@ -427,35 +429,44 @@ def format_time(seconds):
 
 
 def measure_memory_usage_and_time(func):
+    """Decorator to measure memory usage and execution time of a function."""
+
+    @wraps(func)
     def wrapper(*args, **kwargs):
-        # Start timing
-        start_at = time.time()
+        process = psutil.Process()
+        start_time = time.perf_counter()
 
-        # Start memory tracking
-        tracemalloc.start()
+        # Memory monitoring
+        peak_rss = process.memory_info().rss
+        sampling_interval = 0.05  # 50ms
 
-        # Call the original function
-        result = func(*args, **kwargs)
+        def memory_monitor():
+            nonlocal peak_rss
+            while getattr(memory_monitor, "running", True):
+                try:
+                    peak_rss = max(peak_rss, process.memory_info().rss)
+                    time.sleep(sampling_interval)
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    break
 
-        # Stop memory tracking
-        snapshot = tracemalloc.take_snapshot()
-        top_stats = snapshot.statistics("lineno")
+        # Start monitoring thread
+        monitor_thread = threading.Thread(target=memory_monitor, daemon=True)
+        memory_monitor.running = True
+        monitor_thread.start()
 
-        # Stop timing
-        end_at = time.time()
-        elapsed_time = end_at - start_at
-        formatted_time = format_time(elapsed_time)
+        try:
+            result = func(*args, **kwargs)
+        finally:
+            # Stop monitoring
+            memory_monitor.running = False
+            monitor_thread.join(timeout=sampling_interval * 2)
+            peak_rss = max(peak_rss, process.memory_info().rss)
 
-        # Get the maximum memory used during execution
-        max_memory = max(stat.size for stat in top_stats)
-        formatted_memory = format_bytes(max_memory)
-
-        # Log the time and memory usage together
         logger.info(
-            f"{func.__name__} completed in {formatted_time}. Peak memory usage: {formatted_memory}"
+            f"pyprophet {func.__name__} took {format_time(time.perf_counter() - start_time)}; "
+            f"Peak Memory Usage: {format_bytes(peak_rss)}."
         )
 
-        # Return the result of the function
         return result
 
     return wrapper
