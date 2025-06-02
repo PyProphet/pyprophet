@@ -243,7 +243,7 @@ class OSWReader(BaseOSWReader):
                   SCORE_IPF.PEP AS ipf_pep,
                   SCORE_MS2.RANK AS peak_group_rank,
                   SCORE_MS2.SCORE AS d_score,
-                  SCORE_MS2.Q_VALUE AS ms2_m_score,
+                  SCORE_MS2.QVALUE AS ms2_m_score,
                   SCORE_IPF.QVALUE AS m_score
             FROM PRECURSOR
             INNER JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
@@ -256,7 +256,7 @@ class OSWReader(BaseOSWReader):
             LEFT JOIN SCORE_MS2 ON SCORE_MS2.FEATURE_ID = FEATURE.ID
             LEFT JOIN SCORE_IPF ON SCORE_IPF.FEATURE_ID = FEATURE.ID
             INNER JOIN PEPTIDE AS PEPTIDE_IPF ON SCORE_IPF.PEPTIDE_ID = PEPTIDE_IPF.ID
-            WHERE SCORE_MS2.Q_VALUE < {cfg.max_rs_peakgroup_qvalue} AND SCORE_IPF.PEP < {cfg.ipf_max_peptidoform_pep}
+            WHERE SCORE_MS2.QVALUE < {cfg.max_rs_peakgroup_qvalue} AND SCORE_IPF.PEP < {cfg.ipf_max_peptidoform_pep}
             ORDER BY transition_group_id, peak_group_rank;
         """
         return pd.read_sql_query(query, con)
@@ -290,7 +290,7 @@ class OSWReader(BaseOSWReader):
                   FEATURE.RIGHT_WIDTH AS rightWidth,
                   SCORE_MS2.RANK AS peak_group_rank,
                   SCORE_MS2.SCORE AS d_score,
-                  SCORE_MS2.Q_VALUE AS m_score,
+                  SCORE_MS2.QVALUE AS m_score,
                   {score_ms1_pep} AS ms1_pep,
                   SCORE_MS2.PEP AS ms2_pep
             FROM PRECURSOR
@@ -302,7 +302,7 @@ class OSWReader(BaseOSWReader):
             LEFT JOIN FEATURE_MS2 ON FEATURE_MS2.FEATURE_ID = FEATURE.ID
             {link_ms1}
             LEFT JOIN SCORE_MS2 ON SCORE_MS2.FEATURE_ID = FEATURE.ID
-            WHERE SCORE_MS2.Q_VALUE < {cfg.max_rs_peakgroup_qvalue}
+            WHERE SCORE_MS2.QVALUE < {cfg.max_rs_peakgroup_qvalue}
             ORDER BY transition_group_id, peak_group_rank;
         """
         data = pd.read_sql_query(query, con)
@@ -338,7 +338,7 @@ class OSWReader(BaseOSWReader):
                   FEATURE.RIGHT_WIDTH AS rightWidth,
                   SCORE_MS2.RANK AS peak_group_rank,
                   SCORE_MS2.SCORE AS d_score,
-                  SCORE_MS2.Q_VALUE AS m_score
+                  SCORE_MS2.QVALUE AS m_score
             FROM PRECURSOR
             INNER JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
             INNER JOIN PEPTIDE ON PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
@@ -347,7 +347,7 @@ class OSWReader(BaseOSWReader):
             LEFT JOIN FEATURE_MS1 ON FEATURE_MS1.FEATURE_ID = FEATURE.ID
             LEFT JOIN FEATURE_MS2 ON FEATURE_MS2.FEATURE_ID = FEATURE.ID
             LEFT JOIN SCORE_MS2 ON SCORE_MS2.FEATURE_ID = FEATURE.ID
-            WHERE SCORE_MS2.Q_VALUE < {cfg.max_rs_peakgroup_qvalue}
+            WHERE SCORE_MS2.QVALUE < {cfg.max_rs_peakgroup_qvalue}
             ORDER BY transition_group_id, peak_group_rank;
         """
         return pd.read_sql_query(query, con)
@@ -447,7 +447,7 @@ class OSWReader(BaseOSWReader):
                   FEATURE.RIGHT_WIDTH AS rightWidth,
                   SCORE_MS2.RANK AS peak_group_rank,
                   SCORE_MS2.SCORE AS d_score,
-                  SCORE_MS2.Q_VALUE AS m_score
+                  SCORE_MS2.QVALUE AS m_score
             FROM PRECURSOR
             INNER JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
             INNER JOIN PEPTIDE ON PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
@@ -456,7 +456,7 @@ class OSWReader(BaseOSWReader):
             LEFT JOIN FEATURE_MS1 ON FEATURE_MS1.FEATURE_ID = FEATURE.ID
             LEFT JOIN FEATURE_MS2 ON FEATURE_MS2.FEATURE_ID = FEATURE.ID
             LEFT JOIN SCORE_MS2 ON SCORE_MS2.FEATURE_ID = FEATURE.ID
-            WHERE SCORE_MS2.Q_VALUE < {cfg.max_rs_peakgroup_qvalue}
+            WHERE SCORE_MS2.QVALUE < {cfg.max_rs_peakgroup_qvalue}
             ORDER BY transition_group_id, peak_group_rank;
         """
         return pd.read_sql_query(query, con)
@@ -513,7 +513,7 @@ class OSWReader(BaseOSWReader):
             """
             SELECT RUN_ID AS id_run,
                   PEPTIDE_ID AS id_peptide,
-                  Q_VALUE AS m_score_peptide_run_specific
+                  QVALUE AS m_score_peptide_run_specific
             FROM SCORE_PEPTIDE
             WHERE CONTEXT == 'run-specific';
         """,
@@ -529,7 +529,7 @@ class OSWReader(BaseOSWReader):
             """
             SELECT RUN_ID AS id_run,
                   PEPTIDE_ID AS id_peptide,
-                  Q_VALUE AS m_score_peptide_experiment_wide
+                  QVALUE AS m_score_peptide_experiment_wide
             FROM SCORE_PEPTIDE
             WHERE CONTEXT == 'experiment-wide';
         """,
@@ -542,7 +542,7 @@ class OSWReader(BaseOSWReader):
         data_peptide_global = pd.read_sql_query(
             """
             SELECT PEPTIDE_ID AS id_peptide,
-                  Q_VALUE AS m_score_peptide_global
+                  QVALUE AS m_score_peptide_global
             FROM SCORE_PEPTIDE
             WHERE CONTEXT == 'global';
         """,
@@ -570,7 +570,7 @@ class OSWReader(BaseOSWReader):
             """
             SELECT RUN_ID AS id_run,
                   PEPTIDE_ID AS id_peptide,
-                  MIN(Q_VALUE) AS m_score_protein_run_specific
+                  MIN(QVALUE) AS m_score_protein_run_specific
             FROM PEPTIDE_PROTEIN_MAPPING
             INNER JOIN SCORE_PROTEIN ON PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID = SCORE_PROTEIN.PROTEIN_ID
             WHERE CONTEXT == 'run-specific'
@@ -588,7 +588,7 @@ class OSWReader(BaseOSWReader):
             """
             SELECT RUN_ID AS id_run,
                   PEPTIDE_ID AS id_peptide,
-                  MIN(Q_VALUE) AS m_score_protein_experiment_wide
+                  MIN(QVALUE) AS m_score_protein_experiment_wide
             FROM PEPTIDE_PROTEIN_MAPPING
             INNER JOIN SCORE_PROTEIN ON PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID = SCORE_PROTEIN.PROTEIN_ID
             WHERE CONTEXT == 'experiment-wide'
@@ -608,7 +608,7 @@ class OSWReader(BaseOSWReader):
         data_protein_global = pd.read_sql_query(
             """
             SELECT PEPTIDE_ID AS id_peptide,
-                  MIN(Q_VALUE) AS m_score_protein_global
+                  MIN(QVALUE) AS m_score_protein_global
             FROM PEPTIDE_PROTEIN_MAPPING
             INNER JOIN SCORE_PROTEIN ON PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID = SCORE_PROTEIN.PROTEIN_ID
             WHERE CONTEXT == 'global'
