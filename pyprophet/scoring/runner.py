@@ -37,6 +37,9 @@ class PyProphetRunner(object):
         self.config = config
         self.reader = ReaderDispatcher.get_reader(config)
         self.writer = WriterDispatcher.get_writer(config)
+        logger.debug(
+            f"Using reader: {self.reader.__class__.__name__} for file type: {self.config.file_type}"
+        )
         self.table = self.reader.read()
 
     @property
