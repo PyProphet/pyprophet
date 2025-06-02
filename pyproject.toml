@@ -42,7 +42,8 @@ dependencies = [
     "tabulate",
     "pyarrow",
     "pypdf",
-    "psutil"
+    "psutil",
+    "pyopenms"
 ]
 
 # Optional dependencies 
