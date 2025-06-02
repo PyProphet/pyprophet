@@ -663,7 +663,11 @@ class OSWWriter(BaseOSWWriter):
 
                 df_main.columns = [c.upper() for c in df_main.columns]
                 df_main = df_main.rename(
-                    columns={"PEAK_GROUP_RANK": "RANK", "D_SCORE_COMBINED": "SCORE"}
+                    columns={
+                        "PEAK_GROUP_RANK": "RANK",
+                        "D_SCORE_COMBINED": "SCORE",
+                        "QVALUE": "Q_VALUE",
+                    }
                 )
                 df_main.to_sql("SCORE_MS1", con, index=False)
 

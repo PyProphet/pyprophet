@@ -405,6 +405,10 @@ class BaseWriter(ABC):
         df = df[score_cols].rename(columns=str.upper)
         df = df.rename(columns={"D_SCORE": "SCORE"})
 
+        if self.config.file_type == "osw":
+            # Consistent renaming with original implementation for OSW files
+            df = df.rename(columns={"P_VALUE": "PVALUE", "Q_VALUE": "QVALUE"})
+
         if self.config.file_type == "osw" or self.level not in ("ms1ms2", "ms2"):
             df = df.rename(columns={"PEAK_GROUP_RANK": "RANK"})
 

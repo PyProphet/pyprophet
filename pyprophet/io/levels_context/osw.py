@@ -636,8 +636,8 @@ class OSWWriter(BaseOSWWriter):
                 "RUN_ID",
                 context_level_id.upper(),
                 "SCORE",
-                "P_VALUE",
-                "Q_VALUE",
+                "PVALUE",
+                "QVALUE",
                 "PEP",
             ]
 
