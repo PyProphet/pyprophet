@@ -48,7 +48,7 @@ dependencies = [
 # Optional dependencies 
 [project.optional-dependencies]
 testing = ["pytest", "pytest-regtest", "pytest-xdist"]
-docs = ["sphinx", "sphinx-copybutton", "pydata_sphinx_theme", "sphinx-click"]
+docs = ["sphinx", "sphinx-copybutton", "sphinx_rtd_theme", "pydata_sphinx_theme", "sphinx-click"]
 
 # Define console entry points
 [project.scripts]
