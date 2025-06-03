@@ -37,3 +37,7 @@ nosetests.xml
 # vim
 *.sw[opqrs]
 *~
+
+# docs
+docs/_build/*
+docs/api/generated/*
