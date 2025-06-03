@@ -56,3 +56,9 @@ pytest -k "test_protein_levels and experiment-wide"
 # Run all tests for parquet input
 pytest -k "parquet"
 ````
+
+To run tests in parallel, you need the `pytest-xdist` plugin. You can then use the `-n` option to specify the number of parallel workers:
+
+````
+pytest -n 4
+````
