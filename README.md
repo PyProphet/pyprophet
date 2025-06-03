@@ -1,7 +1,15 @@
-[![Build Status](https://travis-ci.org/PyProphet/pyprophet.svg?branch=master)](https://travis-ci.org/PyProphet/pyprophet) [![Project Stats](https://www.openhub.net/p/PyProphet/widgets/project_thin_badge.gif)](https://www.openhub.net/p/PyProphet)
+<div align="center">
+    <img src="https://github.com/PyProphet/pyprophet/blob/master/assets/PyProphet_Logo.png" alt="PyProphet" width="300"/>
+</div>
 
 PyProphet
 =========
+
+<!-- [![Build Status](https://travis-ci.org/PyProphet/pyprophet.svg?branch=master)](https://travis-ci.org/PyProphet/pyprophet)  -->
+[![continuous-integration](https://github.com/PyProphet/pyprophet/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/PyProphet/pyprophet/actions/workflows/ci.yml)
+[![Project Stats](https://www.openhub.net/p/PyProphet/widgets/project_thin_badge.gif)](https://www.openhub.net/p/PyProphet)
+![PyPI - Version](https://img.shields.io/pypi/v/pyprophet)
+
 
 PyProphet: Semi-supervised learning and scoring of OpenSWATH results.
 
