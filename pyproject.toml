@@ -23,6 +23,7 @@ keywords = ["bioinformatics", "openSWATH", "mass spectrometry"]
 # Dependencies required for runtime
 dependencies = [
     "Click",
+    "loguru",
     "duckdb",
     "duckdb-extensions",
     "duckdb-extension-sqlite-scanner",
@@ -33,18 +34,21 @@ dependencies = [
     "cython",
     "numexpr >= 2.10.1",
     "scikit-learn >= 1.5",
-    "xgboost",
-    "hyperopt",
+    "xgboost >= 2.1.4",
     "statsmodels >= 0.8.0",
     "matplotlib",
+    "seaborn",
     "tabulate",
     "pyarrow",
-    "pypdf"
+    "pypdf",
+    "psutil",
+    "pyopenms"
 ]
 
 # Optional dependencies 
 [project.optional-dependencies]
-testing = ["pytest", "pytest-regtest"]
+testing = ["pytest", "pytest-regtest", "pytest-xdist"]
+docs = ["sphinx", "sphinx-copybutton", "pydata_sphinx_theme", "sphinx-click"]
 
 # Define console entry points
 [project.scripts]

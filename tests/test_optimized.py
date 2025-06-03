@@ -1,10 +1,8 @@
-
-import pyprophet.optimized as o
 import numpy as np
+import pyprophet.scoring.optimized as o
 
 
 def test_rank():
-
     groups = [1, 1, 1, 1, 1, 2, 3, 3, 3, 0]
     values = [2, 7, 0, 5, 3, 7, 2, 1, 3, 9]
 
@@ -26,7 +24,6 @@ def test_rank():
 
 
 def test_rank32():
-
     groups = [1, 1, 1, 1, 1, 2, 3, 3, 3, 0]
     values = [2, 7, 0, 5, 3, 7, 2, 1, 3, 9]
 
@@ -48,26 +45,33 @@ def test_rank32():
 
 
 def test_single_chromatogram_hypothesis_fast():
-
     prior_chrom_null = 0.2
     prior_pg = 0.1
 
-    probabilities = array64([.7])  # probability that the peaks are false
+    probabilities = array64([0.7])  # probability that the peaks are false
 
-    result = o.single_chromatogram_hypothesis_fast(probabilities, prior_chrom_null, prior_pg)
+    result = o.single_chromatogram_hypothesis_fast(
+        probabilities, prior_chrom_null, prior_pg
+    )
     result_h0 = result[0]
     result = result[1:]
 
     np.testing.assert_array_almost_equal(result, [0.17647059])
     np.testing.assert_array_almost_equal([result_h0], [0.823529411765])
 
-    probabilities = array64([0.5, 0.7, 0.1, 0.01])  # probability that the peaks are false
+    probabilities = array64(
+        [0.5, 0.7, 0.1, 0.01]
+    )  # probability that the peaks are false
 
-    result = o.single_chromatogram_hypothesis_fast(probabilities, prior_chrom_null, prior_pg)
+    result = o.single_chromatogram_hypothesis_fast(
+        probabilities, prior_chrom_null, prior_pg
+    )
     result_h0 = result[0]
     result = result[1:]
 
-    np.testing.assert_array_almost_equal(result, [0.00897436, 0.00384615, 0.08076923, 0.88846154])
+    np.testing.assert_array_almost_equal(
+        result, [0.00897436, 0.00384615, 0.08076923, 0.88846154]
+    )
     np.testing.assert_array_almost_equal([result_h0], [0.0179487179487])
 
 
@@ -85,7 +89,6 @@ def _test_match(values):
 
 
 def test_find_neared_matches():
-
     ix = o.find_nearest_matches(arange32(4.0), arange32(2.0))
     assert list(ix) == [0, 1]
 
@@ -156,7 +159,6 @@ def test_count_num_positives():
 def _test_find_neared_matches_fuzzy():
     for l in range(1, 100):
         for i in range(100):
-
             basis = np.random.random((l,))
             basis.sort()
 
@@ -211,6 +213,3 @@ def _test_find_neared_matches_fuzzy():
             tobe = o.find_nearest_matches(basis, search, 0)
             optim = o.find_nearest_matches(basis, search)
             assert np.all(tobe == optim)
-
-
-
