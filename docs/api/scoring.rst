@@ -5,9 +5,6 @@ Semi-Supervised Scoring Documentation
    :no-members:
    :no-inherited-members:
 
-Runner
-----------------
-
 .. currentmodule:: pyprophet.scoring
 
 .. autosummary::
@@ -15,65 +12,77 @@ Runner
    :toctree: generated/
    :template: class.rst
 
-   runner.PyProphetRunner
-   runner.PyProphetLearner
-   runner.PyProphetWeightApplier
+   scoring
+
+Runner
+----------------
+
+.. currentmodule:: pyprophet.scoring.runner
+
+.. autosummary::
+   :nosignatures:
+   :toctree: generated/
+   :template: class.rst
+
+   PyProphetRunner
+   PyProphetLearner
+   PyProphetWeightApplier
 
 PyProphet
 ----------------
 
-.. currentmodule:: pyprophet.scoring
+.. currentmodule:: pyprophet.scoring.pyprophet
 
 .. autosummary::
    :nosignatures:
    :toctree: generated/
    :template: class.rst
 
-   pyprophet.PyProphet
-   pyprophet.Scorer
+   PyProphet
+   Scorer
 
 Semi-Supervised
 ----------------
 
-.. currentmodule:: pyprophet.scoring
+.. currentmodule:: pyprophet.scoring.semi_supervised
 
 .. autosummary::
    :nosignatures:
    :toctree: generated/
    :template: class.rst
 
-   semi_supervised.AbstractSemiSupervisedLearner
-   semi_supervised.StandardSemiSupervisedLearner
+   AbstractSemiSupervisedLearner
+   StandardSemiSupervisedLearner
 
 Classifiers
 ----------------
 
-.. currentmodule:: pyprophet.scoring
+.. currentmodule:: pyprophet.scoring.classifiers
 
 .. autosummary::
    :nosignatures:
    :toctree: generated/
    :template: class.rst
 
-   classifiers.AbstractLearner
-   classifiers.LinearLearner
-   classifiers.LDALearner
-   classifiers.SVMLearner
-   classifiers.XGBLearner
+   AbstractLearner
+   LinearLearner
+   LDALearner
+   SVMLearner
+   XGBLearner
 
 Data Handling
 ----------------
 
-.. currentmodule:: pyprophet.scoring
+.. currentmodule:: pyprophet.scoring.data_handling
 
 .. autosummary::
    :nosignatures:
    :toctree: generated/
    :template: class.rst
 
-   data_handling.Experiment
-   data_handling.prepare_data_table
-   data_handling.cleanup_and_check
-   data_handling.check_for_unique_blocks
-   data_handling.update_chosen_main_score_in_table
-   data_handling.use_metabolomics_scores
+   Experiment
+   prepare_data_table
+   cleanup_and_check
+   check_for_unique_blocks
+   update_chosen_main_score_in_table
+   use_metabolomics_scores
