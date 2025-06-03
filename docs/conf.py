@@ -25,6 +25,8 @@ import logging
 logging.basicConfig(level=logging.INFO)  # Set up basic logging
 logging.debug("PYTHON PATH: %s", sys.path)
 logging.debug("Working Directory: %s", os.getcwd())
+
+
 def find_git_directory(start_path):
     """Find the full path to the nearest '.git' directory by climbing up the directory tree.
 
@@ -85,11 +87,10 @@ extensions = [
     "sphinx.ext.autosectionlabel",
     "sphinx.ext.viewcode",  # Add links to source code
     "sphinx.ext.napoleon",  # Support Google/Numpy docstrings
-    "sphinx_rtd_theme",  # ReadTheDocs theme
-    "myst_parser",  # Markdown support
     "sphinx.ext.autosummary",  # Generate autodoc summaries
-    "sphinx_copybutton",
     "sphinx.ext.githubpages",
+    "sphinx_rtd_theme",  # ReadTheDocs theme
+    "sphinx_copybutton",
     "sphinx_click",
 ]
 
