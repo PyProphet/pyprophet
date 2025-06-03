@@ -9,14 +9,6 @@ from pyprophet.io.scoring.tsv import TSVReader  # legacy, limited support
 from pyprophet._config import RunnerIOConfig, RunnerConfig
 
 
-xgb_hyperparams = {
-    "autotune": False,
-    "autotune_num_rounds": 10,
-    "num_boost_round": 100,
-    "early_stopping_rounds": 10,
-    "test_size": 0.33,
-}
-
 xgb_params = {
     "eta": 0.3,
     "gamma": 0,
@@ -35,19 +27,6 @@ xgb_params = {
     "eval_metric": "auc",
 }
 
-xgb_params_space = {
-    "eta": hp.uniform("eta", 0.0, 0.3),
-    "gamma": hp.uniform("gamma", 0.0, 0.5),
-    "max_depth": hp.quniform("max_depth", 2, 8, 1),
-    "min_child_weight": hp.quniform("min_child_weight", 1, 5, 1),
-    "lambda": hp.uniform("lambda", 0.0, 1.0),
-    "alpha": hp.uniform("alpha", 0.0, 1.0),
-    "objective": "binary:logitraw",
-    "nthread": 1,
-    "eval_metric": "auc",
-    "scale_pos_weight": 1.0,
-    "verbosity": 0,
-}
 
 # ================== TEST UTILITIES ==================
 
@@ -63,9 +42,7 @@ def create_reader_config(level, infile, outfile):
         context="score_learn",
         level=level,
         runner=RunnerConfig(
-            xgb_hyperparams=xgb_hyperparams,
             xgb_params=xgb_params,
-            xgb_params_space=xgb_params_space,
         ),
     )
 
@@ -249,9 +226,9 @@ def test_reader_level(request, level, reader_fixture):
     df = reader.read()
 
     # Basic checks for all readers
-    assert isinstance(
-        df, pd.DataFrame
-    ), f"{reader.__class__.__name__} returned an invalid type"
+    assert isinstance(df, pd.DataFrame), (
+        f"{reader.__class__.__name__} returned an invalid type"
+    )
     assert not df.empty, f"{reader.__class__.__name__} returned an empty DataFrame"
 
     # Legacy handling for TSVReader
