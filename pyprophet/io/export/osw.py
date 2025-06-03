@@ -748,7 +748,7 @@ class OSWWriter(BaseOSWWriter):
             f"SELECT ID, FILENAME FROM sqlite_scan('{self.config.infile}', 'RUN')"
         ).fetchdf()
         run_df["BASENAME"] = run_df["FILENAME"].apply(
-            lambda x: re.sub(r"\.[^.]*$", "", os.path.basename(x))
+            lambda x: re.sub(r"(\.[^.]*)*$", "", os.path.basename(x))
         )
         logger.info(f"Found {len(run_df)} runs to export.")
 
