@@ -27,7 +27,6 @@ Usage:
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Literal, Optional, Union
 import os
-from hyperopt import hp
 import numpy as np
 
 from ._base import BaseIOConfig

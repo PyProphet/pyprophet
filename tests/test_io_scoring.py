@@ -1,6 +1,5 @@
 import pytest
 import pandas as pd
-from hyperopt import hp
 
 from pyprophet.io.scoring.osw import OSWReader
 from pyprophet.io.scoring.parquet import ParquetReader
