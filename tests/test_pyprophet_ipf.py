@@ -110,24 +110,63 @@ def validate_output(
 
     # Validate precursor-level data
     precursor_data = reader.read(level="peakgroup_precursor")
+    # Convert ID columns to nullable integers if they exist
+    for id_col in ["feature_id", "run_id", "peptide_id"]:
+        if id_col in precursor_data.columns:
+            precursor_data[id_col] = precursor_data[id_col].astype("Int64")
+    sort_cols = [
+        "feature_id",
+        "ms2_peakgroup_pep",
+        "ms1_precursor_pep",
+        "ms2_precursor_pep",
+    ]
     print("Precursor Data:", file=regtest)
-    print(precursor_data.sort_index(axis=1).head(100), file=regtest)
+    print(
+        precursor_data.sort_values(sort_cols).reset_index(drop=True).head(100),
+        file=regtest,
+    )
 
     # Validate transition-level data
     transition_data = reader.read(level="transition")
+    # Convert ID columns to nullable integers
+    for id_col in ["feature_id", "transition_id", "peptide_id"]:
+        if id_col in transition_data.columns:
+            transition_data[id_col] = transition_data[id_col].astype("Int64")
+    sort_cols = [
+        "feature_id",
+        "transition_id",
+        "pep",
+        "peptide_id",
+        "bmask",
+        "num_peptidoforms",
+    ]
     print("Transition Data:", file=regtest)
-    print(transition_data.sort_index(axis=1).head(100), file=regtest)
+    print(
+        transition_data.sort_values(sort_cols).reset_index(drop=True).head(100),
+        file=regtest,
+    )
 
     # For OSW files, also validate transition and IPF data
     if input_type == "osw":
         with sqlite3.connect(input_path) as con:
             # IPF data
-            ipf_data = pd.read_sql_query("SELECT * FROM SCORE_IPF LIMIT 100", con)
+            ipf_data = pd.read_sql_query(
+                "SELECT * FROM SCORE_IPF ORDER BY FEATURE_ID, PEPTIDE_ID, PRECURSOR_PEAKGROUP_PEP, QVALUE, PEP LIMIT 100",
+                con,
+            )
             ipf_data.columns = [col.lower() for col in ipf_data.columns]
+            sort_cols = [
+                "feature_id",
+                "peptide_id",
+                "precursor_peakgroup_pep",
+                "qvalue",
+                "pep",
+            ]
             print("IPF Data:", file=regtest)
-            print(ipf_data.sort_index(axis=1).head(100), file=regtest)
+            print(ipf_data.sort_values(sort_cols).head(100), file=regtest)
     elif input_type == "parquet":
         cols = [
+            "RUN_ID",
             "FEATURE_ID",
             "PEPTIDE_ID",
             "SCORE_IPF_PRECURSOR_PEAKGROUP_PEP",
@@ -135,6 +174,10 @@ def validate_output(
             "SCORE_IPF_PEP",
         ]
         ipf_data = pd.read_parquet(input_path, columns=cols)
+        # Convert ID columns to nullable integers
+        for id_col in ["RUN_ID", "FEATURE_ID", "PEPTIDE_ID"]:
+            ipf_data[id_col] = ipf_data[id_col].astype("Int64")
+        ipf_data = ipf_data[ipf_data["RUN_ID"].notnull()]
         ipf_data = ipf_data.rename(
             columns={
                 "SCORE_IPF_PRECURSOR_PEAKGROUP_PEP": "PRECURSOR_PEAKGROUP_PEP",
@@ -143,8 +186,18 @@ def validate_output(
             }
         )
         ipf_data.columns = [col.lower() for col in ipf_data.columns]
+        sort_cols = [
+            "feature_id",
+            "peptide_id",
+            "precursor_peakgroup_pep",
+            "qvalue",
+            "pep",
+        ]
         print("IPF Data:", file=regtest)
-        print(ipf_data.sort_index(axis=1).head(100), file=regtest)
+        print(
+            ipf_data.sort_values(sort_cols).reset_index(drop=True).head(100),
+            file=regtest,
+        )
     elif input_type == "parquet_split":
         cols = [
             "FEATURE_ID",
@@ -156,6 +209,9 @@ def validate_output(
         ipf_data = pd.read_parquet(
             os.path.join(input_path, "precursors_features.parquet"), columns=cols
         )
+        # Convert ID columns to nullable integers
+        for id_col in ["FEATURE_ID", "PEPTIDE_ID"]:
+            ipf_data[id_col] = ipf_data[id_col].astype("Int64")
         ipf_data = ipf_data.rename(
             columns={
                 "SCORE_IPF_PRECURSOR_PEAKGROUP_PEP": "PRECURSOR_PEAKGROUP_PEP",
@@ -164,8 +220,18 @@ def validate_output(
             }
         )
         ipf_data.columns = [col.lower() for col in ipf_data.columns]
+        sort_cols = [
+            "feature_id",
+            "peptide_id",
+            "precursor_peakgroup_pep",
+            "qvalue",
+            "pep",
+        ]
         print("IPF Data:", file=regtest)
-        print(ipf_data.sort_index(axis=1).head(100), file=regtest)
+        print(
+            ipf_data.sort_values(sort_cols).reset_index(drop=True).head(100),
+            file=regtest,
+        )
 
 
 # ================== TEST CASES ==================

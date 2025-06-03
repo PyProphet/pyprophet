@@ -215,6 +215,13 @@ class OSWTestStrategy(TestStrategy):
             config.ipf_ms2_scoring = True
             reader = ReaderDispatcher.get_reader(config)
             table = reader.read(level="peakgroup_precursor")
+            sort_cols = [
+                "feature_id",
+                "ms2_peakgroup_pep",
+                "ms1_precursor_pep",
+                "ms2_precursor_pep",
+            ]
+            table = table.sort_values(sort_cols).reset_index(drop=True)
 
         print(table.head(100).sort_index(axis=1), file=regtest)
 
@@ -269,6 +276,13 @@ class ParquetTestStrategy(TestStrategy):
         config.ipf_ms2_scoring = True
         reader = ReaderDispatcher.get_reader(config)
         table = reader.read(level="peakgroup_precursor")
+        sort_cols = [
+            "feature_id",
+            "ms2_peakgroup_pep",
+            "ms1_precursor_pep",
+            "ms2_precursor_pep",
+        ]
+        table = table.sort_values(sort_cols).reset_index(drop=True)
         print(table.head(100).sort_index(axis=1), file=regtest)
 
     def apply_weights(self):
@@ -309,6 +323,13 @@ class ParquetTestStrategy(TestStrategy):
         config.ipf_ms2_scoring = False
         reader = ReaderDispatcher.get_reader(config)
         table = reader.read(level="peakgroup_precursor")
+        sort_cols = [
+            "feature_id",
+            "ms2_peakgroup_pep",
+            "ms1_precursor_pep",
+            "ms2_precursor_pep",
+        ]
+        table = table.sort_values(sort_cols).reset_index(drop=True)
         print(table.head(100).sort_index(axis=1), file=regtest)
 
 
@@ -365,6 +386,13 @@ class SplitParquetTestStrategy(TestStrategy):
         config.ipf_ms2_scoring = True
         reader = ReaderDispatcher.get_reader(config)
         table = reader.read(level="peakgroup_precursor")
+        sort_cols = [
+            "feature_id",
+            "ms2_peakgroup_pep",
+            "ms1_precursor_pep",
+            "ms2_precursor_pep",
+        ]
+        table = table.sort_values(sort_cols).reset_index(drop=True)
         print(table.head(100).sort_index(axis=1), file=regtest)
 
     def apply_weights(self):
@@ -419,6 +447,13 @@ class SplitParquetTestStrategy(TestStrategy):
         config.ipf_ms2_scoring = False
         reader = ReaderDispatcher.get_reader(config)
         table = reader.read(level="peakgroup_precursor")
+        sort_cols = [
+            "feature_id",
+            "ms2_peakgroup_pep",
+            "ms1_precursor_pep",
+            "ms2_precursor_pep",
+        ]
+        table = table.sort_values(sort_cols).reset_index(drop=True)
         print(table.head(100).sort_index(axis=1), file=regtest)
 
 
@@ -478,6 +513,13 @@ class MultiSplitParquetTestStrategy(TestStrategy):
         config.ipf_ms2_scoring = True
         reader = ReaderDispatcher.get_reader(config)
         table = reader.read(level="peakgroup_precursor")
+        sort_cols = [
+            "feature_id",
+            "ms2_peakgroup_pep",
+            "ms1_precursor_pep",
+            "ms2_precursor_pep",
+        ]
+        table = table.sort_values(sort_cols).reset_index(drop=True)
         print(table.head(100).sort_index(axis=1), file=regtest)
 
     def apply_weights(self):
@@ -532,6 +574,13 @@ class MultiSplitParquetTestStrategy(TestStrategy):
         config.ipf_ms2_scoring = False
         reader = ReaderDispatcher.get_reader(config)
         table = reader.read(level="peakgroup_precursor")
+        sort_cols = [
+            "feature_id",
+            "ms2_peakgroup_pep",
+            "ms1_precursor_pep",
+            "ms2_precursor_pep",
+        ]
+        table = table.sort_values(sort_cols).reset_index(drop=True)
         print(table.head(100).sort_index(axis=1), file=regtest)
 
 
