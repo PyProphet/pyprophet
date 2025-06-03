@@ -1,3 +1,4 @@
+import os
 import pytest
 import pandas as pd
 
@@ -7,6 +8,11 @@ from pyprophet.io.scoring.split_parquet import SplitParquetReader
 from pyprophet.io.scoring.tsv import TSVReader  # legacy, limited support
 from pyprophet._config import RunnerIOConfig, RunnerConfig
 
+pd.options.display.expand_frame_repr = False
+pd.options.display.precision = 4
+pd.options.display.max_columns = None
+
+DATA_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 
 xgb_params = {
     "eta": 0.3,
@@ -135,37 +141,37 @@ def get_comparison_columns(reader_type, level):
 # ================== FIXTURES ==================
 # Helper functions for reader creation
 def _create_osw_reader(level):
-    config = create_reader_config(
-        level, "./data/test_data.osw", "./data/tmp_test_data.osw"
-    )
+    infile = os.path.join(DATA_FOLDER, "test_data.osw")
+    outfile = os.path.join(DATA_FOLDER, "tmp_test_data.osw")
+    config = create_reader_config(level, infile, outfile)
     return OSWReader(config)
 
 
 def _create_parquet_reader(level):
-    config = create_reader_config(
-        level, "./data/test_data.parquet", "./data/tmp_test_data.parquet"
-    )
+    infile = os.path.join(DATA_FOLDER, "test_data.parquet")
+    outfile = os.path.join(DATA_FOLDER, "tmp_test_data.parquet")
+    config = create_reader_config(level, infile, outfile)
     return ParquetReader(config)
 
 
 def _create_split_parquet_reader(level):
-    config = create_reader_config(
-        level, "./data/test_data.oswpq/", "./data/tmp_test_data.oswpq/"
-    )
+    infile = os.path.join(DATA_FOLDER, "test_data.oswpq")
+    outfile = os.path.join(DATA_FOLDER, "tmp_test_data.oswpq")
+    config = create_reader_config(level, infile, outfile)
     return SplitParquetReader(config)
 
 
 def _create_split_parquet_multi_reader(level):
-    config = create_reader_config(
-        level, "./data/test_data.oswpqd/", "./data/tmp_test_data.oswpqd/"
-    )
+    infile = os.path.join(DATA_FOLDER, "test_data.oswpqd")
+    outfile = os.path.join(DATA_FOLDER, "tmp_test_data.oswpqd")
+    config = create_reader_config(level, infile, outfile)
     return SplitParquetReader(config)
 
 
 def _create_tsv_reader(level):
-    config = create_reader_config(
-        level, "./data/test_data.txt", "./data/tmp_test_data.txt"
-    )
+    infile = os.path.join(DATA_FOLDER, "test_data.txt")
+    outfile = os.path.join(DATA_FOLDER, "tmp_test_data.txt")
+    config = create_reader_config(level, infile, outfile)
     return TSVReader(config)
 
 
