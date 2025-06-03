@@ -37,24 +37,23 @@ Dependencies:
     - loguru
 """
 
+import glob
+import os
+import pickle
+import sys
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-import sys
-import os
-import glob
-import pickle
-import sqlite3
+
+import click
 import duckdb
 import pandas as pd
 import polars as pl
-import numpy as np
-import click
 from loguru import logger
 
-from .util import print_parquet_tree, get_parquet_column_names
 from .._base import BaseIOConfig
 from .._config import ExportIOConfig
 from ..report import save_report
+from .util import get_parquet_column_names, print_parquet_tree
 
 
 class RowCountMismatchError(Exception):
@@ -164,6 +163,8 @@ class BaseReader(ABC):
                     "transition_count": "var_transition_count",
                 }
             )
+
+        # print(df.info())
         return df
 
 

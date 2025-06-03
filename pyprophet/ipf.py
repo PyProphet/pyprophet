@@ -1,3 +1,32 @@
+"""
+This module implements the Inference of PeptidoForms (IPF) workflow.
+
+IPF is a statistical framework for inferring peptidoforms (modified peptides)
+and their probabilities from mass spectrometry data. The module includes
+functions for precursor-level and peptidoform-level inference, Bayesian modeling,
+and signal propagation across aligned runs.
+
+Key Features:
+    - Precursor-level inference using MS1 and MS2 data.
+    - Peptidoform-level inference using transition-level data.
+    - Bayesian modeling for posterior probability computation.
+    - Signal propagation across aligned runs.
+    - Model-based FDR estimation.
+
+Functions:
+    - compute_model_fdr: Computes model-based FDR estimates from posterior error probabilities.
+    - prepare_precursor_bm: Prepares Bayesian model data for precursor-level inference.
+    - transfer_confident_evidence_across_runs: Propagates confident evidence across aligned runs.
+    - prepare_transition_bm: Prepares Bayesian model data for transition-level inference.
+    - apply_bm: Applies the Bayesian model to compute posterior probabilities.
+    - precursor_inference: Conducts precursor-level inference.
+    - peptidoform_inference: Conducts peptidoform-level inference.
+    - infer_peptidoforms: Orchestrates the IPF workflow.
+
+Classes:
+    None
+"""
+
 import numpy as np
 import pandas as pd
 from loguru import logger
@@ -8,6 +37,15 @@ from .io.dispatcher import ReaderDispatcher, WriterDispatcher
 
 
 def compute_model_fdr(data_in):
+    """
+    Computes model-based FDR estimates from posterior error probabilities.
+
+    Args:
+        data_in (array-like): Input posterior error probabilities.
+
+    Returns:
+        np.ndarray: FDR estimates for the input data.
+    """
     data = np.asarray(data_in)
 
     # compute model based FDR estimates from posterior error probabilities
@@ -26,6 +64,15 @@ def compute_model_fdr(data_in):
 
 
 def prepare_precursor_bm(data):
+    """
+    Prepares Bayesian model data for precursor-level inference.
+
+    Args:
+        data (pd.DataFrame): Input data containing MS1 and MS2 precursor probabilities.
+
+    Returns:
+        pd.DataFrame: Bayesian model data for precursor-level inference.
+    """
     # MS1-level precursors
     ms1_precursor_data = data[
         ["feature_id", "ms2_peakgroup_pep", "ms1_precursor_pep"]
@@ -131,6 +178,18 @@ def transfer_confident_evidence_across_runs(
     ],
     value_cols=["pep", "precursor_peakgroup_pep"],
 ):
+    """
+    Propagates confident evidence across aligned runs.
+
+    Args:
+        df1 (pd.DataFrame): Input data containing feature-level information.
+        across_run_confidence_threshold (float): Confidence threshold for propagation.
+        group_cols (list): Columns to group by during propagation.
+        value_cols (list): Columns to apply the minimum reduction.
+
+    Returns:
+        pd.DataFrame: Data with propagated evidence across runs.
+    """
     feature_ids = np.unique(df1["feature_id"])
     df_list = []
     for feature_id in feature_ids:
@@ -154,6 +213,17 @@ def transfer_confident_evidence_across_runs(
 def prepare_transition_bm(
     data, propagate_signal_across_runs, across_run_confidence_threshold
 ):
+    """
+    Prepares Bayesian model data for transition-level inference.
+
+    Args:
+        data (pd.DataFrame): Input data containing transition-level information.
+        propagate_signal_across_runs (bool): Whether to propagate signal across runs.
+        across_run_confidence_threshold (float): Confidence threshold for propagation.
+
+    Returns:
+        pd.DataFrame: Bayesian model data for transition-level inference.
+    """
     # Propagate peps <= threshold for aligned feature groups across runs
     if propagate_signal_across_runs:
         ## Separate out features that need propagation and those that don't to avoid calling apply on the features that don't need propagated peps
@@ -213,6 +283,15 @@ def prepare_transition_bm(
 
 
 def apply_bm(data):
+    """
+    Applies the Bayesian model to compute posterior probabilities.
+
+    Args:
+        data (pd.DataFrame): Input Bayesian model data.
+
+    Returns:
+        pd.DataFrame: Data with posterior probabilities for each hypothesis.
+    """
     # compute likelihood * prior per feature & hypothesis
     # all priors are identical but pandas DF multiplication requires aggregation, so we use min()
     pp_data = (
@@ -239,6 +318,19 @@ def precursor_inference(
     ipf_max_precursor_pep,
     ipf_max_precursor_peakgroup_pep,
 ):
+    """
+    Conducts precursor-level inference.
+
+    Args:
+        data (pd.DataFrame): Input data containing precursor-level information.
+        ipf_ms1_scoring (bool): Whether to use MS1-level scoring.
+        ipf_ms2_scoring (bool): Whether to use MS2-level scoring.
+        ipf_max_precursor_pep (float): Maximum PEP threshold for precursors.
+        ipf_max_precursor_peakgroup_pep (float): Maximum PEP threshold for peak groups.
+
+    Returns:
+        pd.DataFrame: Inferred precursor probabilities.
+    """
     # prepare MS1-level precursor data
     if ipf_ms1_scoring:
         ms1_precursor_data = data[data["ms1_precursor_pep"] < ipf_max_precursor_pep][
@@ -303,6 +395,19 @@ def peptidoform_inference(
     propagate_signal_across_runs,
     across_run_confidence_threshold,
 ):
+    """
+    Conducts peptidoform-level inference.
+
+    Args:
+        transition_table (pd.DataFrame): Input data containing transition-level information.
+        precursor_data (pd.DataFrame): Precursor-level probabilities.
+        ipf_grouped_fdr (bool): Whether to use grouped FDR estimation.
+        propagate_signal_across_runs (bool): Whether to propagate signal across runs.
+        across_run_confidence_threshold (float): Confidence threshold for propagation.
+
+    Returns:
+        pd.DataFrame: Inferred peptidoform probabilities and FDR estimates.
+    """
     transition_table = pd.merge(transition_table, precursor_data, on="feature_id")
 
     # compute transition posterior probabilities
@@ -345,6 +450,15 @@ def peptidoform_inference(
 
 
 def infer_peptidoforms(config: IPFIOConfig):
+    """
+    Orchestrates the Inference of PeptidoForms (IPF) workflow.
+
+    Args:
+        config (IPFIOConfig): Configuration object for the IPF workflow.
+
+    Returns:
+        None
+    """
     logger.info("Starting IPF (Inference of PeptidoForms).")
     reader = ReaderDispatcher.get_reader(config)
 

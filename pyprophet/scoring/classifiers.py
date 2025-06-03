@@ -1,3 +1,17 @@
+"""
+This module defines various classifiers (learners) for statistical scoring and
+error estimation in targeted proteomics and glycoproteomics data analysis.
+
+Classes:
+    - AbstractLearner: Base class for defining a learner interface.
+    - LinearLearner: Implements a linear classifier for scoring.
+    - LDALearner: Implements a Linear Discriminant Analysis (LDA) learner.
+    - SVMLearner: Implements a Support Vector Machine (SVM) learner.
+    - XGBLearner: Implements an XGBoost-based learner for scoring.
+
+Each learner provides methods for training, scoring, and parameter management.
+"""
+
 import inspect
 from typing import List
 
@@ -18,31 +32,59 @@ from .data_handling import Experiment
 
 
 class AbstractLearner(object):
+    """
+    Abstract base class for defining a learner interface.
+
+    Methods:
+        - learn: Abstract method for training the learner.
+        - score: Abstract method for scoring data.
+        - get_parameters: Abstract method for retrieving model parameters.
+        - set_parameters: Abstract method for setting model parameters.
+        - averaged_learner: Abstract method for creating an averaged learner.
+    """
+
     def learn(self, decoy_peaks, target_peaks, use_main_score=True):
+        """Train the learner using decoy and target peaks."""
         raise NotImplementedError()
 
     def score(self, peaks, use_main_score):
+        """Score the given peaks using the trained model."""
         raise NotImplementedError()
 
     def get_parameters(self):
+        """Retrieve the parameters of the trained model."""
         raise NotImplementedError()
 
     def set_parameters(self, param):
+        """Set the parameters of the model."""
         raise NotImplementedError()
 
     @classmethod
     def averaged_learner(clz, params, **kwargs):
+        """Create an averaged learner from multiple parameter sets."""
         raise NotImplementedError()
 
 
 class LinearLearner(AbstractLearner):
+    """
+    Implements a linear classifier for scoring.
+
+    Methods:
+        - score: Score the given peaks using the linear model.
+        - averaged_learner: Create an averaged learner from multiple parameter sets.
+        - set_parameters: Set the parameters of the linear model.
+        - get_weights: Retrieve feature weights from the model.
+    """
+
     def score(self, peaks, use_main_score):
+        """Score the given peaks using the linear model."""
         X = peaks.get_feature_matrix(use_main_score)
         result = np.dot(X, self.get_parameters()).astype(np.float32)
         return result
 
     @classmethod
     def averaged_learner(clz, params, **kwargs):
+        """Create an averaged learner from multiple parameter sets."""
         assert LinearLearner in inspect.getmro(clz)
         learner = clz(**kwargs)
         avg_param = np.vstack(params).mean(axis=0)
@@ -50,12 +92,19 @@ class LinearLearner(AbstractLearner):
         return learner
 
     def set_parameters(self, classifier):
+        """Set the parameters of the linear model."""
         self.classifier = classifier
         return self
 
     def get_weights(self, features: List[str]) -> pd.DataFrame:
         """
         Return a DataFrame with feature names and their weights, sorted by absolute weight.
+
+        Args:
+            features (List[str]): List of feature names.
+
+        Returns:
+            pd.DataFrame: DataFrame containing feature names and weights.
         """
         if self.classifier is None:
             raise ValueError("Classifier has not been trained yet.")
@@ -66,7 +115,7 @@ class LinearLearner(AbstractLearner):
             assert weights.shape[0] == len(features)
         elif isinstance(self.classifier, LinearSVC):
             weights = self.classifier.coef_
-            intercept = self.classifier.intercept_
+            _intercept = self.classifier.intercept_
             assert weights.shape[0] == 1
             assert weights.shape[1] == len(features)
 
@@ -83,12 +132,22 @@ class LinearLearner(AbstractLearner):
 
 
 class LDALearner(LinearLearner):
+    """
+    Implements a Linear Discriminant Analysis (LDA) learner.
+
+    Methods:
+        - learn: Train the LDA model using decoy and target peaks.
+        - get_parameters: Retrieve the scaling parameters of the LDA model.
+        - set_parameters: Set the scaling parameters of the LDA model.
+    """
+
     def __init__(self):
         self.classifier = None
         self.scalings = None
         self.autotune = None
 
     def learn(self, decoy_peaks, target_peaks, use_main_score=True):
+        """Train the LDA model using decoy and target peaks."""
         assert isinstance(decoy_peaks, Experiment)
         assert isinstance(target_peaks, Experiment)
 
@@ -104,16 +163,25 @@ class LDALearner(LinearLearner):
         return self
 
     def get_parameters(self):
+        """Retrieve the scaling parameters of the LDA model."""
         return self.scalings
 
     def set_parameters(self, w):
+        """Set the scaling parameters of the LDA model."""
         self.scalings = w
         return self
 
 
 class SVMLearner(LinearLearner):
     """
-    Learner that uses Linear Support Vector Classification (SVC).
+    Implements a Support Vector Linear Classification (SVM) learner.
+
+    Methods:
+        - tune: Tune hyperparameters (C, max_iter) using GridSearchCV.
+        - learn: Train the SVM model using decoy and target peaks.
+        - score: Score the given peaks using the SVM model.
+        - get_parameters: Retrieve the parameters of the SVM model.
+        - set_parameters: Set the parameters of the SVM model.
     """
 
     def __init__(self, C, max_iter=1000, autotune=False):
@@ -129,6 +197,16 @@ class SVMLearner(LinearLearner):
     ):
         """
         Tune hyperparameters (C, max_iter) using GridSearchCV.
+
+        Args:
+            decoy_peaks (Experiment): Decoy peaks data.
+            target_peaks (Experiment): Target peaks data.
+            use_main_score (bool): Whether to use the main score.
+            cv_splits (int): Number of cross-validation splits.
+            n_jobs (int): Number of parallel jobs.
+
+        Returns:
+            SVMLearner: The tuned learner instance.
         """
         assert isinstance(decoy_peaks, Experiment)
         assert isinstance(target_peaks, Experiment)
@@ -182,6 +260,7 @@ class SVMLearner(LinearLearner):
         return self
 
     def learn(self, decoy_peaks, target_peaks, use_main_score=True):
+        """Train the SVM model using decoy and target peaks."""
         assert isinstance(decoy_peaks, Experiment)
         assert isinstance(target_peaks, Experiment)
 
@@ -201,6 +280,7 @@ class SVMLearner(LinearLearner):
         return self
 
     def score(self, peaks, use_main_score):
+        """Score the given peaks using the SVM model."""
         X = peaks.get_feature_matrix(use_main_score)
         # Check if self.classifier is loaded weights (an numpy.ndarray object)
         if isinstance(self.classifier, np.ndarray):
@@ -209,15 +289,28 @@ class SVMLearner(LinearLearner):
             return self.classifier.decision_function(X)
 
     def get_parameters(self):
+        """Retrieve the parameters of the SVM model."""
         return self.classifier
 
     def set_parameters(self, classifier):
+        """Set the parameters of the SVM model."""
         # self.weights = w
         self.classifier = classifier
         return self
 
 
 class XGBLearner(AbstractLearner):
+    """
+    Implements an XGBoost-based learner for scoring.
+
+    Methods:
+        - tune: Tune hyperparameters using RandomizedSearchCV.
+        - learn: Train the XGBoost model using decoy and target peaks.
+        - score: Score the given peaks using the XGBoost model.
+        - get_parameters: Retrieve the parameters of the XGBoost model.
+        - set_parameters: Set the parameters of the XGBoost model.
+    """
+
     def __init__(self, autotune, xgb_params, threads):
         self.classifier = None
         self.importance = None
@@ -238,6 +331,16 @@ class XGBLearner(AbstractLearner):
     ):
         """
         Tune hyperparameters using RandomizedSearchCV for faster optimization.
+
+        Args:
+            decoy_peaks (Experiment): Decoy peaks data.
+            target_peaks (Experiment): Target peaks data.
+            use_main_score (bool): Whether to use the main score.
+            cv_splits (int): Number of cross-validation splits.
+            n_jobs (int): Number of parallel jobs.
+
+        Returns:
+            XGBLearner: The tuned learner instance.
         """
         logger.info("Autotuning of XGB hyperparameters using RandomizedSearchCV.")
 
@@ -318,6 +421,7 @@ class XGBLearner(AbstractLearner):
         return self
 
     def learn(self, decoy_peaks, target_peaks, use_main_score=True):
+        """Train the XGBoost model using decoy and target peaks."""
         assert isinstance(decoy_peaks, Experiment)
         assert isinstance(target_peaks, Experiment)
 
@@ -349,15 +453,18 @@ class XGBLearner(AbstractLearner):
         return self
 
     def score(self, peaks, use_main_score):
+        """Score the given peaks using the XGBoost model."""
         X = peaks.get_feature_matrix(use_main_score)
         dtest = xgb.DMatrix(X)
         result = self.classifier.predict(dtest)
         return result.astype(np.float32)
 
     def get_parameters(self):
+        """Retrieve the parameters of the XGBoost model."""
         return self.classifier
 
     def set_parameters(self, classifier):
+        """Set the parameters of the XGBoost model."""
         self.classifier = classifier
         self.importance = classifier.get_score(importance_type="gain")
         return self

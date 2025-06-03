@@ -1,3 +1,16 @@
+"""
+This module defines the core classes and workflows for running PyProphet, a tool for
+statistical scoring and error estimation in targeted proteomics and glycoproteomics data analysis.
+
+Classes:
+    - PyProphetRunner: Base class for running PyProphet workflows.
+    - PyProphetLearner: Implements the learning and scoring workflow.
+    - PyProphetWeightApplier: Applies pre-trained weights to new datasets.
+
+Functions:
+    - profile: A no-op decorator for profiling (used if no profiler is available).
+"""
+
 import abc
 import os
 import pickle
@@ -25,10 +38,20 @@ except NameError:
 
 
 class PyProphetRunner(object):
-    __metaclass__ = abc.ABCMeta
-
-    """Base class for workflow of command line tool
     """
+    Base class for running PyProphet workflows.
+
+    This class provides the core structure for executing PyProphet workflows, including
+    reading input data, running algorithms, and saving results.
+
+    Attributes:
+        config (RunnerIOConfig): Configuration object for the workflow.
+        reader (BaseReader): Reader object for input data.
+        writer (BaseWriter): Writer object for output data.
+        table (pd.DataFrame): The input data table.
+    """
+
+    __metaclass__ = abc.ABCMeta
 
     def __init__(
         self,
@@ -72,9 +95,18 @@ class PyProphetRunner(object):
 
     @abc.abstractmethod
     def run_algo(self, part=None):
+        """
+        Abstract method for running the algorithm.
+
+        Args:
+            part (str, optional): Specifies the part of the workflow to run (e.g., "peptide", "glycan"). Specific for glycopeptide workflows.
+        """
         pass
 
     def run(self):
+        """
+        Executes the PyProphet workflow, including scoring, error estimation, and saving results.
+        """
         self.check_cols = [self.runner_config.group_id, "run_id", "decoy"]
 
         if self.glyco and self.level in ["ms2", "ms1ms2"]:
@@ -195,7 +227,9 @@ class PyProphetRunner(object):
             if self.config.subsample_ratio == 1:
                 # We don't want to save the results if we subsampled the data, the second pass of applying the weights to the full data is when we save the results
                 self.writer.save_results(result, scorer.pi0)
-        self.writer.save_weights(weights)
+        if self.config.context == "score_learn":
+            # We only want to save the weights in the context of learning, to avoid overwriting the weights in the context of applying weights
+            self.writer.save_weights(weights)
 
         seconds = int(needed)
         msecs = int(1000 * (needed - seconds))
@@ -222,7 +256,23 @@ class PyProphetRunner(object):
 
 
 class PyProphetLearner(PyProphetRunner):
+    """
+    Implements the learning and scoring workflow for PyProphet.
+
+    This class extends PyProphetRunner to include functionality for training a classifier
+    and applying it to the input data.
+    """
+
     def run_algo(self, part=None):
+        """
+        Runs the learning and scoring algorithm.
+
+        Args:
+            part (str, optional): Specifies the part of the workflow to run (e.g., "peptide", "glycan"). Specific for glycopeptide workflows.
+
+        Returns:
+            tuple: A tuple containing the result, scorer, and weights.
+        """
         if self.glyco:
             if (
                 self.level in ["ms2", "ms1ms2"]
@@ -245,6 +295,13 @@ class PyProphetLearner(PyProphetRunner):
 
 
 class PyProphetWeightApplier(PyProphetRunner):
+    """
+    Applies pre-trained weights to full/new datasets.
+
+    This class extends PyProphetRunner to include functionality for loading pre-trained
+    weights and applying them to input data.
+    """
+
     def __init__(self, apply_weights: str, config: RunnerIOConfig):
         super(PyProphetWeightApplier, self).__init__(config)
 
@@ -318,6 +375,12 @@ class PyProphetWeightApplier(PyProphetRunner):
                     raise
 
     def run_algo(self):
+        """
+        Runs the algorithm to apply pre-trained weights.
+
+        Returns:
+            tuple: A tuple containing the result, scorer, and weights.
+        """
         (result, scorer, weights) = PyProphet(self.config).apply_weights(
             self.table, self.persisted_weights
         )

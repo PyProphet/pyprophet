@@ -9,6 +9,7 @@ from .util import (
     write_logfile,
     transform_threads,
     measure_memory_usage_and_time,
+    memray_profile,
 )
 from .._config import RunnerIOConfig
 from ..scoring.runner import PyProphetLearner, PyProphetWeightApplier
@@ -237,7 +238,9 @@ from ..scoring.runner import PyProphetLearner, PyProphetWeightApplier
     help="Run in test mode with fixed seed.",
     hidden=True,
 )
+@click.option("--profile", is_flag=True, help="Enable Memray profiling.")
 @click.pass_context
+@memray_profile()
 @measure_memory_usage_and_time
 @logger.catch(reraise=True)
 def score(
@@ -282,6 +285,7 @@ def score(
     main_score_selection_report,
     threads,
     test,
+    profile,  # NOQA: F841 unused variable, but used in decorator
 ):
     """
     Conduct semi-supervised learning and error-rate estimation for MS1, MS2 and transition-level data.
