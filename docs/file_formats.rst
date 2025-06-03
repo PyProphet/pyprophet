@@ -51,7 +51,7 @@ PyProphet also supports a split parquet format, which is useful for large datase
         └── 📄 transition_features.parquet
 
 
-To further split the data by run, you can use the `--split_by_run` option. This will create separate parquet files for each run, which can be useful for large datasets with multiple runs. The split parquet files are named as follows:
+To further split the data by run, you can use the `--split_runs` option. This will create separate parquet files for each run, which can be useful for large datasets with multiple runs. The split parquet files are named as follows:
 
 .. code-block:: text
 
