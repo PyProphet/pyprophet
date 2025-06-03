@@ -1,3 +1,5 @@
+.. _file_formats:
+
 File Formats
 =========================
 
@@ -14,6 +16,7 @@ The OSW-sqlite based files have a flexible relational data structure. They conta
 
 Parquet Format (*.parquet*)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. _parquet_format:
 
 Parquet is a columnar storage file format that is optimized for use with large datasets. It is designed to be efficient in terms of both storage space and query performance. PyProphet supports reading and writing Parquet files, allowing users to work with large datasets more efficiently. PyProphet offers the options to convert the OpenSWATH SQLite format (*.osw*) to a single parquet file (with both precursor and transition data). The data is stored in two separate blocks to separate precursor and transition data, similar to the example table below:
 
@@ -41,6 +44,7 @@ Parquet is a columnar storage file format that is optimized for use with large d
 
 Split Parquet Format (*.parquet* / *.oswpq* / *.oswpqd*)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. _split_parquet_format:
 
 PyProphet also supports a split parquet format, which is useful for large datasets. This format splits the precursor and transition data into separate files, allowing for more efficient storage and processing. The split parquet format can be used with the `--split_transition_data` option when converting from OpenSWATH SQLite format to Parquet format. The split parquet files are named as follows:
 

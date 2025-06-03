@@ -8,6 +8,7 @@ PyProphet is a Python package designed for scoring and post-processing of proteo
 .. toctree::
    :maxdepth: 2
 
+   user_guide/index.rst
    file_formats
    cli
    api/index.rst

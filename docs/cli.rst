@@ -1,3 +1,5 @@
+.. _command_line_interface:
+
 Command Line Interface
 =========================
 
@@ -15,6 +17,7 @@ Command Line Interface
 
 Semi-Supervised Scoring of Peak-Groups
 --------------------------------------
+.. _cli_score:
 
 PyProphet provides a command-line interface for scoring peak-groups using the `score` subcommand. This provides a re-implementation of the original `mProphet <http://dx.doi.org/10.1093/bioinformatics/btu686>`_ algorithm, which is a semi-supervised machine learning approach for scoring peak-groups in SRM mass spectrometry data.
 
@@ -30,6 +33,7 @@ The :program:`score` command has several advanced options that can be seen using
 
 Inference of Peptidoforms
 -------------------------
+.. _cli_ipf:
 
 For PTM analyses, PyProphet provides the :program:`ipf` subcommand. This command allows you to perform inference of peptidoforms, for site-localization of peptidoforms in large-scale DIA experiments.
 
@@ -53,6 +57,7 @@ Refer to `Yang, Y. et. al. (2021) <https://www.nature.com/articles/s41467-021-26
 
 Peptide / Protein / Gene Inference
 ----------------------------------
+.. _cli_levels_context:
 
 To perform inference at different levels of biological context and different experimental contexts (global, experiment-wide and run-specific), PyProphet provides the :program:`levels-context` subcommand. This command allows you to infer peptide, glycopeptide, protein, and gene levels from your data.
 
@@ -93,6 +98,7 @@ PyProphet provides several export utilities to export between different file for
 
 TSV Results (Proteomics)
 ^^^^^^^^^^^^^^^^^^^^^^^^
+.. _export_tsv_proteomics:
 
 To export results from a post-scoring workflow (using the *.osw* input workflow) to a tab-separated values (TSV) file, you can use the :program:`export tsv` subcommand. This is useful for exporting results in a format that can be easily read and processed by other tools or scripts.
 
@@ -120,6 +126,7 @@ This is similar to the TSV export for proteomics, but specifically designed for 
 
 TSV Quantification Matrices (Proteomics)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. _export_matrix_proteomics:
 
 To export quantification matrices from a post-scoring workflow to a tab-separated values (TSV) file, you can use the :program:`export matrix` subcommand. This is useful for exporting quantification data in a format that can be easily read and processed by other tools or scripts.
 
