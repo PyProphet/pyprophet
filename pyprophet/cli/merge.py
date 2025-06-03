@@ -11,7 +11,7 @@ from .util import (
     measure_memory_usage_and_time,
 )
 
-from ..levels_contexts import (
+from ..util import (
     merge_osw as _merge_osw,
 )
 from .._base import BaseIOConfig
