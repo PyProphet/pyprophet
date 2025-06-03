@@ -75,36 +75,7 @@ def partial_score(self, part):
     table = table.rename(columns={"decoy_" + part: "decoy"})
 
     (result, scorer, weights) = PyProphet(
-        classifier=self.classifier,
-        xgb_hyperparams=self.xgb_hyperparams,
-        xgb_params=self.xgb_params,
-        xgb_params_space=self.xgb_params_space,
-        xeval_fraction=self.xeval_fraction,
-        xeval_num_iter=self.xeval_num_iter,
-        ss_initial_fdr=self.ss_initial_fdr,
-        ss_iteration_fdr=self.ss_iteration_fdr,
-        ss_num_iter=self.ss_num_iter,
-        group_id=self.group_id,
-        parametric=self.parametric,
-        pfdr=self.pfdr,
-        pi0_lambda=self.pi0_lambda,
-        pi0_method=self.pi0_method,
-        pi0_smooth_df=self.pi0_smooth_df,
-        pi0_smooth_log_pi0=self.pi0_smooth_log_pi0,
-        lfdr_truncate=self.lfdr_truncate,
-        lfdr_monotone=self.lfdr_monotone,
-        lfdr_transformation=self.lfdr_transformation,
-        lfdr_adj=self.lfdr_adj,
-        lfdr_eps=self.lfdr_eps,
-        tric_chromprob=self.tric_chromprob,
-        threads=self.threads,
-        test=self.test,
-        ss_score_filter=self.ss_score_filter,
-        color_palette=self.color_palette,
-        main_score_selection_report=self.main_score_selection_report,
-        outfile=self.outfile,
-        level=self.level,
-        ss_use_dynamic_main_score=self.ss_use_dynamic_main_score,
+        self.config,
     ).learn_and_apply(table)
 
     return (result, scorer, weights)
