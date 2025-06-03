@@ -524,13 +524,13 @@ class MultiSplitParquetTestStrategy(TestStrategy):
 
     def apply_weights(self):
         # Run scoring without weights to generate initial scores
-        cmd = f"pyprophet score --level ms2 --pi0_method=smoother --pi0_lambda 0.001 0 0 --in={self.input_file} --test --ss_iteration_fdr=0.02 --subsample_ratio=0.8"
+        cmd = f"pyprophet score --level ms2 --pi0_method=smoother --pi0_lambda 0.001 0 0 --in={self.input_file} --test --ss_iteration_fdr=0.02 --subsample_ratio=1.0"
         self.runner.run_command(cmd)
 
         cmd = f"pyprophet score --level ms2 --pi0_method=smoother --pi0_lambda 0.4 0 0 --in={self.input_file} --apply_weights={self.weights_file} --test --ss_iteration_fdr=0.02"
         self.runner.run_command(cmd)
 
-        cmd = f"pyprophet score --level transition --pi0_method=smoother --pi0_lambda 0.001 0 0 --in={self.input_file} --test --ss_iteration_fdr=0.02 --subsample_ratio=0.8"
+        cmd = f"pyprophet score --level transition --pi0_method=smoother --pi0_lambda 0.001 0 0 --in={self.input_file} --test --ss_iteration_fdr=0.02 --subsample_ratio=1.0"
         self.runner.run_command(cmd)
 
         cmd = f"pyprophet score --level transition --pi0_method=smoother --pi0_lambda 0.4 0 0 --in={self.input_file} --apply_weights={self.weights_file} --test --ss_iteration_fdr=0.02"
