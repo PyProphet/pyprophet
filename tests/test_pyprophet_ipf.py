@@ -197,7 +197,7 @@ def test_ipf_scoring(
     # Validate output
     validate_output(
         regtest,
-        input_strategy["path"],
+        str(input_strategy["path"]),
         input_strategy["reader"],
         ipf_ms1_scoring,
         ipf_ms2_scoring,

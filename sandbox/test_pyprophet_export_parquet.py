@@ -230,7 +230,7 @@ def _run_export_parquet_scoring_format(
     shutil.copy(data_path, temp_folder)
 
     # MS1-level
-    cmdline = "pyprophet export-parquet --in=test_data.osw --out=test_data.parquet --scoring_format --compression {} --compression_level {}".format(
+    cmdline = "pyprophet export-parquet --in=test_data.osw --out=test_data.parquet --compression {} --compression_level {}".format(
         compression, compression_level
     )
 

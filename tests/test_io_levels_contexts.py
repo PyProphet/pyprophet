@@ -186,8 +186,8 @@ def test_reader_level_context(input_strategy, temp_folder, level, context, reque
     config = create_reader_config(
         level=level,
         context=context,
-        infile=input_strategy["path"],
-        outfile=temp_folder / f"output_{level}_{context}",
+        infile=str(input_strategy["path"]),
+        outfile=str(temp_folder / f"output_{level}_{context}"),
     )
 
     # Initialize appropriate reader
@@ -229,8 +229,8 @@ def test_compare_readers(
     primary_config = create_reader_config(
         level=level,
         context=context,
-        infile=input_strategy["path"],
-        outfile=temp_folder / f"output_{level}_{context}",
+        infile=str(input_strategy["path"]),
+        outfile=str(temp_folder / f"output_{level}_{context}"),
     )
     primary_config.file_type = input_strategy["file_type"]
 
@@ -292,8 +292,8 @@ def test_compare_readers(
         comp_config = create_reader_config(
             level=level,
             context=context,
-            infile=strategy["path"],
-            outfile=temp_folder / f"output_{level}_{context}_comp",
+            infile=str(strategy["path"]),
+            outfile=str(temp_folder / f"output_{level}_{context}_comp"),
         )
         comp_config.file_type = strategy["file_type"]
 

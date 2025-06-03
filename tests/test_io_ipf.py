@@ -179,8 +179,8 @@ def test_reader_ipf_level(input_strategy, temp_folder, level):
     # 2. Test reading the results
     config = create_reader_config(
         level=level,
-        infile=input_strategy["path"],
-        outfile=temp_folder / f"output_{level}",
+        infile=str(input_strategy["path"]),
+        outfile=str(temp_folder / f"output_{level}"),
     )
     config.ipf_ms1_scoring = False
     config.ipf_ms2_scoring = False
@@ -228,8 +228,8 @@ def test_compare_readers(
     # Create config for primary reader
     primary_config = create_reader_config(
         level=level,
-        infile=input_strategy["path"],
-        outfile=temp_folder / f"output_{level}",
+        infile=str(input_strategy["path"]),
+        outfile=str(temp_folder / f"output_{level}"),
     )
     primary_config.file_type = input_strategy["file_type"]
     primary_config.ipf_ms1_scoring = False
@@ -286,8 +286,8 @@ def test_compare_readers(
         # Create config for comparison reader
         comp_config = create_reader_config(
             level=level,
-            infile=strategy["path"],
-            outfile=temp_folder / f"output_{level}_comp",
+            infile=str(strategy["path"]),
+            outfile=str(temp_folder / f"output_{level}_comp"),
         )
         comp_config.file_type = strategy["file_type"]
         comp_config.ipf_ms1_scoring = False

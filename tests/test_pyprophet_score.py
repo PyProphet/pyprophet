@@ -223,17 +223,12 @@ class ParquetTestStrategy(TestStrategy):
     """Test strategy for Parquet files"""
 
     def prepare(self):
-        self.osw_file = self.runner.copy_test_file("test_data.osw")
-        self.input_file = self.osw_file.replace(".osw", ".parquet")
+        self.input_file = self.runner.copy_test_file("test_data.parquet")
         self.weights_file = "test_data_weights.csv"
 
     def execute(self, levels=None, **kwargs):
         if not levels:
             levels = ["ms1", "ms2", "transition"]
-
-        # First generate the parquet file from the OSW file
-        cmd = f"pyprophet export parquet --in={self.osw_file} --out={self.input_file}"
-        self.runner.run_command(cmd)
 
         # Execute each level command separately
         for level in levels:
@@ -277,18 +272,14 @@ class ParquetTestStrategy(TestStrategy):
         print(table.head(100).sort_index(axis=1), file=regtest)
 
     def apply_weights(self):
-        # First generate the parquet file from the OSW file
-        cmd = f"pyprophet export parquet --in={self.osw_file} --out={self.input_file}"
-        self.runner.run_command(cmd)
-
         # Run scoring without weights to generate initial scores
-        cmd = f"pyprophet score --level ms2 --pi0_method=smoother --pi0_lambda 0.001 0 0 --in={self.input_file} --test --ss_iteration_fdr=0.02 --subsample_ratio=0.3"
+        cmd = f"pyprophet score --level ms2 --pi0_method=smoother --pi0_lambda 0.001 0 0 --in={self.input_file} --test --ss_iteration_fdr=0.02 --subsample_ratio=0.9"
         self.runner.run_command(cmd)
 
         cmd = f"pyprophet score --level ms2 --pi0_method=smoother --pi0_lambda 0.4 0 0 --in={self.input_file} --apply_weights={self.weights_file} --test --ss_iteration_fdr=0.02"
         self.runner.run_command(cmd)
 
-        cmd = f"pyprophet score --level transition --pi0_method=smoother --pi0_lambda 0.001 0 0 --in={self.input_file} --test --ss_iteration_fdr=0.02 --subsample_ratio=0.3"
+        cmd = f"pyprophet score --level transition --pi0_method=smoother --pi0_lambda 0.001 0 0 --in={self.input_file} --test --ss_iteration_fdr=0.02 --subsample_ratio=0.9"
         self.runner.run_command(cmd)
 
         cmd = f"pyprophet score --level transition --pi0_method=smoother --pi0_lambda 0.4 0 0 --in={self.input_file} --apply_weights={self.weights_file} --test --ss_iteration_fdr=0.02"
@@ -325,17 +316,12 @@ class SplitParquetTestStrategy(TestStrategy):
     """Test strategy for Parquet files"""
 
     def prepare(self):
-        self.osw_file = self.runner.copy_test_file("test_data.osw")
-        self.input_file = f"{self.osw_file}pq"
+        self.input_file = self.runner.copy_test_dir("test_data.oswpq")
         self.weights_file = "test_data_weights.csv"
 
     def execute(self, levels=None, **kwargs):
         if not levels:
             levels = ["ms1", "ms2", "transition"]
-
-        # First generate the parquet file from the OSW file
-        cmd = f"pyprophet export parquet --in={self.osw_file} --out={self.input_file} --split_transition_data"
-        self.runner.run_command(cmd)
 
         # Execute each level command separately
         for level in levels:
@@ -382,10 +368,6 @@ class SplitParquetTestStrategy(TestStrategy):
         print(table.head(100).sort_index(axis=1), file=regtest)
 
     def apply_weights(self):
-        # First generate the parquet file from the OSW file
-        cmd = f"pyprophet export parquet --in={self.osw_file} --out={self.input_file} --split_transition_data"
-        self.runner.run_command(cmd)
-
         # Run scoring without weights to generate initial scores
         cmd = f"pyprophet score --level ms2 --pi0_method=smoother --pi0_lambda 0.001 0 0 --in={self.input_file} --test --ss_iteration_fdr=0.02 --subsample_ratio=0.8"
         self.runner.run_command(cmd)
@@ -444,17 +426,12 @@ class MultiSplitParquetTestStrategy(TestStrategy):
     """Test strategy for Parquet files"""
 
     def prepare(self):
-        self.osw_file = self.runner.copy_test_file("test_data.osw")
-        self.input_file = f"{self.osw_file}pq"
+        self.input_file = self.runner.copy_test_dir("test_data.oswpqd")
         self.weights_file = "test_data_weights.csv"
 
     def execute(self, levels=None, **kwargs):
         if not levels:
             levels = ["ms1", "ms2", "transition"]
-
-        # First generate the parquet file from the OSW file
-        cmd = f"pyprophet export parquet --in={self.osw_file} --out={self.input_file} --split_transition_data --split_runs"
-        self.runner.run_command(cmd)
 
         # Execute each level command separately
         for level in levels:
@@ -504,14 +481,6 @@ class MultiSplitParquetTestStrategy(TestStrategy):
         print(table.head(100).sort_index(axis=1), file=regtest)
 
     def apply_weights(self):
-        # First generate the parquet file from the OSW file
-        cmd = f"pyprophet export parquet --in={self.osw_file} --out={self.input_file} --split_transition_data --split_runs"
-        self.runner.run_command(cmd)
-
-        print(f"Input file: {self.input_file}")
-
-        print(f"list files in input: {os.listdir(self.input_file)}")
-
         # Run scoring without weights to generate initial scores
         cmd = f"pyprophet score --level ms2 --pi0_method=smoother --pi0_lambda 0.001 0 0 --in={self.input_file} --test --ss_iteration_fdr=0.02 --subsample_ratio=0.8"
         self.runner.run_command(cmd)
