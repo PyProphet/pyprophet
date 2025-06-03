@@ -1,15 +1,15 @@
 Peptide Data:
-    FEATURE_ID  PEPTIDE_ID  SCORE_PEPTIDE_EXPERIMENT_WIDE_PEP  SCORE_PEPTIDE_EXPERIMENT_WIDE_P_VALUE  SCORE_PEPTIDE_EXPERIMENT_WIDE_Q_VALUE  SCORE_PEPTIDE_EXPERIMENT_WIDE_SCORE
-0   1.0824e+18       386.0                             0.0031                                 0.0029                                 0.0033                               5.5702
-1  -4.5156e+18       386.0                             0.0031                                 0.0029                                 0.0033                               5.5702
-2  -4.0449e+18       386.0                             0.0031                                 0.0029                                 0.0033                               5.5702
-3  -9.1447e+18      1253.0                             0.0031                                 0.0029                                 0.0033                               4.9517
-4  -7.5022e+18      1253.0                             0.0031                                 0.0029                                 0.0033                               4.9517
-..         ...         ...                                ...                                    ...                                    ...                                  ...
-95  4.9636e+18       254.0                             1.0000                                 0.1994                                 0.2018                               0.8783
-96  1.9280e+18       254.0                             1.0000                                 0.1994                                 0.2018                               0.8783
-97  2.8227e+18       254.0                             1.0000                                 0.1994                                 0.2018                               0.8783
-98  2.2490e+18       254.0                             1.0000                                 0.1994                                 0.2018                               0.8783
-99 -8.1159e+18      1148.0                             1.0000                                 0.4692                                 0.4692                              -1.3989
+                  RUN_ID            FEATURE_ID  PEPTIDE_ID  SCORE_PEPTIDE_EXPERIMENT_WIDE_SCORE  SCORE_PEPTIDE_EXPERIMENT_WIDE_P_VALUE  SCORE_PEPTIDE_EXPERIMENT_WIDE_Q_VALUE  SCORE_PEPTIDE_EXPERIMENT_WIDE_PEP
+0   -8670811102654833664  -9211032279639747584       976.0                               5.0806                                 0.0029                                 0.0033                             0.0031
+1   -8670811102654833664  -9211032279639747584         NaN                                  NaN                                    NaN                                    NaN                                NaN
+2   -8670811102654833664  -9211032279639747584         NaN                                  NaN                                    NaN                                    NaN                                NaN
+3   -8670811102654833664  -9211032279639747584         NaN                                  NaN                                    NaN                                    NaN                                NaN
+4   -8670811102654833664  -9211032279639747584         NaN                                  NaN                                    NaN                                    NaN                                NaN
+..                   ...                   ...         ...                                  ...                                    ...                                    ...                                ...
+95  -8670811102654833664  -9202066408251325440         NaN                                  NaN                                    NaN                                    NaN                                NaN
+96  -8670811102654833664  -9202066408251325440         NaN                                  NaN                                    NaN                                    NaN                                NaN
+97  -8670811102654833664  -9202066408251325440         NaN                                  NaN                                    NaN                                    NaN                                NaN
+98  -8670811102654833664  -9202066408251325440         NaN                                  NaN                                    NaN                                    NaN                                NaN
+99  -8670811102654833664  -9202066408251325440         NaN                                  NaN                                    NaN                                    NaN                                NaN
 
-[100 rows x 6 columns]
+[100 rows x 7 columns]

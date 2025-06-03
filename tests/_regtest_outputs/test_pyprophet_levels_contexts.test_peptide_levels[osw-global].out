@@ -1,15 +1,15 @@
 Peptide Data:
-   context     pep  peptide_id  pvalue  qvalue run_id   score
-0   global  0.0031          33  0.0029  0.0033   None  5.7301
-1   global  1.0000          43  0.3988  0.4000   None  0.2543
-2   global  0.1143          45  0.0088  0.0091   None  3.1969
-3   global  1.0000          56  0.4692  0.4692   None -0.2546
-4   global  1.0000          72  0.4692  0.4692   None  0.0510
-..     ...     ...         ...     ...     ...    ...     ...
-95  global  1.0000         605  0.4692  0.4692   None -0.5882
-96  global  0.1143         623  0.0088  0.0091   None  3.5708
-97  global  1.0000         714  0.2493  0.2507   None  0.4414
-98  global  1.0000         744  0.0674  0.0685   None  1.3859
-99  global  0.0031         746  0.0029  0.0033   None  5.8152
+   context run_id  peptide_id   score  pvalue  qvalue     pep
+0   global   None           2  5.5390  0.0029  0.0033  0.0031
+1   global   None           3  0.1314  0.3988  0.4000  1.0000
+2   global   None           5  5.8582  0.0029  0.0033  0.0031
+3   global   None           7  0.3975  0.2493  0.2507  1.0000
+4   global   None           8 -0.4131  0.4692  0.4692  1.0000
+..     ...    ...         ...     ...     ...     ...     ...
+95  global   None         243  0.7509  0.1994  0.2018  1.0000
+96  global   None         244  0.9504  0.1994  0.2018  1.0000
+97  global   None         248  5.5804  0.0029  0.0033  0.0031
+98  global   None         250  5.5397  0.0029  0.0033  0.0031
+99  global   None         251  0.1822  0.3988  0.4000  1.0000
 
 [100 rows x 7 columns]

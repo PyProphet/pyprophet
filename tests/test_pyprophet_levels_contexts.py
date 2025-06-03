@@ -103,16 +103,27 @@ def validate_peptide_results(regtest, input_path, input_type, context):
     # reader = ReaderDispatcher.get_reader(config)
 
     if input_type == "osw":
+        sort_cols = [
+            "context",
+            "run_id",
+            "peptide_id",
+            "score",
+            "pvalue",
+            "qvalue",
+            "pep",
+        ]
         with sqlite3.connect(input_path) as con:
             peptide_data = pd.read_sql_query(
-                "SELECT * FROM SCORE_PEPTIDE LIMIT 100", con
+                "SELECT * FROM SCORE_PEPTIDE ORDER BY CONTEXT, RUN_ID, PEPTIDE_ID, SCORE, PVALUE, QVALUE, PEP LIMIT 100",
+                con,
             )
             peptide_data.columns = [col.lower() for col in peptide_data.columns]
             print("Peptide Data:", file=regtest)
-            print(peptide_data.sort_index(axis=1).head(100), file=regtest)
+            print(peptide_data.sort_values(sort_cols).head(100), file=regtest)
     else:
         # For Parquet/SplitParquet, use appropriate reader
         cols = [
+            "RUN_ID",
             "FEATURE_ID",
             "PEPTIDE_ID",
             f"SCORE_PEPTIDE_{context.upper().replace('-', '_')}_SCORE",
@@ -120,24 +131,45 @@ def validate_peptide_results(regtest, input_path, input_type, context):
             f"SCORE_PEPTIDE_{context.upper().replace('-', '_')}_Q_VALUE",
             f"SCORE_PEPTIDE_{context.upper().replace('-', '_')}_PEP",
         ]
+
         peptide_data = pd.read_parquet(input_path, columns=cols)
+
+        # Convert IDs to nullable integers (Int64)
+        for id_col in ["RUN_ID", "FEATURE_ID"]:
+            peptide_data[id_col] = peptide_data[id_col].astype("Int64")
+
+        # Filter NULLs and sort consistently
+        peptide_data = peptide_data[peptide_data["RUN_ID"].notnull()]
+        peptide_data = peptide_data.sort_values(cols).reset_index(drop=True)
+
         print("Peptide Data:", file=regtest)
-        print(peptide_data.sort_index(axis=1).head(100), file=regtest)
+        print(peptide_data.head(100), file=regtest)
 
 
 def validate_protein_results(regtest, input_path, input_type, context):
     """Validate protein-level results"""
     if input_type == "osw":
+        sort_cols = [
+            "context",
+            "run_id",
+            "protein_id",
+            "score",
+            "pvalue",
+            "qvalue",
+            "pep",
+        ]
         with sqlite3.connect(input_path) as con:
             protein_data = pd.read_sql_query(
-                "SELECT * FROM SCORE_PROTEIN LIMIT 100", con
+                "SELECT * FROM SCORE_PROTEIN ORDER BY CONTEXT, RUN_ID, PROTEIN_ID, SCORE, PVALUE, QVALUE, PEP LIMIT 100",
+                con,
             )
             protein_data.columns = [col.lower() for col in protein_data.columns]
             print("Protein Data:", file=regtest)
-            print(protein_data.sort_index(axis=1).head(100), file=regtest)
+            print(protein_data.sort_values(sort_cols).head(100), file=regtest)
     else:
         # For Parquet/SplitParquet, use appropriate reader
         cols = [
+            "RUN_ID",
             "FEATURE_ID",
             "PROTEIN_ID",
             f"SCORE_PROTEIN_{context.upper().replace('-', '_')}_SCORE",
@@ -145,9 +177,18 @@ def validate_protein_results(regtest, input_path, input_type, context):
             f"SCORE_PROTEIN_{context.upper().replace('-', '_')}_Q_VALUE",
             f"SCORE_PROTEIN_{context.upper().replace('-', '_')}_PEP",
         ]
+
         protein_data = pd.read_parquet(input_path, columns=cols)
+
+        # Convert IDs to nullable integers
+        for id_col in ["RUN_ID", "FEATURE_ID"]:
+            protein_data[id_col] = protein_data[id_col].astype("Int64")
+
+        protein_data = protein_data[protein_data["RUN_ID"].notnull()]
+        protein_data = protein_data.sort_values(cols).reset_index(drop=True)
+
         print("Protein Data:", file=regtest)
-        print(protein_data.sort_index(axis=1).head(100), file=regtest)
+        print(protein_data.head(100), file=regtest)
 
 
 # ================== TEST CASES ==================
