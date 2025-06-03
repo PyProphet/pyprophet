@@ -391,12 +391,6 @@ def export_matrix(
 )
 # Convert to scoring format
 @click.option(
-    "--scoring_format",
-    "scoring_format",
-    is_flag=True,
-    help="Convert OSW to parquet format that is compatible with the scoring/inference modules",
-)
-@click.option(
     "--split_transition_data/--no-split_transition_data",
     "split_transition_data",
     default=False,
@@ -436,7 +430,6 @@ def export_parquet(
     transitionLevel,
     onlyFeatures,
     noDecoys,
-    scoring_format,
     split_transition_data,
     split_runs,
     compression,
@@ -447,62 +440,54 @@ def export_parquet(
     """
     # Check if the input file has an .osw extension
     if infile.endswith(".osw"):
-        if scoring_format:
-            logger.info("Will export OSW to parquet scoring format")
-            if os.path.exists(outfile):
-                logger.warning(
-                    f"Warn: {outfile} already exists, will overwrite/delete in 10 seconds",
-                )
-
-                time.sleep(10)
-
-                if os.path.isdir(outfile):
-                    shutil.rmtree(outfile)
-                else:
-                    os.remove(outfile)
-
-            if split_transition_data:
-                logger.info(
-                    f"{outfile} will be a directory containing a separate precursors_features.parquet and a transition_features.parquet"
-                )
-
-            config = ExportIOConfig(
-                infile=infile,
-                outfile=outfile,
-                subsample_ratio=1.0,  # Not used in export
-                level="osw",
-                context="export",
-                export_format="parquet"
-                if not split_transition_data
-                else "parquet_split",
-                split_transition_data=split_transition_data,
-                split_runs=split_runs,
-                compression_method=compression,
-                compression_level=compression_level,
+        logger.info("Will export OSW to parquet scoring format")
+        if os.path.exists(outfile):
+            logger.warning(
+                f"Warn: {outfile} already exists, will overwrite/delete in 10 seconds",
             )
 
-            writer = WriterDispatcher.get_writer(config)
-            writer.export()
+            time.sleep(10)
 
-        else:
-            if transitionLevel:
-                logger.info("Will export transition level data")
-            if outfile is None:
-                outfile = infile.split(".osw")[0] + ".parquet"
-            if os.path.exists(outfile):
-                overwrite = click.confirm(
-                    f"{outfile} already exists, would you like to overwrite?"
-                )
-                if not overwrite:
-                    raise click.ClickException(f"Aborting: {outfile} already exists!")
-            logger.info("Parquet file will be written to {}".format(outfile))
-            # Old export placeholder
+            if os.path.isdir(outfile):
+                shutil.rmtree(outfile)
+            else:
+                os.remove(outfile)
+
+        if split_transition_data:
+            logger.info(
+                f"{outfile} will be a directory containing a separate precursors_features.parquet and a transition_features.parquet"
+            )
+
+        config = ExportIOConfig(
+            infile=infile,
+            outfile=outfile,
+            subsample_ratio=1.0,  # Not used in export
+            level="osw",
+            context="export",
+            export_format="parquet" if not split_transition_data else "parquet_split",
+            split_transition_data=split_transition_data,
+            split_runs=split_runs,
+            compression_method=compression,
+            compression_level=compression_level,
+        )
+
+        writer = WriterDispatcher.get_writer(config)
+        writer.export()
+
     elif infile.endswith(".sqmass") or infile.endswith(".sqMass"):
         logger.info("Will export sqMass to parquet")
         if os.path.exists(outfile):
             logger.info(
-                f"Warn: {outfile} already exists, will overwrite",
+                f"Warn: {outfile} already exists, will overwrite/delete in 10 seconds",
             )
+
+            time.sleep(10)
+
+            if os.path.isdir(outfile):
+                shutil.rmtree(outfile)
+            else:
+                os.remove(outfile)
+
         config = ExportIOConfig(
             infile=infile,
             outfile=outfile,
