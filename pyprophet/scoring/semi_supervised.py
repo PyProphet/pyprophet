@@ -359,10 +359,7 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
             self.pi0_smooth_log_pi0,
         )
 
-        if (
-            isinstance(self.inner_learner, XGBLearner)
-            and self.inner_learner.xgb_hyperparams["autotune"]
-        ):
+        if isinstance(self.inner_learner, XGBLearner) and self.inner_learner.autotune:
             self.inner_learner.tune(td_peaks, bt_peaks, True)
         elif isinstance(self.inner_learner, SVMLearner) and self.inner_learner.autotune:
             self.inner_learner.tune(td_peaks, bt_peaks, True)

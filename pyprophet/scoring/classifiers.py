@@ -4,14 +4,12 @@ from typing import List
 import numpy as np
 import pandas as pd
 import xgboost as xgb
-from hyperopt import tpe
-from hyperopt.fmin import fmin
 from loguru import logger
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.model_selection import (
     GridSearchCV,
     KFold,
-    cross_val_score,
+    RandomizedSearchCV,
     train_test_split,
 )
 from sklearn.svm import LinearSVC
@@ -220,154 +218,102 @@ class SVMLearner(LinearLearner):
 
 
 class XGBLearner(AbstractLearner):
-    def __init__(
-        self, autotune, xgb_hyperparams, xgb_params, xgb_params_space, threads
-    ):
+    def __init__(self, autotune, xgb_params, threads):
         self.classifier = None
         self.importance = None
         self.autotune = autotune
-        self.xgb_hyperparams = xgb_hyperparams
+        self.xgb_hyperparams = {
+            "autotune_num_rounds": 10,
+            "num_boost_round": 100,
+            "early_stopping_rounds": 10,
+            "test_size": 0.33,
+        }
         self.xgb_params = xgb_params
-        self.xgb_params_space = xgb_params_space
         self.xgb_params_tuned = xgb_params
         self.threads = threads
         self.xgb_params["nthread"] = self.threads
 
-    def tune(self, decoy_peaks, target_peaks, use_main_score=True):
-        def objective(params):
-            params = {
-                "eta": "{:.3f}".format(params["eta"]),
-                "gamma": "{:.3f}".format(params["gamma"]),
-                "max_depth": int(params["max_depth"]),
-                "min_child_weight": int(params["min_child_weight"]),
-                "subsample": "{:.3f}".format(params["subsample"]),
-                "colsample_bytree": "{:.3f}".format(params["colsample_bytree"]),
-                "colsample_bylevel": "{:.3f}".format(params["colsample_bylevel"]),
-                "colsample_bynode": "{:.3f}".format(params["colsample_bynode"]),
-                "lambda": "{:.3f}".format(params["lambda"]),
-                "alpha": "{:.3f}".format(params["alpha"]),
-                "scale_pos_weight": "{:.3f}".format(params["scale_pos_weight"]),
-            }
-
-            clf = xgb.XGBClassifier(
-                random_state=42,
-                verbosity=0,
-                objective="binary:logitraw",
-                eval_metric="auc",
-                **params,
-            )
-
-            score = cross_val_score(
-                clf,
-                X,
-                y,
-                scoring="roc_auc",
-                n_jobs=self.threads,
-                cv=KFold(n_splits=3, shuffle=True, random_state=42),
-            ).mean()
-            # click.echo("Info: AUC: {:.3f} hyperparameters: {}".format(score, params))
-            return score
-
-        logger.info("Autotuning of XGB hyperparameters.")
+    def tune(
+        self, decoy_peaks, target_peaks, use_main_score=True, cv_splits=3, n_jobs=-1
+    ):
+        """
+        Tune hyperparameters using RandomizedSearchCV for faster optimization.
+        """
+        logger.info("Autotuning of XGB hyperparameters using RandomizedSearchCV.")
 
         assert isinstance(decoy_peaks, Experiment)
         assert isinstance(target_peaks, Experiment)
 
+        # Prepare feature matrices
         X0 = decoy_peaks.get_feature_matrix(use_main_score)
         X1 = target_peaks.get_feature_matrix(use_main_score)
         X = np.vstack((X0, X1))
         y = np.zeros((X.shape[0],))
         y[X0.shape[0] :] = 1.0
 
-        # Tune complexity hyperparameters
-        xgb_params_complexity = self.xgb_params_tuned
-        xgb_params_complexity.update(
-            {k: self.xgb_params_space[k] for k in ("max_depth", "min_child_weight")}
+        # Define parameter distributions for RandomizedSearchCV
+        param_dist = {
+            "learning_rate": np.linspace(0.0, 0.3, num=100),
+            "gamma": np.linspace(0.0, 0.5, num=100),
+            "max_depth": list(range(2, 9)),  # 2 to 8 inclusive
+            "min_child_weight": list(range(1, 6)),  # 1 to 5 inclusive
+            "subsample": [1.0],  # Fixed value
+            "colsample_bytree": [1.0],  # Fixed value
+            "reg_lambda": np.linspace(0.0, 1.0, num=100),
+            "reg_alpha": np.linspace(0.0, 1.0, num=100),
+            "scale_pos_weight": [1.0],  # Fixed value
+        }
+
+        # Create base model with fixed parameters
+        xgb_model = xgb.XGBClassifier(
+            objective="binary:logitraw",
+            eval_metric="auc",
+            nthread=self.threads,
+            verbosity=0,
+            random_state=42,
+            colsample_bylevel=1.0,  # Fixed params moved here
+            colsample_bynode=1.0,  # Fixed params moved here
         )
 
-        rng = np.random.default_rng(42)
-        best_complexity = fmin(
-            fn=objective,
-            space=xgb_params_complexity,
-            algo=tpe.suggest,
-            max_evals=self.xgb_hyperparams["autotune_num_rounds"],
-            rstate=rng,
-        )
-        best_complexity["max_depth"] = int(best_complexity["max_depth"])
-        best_complexity["min_child_weight"] = int(best_complexity["min_child_weight"])
-
-        self.xgb_params_tuned.update(best_complexity)
-
-        # Tune gamma hyperparameter
-        xgb_params_gamma = self.xgb_params_tuned
-        xgb_params_gamma["gamma"] = self.xgb_params_space["gamma"]
-
-        best_gamma = fmin(
-            fn=objective,
-            space=xgb_params_gamma,
-            algo=tpe.suggest,
-            max_evals=self.xgb_hyperparams["autotune_num_rounds"],
-            rstate=rng,
+        # Set up RandomizedSearchCV
+        random_search = RandomizedSearchCV(
+            estimator=xgb_model,
+            param_distributions=param_dist,
+            n_iter=self.xgb_hyperparams["autotune_num_rounds"],
+            cv=KFold(n_splits=cv_splits, shuffle=True, random_state=42),
+            n_jobs=n_jobs,
+            scoring="roc_auc",
+            verbose=3,
+            random_state=42,
         )
 
-        self.xgb_params_tuned.update(best_gamma)
+        # Perform the random search
+        random_search.fit(X, y)
 
-        # Tune subsampling hyperparameters
-        xgb_params_subsampling = self.xgb_params_tuned
-        xgb_params_subsampling.update(
+        # Get the best parameters and convert to original parameter names
+        best_params = random_search.best_params_
+        self.xgb_params_tuned.update(
             {
-                k: self.xgb_params_space[k]
-                for k in (
-                    "subsample",
-                    "colsample_bytree",
-                    "colsample_bylevel",
-                    "colsample_bynode",
-                )
+                "eta": best_params["learning_rate"],
+                "gamma": best_params["gamma"],
+                "max_depth": best_params["max_depth"],
+                "min_child_weight": best_params["min_child_weight"],
+                "subsample": 1.0,
+                "colsample_bytree": 1.0,
+                "colsample_bylevel": 1.0,
+                "colsample_bynode": 1.0,
+                "lambda": best_params["reg_lambda"],
+                "alpha": best_params["reg_alpha"],
+                "scale_pos_weight": 1.0,
             }
         )
 
-        best_subsampling = fmin(
-            fn=objective,
-            space=xgb_params_subsampling,
-            algo=tpe.suggest,
-            max_evals=self.xgb_hyperparams["autotune_num_rounds"],
-            rstate=rng,
-        )
-
-        self.xgb_params_tuned.update(best_subsampling)
-
-        # Tune regularization hyperparameters
-        xgb_params_regularization = self.xgb_params_tuned
-        xgb_params_regularization.update(
-            {k: self.xgb_params_space[k] for k in ("lambda", "alpha")}
-        )
-
-        best_regularization = fmin(
-            fn=objective,
-            space=xgb_params_regularization,
-            algo=tpe.suggest,
-            max_evals=self.xgb_hyperparams["autotune_num_rounds"],
-            rstate=rng,
-        )
-
-        self.xgb_params_tuned.update(best_regularization)
-
-        # Tune learning rate
-        xgb_params_learning = self.xgb_params_tuned
-        xgb_params_learning["eta"] = self.xgb_params_space["eta"]
-
-        best_learning = fmin(
-            fn=objective,
-            space=xgb_params_learning,
-            algo=tpe.suggest,
-            max_evals=self.xgb_hyperparams["autotune_num_rounds"],
-            rstate=rng,
-        )
-
-        self.xgb_params_tuned.update(best_learning)
-        logger.info("Optimal hyperparameters: {}".format(self.xgb_params_tuned))
-
         self.xgb_params = self.xgb_params_tuned
+        best_params_str = [
+            f"{key}: {str(value).replace('{', '[').replace('}', ']')} | "
+            for key, value in self.xgb_params_tuned.items()
+        ]
+        logger.info(f"Optimal hyperparameters: {best_params_str}")
 
         return self
 

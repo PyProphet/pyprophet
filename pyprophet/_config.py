@@ -96,9 +96,7 @@ class RunnerConfig:
         ss_main_score (str): Starting main score for semi-supervised learning (can be 'auto').
         main_score_selection_report (bool): Whether to generate a report for main score selection.
 
-        xgb_hyperparams (bool): Whether to autotune XGBoost hyperparameters.
         xgb_params (dict): Default XGBoost parameters for training.
-        xgb_params_space (dict): Search space for XGBoost hyperparameter optimization.
 
         xeval_fraction (float): Fraction of data used in each cross-validation iteration.
         xeval_num_iter (int): Number of cross-validation iterations.
@@ -136,9 +134,7 @@ class RunnerConfig:
     main_score_selection_report: bool = False
 
     # XGBoost-related hyperparameters
-    xgb_hyperparams: bool = False
     xgb_params: dict = field(default_factory=dict)
-    xgb_params_space: dict = field(default_factory=dict)
 
     # Cross-validation settings
     xeval_fraction: float = 0.5
@@ -200,9 +196,7 @@ class RunnerConfig:
         if self.classifier == "XGBoost":
             parts.extend(
                 [
-                    f"  xgb_hyperparams={self.xgb_hyperparams}",
                     f"  xgb_params={self.xgb_params}",
-                    f"  xgb_params_space={self.xgb_params_space}",
                 ]
             )
 
@@ -351,13 +345,6 @@ class RunnerIOConfig(BaseIOConfig):
         """
         Creates a configuration object from command-line arguments.
         """
-        xgb_hyperparams = {
-            "autotune": autotune,
-            "autotune_num_rounds": 10,
-            "num_boost_round": 100,
-            "early_stopping_rounds": 10,
-            "test_size": 0.33,
-        }
 
         xgb_params = {
             "eta": 0.3,
@@ -380,24 +367,6 @@ class RunnerIOConfig(BaseIOConfig):
         if test:
             xgb_params["tree_method"] = "exact"
 
-        xgb_params_space = {
-            "eta": hp.uniform("eta", 0.0, 0.3),
-            "gamma": hp.uniform("gamma", 0.0, 0.5),
-            "max_depth": hp.quniform("max_depth", 2, 8, 1),
-            "min_child_weight": hp.quniform("min_child_weight", 1, 5, 1),
-            "subsample": 1,
-            "colsample_bytree": 1,
-            "colsample_bylevel": 1,
-            "colsample_bynode": 1,
-            "lambda": hp.uniform("lambda", 0.0, 1.0),
-            "alpha": hp.uniform("alpha", 0.0, 1.0),
-            "objective": "binary:logitraw",
-            "nthread": 1,
-            "eval_metric": "auc",
-            "scale_pos_weight": 1.0,
-            "verbosity": 0,
-        }
-
         error_estimation_config = ErrorEstimationConfig(
             parametric=parametric,
             pfdr=pfdr,
@@ -417,9 +386,7 @@ class RunnerIOConfig(BaseIOConfig):
             autotune=autotune,
             ss_main_score=ss_main_score,
             main_score_selection_report=main_score_selection_report,
-            xgb_hyperparams=xgb_hyperparams,
             xgb_params=xgb_params,
-            xgb_params_space=xgb_params_space,
             xeval_fraction=xeval_fraction,
             xeval_num_iter=xeval_num_iter,
             ss_initial_fdr=ss_initial_fdr,

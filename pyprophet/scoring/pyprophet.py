@@ -229,9 +229,7 @@ class PyProphet:
         elif self.rc.classifier == "XGBoost":
             base_learner = XGBLearner(
                 self.rc.autotune,
-                self.rc.xgb_hyperparams,
                 self.rc.xgb_params,
-                self.rc.xgb_params_space,
                 self.rc.threads,
             )
         else:
