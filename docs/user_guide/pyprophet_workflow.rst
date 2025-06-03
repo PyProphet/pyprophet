@@ -158,7 +158,16 @@ See the :ref:`CLI documentation <cli_levels_context>` for more information on th
 Exporting Results
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Finally, you can export the results to a variety of formats using the `pyprophet export` command. 
+Finally, you can export the results to a variety of formats using the `pyprophet export` command or if you want to keep the parquet files, you can merge all the individual parquet runs into a single parquet file using `pyprohpet merge` command.
+
+To merge all the individual parquet runs into a single parquet file, you can use the following command:
+
+.. code-block:: bash
+
+    pyprophet merge parquet --out all_runs.parquet all_runs.oswpqd
+
+.. note::
+    This will create a single `all_runs.parquet` file that contains all the scored precursor features. If you want to also merge the transition data, you can use the `--merge_transitions` parameter. This will create two merged parquet files: `all_runs_precursors.parquet/precursors_features.parquet` and `all_runs_transitions.parquet/transition_features.parquet`. See the :ref:`CLI documentation <merge_parquet>` for more information on the available parameters and how to customize the merge process.
 
 To export a filtered version of the results to a TSV file, you can use the following command:
 

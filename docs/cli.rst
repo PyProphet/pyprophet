@@ -161,3 +161,30 @@ To export a PDF report of the results, you can use the :program:`export score-re
 .. click:: pyprophet.cli.export:export_scored_report
    :prog: pyprophet export score-report
    :nested: none
+
+
+Merge files
+-----------
+
+PyProphet provides a command to merge multiple files into a single file. This is useful for combining results from different analyses or runs into a single file for further processing or analysis.
+
+.. currentmodule:: pyprophet.cli.merge
+
+Merge OSW Files
+^^^^^^^^^^^^^^^^
+
+To merge multiple OSW files into a single OSW file, you can use the :program:`merge osw` subcommand. 
+
+.. click:: pyprophet.cli.merge:merge_osw
+   :prog: pyprophet merge osw
+   :nested: none
+
+Merge Parquet Files
+^^^^^^^^^^^^^^^^^^^
+.. _merge_parquet:
+
+To merge multiple Parquet files into a single Parquet file, you can use the :program:`merge parquet` subcommand.
+
+.. click:: pyprophet.cli.merge:merge_parquet
+   :prog: pyprophet merge parquet
+   :nested: none

@@ -7,3 +7,5 @@ API Reference
    io
    config
    scoring
+   ipf
+   levels_context
