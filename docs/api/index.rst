@@ -6,3 +6,4 @@ API Reference
 
    io
    config
+   scoring
