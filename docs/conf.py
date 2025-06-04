@@ -12,6 +12,7 @@ docs/conf
 
 import os
 import sys
+from importlib.metadata import version as get_version
 from pathlib import Path
 from datetime import datetime
 
@@ -55,8 +56,8 @@ def find_git_directory(start_path):
 project = "PyProphet"
 copyright = f"{datetime.now().year}, PyProphet Team"
 author = "PyProphet Team"
-version = "3.0.0"
-release = version
+release = get_version("pyprophet")
+version = ".".join(release.split(".")[:2])
 
 # if the variable is not set (e.g., when building locally and not on RTD)
 rtd_branch = os.environ.get("READTHEDOCS_GIT_IDENTIFIER", "")
