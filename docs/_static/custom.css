@@ -1,0 +1,11 @@
+/* Style for badge container */
+.badge-container {
+    margin: 1em 0;
+    text-align: center;
+}
+
+.badge-container img {
+    display: inline-block;
+    margin: 0 5px 5px 0;
+    height: 20px;
+}

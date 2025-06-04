@@ -1,3 +1,21 @@
+"""
+This module provides utilities for handling and processing data in PyProphet for semi-supervised scoring
+
+It includes functions for cleaning and validating data, preparing data tables,
+and managing feature scaling and ranking. Additionally, it defines the `Experiment`
+class, which encapsulates data operations for peak groups, decoys, and targets.
+
+Classes:
+    - Experiment: Encapsulates data operations for peak groups, decoys, and targets.
+
+Functions:
+    - use_metabolomics_scores: Returns a list of metabolomics-specific score columns.
+    - check_for_unique_blocks: Checks if transition group IDs form unique blocks.
+    - cleanup_and_check: Cleans up the input DataFrame and validates its structure.
+    - prepare_data_table: Prepares the input data table for scoring and analysis.
+    - update_chosen_main_score_in_table: Updates the main score column in the feature table.
+"""
+
 import random
 
 import click
@@ -17,8 +35,12 @@ except NameError:
         return fun
 
 
-# selection of scores with low cross-correlation for metabolomics scoring
 def use_metabolomics_scores():
+    """
+    Returns a list of metabolomics-specific score columns.
+
+    These scores are selected for their low cross-correlation in metabolomics scoring.
+    """
     return [
         "var_ms1_isotope_overlap_score",
         "var_ms1_xcorr_coelution_contrast",
@@ -35,6 +57,15 @@ def use_metabolomics_scores():
 
 
 def check_for_unique_blocks(tg_ids):
+    """
+    Checks if group IDs form unique blocks.
+
+    Args:
+        tg_ids (iterable): group IDs.
+
+    Returns:
+        bool: True if the IDs form unique blocks, False otherwise.
+    """
     seen = set()
     last_tg_id = None
     for tg_id in tg_ids:
@@ -48,6 +79,15 @@ def check_for_unique_blocks(tg_ids):
 
 @profile
 def cleanup_and_check(df):
+    """
+    Cleans up the input DataFrame and validates its structure.
+
+    Args:
+        df (pd.DataFrame): Input data.
+
+    Returns:
+        pd.DataFrame: Cleaned and validated data.
+    """
     score_columns = ["main_score"] + [c for c in df.columns if c.startswith("var_")]
     # this is fast but not easy to read
     # find peak groups with in valid scores:
@@ -89,6 +129,21 @@ def prepare_data_table(
     score_columns=None,
     level=None,
 ):
+    """
+    Prepares the input data table for scoring and analysis.
+
+    Args:
+        table (pd.DataFrame): Input data table.
+        ss_score_filter (str): Semi-supervised score filter.
+        tg_id_name (str): Name of the transition group ID column.
+        decoy_name (str): Name of the decoy column.
+        main_score_name (str, optional): Name of the main score column.
+        score_columns (list, optional): List of score columns.
+        level (str, optional): Analysis level (e.g., "alignment").
+
+    Returns:
+        tuple: Prepared DataFrame, list of all score columns, and used variable column IDs.
+    """
     N = len(table)
     if not N:
         raise click.ClickException("Empty input file supplied.")
@@ -230,7 +285,15 @@ def prepare_data_table(
 
 def update_chosen_main_score_in_table(train, score_columns, use_as_main_score):
     """
-    Update feature tables main_score
+    Updates the main score column in the feature table.
+
+    Args:
+        train (Experiment): The training data.
+        score_columns (list): List of score columns.
+        use_as_main_score (str): The column to use as the new main score.
+
+    Returns:
+        tuple: Updated training data and score columns.
     """
     # Get current main score column name
     old_main_score_column = [col for col in score_columns if "main" in col][0]
@@ -292,11 +355,22 @@ def update_chosen_main_score_in_table(train, score_columns, use_as_main_score):
 
 
 class Experiment(object):
+    """
+    Encapsulates data operations for peak groups, decoys, and targets.
+
+    Attributes:
+        df (pd.DataFrame): The underlying data.
+    """
+
     @profile
     def __init__(self, df):
         self.df = df.copy()
 
     def log_summary(self):
+        """
+        Logs a summary of the input data, including the number of peak groups,
+        group IDs, and scores.
+        """
         logger.info("Summary of input data:")
         logger.info("%d peak groups" % len(self.df))
         logger.info("%d group ids" % len(self.df.tg_id.unique()))
@@ -319,9 +393,10 @@ class Experiment(object):
 
     def scale_features(self, score_columns):
         """
-        Scale the features to [0,1] range
+        Scales the features to the [0, 1] range.
+
         Args:
-            score_columns: list of columns to be scaled
+            score_columns (list): List of columns to be scaled.
         """
 
         scaler = StandardScaler()
@@ -342,10 +417,24 @@ class Experiment(object):
             self.df[col] = scaled_features[:, i]
 
     def set_and_rerank(self, col_name, scores):
+        """
+        Sets a column with new scores and re-ranks the data.
+
+        Args:
+            col_name (str): Name of the column to update.
+            scores (array-like): New scores to assign.
+        """
+        pass
         self.df.loc[:, col_name] = scores
         self.rank_by(col_name)
 
     def rank_by(self, score_col_name):
+        """
+        Ranks the data by the specified score column.
+
+        Args:
+            score_col_name (str): Name of the score column to rank by.
+        """
         flags = find_top_ranked(
             self.df.tg_num_id.values,
             self.df[score_col_name].values.astype(np.float32, copy=False),
@@ -353,32 +442,73 @@ class Experiment(object):
         self.df.is_top_peak = flags
 
     def get_top_test_peaks(self):
+        """
+        Retrieves the top test peaks.
+
+        Returns:
+            Experiment: A new Experiment containing the top test peaks.
+        """
         df = self.df
         return Experiment(df[(df.is_train == False) & (df.is_top_peak == True)])
 
     def get_decoy_peaks(self):
+        """
+        Retrieves the decoy peaks.
+
+        Returns:
+            Experiment: A new Experiment containing the decoy peaks.
+        """
         return Experiment(self.df[self.df.is_decoy == True])
 
     def get_target_peaks(self):
+        """
+        Retrieves the target peaks.
+
+        Returns:
+            Experiment: A new Experiment containing the target peaks.
+        """
         return Experiment(self.df[self.df.is_decoy == False])
 
     def get_top_decoy_peaks(self):
+        """
+        Retrieves the top decoy peaks.
+
+        Returns:
+            Experiment: A new Experiment containing the top decoy peaks.
+        """
         ix_top = self.df.is_top_peak == True
         return Experiment(self.df[(self.df.is_decoy == True) & ix_top])
 
     def get_top_target_peaks(self):
+        """
+        Retrieves the top target peaks.
+
+        Returns:
+            Experiment: A new Experiment containing the top target peaks.
+        """
         ix_top = self.df.is_top_peak == True
         return Experiment(self.df[(self.df.is_decoy == False) & ix_top])
 
     def get_feature_matrix(self, use_main_score):
+        """
+        Retrieves the feature matrix for scoring.
+
+        Args:
+            use_main_score (bool): Whether to include the main score.
+
+        Returns:
+            np.ndarray: The feature matrix.
+        """
         min_col = 5 if use_main_score else 6
         return self.df.iloc[:, min_col:-1].values
 
     def normalize_score_by_decoys(self, score_col_name):
         """
-        normalize the decoy scores to mean 0 and std 1, scale the targets accordingly
+        Normalizes the decoy scores to mean 0 and standard deviation 1,
+        and scales the target scores accordingly.
+
         Args:
-            score_col_name: str, the name of the score column
+            score_col_name (str): Name of the score column to normalize.
         """
         td_scores = self.get_top_decoy_peaks()[score_col_name]
         mu, nu = mean_and_std_dev(td_scores)
@@ -391,10 +521,22 @@ class Experiment(object):
         self.df.loc[:, score_col_name] = (self.df[score_col_name] - mu) / nu
 
     def filter_(self, idx):
+        """
+        Filters the data based on the given index.
+
+        Args:
+            idx (array-like): Boolean index for filtering.
+
+        Returns:
+            Experiment: A new Experiment containing the filtered data.
+        """
         return Experiment(self.df[idx])
 
     @profile
     def add_peak_group_rank(self):
+        """
+        Adds a peak group rank column to the data.
+        """
         ids = self.df.tg_num_id.values
         scores = self.df.d_score.values
         peak_group_ranks = rank(ids, scores.astype(np.float32, copy=False))
@@ -402,6 +544,13 @@ class Experiment(object):
 
     @profile
     def split_for_xval(self, fraction, is_test):
+        """
+        Splits the data for cross-validation.
+
+        Args:
+            fraction (float): Fraction of data to use for training.
+            is_test (bool): Whether this is a test split.
+        """
         df = self.df
         decoy_ids = df[df.is_decoy == True].tg_id.unique()
         target_ids = df[df.is_decoy == False].tg_id.unique()
@@ -421,5 +570,11 @@ class Experiment(object):
         df.loc[~ix_learn, "is_train"] = False
 
     def get_train_peaks(self):
+        """
+        Retrieves the training peaks.
+
+        Returns:
+            Experiment: A new Experiment containing the training peaks.
+        """
         df = self.df[self.df.is_train == True]
         return Experiment(df)

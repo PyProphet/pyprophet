@@ -24,7 +24,7 @@ class ParquetReader(BaseParquetReader):
         infile (str): Input file path.
         outfile (str): Output file path.
         classifier (str): Classifier used for semi-supervised learning.
-        level (str): Level used in semi-supervised learning (e.g., 'ms1', 'ms2', 'ms1ms2', 'transition', 'alignment'), or context level used peptide/protein/gene inference (e.g., 'global', 'experiment-wide', 'run-specific').
+        level (str): Level of data to extract for IPF. ["peakgroup_precursor", "transition", "alignment"].
         glyco (bool): Flag indicating whether analysis is glycoform-specific.
 
     Methods:
@@ -168,6 +168,7 @@ class ParquetReader(BaseParquetReader):
         FROM data
         WHERE TRANSITION_TYPE != ''
         AND TRANSITION_DECOY = 0
+        AND SCORE_TRANSITION_SCORE IS NOT NULL
         AND SCORE_TRANSITION_PEP < {pep_threshold}
         """
         evidence = con.execute(query).df().rename(columns=str.lower)
@@ -178,6 +179,7 @@ class ParquetReader(BaseParquetReader):
         FROM data
         WHERE TRANSITION_TYPE != ''
         AND TRANSITION_DECOY = 0
+        AND SCORE_TRANSITION_SCORE IS NOT NULL
         AND IPF_PEPTIDE_ID IS NOT NULL
         """
         bitmask = con.execute(query).df().rename(columns=str.lower)
@@ -187,7 +189,9 @@ class ParquetReader(BaseParquetReader):
         SELECT FEATURE_ID, COUNT(DISTINCT IPF_PEPTIDE_ID) AS NUM_PEPTIDOFORMS
         FROM data
         WHERE TRANSITION_TYPE != ''
+        AND TRANSITION_ID IS NOT NULL
         AND TRANSITION_DECOY = 0
+        AND SCORE_TRANSITION_SCORE IS NOT NULL
         AND IPF_PEPTIDE_ID IS NOT NULL
         GROUP BY FEATURE_ID
         ORDER BY FEATURE_ID
@@ -198,8 +202,10 @@ class ParquetReader(BaseParquetReader):
         query = """
         SELECT DISTINCT FEATURE_ID, IPF_PEPTIDE_ID AS PEPTIDE_ID
         FROM data
-        WHERE TRANSITION_TYPE != ''
+        WHERE TRANSITION_ID IS NOT NULL
+        AND TRANSITION_TYPE != ''
         AND TRANSITION_DECOY = 0
+        AND SCORE_TRANSITION_SCORE IS NOT NULL
         AND IPF_PEPTIDE_ID IS NOT NULL
         ORDER BY FEATURE_ID
         """
@@ -218,6 +224,7 @@ class ParquetReader(BaseParquetReader):
             trans_pf, bitmask, how="left", on=["transition_id", "peptide_id"]
         ).fillna(0)
         result = pd.merge(trans_pf_bm, num_peptidoforms, how="inner", on="feature_id")
+        result = result.drop_duplicates()
 
         logger.info(f"Loaded {len(result)} transition-peptidoform entries")
         return result
@@ -311,7 +318,7 @@ class ParquetWriter(BaseParquetWriter):
             con,
             target_file,
             "p.FEATURE_ID, p.IPF_PEPTIDE_ID",
-            "ON p.FEATURE_ID = s.FEATURE_ID AND p.IPF_PEPTIDE_ID = s.PEPTIDE_ID",
+            "p.FEATURE_ID = s.FEATURE_ID AND p.IPF_PEPTIDE_ID = s.PEPTIDE_ID",
             "p",
         )
 

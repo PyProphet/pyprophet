@@ -1,3 +1,4 @@
+import os
 import click
 from loguru import logger
 
@@ -8,6 +9,7 @@ from .util import (
     write_logfile,
     transform_threads,
     measure_memory_usage_and_time,
+    memray_profile,
 )
 from .._config import RunnerIOConfig
 from ..scoring.runner import PyProphetLearner, PyProphetWeightApplier
@@ -236,7 +238,9 @@ from ..scoring.runner import PyProphetLearner, PyProphetWeightApplier
     help="Run in test mode with fixed seed.",
     hidden=True,
 )
+@click.option("--profile", is_flag=True, help="Enable Memray profiling.")
 @click.pass_context
+@memray_profile()
 @measure_memory_usage_and_time
 @logger.catch(reraise=True)
 def score(
@@ -281,6 +285,7 @@ def score(
     main_score_selection_report,
     threads,
     test,
+    profile,  # NOQA: F841 unused variable, but used in decorator
 ):
     """
     Conduct semi-supervised learning and error-rate estimation for MS1, MS2 and transition-level data.
@@ -363,7 +368,33 @@ def score(
             )
             config.subsample_ratio = 1.0
             config.context = "score_apply"
-            PyProphetWeightApplier(weights_path, config).run()
+            if config.file_type == "parquet_split_multi":
+                base_dir = config.infile
+                runs = [
+                    os.path.join(base_dir, d)
+                    for d in os.listdir(base_dir)
+                    if os.path.isdir(os.path.join(base_dir, d))
+                ]
+                logger.info(
+                    f"Found {len(runs)} runs in split parquet multi directory: {base_dir}",
+                )
+                logger.info(
+                    "For memory efficiency, we will apply weights to each run individually to avoid loading all runs at once.",
+                )
+                for run in runs:
+                    run_config = config.copy()
+                    run_config.infile = run
+                    if infile != outfile:
+                        run_config.outfile = os.path.join(
+                            os.path.basename(outfile), run
+                        )
+                    else:
+                        run_config.outfile = run
+                    run_config.prefix = os.path.splitext(run)[0]
+                    run_config.file_type = "parquet_split"
+                    PyProphetWeightApplier(weights_path, run_config).run()
+            else:
+                PyProphetWeightApplier(weights_path, config).run()
         else:
             logger.info(
                 f"Conducting {level} semi-supervised learning.",
@@ -373,4 +404,29 @@ def score(
         logger.info(
             f"Applying {level} weights from {apply_weights} to the full data set.",
         )
-        PyProphetWeightApplier(apply_weights, config).run()
+        config.context = "score_apply"
+        if config.file_type == "parquet_split_multi":
+            base_dir = config.infile
+            runs = [
+                os.path.join(base_dir, d)
+                for d in os.listdir(base_dir)
+                if os.path.isdir(os.path.join(base_dir, d))
+            ]
+            logger.info(
+                f"Found {len(runs)} runs in split parquet multi directory: {base_dir}",
+            )
+            logger.info(
+                "For memory efficiency, we will apply weights to each run individually to avoid loading all runs at once.",
+            )
+            for run in runs:
+                run_config = config.copy()
+                run_config.infile = run
+                if infile != outfile:
+                    run_config.outfile = os.path.join(os.path.basename(outfile), run)
+                else:
+                    run_config.outfile = run
+                run_config.prefix = os.path.splitext(run)[0]
+                run_config.file_type = "parquet_split"
+                PyProphetWeightApplier(apply_weights, run_config).run()
+        else:
+            PyProphetWeightApplier(apply_weights, config).run()

@@ -2,8 +2,7 @@ import sqlite3
 import pandas as pd
 
 
-from .io.util import check_sqlite_table, write_scores_sql_command
-from .report import plot_scores
+from ..io.util import check_sqlite_table, write_scores_sql_command
 
 
 def export_compound_tsv(infile, outfile, format, outcsv, max_rs_peakgroup_qvalue):
@@ -14,7 +13,6 @@ def export_compound_tsv(infile, outfile, format, outcsv, max_rs_peakgroup_qvalue
         check_sqlite_table(con, "SCORE_MS1") is False
         and check_sqlite_table(con, "SCORE_MS2") is False
     ):  # No scoring performend
-
         score_sql = ""
 
         if check_sqlite_table(con, "FEATURE_MS1"):

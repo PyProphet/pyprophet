@@ -40,7 +40,7 @@ def create_levels_context_group():
     "infile",
     required=True,
     type=click.Path(exists=True),
-    help="PyProphet input file. Valid formats are .osw, .parquet (produced by export_parquet with `--scoring_format`)",
+    help="PyProphet input file. Valid formats are .osw, .parquet (produced by export parquet)",
 )
 @click.option(
     "--out",
@@ -218,7 +218,7 @@ def glycopeptide(
     "infile",
     required=True,
     type=click.Path(exists=True),
-    help="PyProphet input file.  Valid formats are .osw, .parquet (produced by export_parquet with `--scoring_format`)",
+    help="PyProphet input file.  Valid formats are .osw, .parquet (produced by export parquet)",
 )
 @click.option(
     "--out",
@@ -312,7 +312,7 @@ def gene(
     "infile",
     required=True,
     type=click.Path(exists=True),
-    help="PyProphet input file.  Valid formats are .osw, .parquet (produced by export_parquet with `--scoring_format`)",
+    help="PyProphet input file.  Valid formats are .osw, .parquet (produced by export parquet)",
 )
 @click.option(
     "--out",

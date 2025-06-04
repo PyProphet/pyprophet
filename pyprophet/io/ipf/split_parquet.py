@@ -199,6 +199,7 @@ class SplitParquetReader(BaseSplitParquetReader):
         FROM transition t
         WHERE t.TRANSITION_TYPE != ''
         AND t.TRANSITION_DECOY = 0
+        AND t.SCORE_TRANSITION_SCORE IS NOT NULL
         AND t.SCORE_TRANSITION_PEP < {pep_threshold}
         """
         evidence = con.execute(query).df().rename(columns=str.lower)
@@ -209,6 +210,7 @@ class SplitParquetReader(BaseSplitParquetReader):
         FROM transition t
         WHERE t.TRANSITION_TYPE != ''
         AND t.TRANSITION_DECOY = 0
+        AND t.SCORE_TRANSITION_SCORE IS NOT NULL
         AND t.IPF_PEPTIDE_ID IS NOT NULL
         """
         bitmask = con.execute(query).df().rename(columns=str.lower)
@@ -219,6 +221,7 @@ class SplitParquetReader(BaseSplitParquetReader):
         FROM transition t
         WHERE t.TRANSITION_TYPE != ''
         AND t.TRANSITION_DECOY = 0
+        AND t.SCORE_TRANSITION_SCORE IS NOT NULL
         AND t.IPF_PEPTIDE_ID IS NOT NULL
         GROUP BY t.FEATURE_ID
         ORDER BY t.FEATURE_ID
@@ -231,6 +234,7 @@ class SplitParquetReader(BaseSplitParquetReader):
         FROM transition t
         WHERE t.TRANSITION_TYPE != ''
         AND t.TRANSITION_DECOY = 0
+        AND t.SCORE_TRANSITION_SCORE IS NOT NULL
         AND t.IPF_PEPTIDE_ID IS NOT NULL
         ORDER BY t.FEATURE_ID
         """
@@ -249,6 +253,8 @@ class SplitParquetReader(BaseSplitParquetReader):
             trans_pf, bitmask, how="left", on=["transition_id", "peptide_id"]
         ).fillna(0)
         result = pd.merge(trans_pf_bm, num_peptidoforms, how="inner", on="feature_id")
+
+        result = result.drop_duplicates()
 
         logger.info(f"Loaded {len(result)} transition-peptidoform entries")
         return result

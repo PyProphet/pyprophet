@@ -1,4 +1,19 @@
-import click
+"""
+This module implements semi-supervised learning for statistical scoring and error estimation
+in targeted proteomics and glycoproteomics data analysis.
+
+It provides abstract and concrete implementations of semi-supervised learners, enabling
+iterative learning and scoring workflows. The learners support dynamic main score selection,
+cross-validation, and parameter tuning.
+
+Classes:
+    - AbstractSemiSupervisedLearner: Base class for semi-supervised learning workflows.
+    - StandardSemiSupervisedLearner: Implements a standard semi-supervised learning workflow.
+
+Functions:
+    - profile: A no-op decorator for profiling (used if no profiler is available).
+"""
+
 import numpy as np
 from loguru import logger
 
@@ -14,6 +29,15 @@ except NameError:
 
 
 class AbstractSemiSupervisedLearner(object):
+    """
+    Abstract base class for semi-supervised learning workflows.
+
+    Attributes:
+        xeval_fraction (float): Fraction of data used for cross-validation.
+        xeval_num_iter (int): Number of iterations for cross-validation.
+        test (bool): Whether to enable testing mode.
+    """
+
     def __init__(self, xeval_fraction, xeval_num_iter, test):
         self.xeval_fraction = xeval_fraction
         self.xeval_num_iter = xeval_num_iter
@@ -22,19 +46,58 @@ class AbstractSemiSupervisedLearner(object):
     def start_semi_supervised_learning(
         self, train, score_columns, working_thread_number
     ):
+        """
+        Abstract method to start the semi-supervised learning process.
+
+        Args:
+            train (Experiment): Training data.
+            score_columns (list): List of score column names.
+            working_thread_number (int): Number of threads to use.
+        """
         raise NotImplementedError()
 
     def iter_semi_supervised_learning(self, train):
+        """
+        Abstract method for iterative semi-supervised learning.
+
+        Args:
+            train (Experiment): Training data.
+        """
         raise NotImplementedError()
 
     def averaged_learner(self, params, **kwargs):
+        """
+        Abstract method to create an averaged learner from multiple parameter sets.
+
+        Args:
+            params (list): List of parameter sets.
+            kwargs: Additional arguments.
+        """
         raise NotImplementedError()
 
     def score(self, df, params):
+        """
+        Abstract method to score the given data using the trained model.
+
+        Args:
+            df (pd.DataFrame): Input data.
+            params (dict): Model parameters.
+        """
         raise NotImplementedError()
 
     @profile
     def learn_randomized(self, experiment, score_columns, working_thread_number):
+        """
+        Performs randomized semi-supervised learning with cross-validation.
+
+        Args:
+            experiment (Experiment): The experiment data.
+            score_columns (list): List of score column names.
+            working_thread_number (int): Number of threads to use.
+
+        Returns:
+            tuple: Target scores, decoy scores, and model parameters.
+        """
         assert isinstance(experiment, Experiment)
 
         logger.info("Learning on cross-validation fold.")
@@ -91,6 +154,15 @@ class AbstractSemiSupervisedLearner(object):
         return top_test_target_scores, top_test_decoy_scores, params
 
     def learn_final(self, experiment):
+        """
+        Performs final learning on cross-validated scores.
+
+        Args:
+            experiment (Experiment): The experiment data.
+
+        Returns:
+            dict: Final model parameters.
+        """
         assert isinstance(experiment, Experiment)
 
         logger.info("Learning on cross-validated scores.")
@@ -111,6 +183,22 @@ class AbstractSemiSupervisedLearner(object):
 
 
 class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
+    """
+    Implements a standard semi-supervised learning workflow.
+
+    Attributes:
+        inner_learner (AbstractLearner): The base learner used for training.
+        ss_initial_fdr (float): Initial FDR threshold for training.
+        ss_iteration_fdr (float): FDR threshold for iterative learning.
+        parametric (bool): Whether to use parametric FDR estimation.
+        pfdr (bool): Whether to use pFDR estimation.
+        pi0_lambda (list): Lambda values for pi0 estimation.
+        pi0_method (str): Method for pi0 estimation.
+        pi0_smooth_df (int): Degrees of freedom for pi0 smoothing.
+        pi0_smooth_log_pi0 (bool): Whether to log-transform pi0 values.
+        ss_use_dynamic_main_score (bool): Whether to dynamically select the main score.
+    """
+
     def __init__(
         self,
         inner_learner,
@@ -153,6 +241,16 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
 
     @classmethod
     def from_config(cls, config: RunnerIOConfig, base_learner):
+        """
+        Creates a StandardSemiSupervisedLearner instance from a configuration object.
+
+        Args:
+            config (RunnerIOConfig): The configuration object.
+            base_learner (AbstractLearner): The base learner used for training.
+
+        Returns:
+            StandardSemiSupervisedLearner: The initialized learner.
+        """
         rc = config.runner
         return cls(
             base_learner,
@@ -190,6 +288,29 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
         level=None,
         working_thread_number=None,
     ):
+        """
+        Selects the best target peaks and top decoy peaks based on FDR thresholds.
+
+        Args:
+            train (Experiment): Training data.
+            sel_column (str): Column used for selection.
+            cutoff_fdr (float): FDR threshold for selection.
+            parametric (bool): Whether to use parametric FDR estimation.
+            pfdr (bool): Whether to use pFDR estimation.
+            pi0_lambda (list): Lambda values for pi0 estimation.
+            pi0_method (str): Method for pi0 estimation.
+            pi0_smooth_df (int): Degrees of freedom for pi0 smoothing.
+            pi0_smooth_log_pi0 (bool): Whether to log-transform pi0 values.
+            mapper (dict, optional): Mapping of column aliases to feature names.
+            main_score_selection_report (bool, optional): Whether to generate a score selection report.
+            outfile (str, optional): Path to the output file.
+            level (str, optional): Analysis level (e.g., peptide, protein).
+            working_thread_number (int, optional): Number of threads to use.
+
+        Returns:
+            tuple: Top decoy peaks and best target peaks.
+        """
+
         assert isinstance(train, Experiment)
         assert isinstance(sel_column, str)
         assert isinstance(cutoff_fdr, float)
@@ -222,7 +343,16 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
 
     def get_delta_td_bt_feature_size(self, train, col, mapper, working_thread_number):
         """
-        Get the the difference in feature size based on which column is used in select_train_peaks for top decoy features and best target features
+        Calculates the difference in feature size between top decoy peaks and best target peaks.
+
+        Args:
+            train (Experiment): Training data.
+            col (str): Column used for selection.
+            mapper (dict): Mapping of column aliases to feature names.
+            working_thread_number (int): Number of threads to use.
+
+        Returns:
+            int: The absolute difference in feature size.
         """
         assert isinstance(train, Experiment)
         assert isinstance(col, str)
@@ -253,6 +383,17 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
     def start_semi_supervised_learning(
         self, train, score_columns, working_thread_number
     ):
+        """
+        Starts the semi-supervised learning process.
+
+        Args:
+            train (Experiment): Training data.
+            score_columns (list): List of score column names.
+            working_thread_number (int): Number of threads to use.
+
+        Returns:
+            tuple: Model parameters, classifier scores, and selected main score column.
+        """
         # Get tables aliased score variable name
         df_column_score_alias = [
             col
@@ -311,6 +452,17 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
     def iter_semi_supervised_learning(
         self, train, score_columns, working_thread_number
     ):
+        """
+        Performs iterative semi-supervised learning.
+
+        Args:
+            train (Experiment): Training data.
+            score_columns (list): List of score column names.
+            working_thread_number (int): Number of threads to use.
+
+        Returns:
+            tuple: Model parameters and classifier scores.
+        """
         # Get tables aliased score variable name
         df_column_score_alias = [
             col
@@ -347,6 +499,15 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
         return w, clf_scores
 
     def tune_semi_supervised_learning(self, train):
+        """
+        Tunes the semi-supervised learning model.
+
+        Args:
+            train (Experiment): Training data.
+
+        Returns:
+            tuple: Model parameters and classifier scores.
+        """
         td_peaks, bt_peaks = self.select_train_peaks(
             train,
             "classifier_score",
@@ -359,10 +520,7 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
             self.pi0_smooth_log_pi0,
         )
 
-        if (
-            isinstance(self.inner_learner, XGBLearner)
-            and self.inner_learner.xgb_hyperparams["autotune"]
-        ):
+        if isinstance(self.inner_learner, XGBLearner) and self.inner_learner.autotune:
             self.inner_learner.tune(td_peaks, bt_peaks, True)
         elif isinstance(self.inner_learner, SVMLearner) and self.inner_learner.autotune:
             self.inner_learner.tune(td_peaks, bt_peaks, True)
@@ -373,12 +531,38 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
         return w, clf_scores
 
     def averaged_learner(self, params, **kwargs):
+        """
+        Creates an averaged learner from multiple parameter sets.
+
+        Args:
+            params (list): List of parameter sets.
+            kwargs: Additional arguments.
+
+        Returns:
+            AbstractLearner: The averaged learner.
+        """
         return self.inner_learner.averaged_learner(params, **kwargs)
 
     def set_learner(self, model):
+        """
+        Sets the parameters of the inner learner.
+
+        Args:
+            model (object): The model parameters.
+        """
         logger.trace(f"Setting inner learner parmeters from : {model}")
         return self.inner_learner.set_parameters(model)
 
     def score(self, df, params):
+        """
+        Scores the given data using the trained model.
+
+        Args:
+            df (pd.DataFrame): Input data.
+            params (dict): Model parameters.
+
+        Returns:
+            np.ndarray: Classifier scores.
+        """
         self.inner_learner.set_parameters(params)
         return self.inner_learner.score(df, True)

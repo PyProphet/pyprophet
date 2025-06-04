@@ -331,7 +331,7 @@ class OSWReader(BaseOSWReader):
             """
             SELECT * 
             FROM transition_table 
-            ORDER BY RUN_ID, PRECURSOR_ID, EXP_RT, TRANSITION_ID
+            ORDER BY RUN_ID, FEATURE_ID, PRECURSOR_ID, EXP_RT, TRANSITION_ID
             """
         ).fetchdf()
 
@@ -663,7 +663,11 @@ class OSWWriter(BaseOSWWriter):
 
                 df_main.columns = [c.upper() for c in df_main.columns]
                 df_main = df_main.rename(
-                    columns={"PEAK_GROUP_RANK": "RANK", "D_SCORE_COMBINED": "SCORE"}
+                    columns={
+                        "PEAK_GROUP_RANK": "RANK",
+                        "D_SCORE_COMBINED": "SCORE",
+                        "QVALUE": "Q_VALUE",
+                    }
                 )
                 df_main.to_sql("SCORE_MS1", con, index=False)
 

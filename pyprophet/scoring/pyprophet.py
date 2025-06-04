@@ -1,8 +1,27 @@
+"""
+This module implements the core functionality of PyProphet, a tool for statistical scoring
+and error estimation in targeted proteomics and glycoproteomics data analysis.
+
+It includes classes and functions for:
+- Semi-supervised learning and scoring workflows.
+- Statistical error estimation and hypothesis testing.
+- Integration with various classifiers (e.g., LDA, SVM, XGBoost).
+- Data preparation and feature scaling.
+
+Classes:
+    - Scorer: Handles scoring, error estimation, and hypothesis testing for experiments.
+    - PyProphet: Orchestrates the semi-supervised learning and scoring workflow.
+
+Functions:
+    - timer: A context manager for measuring execution time.
+    - unwrap_self_for_multiprocessing: Helper function for multiprocessing method calls.
+    - calculate_params_for_d_score: Calculates parameters for d-score normalization.
+"""
+
 from __future__ import division
 
 import multiprocessing
 import operator
-import os
 import time
 from collections import namedtuple
 from contextlib import contextmanager
@@ -35,6 +54,15 @@ except NameError:
 
 @contextmanager
 def timer(name=""):
+    """
+    A context manager for measuring execution time.
+
+    Args:
+        name (str): Optional name for the timer.
+
+    Yields:
+        None
+    """
     start_at = time.time()
 
     yield
@@ -71,6 +99,16 @@ def unwrap_self_for_multiprocessing(arg):
 
 @profile
 def calculate_params_for_d_score(classifier, experiment):
+    """
+    Calculates parameters for d-score normalization.
+
+    Args:
+        classifier: The trained classifier.
+        experiment: The experiment data.
+
+    Returns:
+        tuple: Mean and standard deviation of decoy scores.
+    """
     score = classifier.score(experiment, True)
     experiment.set_and_rerank("classifier_score", score)
 
@@ -81,6 +119,18 @@ def calculate_params_for_d_score(classifier, experiment):
 
 
 class Scorer(object):
+    """
+    Handles scoring, error estimation, and hypothesis testing for experiments.
+
+    Attributes:
+        classifier: The trained classifier used for scoring.
+        score_columns: List of score column names.
+        mu, nu: Parameters for d-score normalization.
+        error_stat: Error statistics for target and decoy scores.
+        pi0: Estimated proportion of null hypotheses.
+        level: Analysis level (e.g., peptide, protein).
+    """
+
     def __init__(
         self,
         classifier,
@@ -94,6 +144,22 @@ class Scorer(object):
         color_palette,
         level,
     ):
+        """
+        Initializes the Scorer with the given classifier, experiment, and configuration.
+
+        Args:
+            classifier: The trained classifier.
+            score_columns: List of score column names.
+            experiment: The experiment data.
+            group_id: Group ID for scoring.
+            error_estimation_config: Configuration for error estimation.
+            tric_chromprob: Flag for chromatogram probabilities.
+            ss_score_filter: Filter for semi-supervised scoring.
+            ss_scale_features: Flag for feature scaling.
+            color_palette: Color palette for visualization.
+            level: Analysis level (e.g., peptide, protein).
+        """
+
         self.classifier = classifier
         self.score_columns = score_columns
         self.mu, self.nu = calculate_params_for_d_score(classifier, experiment)
@@ -136,6 +202,15 @@ class Scorer(object):
         self.decoy_scores = experiment.get_top_decoy_peaks().df["d_score"]
 
     def score(self, table):
+        """
+        Scores the given table using the trained classifier.
+
+        Args:
+            table: The input data table.
+
+        Returns:
+            pd.DataFrame: The scored table with additional columns for scores and error metrics.
+        """
         prepared_table, __, used_var_column_ids = prepare_data_table(
             table,
             self.ss_score_filter,
@@ -179,6 +254,16 @@ class Scorer(object):
         return df
 
     def add_chromatogram_probabilities(self, scored_table, texp):
+        """
+        Adds chromatogram probabilities to the scored table.
+
+        Args:
+            scored_table: The scored table.
+            texp: The experiment data.
+
+        Returns:
+            pd.DataFrame: The updated scored table with chromatogram probabilities.
+        """
         allhypothesis, h0 = posterior_chromatogram_hypotheses_fast(
             texp, self.pi0["pi0"]
         )
@@ -189,9 +274,21 @@ class Scorer(object):
         return scored_table
 
     def get_error_stats(self):
+        """
+        Retrieves the final and summary error statistics.
+
+        Returns:
+            tuple: Final error table and summary error table.
+        """
         return final_err_table(self.error_stat), summary_err_table(self.error_stat)
 
     def minimal_error_stat(self):
+        """
+        Creates a minimal error statistics object for serialization.
+
+        Returns:
+            ErrorStatistics: The minimal error statistics object.
+        """
         minimal_err_stat = ErrorStatistics(
             self.error_stat.df.loc[:, ["svalue", "qvalue", "pvalue", "pep", "cutoff"]],
             self.error_stat.num_null,
@@ -212,8 +309,11 @@ class Scorer(object):
 
 class PyProphet:
     """
-    PyProphet assembles the semi-supervised scoring workflow, including training and applying
-    statistical classifiers (e.g., LDA, XGBoost), estimating error rates, and generating scores.
+    Orchestrates the semi-supervised learning and scoring workflow.
+
+    Attributes:
+        config: The configuration object for the workflow.
+        semi_supervised_learner: The semi-supervised learner instance.
     """
 
     def __init__(self, config: RunnerIOConfig):
@@ -229,9 +329,7 @@ class PyProphet:
         elif self.rc.classifier == "XGBoost":
             base_learner = XGBLearner(
                 self.rc.autotune,
-                self.rc.xgb_hyperparams,
                 self.rc.xgb_params,
-                self.rc.xgb_params_space,
                 self.rc.threads,
             )
         else:
@@ -245,6 +343,15 @@ class PyProphet:
         )
 
     def _setup_experiment(self, table):
+        """
+        Prepares the experiment data by scaling features and logging a summary.
+
+        Args:
+            table: The input data table.
+
+        Returns:
+            tuple: Prepared experiment and list of score columns.
+        """
         prepared_table, score_columns, used_var_column_ids = prepare_data_table(
             table,
             self.rc.ss_score_filter,
@@ -260,6 +367,16 @@ class PyProphet:
         return experiment, score_columns
 
     def apply_weights(self, table, loaded_weights):
+        """
+        Applies pre-trained weights to the input data.
+
+        Args:
+            table: The input data table.
+            loaded_weights: The pre-trained weights.
+
+        Returns:
+            tuple: Result object, scorer instance, and classifier table.
+        """
         with timer("Apply Weights"):
             experiment, score_columns = self._setup_experiment(table)
 
@@ -290,6 +407,16 @@ class PyProphet:
             )
 
     def _apply_weights_on_exp(self, experiment, weights):
+        """
+        Applies weights to the experiment and updates the learner.
+
+        Args:
+            experiment: The experiment data.
+            weights: The pre-trained weights.
+
+        Returns:
+            object: The updated learner instance.
+        """
         learner = self.semi_supervised_learner
         logger.info("Applying pretrained weights.")
 
@@ -312,6 +439,15 @@ class PyProphet:
 
     @profile
     def learn_and_apply(self, table):
+        """
+        Performs learning and scoring on the input data.
+
+        Args:
+            table: The input data table.
+
+        Returns:
+            tuple: Result object, scorer instance, and classifier table.
+        """
         with timer("Learn and Apply"):
             experiment, score_columns = self._setup_experiment(table)
             final_classifier = self._learn(experiment, score_columns)
@@ -320,6 +456,16 @@ class PyProphet:
             )
 
     def _learn(self, experiment, score_columns):
+        """
+        Trains the semi-supervised learner using randomized folds.
+
+        Args:
+            experiment: The experiment data.
+            score_columns: List of score column names.
+
+        Returns:
+            object: The trained learner instance.
+        """
         learner = self.semi_supervised_learner
         neval = self.rc.ss_num_iter
         ttt, ttd, ws = [], [], []
@@ -368,6 +514,18 @@ class PyProphet:
         return learner.set_learner(model)
 
     def _build_result(self, table, final_classifier, score_columns, experiment):
+        """
+        Builds the final result object after scoring and error estimation.
+
+        Args:
+            table: The input data table.
+            final_classifier: The trained classifier.
+            score_columns: List of score column names.
+            experiment: The experiment data.
+
+        Returns:
+            tuple: Result object, scorer instance, and classifier table.
+        """
         # Collect weights
         if self.rc.classifier == "LDA":
             weights = final_classifier.get_parameters()

@@ -91,10 +91,8 @@ def posterior_chromatogram_hypotheses_fast(experiment, prior_chrom_null):
     final_result = []
     final_result_h0 = []
     for i in range(tg_ids.shape[0]):
-
         id_ = tg_ids[i]
         if id_ != current_tg_id:
-
             # Actual computation for a single transition group (chromatogram)
             prior_pg_true = (1.0 - prior_chrom_null) / len(scores)
             rr = single_chromatogram_hypothesis_fast(
@@ -241,25 +239,25 @@ def pi0est(
                 "pi0_method must be one of 'smoother' or 'bootstrap'."
             )
     if pi0 <= 0:
-        # # Try from uniprot import histogram, then default to plot_hist
-        # try:
-        #     from uniplot import histogram
+        # Try from uniprot import histogram, then default to plot_hist
+        try:
+            from uniplot import histogram
 
-        #     histogram(
-        #         p,
-        #         bins=10,
-        #         bins_min=0,
-        #         bins_max=1,
-        #         title="ditribution of p-values used during pi0 estimation",
-        #     )
-        # except ImportError:
-        #     plot_hist(
-        #         p,
-        #         f"p-value density histogram used during pi0 estimation",
-        #         "p-value",
-        #         "density histogram",
-        #         "pi0_estimation_error_pvalue_histogram_plot.pdf",
-        #     )
+            histogram(
+                p,
+                bins=10,
+                bins_min=0,
+                bins_max=1,
+                title="ditribution of p-values used during pi0 estimation",
+            )
+        except ImportError:
+            plot_hist(
+                p,
+                "p-value density histogram used during pi0 estimation",
+                "p-value",
+                "density histogram",
+                "pi0_estimation_error_pvalue_histogram_plot.pdf",
+            )
         raise click.ClickException(
             f"The estimated pi0 <= 0. Check that you have valid p-values or use a different range of lambda. Current lambda range: {lambda_}"
         )

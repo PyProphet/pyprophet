@@ -165,7 +165,7 @@ class OSWReader(BaseOSWReader):
             group_id = "PEPTIDE.ID"
         else:
             run_id = "RUN_ID"
-            group_id = 'RUN_ID || "_" || PEPTIDE.ID'
+            group_id = "RUN_ID || '_' || PEPTIDE_ID"
 
         logger.info("Reading peptide-level data ...")
 
@@ -174,17 +174,16 @@ class OSWReader(BaseOSWReader):
                     {run_id} AS RUN_ID,
                     {group_id} AS GROUP_ID,
                     PEPTIDE.ID AS PEPTIDE_ID,
-                    PRECURSOR.DECOY,
+                    PRECURSOR.DECOY AS DECOY,
                     SCORE_MS2.SCORE AS SCORE,
-                    {cfg.context_fdr} AS CONTEXT
+                    '{cfg.context_fdr}' AS CONTEXT
                 FROM osw.PEPTIDE
                 INNER JOIN osw.PRECURSOR_PEPTIDE_MAPPING ON PEPTIDE.ID = PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID
                 INNER JOIN osw.PRECURSOR ON PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID = PRECURSOR.ID
                 INNER JOIN osw.FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID
                 INNER JOIN osw.SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
-                GROUP BY GROUP_ID
-                HAVING MAX(SCORE)
-                ORDER BY SCORE DESC
+                WHERE SCORE_MS2.SCORE IS NOT NULL
+                QUALIFY ROW_NUMBER() OVER (PARTITION BY {group_id} ORDER BY SCORE DESC) = 1
             """
 
         df = con.execute(query).fetchdf()
@@ -205,7 +204,7 @@ class OSWReader(BaseOSWReader):
             group_id = "GLYCOPEPTIDE.ID"
         else:
             run_id = "RUN_ID"
-            group_id = 'RUN_ID || "_" || GLYCOPEPTIDE.ID'
+            group_id = "RUN_ID || '_' || GLYCOPEPTIDE.ID"
 
         logger.info("Reading glycopeptide-level data ...")
 
@@ -219,7 +218,7 @@ class OSWReader(BaseOSWReader):
             SCORE_MS2.SCORE AS d_score_combined,
             SCORE_MS2_PART_PEPTIDE.SCORE AS d_score_peptide,
             SCORE_MS2_PART_GLYCAN.SCORE AS d_score_glycan,
-            "{cfg.context_fdr}" AS CONTEXT
+            '{cfg.context_fdr}' AS CONTEXT
         FROM osw.GLYCOPEPTIDE
         INNER JOIN osw.PRECURSOR_GLYCOPEPTIDE_MAPPING ON GLYCOPEPTIDE.ID = PRECURSOR_GLYCOPEPTIDE_MAPPING.GLYCOPEPTIDE_ID
         INNER JOIN osw.PRECURSOR ON PRECURSOR_GLYCOPEPTIDE_MAPPING.PRECURSOR_ID = PRECURSOR.ID
@@ -227,9 +226,10 @@ class OSWReader(BaseOSWReader):
         INNER JOIN osw.SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
         INNER JOIN osw.SCORE_MS2_PART_PEPTIDE ON FEATURE.ID = SCORE_MS2_PART_PEPTIDE.FEATURE_ID
         INNER JOIN osw.SCORE_MS2_PART_GLYCAN ON FEATURE.ID = SCORE_MS2_PART_GLYCAN.FEATURE_ID
-        GROUP BY GROUP_ID
-        HAVING MAX(d_score_combined)
-        ORDER BY d_score_combined DESC
+        WHERE SCORE_MS2.SCORE IS NOT NULL 
+        AND SCORE_MS2_PART_PEPTIDE.SCORE IS NOT NULL
+        AND SCORE_MS2_PART_GLYCAN.SCORE IS NOT NULL
+        QUALIFY ROW_NUMBER() OVER (PARTITION BY {group_id} ORDER BY d_score_combined DESC) = 1
         """
 
         df = con.execute(query).fetchdf()
@@ -247,7 +247,7 @@ class OSWReader(BaseOSWReader):
             group_id = "PROTEIN.ID"
         else:
             run_id = "RUN_ID"
-            group_id = 'RUN_ID || "_" || PROTEIN.ID'
+            group_id = "RUN_ID || '_' || PROTEIN_ID"
 
         logger.info("Reading protein-level data ...")
 
@@ -257,7 +257,7 @@ class OSWReader(BaseOSWReader):
                 PROTEIN.ID AS PROTEIN_ID,
                 PRECURSOR.DECOY AS DECOY,
                 SCORE,
-                "{cfg.context_fdr}" AS CONTEXT
+                '{cfg.context_fdr}' AS CONTEXT
         FROM osw.PROTEIN
         INNER JOIN
             (SELECT PEPTIDE_PROTEIN_MAPPING.PEPTIDE_ID AS PEPTIDE_ID,
@@ -274,9 +274,8 @@ class OSWReader(BaseOSWReader):
         INNER JOIN osw.PRECURSOR ON PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID = PRECURSOR.ID
         INNER JOIN osw.FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID
         INNER JOIN osw.SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
-        GROUP BY GROUP_ID
-        HAVING MAX(SCORE)
-        ORDER BY SCORE DESC
+        WHERE SCORE_MS2.SCORE IS NOT NULL
+        QUALIFY ROW_NUMBER() OVER (PARTITION BY {group_id} ORDER BY SCORE DESC) = 1
         """
 
         df = con.execute(query).fetchdf()
@@ -294,7 +293,7 @@ class OSWReader(BaseOSWReader):
             group_id = "GENE.ID"
         else:
             run_id = "RUN_ID"
-            group_id = 'RUN_ID || "_" || GENE.ID'
+            group_id = "RUN_ID || '_' || GENE_ID"
 
         logger.info("Reading gene-level data ...")
 
@@ -304,7 +303,7 @@ class OSWReader(BaseOSWReader):
                 GENE.ID AS GENE_ID,
                 PRECURSOR.DECOY AS DECOY,
                 SCORE,
-                "{cfg.context_fdr}" AS CONTEXT
+                '{cfg.context_fdr}' AS CONTEXT
         FROM osw.GENE
         INNER JOIN
             (SELECT PEPTIDE_GENE_MAPPING.PEPTIDE_ID AS PEPTIDE_ID,
@@ -321,9 +320,8 @@ class OSWReader(BaseOSWReader):
         INNER JOIN osw.PRECURSOR ON PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID = PRECURSOR.ID
         INNER JOIN osw.FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID
         INNER JOIN osw.SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
-        GROUP BY GROUP_ID
-        HAVING MAX(SCORE)
-        ORDER BY SCORE DESC
+        WHERE SCORE_MS2.SCORE IS NOT NULL
+        QUALIFY ROW_NUMBER() OVER (PARTITION BY {group_id} ORDER BY SCORE DESC) = 1
         """
 
         df = con.execute(query).fetchdf()
@@ -354,9 +352,9 @@ class OSWReader(BaseOSWReader):
                     {run_id} AS RUN_ID,
                     {group_id} AS GROUP_ID,
                     PEPTIDE.ID AS PEPTIDE_ID,
-                    PRECURSOR.DECOY,
+                    PRECURSOR.DECOY AS DECOY,
                     SCORE_MS2.SCORE AS SCORE,
-                    {cfg.context_fdr} AS CONTEXT
+                   '{cfg.context_fdr}' AS CONTEXT
                 FROM PEPTIDE
                 INNER JOIN PRECURSOR_PEPTIDE_MAPPING ON PEPTIDE.ID = PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID
                 INNER JOIN PRECURSOR ON PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID = PRECURSOR.ID
@@ -648,6 +646,6 @@ class OSWWriter(BaseOSWWriter):
                 con,
                 index=False,
                 dtype={"RUN_ID": "INTEGER"},
-                if_exists="replace",
+                if_exists="append",
             )
             con.close()

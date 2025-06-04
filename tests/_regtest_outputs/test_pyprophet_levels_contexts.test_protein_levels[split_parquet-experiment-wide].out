@@ -1,0 +1,15 @@
+Protein Data:
+                  RUN_ID            FEATURE_ID  PROTEIN_ID  SCORE_PROTEIN_EXPERIMENT_WIDE_SCORE  SCORE_PROTEIN_EXPERIMENT_WIDE_P_VALUE  SCORE_PROTEIN_EXPERIMENT_WIDE_Q_VALUE  SCORE_PROTEIN_EXPERIMENT_WIDE_PEP
+0   -8670811102654833664  -9211032279639747584         2.0                               5.8995                                 0.0625                                 0.0625                             0.3674
+1   -8670811102654833664  -9211032279639747584         NaN                                  NaN                                    NaN                                    NaN                                NaN
+2   -8670811102654833664  -9211032279639747584         NaN                                  NaN                                    NaN                                    NaN                                NaN
+3   -8670811102654833664  -9211032279639747584         NaN                                  NaN                                    NaN                                    NaN                                NaN
+4   -8670811102654833664  -9211032279639747584         NaN                                  NaN                                    NaN                                    NaN                                NaN
+..                   ...                   ...         ...                                  ...                                    ...                                    ...                                ...
+95  -8670811102654833664  -9202066408251325440         NaN                                  NaN                                    NaN                                    NaN                                NaN
+96  -8670811102654833664  -9202066408251325440         NaN                                  NaN                                    NaN                                    NaN                                NaN
+97  -8670811102654833664  -9202066408251325440         NaN                                  NaN                                    NaN                                    NaN                                NaN
+98  -8670811102654833664  -9202066408251325440         NaN                                  NaN                                    NaN                                    NaN                                NaN
+99  -8670811102654833664  -9202066408251325440         NaN                                  NaN                                    NaN                                    NaN                                NaN
+
+[100 rows x 7 columns]

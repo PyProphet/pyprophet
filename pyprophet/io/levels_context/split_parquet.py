@@ -96,6 +96,7 @@ class SplitParquetReader(BaseSplitParquetReader):
                 SCORE_MS2_SCORE AS SCORE,
                 '{cfg.context_fdr}' AS CONTEXT
             FROM precursors p
+            WHERE SCORE_MS2_SCORE IS NOT NULL
             QUALIFY ROW_NUMBER() OVER (PARTITION BY {group_id} ORDER BY SCORE_MS2_SCORE DESC) = 1
         """
 
@@ -142,6 +143,7 @@ class SplitParquetReader(BaseSplitParquetReader):
                 '{cfg.context_fdr}' AS CONTEXT
             FROM precursors p
             JOIN one_peptide_proteins opp ON p.PEPTIDE_ID = opp.PEPTIDE_ID
+            WHERE SCORE_MS2_SCORE IS NOT NULL
             QUALIFY ROW_NUMBER() OVER (PARTITION BY {group_id} ORDER BY SCORE_MS2_SCORE DESC) = 1
         """
         df = con.execute(query).df()
@@ -187,6 +189,7 @@ class SplitParquetReader(BaseSplitParquetReader):
                 '{cfg.context_fdr}' AS CONTEXT
             FROM precursors p
             JOIN one_gene_peptides ogp ON p.PEPTIDE_ID = ogp.PEPTIDE_ID
+            WHERE SCORE_MS2_SCORE IS NOT NULL
             QUALIFY ROW_NUMBER() OVER (PARTITION BY {group_id} ORDER BY SCORE_MS2_SCORE DESC) = 1
         """
 
@@ -215,7 +218,6 @@ class SplitParquetWriter(BaseSplitParquetWriter):
         super().__init__(config)
 
     def save_results(self, result):
-
         context = self.config.context_fdr
         context_level_id = self.context_level_id_map.get(self.level)
         col_prefix = f"SCORE_{self.level.upper()}_{context.upper().replace('-', '_')}"

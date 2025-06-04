@@ -1,17 +1,29 @@
+"""
+This module defines various classifiers (learners) for statistical scoring and
+error estimation in targeted proteomics and glycoproteomics data analysis.
+
+Classes:
+    - AbstractLearner: Base class for defining a learner interface.
+    - LinearLearner: Implements a linear classifier for scoring.
+    - LDALearner: Implements a Linear Discriminant Analysis (LDA) learner.
+    - SVMLearner: Implements a Support Vector Machine (SVM) learner.
+    - XGBLearner: Implements an XGBoost-based learner for scoring.
+
+Each learner provides methods for training, scoring, and parameter management.
+"""
+
 import inspect
 from typing import List
 
 import numpy as np
 import pandas as pd
 import xgboost as xgb
-from hyperopt import tpe
-from hyperopt.fmin import fmin
 from loguru import logger
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.model_selection import (
     GridSearchCV,
     KFold,
-    cross_val_score,
+    RandomizedSearchCV,
     train_test_split,
 )
 from sklearn.svm import LinearSVC
@@ -21,31 +33,59 @@ from .data_handling import Experiment
 
 
 class AbstractLearner(object):
+    """
+    Abstract base class for defining a learner interface.
+
+    Methods:
+        - learn: Abstract method for training the learner.
+        - score: Abstract method for scoring data.
+        - get_parameters: Abstract method for retrieving model parameters.
+        - set_parameters: Abstract method for setting model parameters.
+        - averaged_learner: Abstract method for creating an averaged learner.
+    """
+
     def learn(self, decoy_peaks, target_peaks, use_main_score=True):
+        """Train the learner using decoy and target peaks."""
         raise NotImplementedError()
 
     def score(self, peaks, use_main_score):
+        """Score the given peaks using the trained model."""
         raise NotImplementedError()
 
     def get_parameters(self):
+        """Retrieve the parameters of the trained model."""
         raise NotImplementedError()
 
     def set_parameters(self, param):
+        """Set the parameters of the model."""
         raise NotImplementedError()
 
     @classmethod
     def averaged_learner(clz, params, **kwargs):
+        """Create an averaged learner from multiple parameter sets."""
         raise NotImplementedError()
 
 
 class LinearLearner(AbstractLearner):
+    """
+    Implements a linear classifier for scoring.
+
+    Methods:
+        - score: Score the given peaks using the linear model.
+        - averaged_learner: Create an averaged learner from multiple parameter sets.
+        - set_parameters: Set the parameters of the linear model.
+        - get_weights: Retrieve feature weights from the model.
+    """
+
     def score(self, peaks, use_main_score):
+        """Score the given peaks using the linear model."""
         X = peaks.get_feature_matrix(use_main_score)
         result = np.dot(X, self.get_parameters()).astype(np.float32)
         return result
 
     @classmethod
     def averaged_learner(clz, params, **kwargs):
+        """Create an averaged learner from multiple parameter sets."""
         assert LinearLearner in inspect.getmro(clz)
         learner = clz(**kwargs)
         avg_param = np.vstack(params).mean(axis=0)
@@ -53,12 +93,19 @@ class LinearLearner(AbstractLearner):
         return learner
 
     def set_parameters(self, classifier):
+        """Set the parameters of the linear model."""
         self.classifier = classifier
         return self
 
     def get_weights(self, features: List[str]) -> pd.DataFrame:
         """
         Return a DataFrame with feature names and their weights, sorted by absolute weight.
+
+        Args:
+            features (List[str]): List of feature names.
+
+        Returns:
+            pd.DataFrame: DataFrame containing feature names and weights.
         """
         if self.classifier is None:
             raise ValueError("Classifier has not been trained yet.")
@@ -69,7 +116,7 @@ class LinearLearner(AbstractLearner):
             assert weights.shape[0] == len(features)
         elif isinstance(self.classifier, LinearSVC):
             weights = self.classifier.coef_
-            intercept = self.classifier.intercept_
+            _intercept = self.classifier.intercept_
             assert weights.shape[0] == 1
             assert weights.shape[1] == len(features)
 
@@ -86,12 +133,22 @@ class LinearLearner(AbstractLearner):
 
 
 class LDALearner(LinearLearner):
+    """
+    Implements a Linear Discriminant Analysis (LDA) learner.
+
+    Methods:
+        - learn: Train the LDA model using decoy and target peaks.
+        - get_parameters: Retrieve the scaling parameters of the LDA model.
+        - set_parameters: Set the scaling parameters of the LDA model.
+    """
+
     def __init__(self):
         self.classifier = None
         self.scalings = None
         self.autotune = None
 
     def learn(self, decoy_peaks, target_peaks, use_main_score=True):
+        """Train the LDA model using decoy and target peaks."""
         assert isinstance(decoy_peaks, Experiment)
         assert isinstance(target_peaks, Experiment)
 
@@ -107,16 +164,25 @@ class LDALearner(LinearLearner):
         return self
 
     def get_parameters(self):
+        """Retrieve the scaling parameters of the LDA model."""
         return self.scalings
 
     def set_parameters(self, w):
+        """Set the scaling parameters of the LDA model."""
         self.scalings = w
         return self
 
 
 class SVMLearner(LinearLearner):
     """
-    Learner that uses Linear Support Vector Classification (SVC).
+    Implements a Support Vector Linear Classification (SVM) learner.
+
+    Methods:
+        - tune: Tune hyperparameters (C, max_iter) using GridSearchCV.
+        - learn: Train the SVM model using decoy and target peaks.
+        - score: Score the given peaks using the SVM model.
+        - get_parameters: Retrieve the parameters of the SVM model.
+        - set_parameters: Set the parameters of the SVM model.
     """
 
     def __init__(self, C, max_iter=1000, autotune=False):
@@ -132,6 +198,16 @@ class SVMLearner(LinearLearner):
     ):
         """
         Tune hyperparameters (C, max_iter) using GridSearchCV.
+
+        Args:
+            decoy_peaks (Experiment): Decoy peaks data.
+            target_peaks (Experiment): Target peaks data.
+            use_main_score (bool): Whether to use the main score.
+            cv_splits (int): Number of cross-validation splits.
+            n_jobs (int): Number of parallel jobs.
+
+        Returns:
+            SVMLearner: The tuned learner instance.
         """
         assert isinstance(decoy_peaks, Experiment)
         assert isinstance(target_peaks, Experiment)
@@ -185,6 +261,7 @@ class SVMLearner(LinearLearner):
         return self
 
     def learn(self, decoy_peaks, target_peaks, use_main_score=True):
+        """Train the SVM model using decoy and target peaks."""
         assert isinstance(decoy_peaks, Experiment)
         assert isinstance(target_peaks, Experiment)
 
@@ -204,6 +281,7 @@ class SVMLearner(LinearLearner):
         return self
 
     def score(self, peaks, use_main_score):
+        """Score the given peaks using the SVM model."""
         X = peaks.get_feature_matrix(use_main_score)
         # Check if self.classifier is loaded weights (an numpy.ndarray object)
         if isinstance(self.classifier, np.ndarray):
@@ -212,9 +290,11 @@ class SVMLearner(LinearLearner):
             return self.classifier.decision_function(X)
 
     def get_parameters(self):
+        """Retrieve the parameters of the SVM model."""
         return self.classifier
 
     def set_parameters(self, classifier):
+        """Set the parameters of the SVM model."""
         # self.weights = w
         self.classifier = classifier
         return self
@@ -256,158 +336,128 @@ class HistGBCLearner(AbstractLearner):
 
 
 class XGBLearner(AbstractLearner):
-    def __init__(
-        self, autotune, xgb_hyperparams, xgb_params, xgb_params_space, threads
-    ):
+    """
+    Implements an XGBoost-based learner for scoring.
+
+    Methods:
+        - tune: Tune hyperparameters using RandomizedSearchCV.
+        - learn: Train the XGBoost model using decoy and target peaks.
+        - score: Score the given peaks using the XGBoost model.
+        - get_parameters: Retrieve the parameters of the XGBoost model.
+        - set_parameters: Set the parameters of the XGBoost model.
+    """
+
+    def __init__(self, autotune, xgb_params, threads):
         self.classifier = None
         self.importance = None
         self.autotune = autotune
-        self.xgb_hyperparams = xgb_hyperparams
+        self.xgb_hyperparams = {
+            "autotune_num_rounds": 10,
+            "num_boost_round": 100,
+            "early_stopping_rounds": 10,
+            "test_size": 0.33,
+        }
         self.xgb_params = xgb_params
-        self.xgb_params_space = xgb_params_space
         self.xgb_params_tuned = xgb_params
         self.threads = threads
         self.xgb_params["nthread"] = self.threads
 
-    def tune(self, decoy_peaks, target_peaks, use_main_score=True):
-        def objective(params):
-            params = {
-                "eta": "{:.3f}".format(params["eta"]),
-                "gamma": "{:.3f}".format(params["gamma"]),
-                "max_depth": int(params["max_depth"]),
-                "min_child_weight": int(params["min_child_weight"]),
-                "subsample": "{:.3f}".format(params["subsample"]),
-                "colsample_bytree": "{:.3f}".format(params["colsample_bytree"]),
-                "colsample_bylevel": "{:.3f}".format(params["colsample_bylevel"]),
-                "colsample_bynode": "{:.3f}".format(params["colsample_bynode"]),
-                "lambda": "{:.3f}".format(params["lambda"]),
-                "alpha": "{:.3f}".format(params["alpha"]),
-                "scale_pos_weight": "{:.3f}".format(params["scale_pos_weight"]),
-            }
+    def tune(
+        self, decoy_peaks, target_peaks, use_main_score=True, cv_splits=3, n_jobs=-1
+    ):
+        """
+        Tune hyperparameters using RandomizedSearchCV for faster optimization.
 
-            clf = xgb.XGBClassifier(
-                random_state=42,
-                verbosity=0,
-                objective="binary:logitraw",
-                eval_metric="auc",
-                **params,
-            )
+        Args:
+            decoy_peaks (Experiment): Decoy peaks data.
+            target_peaks (Experiment): Target peaks data.
+            use_main_score (bool): Whether to use the main score.
+            cv_splits (int): Number of cross-validation splits.
+            n_jobs (int): Number of parallel jobs.
 
-            score = cross_val_score(
-                clf,
-                X,
-                y,
-                scoring="roc_auc",
-                n_jobs=self.threads,
-                cv=KFold(n_splits=3, shuffle=True, random_state=42),
-            ).mean()
-            # click.echo("Info: AUC: {:.3f} hyperparameters: {}".format(score, params))
-            return score
-
-        logger.info("Autotuning of XGB hyperparameters.")
+        Returns:
+            XGBLearner: The tuned learner instance.
+        """
+        logger.info("Autotuning of XGB hyperparameters using RandomizedSearchCV.")
 
         assert isinstance(decoy_peaks, Experiment)
         assert isinstance(target_peaks, Experiment)
 
+        # Prepare feature matrices
         X0 = decoy_peaks.get_feature_matrix(use_main_score)
         X1 = target_peaks.get_feature_matrix(use_main_score)
         X = np.vstack((X0, X1))
         y = np.zeros((X.shape[0],))
         y[X0.shape[0] :] = 1.0
 
-        # Tune complexity hyperparameters
-        xgb_params_complexity = self.xgb_params_tuned
-        xgb_params_complexity.update(
-            {k: self.xgb_params_space[k] for k in ("max_depth", "min_child_weight")}
+        # Define parameter distributions for RandomizedSearchCV
+        param_dist = {
+            "learning_rate": np.linspace(0.0, 0.3, num=100),
+            "gamma": np.linspace(0.0, 0.5, num=100),
+            "max_depth": list(range(2, 9)),  # 2 to 8 inclusive
+            "min_child_weight": list(range(1, 6)),  # 1 to 5 inclusive
+            "subsample": [1.0],  # Fixed value
+            "colsample_bytree": [1.0],  # Fixed value
+            "reg_lambda": np.linspace(0.0, 1.0, num=100),
+            "reg_alpha": np.linspace(0.0, 1.0, num=100),
+            "scale_pos_weight": [1.0],  # Fixed value
+        }
+
+        # Create base model with fixed parameters
+        xgb_model = xgb.XGBClassifier(
+            objective="binary:logitraw",
+            eval_metric="auc",
+            nthread=self.threads,
+            verbosity=0,
+            random_state=42,
+            colsample_bylevel=1.0,  # Fixed params moved here
+            colsample_bynode=1.0,  # Fixed params moved here
         )
 
-        rng = np.random.default_rng(42)
-        best_complexity = fmin(
-            fn=objective,
-            space=xgb_params_complexity,
-            algo=tpe.suggest,
-            max_evals=self.xgb_hyperparams["autotune_num_rounds"],
-            rstate=rng,
-        )
-        best_complexity["max_depth"] = int(best_complexity["max_depth"])
-        best_complexity["min_child_weight"] = int(best_complexity["min_child_weight"])
-
-        self.xgb_params_tuned.update(best_complexity)
-
-        # Tune gamma hyperparameter
-        xgb_params_gamma = self.xgb_params_tuned
-        xgb_params_gamma["gamma"] = self.xgb_params_space["gamma"]
-
-        best_gamma = fmin(
-            fn=objective,
-            space=xgb_params_gamma,
-            algo=tpe.suggest,
-            max_evals=self.xgb_hyperparams["autotune_num_rounds"],
-            rstate=rng,
+        # Set up RandomizedSearchCV
+        random_search = RandomizedSearchCV(
+            estimator=xgb_model,
+            param_distributions=param_dist,
+            n_iter=self.xgb_hyperparams["autotune_num_rounds"],
+            cv=KFold(n_splits=cv_splits, shuffle=True, random_state=42),
+            n_jobs=n_jobs,
+            scoring="roc_auc",
+            verbose=3,
+            random_state=42,
         )
 
-        self.xgb_params_tuned.update(best_gamma)
+        # Perform the random search
+        random_search.fit(X, y)
 
-        # Tune subsampling hyperparameters
-        xgb_params_subsampling = self.xgb_params_tuned
-        xgb_params_subsampling.update(
+        # Get the best parameters and convert to original parameter names
+        best_params = random_search.best_params_
+        self.xgb_params_tuned.update(
             {
-                k: self.xgb_params_space[k]
-                for k in (
-                    "subsample",
-                    "colsample_bytree",
-                    "colsample_bylevel",
-                    "colsample_bynode",
-                )
+                "eta": best_params["learning_rate"],
+                "gamma": best_params["gamma"],
+                "max_depth": best_params["max_depth"],
+                "min_child_weight": best_params["min_child_weight"],
+                "subsample": 1.0,
+                "colsample_bytree": 1.0,
+                "colsample_bylevel": 1.0,
+                "colsample_bynode": 1.0,
+                "lambda": best_params["reg_lambda"],
+                "alpha": best_params["reg_alpha"],
+                "scale_pos_weight": 1.0,
             }
         )
 
-        best_subsampling = fmin(
-            fn=objective,
-            space=xgb_params_subsampling,
-            algo=tpe.suggest,
-            max_evals=self.xgb_hyperparams["autotune_num_rounds"],
-            rstate=rng,
-        )
-
-        self.xgb_params_tuned.update(best_subsampling)
-
-        # Tune regularization hyperparameters
-        xgb_params_regularization = self.xgb_params_tuned
-        xgb_params_regularization.update(
-            {k: self.xgb_params_space[k] for k in ("lambda", "alpha")}
-        )
-
-        best_regularization = fmin(
-            fn=objective,
-            space=xgb_params_regularization,
-            algo=tpe.suggest,
-            max_evals=self.xgb_hyperparams["autotune_num_rounds"],
-            rstate=rng,
-        )
-
-        self.xgb_params_tuned.update(best_regularization)
-
-        # Tune learning rate
-        xgb_params_learning = self.xgb_params_tuned
-        xgb_params_learning["eta"] = self.xgb_params_space["eta"]
-
-        best_learning = fmin(
-            fn=objective,
-            space=xgb_params_learning,
-            algo=tpe.suggest,
-            max_evals=self.xgb_hyperparams["autotune_num_rounds"],
-            rstate=rng,
-        )
-
-        self.xgb_params_tuned.update(best_learning)
-        logger.info("Optimal hyperparameters: {}".format(self.xgb_params_tuned))
-
         self.xgb_params = self.xgb_params_tuned
+        best_params_str = [
+            f"{key}: {str(value).replace('{', '[').replace('}', ']')} | "
+            for key, value in self.xgb_params_tuned.items()
+        ]
+        logger.info(f"Optimal hyperparameters: {best_params_str}")
 
         return self
 
     def learn(self, decoy_peaks, target_peaks, use_main_score=True):
+        """Train the XGBoost model using decoy and target peaks."""
         assert isinstance(decoy_peaks, Experiment)
         assert isinstance(target_peaks, Experiment)
 
@@ -439,15 +489,18 @@ class XGBLearner(AbstractLearner):
         return self
 
     def score(self, peaks, use_main_score):
+        """Score the given peaks using the XGBoost model."""
         X = peaks.get_feature_matrix(use_main_score)
         dtest = xgb.DMatrix(X)
         result = self.classifier.predict(dtest)
         return result.astype(np.float32)
 
     def get_parameters(self):
+        """Retrieve the parameters of the XGBoost model."""
         return self.classifier
 
     def set_parameters(self, classifier):
+        """Set the parameters of the XGBoost model."""
         self.classifier = classifier
         self.importance = classifier.get_score(importance_type="gain")
         return self

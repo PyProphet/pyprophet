@@ -1,7 +1,32 @@
+"""
+This module defines configuration classes for various aspects of the scoring,
+error estimation, and inference processes in PyProphet.
+
+The configurations are implemented using Python's `dataclass` to provide a
+structured and type-safe way to manage parameters. These configurations are
+used to control the behavior of different components, such as scoring,
+classifier setup, error estimation, and I/O operations.
+
+Classes:
+    - ErrorEstimationConfig: Configuration for global and local FDR (false discovery rate) estimation.
+    - RunnerConfig: Configuration for scoring, classifier setup, learning parameters, and optional features.
+    - RunnerIOConfig: Wrapper configuration class for I/O and runner parameters.
+    - IPFIOConfig: Configuration for Inference of Peptidoforms (IPF).
+    - LevelContextIOConfig: Configuration for level-based context inference (e.g., peptide, protein, gene).
+
+Attributes:
+    - These classes include attributes for controlling various aspects of the pipeline,
+      such as classifier type, hyperparameter tuning, error estimation methods,
+      and input/output file handling.
+
+Usage:
+    These configuration classes are typically instantiated with default values
+    or populated from command-line arguments using the `from_cli_args` class methods.
+"""
+
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Literal, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 import os
-from hyperopt import hp
 import numpy as np
 
 from ._base import BaseIOConfig
@@ -70,9 +95,7 @@ class RunnerConfig:
         ss_main_score (str): Starting main score for semi-supervised learning (can be 'auto').
         main_score_selection_report (bool): Whether to generate a report for main score selection.
 
-        xgb_hyperparams (bool): Whether to autotune XGBoost hyperparameters.
         xgb_params (dict): Default XGBoost parameters for training.
-        xgb_params_space (dict): Search space for XGBoost hyperparameter optimization.
 
         xeval_fraction (float): Fraction of data used in each cross-validation iteration.
         xeval_num_iter (int): Number of cross-validation iterations.
@@ -110,9 +133,7 @@ class RunnerConfig:
     main_score_selection_report: bool = False
 
     # XGBoost-related hyperparameters
-    xgb_hyperparams: bool = False
     xgb_params: dict = field(default_factory=dict)
-    xgb_params_space: dict = field(default_factory=dict)
 
     # Cross-validation settings
     xeval_fraction: float = 0.5
@@ -174,9 +195,7 @@ class RunnerConfig:
         if self.classifier == "XGBoost":
             parts.extend(
                 [
-                    f"  xgb_hyperparams={self.xgb_hyperparams}",
                     f"  xgb_params={self.xgb_params}",
-                    f"  xgb_params_space={self.xgb_params_space}",
                 ]
             )
 
@@ -325,13 +344,6 @@ class RunnerIOConfig(BaseIOConfig):
         """
         Creates a configuration object from command-line arguments.
         """
-        xgb_hyperparams = {
-            "autotune": autotune,
-            "autotune_num_rounds": 10,
-            "num_boost_round": 100,
-            "early_stopping_rounds": 10,
-            "test_size": 0.33,
-        }
 
         xgb_params = {
             "eta": 0.3,
@@ -354,24 +366,6 @@ class RunnerIOConfig(BaseIOConfig):
         if test:
             xgb_params["tree_method"] = "exact"
 
-        xgb_params_space = {
-            "eta": hp.uniform("eta", 0.0, 0.3),
-            "gamma": hp.uniform("gamma", 0.0, 0.5),
-            "max_depth": hp.quniform("max_depth", 2, 8, 1),
-            "min_child_weight": hp.quniform("min_child_weight", 1, 5, 1),
-            "subsample": 1,
-            "colsample_bytree": 1,
-            "colsample_bylevel": 1,
-            "colsample_bynode": 1,
-            "lambda": hp.uniform("lambda", 0.0, 1.0),
-            "alpha": hp.uniform("alpha", 0.0, 1.0),
-            "objective": "binary:logitraw",
-            "nthread": 1,
-            "eval_metric": "auc",
-            "scale_pos_weight": 1.0,
-            "verbosity": 0,
-        }
-
         error_estimation_config = ErrorEstimationConfig(
             parametric=parametric,
             pfdr=pfdr,
@@ -391,9 +385,7 @@ class RunnerIOConfig(BaseIOConfig):
             autotune=autotune,
             ss_main_score=ss_main_score,
             main_score_selection_report=main_score_selection_report,
-            xgb_hyperparams=xgb_hyperparams,
             xgb_params=xgb_params,
-            xgb_params_space=xgb_params_space,
             xeval_fraction=xeval_fraction,
             xeval_num_iter=xeval_num_iter,
             ss_initial_fdr=ss_initial_fdr,
@@ -581,8 +573,8 @@ class LevelContextIOConfig(BaseIOConfig):
         outfile,
         subsample_ratio,
         level,
-        context,  # context of module
-        context_fdr,
+        context,  # context of algorithm module (score_learn, score_apply, ipf, levels_context)
+        context_fdr,  # context for levels_context, global, experiment-wide, run-specific
         parametric,
         pfdr,
         pi0_lambda,
@@ -628,3 +620,74 @@ class LevelContextIOConfig(BaseIOConfig):
             density_estimator=density_estimator,
             grid_size=grid_size,
         )
+
+
+@dataclass
+class ExportIOConfig(BaseIOConfig):
+    """
+    Configuration for exporting results to various formats.
+
+    Attributes:
+        export_format (Literal["legacy_merged", "legacy_split", "parquet", "split_parquet"]):
+            Format for exporting results.
+            - "matrix": Single TSV file with merged results in matrix format.
+            - "legacy_merged": Single TSV file with merged results.
+            - "legacy_split": Split TSV files for each run.
+            - "parquet": Single Parquet file with merged results.
+            - "parquet_split": Split Parquet files for each run.
+        out_type (Literal["tsv", "csv"]): Output file type for exported results.
+        transition_quantification (bool): Report aggregated transition-level quantification.
+        max_transition_pep (float): Maximum PEP to retain scored transitions for quantification (requires transition-level scoring).
+        ipf (Literal["peptidoform", "augmented", "disable"]): Should IPF results be reported if present?
+            - "peptidoform": Report results on peptidoform-level,
+            - "augmented": Augment OpenSWATH results with IPF scores,
+            - "disable": Ignore IPF results'
+        ipf_max_peptidoform_pep (float): IPF: Filter results to maximum run-specific peptidoform-level PEP.
+        max_rs_peakgroup_qvalue (float): Filter results to maximum run-specific peak group-level q-value.
+        peptide (bool): Append peptide-level error-rate estimates if available.
+        max_global_peptide_qvalue (float): Filter results to maximum global peptide-level q-value.
+        protein (bool): Append protein-level error-rate estimates if available.
+        max_global_protein_qvalue (float): Filter results to maximum global protein-level q-value.
+
+        # Quantification matrix options
+        top_n (int): Number of top intense features to use for summarization
+        consistent_top (bool): Whether to use same top features across all runs
+        normalization (Literal["none", "median", "medianmedian", "quantile"]): Normalization method
+
+        # OSW: Export to parquet
+        compression_method (Literal["none", "snappy", "gzip", "brotli", "zstd"]): Compression method for parquet files.
+        compression_level (int): Compression level for parquet files (0-9).
+        split_transition_data (bool): Split precursor data and transition data into separate files.
+        split_runs (bool): Split data by runs
+
+        # SqMass: Export to parquet
+        pqp_file (Optional[str]): Path to PQP file for precursor/transition mapping.
+    """
+
+    export_format: Literal[
+        "matrix", "legacy_merged", "legacy_split", "parquet", "parquet_split"
+    ] = "legacy_merged"
+    out_type: Literal["tsv", "csv"] = "tsv"
+    transition_quantification: bool = False
+    max_transition_pep: float = 0.7
+    ipf: Literal["peptidoform", "augmented", "disable"] = "peptidoform"
+    ipf_max_peptidoform_pep: float = 0.4
+    max_rs_peakgroup_qvalue: float = 0.05
+    peptide: bool = True
+    max_global_peptide_qvalue: float = 0.01
+    protein: bool = True
+    max_global_protein_qvalue: float = 0.01
+
+    # Quantification matrix options
+    top_n: int = 3
+    consistent_top: bool = True
+    normalization: Literal["none", "median", "medianmedian", "quantile"] = "none"
+
+    # OSW: Export to parquet
+    compression_method: Literal["none", "snappy", "gzip", "brotli", "zstd"] = "zstd"
+    compression_level: int = 11
+    split_transition_data: bool = True
+    split_runs: bool = False
+
+    # SqMass: Export to parquet
+    pqp_file: Optional[str] = None  # Path to PQP file for precursor/transition mapping

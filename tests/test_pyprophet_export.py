@@ -1,178 +1,235 @@
 from __future__ import print_function
 
 import os
-import subprocess
 import shutil
+import subprocess
 import sys
+from pathlib import Path
 
 import pandas as pd
-import sqlite3
-
 import pytest
 
 pd.options.display.expand_frame_repr = False
 pd.options.display.precision = 4
 pd.options.display.max_columns = None
 
-DATA_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+DATA_FOLDER = Path(__file__).parent / "data"
 
-def _run_cmdline(cmdline):
-    stdout = cmdline + "\n"
+
+# ================== SHARED FIXTURES ==================
+@pytest.fixture
+def temp_folder(tmpdir):
+    """Fixture providing temporary folder path"""
+    return Path(tmpdir.strpath)
+
+
+@pytest.fixture
+def test_data_osw(temp_folder):
+    """Fixture providing OSW test file path"""
+    src = DATA_FOLDER / "test_data.osw"
+    dst = temp_folder / "test_data.osw"
+    shutil.copy(src, dst)
+    return dst
+
+
+@pytest.fixture
+def test_data_parquet(temp_folder):
+    """Fixture providing Parquet test file path"""
+    src = DATA_FOLDER / "test_data.parquet"
+    dst = temp_folder / "test_data.parquet"
+    shutil.copy(src, dst)
+    return dst
+
+
+@pytest.fixture
+def test_data_split_parquet(temp_folder):
+    """Fixture providing SplitParquet test folder"""
+    src = DATA_FOLDER / "test_data.oswpq"
+    dst = temp_folder / "test_data.oswpq"
+    shutil.copytree(src, dst)
+    return dst
+
+
+@pytest.fixture
+def test_data_compound_osw(temp_folder):
+    """Fixture providing compound OSW test file path"""
+    src = DATA_FOLDER / "test_data_compound.osw"
+    dst = temp_folder / "test_data_compound.osw"
+    shutil.copy(src, dst)
+    return dst
+
+
+@pytest.fixture(params=["osw", "parquet", "split_parquet"])
+def input_strategy(request, test_data_osw, test_data_parquet, test_data_split_parquet):
+    """Parametrized fixture for different input strategies"""
+    strategies = {
+        "osw": {
+            "path": test_data_osw,
+            "reader": "osw",
+            "cmd_prefix": f"--in={test_data_osw}",
+        },
+        "parquet": {
+            "path": test_data_parquet,
+            "reader": "parquet",
+            "cmd_prefix": f"--in={test_data_parquet}",
+        },
+        "split_parquet": {
+            "path": test_data_split_parquet,
+            "reader": "parquet_split",
+            "cmd_prefix": f"--in={test_data_split_parquet}",
+        },
+    }
+    return strategies[request.param]
+
+
+# ================== TEST HELPERS ==================
+def run_pyprophet_command(cmd, temp_folder):
+    """Helper to run pyprophet commands"""
     try:
-        stdout += str(subprocess.check_output(cmdline, shell=True,
-                                          stderr=subprocess.STDOUT))
+        return subprocess.check_output(
+            cmd, shell=True, stderr=subprocess.STDOUT, cwd=temp_folder
+        ).decode()
     except subprocess.CalledProcessError as error:
-        print(error, end="", file=sys.stderr)
+        print(f"Command failed: {cmd}\n{error.output.decode()}", file=sys.stderr)
         raise
-    return stdout
 
 
-def _run_osw(regtest, temp_folder, transition_quantification=False, peptide=False, protein=False):
-    os.chdir(temp_folder)
-    data_path = os.path.join(DATA_FOLDER, "test_data.osw")
-    shutil.copy(data_path, temp_folder)
+def validate_export_results(
+    regtest, input_path, input_type, output_file="test_data.tsv"
+):
+    """Validate exported results"""
+    df = pd.read_csv(output_file, sep="\t", nrows=100)
+    print(df.sort_index(axis=1), file=regtest)
+
+
+# ================== TEST CASES ==================
+@pytest.mark.parametrize(
+    "transition_quantification,peptide,protein",
+    [
+        (False, False, False),
+        (True, False, False),
+        (False, True, False),
+        (False, False, True),
+    ],
+)
+def test_osw_analysis(
+    input_strategy, temp_folder, regtest, transition_quantification, peptide, protein
+):
+    """Test OSW analysis with different combinations of options"""
     # MS1-level
-    cmdline = "pyprophet score --in=test_data.osw --level=ms2 --test --pi0_lambda=0.001 0 0 --ss_iteration_fdr=0.02"
+    cmd = f"pyprophet score {input_strategy['cmd_prefix']} --level=ms2 --test --pi0_lambda=0.001 0 0 --ss_iteration_fdr=0.02 && "
 
     # peptide-level
-    cmdline += " peptide --pi0_lambda=0.001 0 0 --in=test_data.osw --context=run-specific"
-    cmdline += " peptide --pi0_lambda=0.001 0 0 --in=test_data.osw --context=experiment-wide"
-    cmdline += " peptide --pi0_lambda=0.001 0 0 --in=test_data.osw --context=global"
+    cmd += f"pyprophet levels-context peptide --pi0_lambda=0.001 0 0 {input_strategy['cmd_prefix']} --context=run-specific && "
+    cmd += f"pyprophet levels-context peptide --pi0_lambda=0.001 0 0 {input_strategy['cmd_prefix']} --context=experiment-wide && "
+    cmd += f"pyprophet levels-context peptide --pi0_lambda=0.001 0 0 {input_strategy['cmd_prefix']} --context=global && "
 
     # protein-level
-    cmdline += " protein --pi0_lambda=0 0 0 --in=test_data.osw --context=run-specific"
-    cmdline += " protein --pi0_lambda=0 0 0 --in=test_data.osw --context=experiment-wide"
-    cmdline += " protein --pi0_lambda=0 0 0 --in=test_data.osw --context=global"
+    cmd += f"pyprophet levels-context protein --pi0_lambda=0 0 0 {input_strategy['cmd_prefix']} --context=run-specific && "
+    cmd += f"pyprophet levels-context protein --pi0_lambda=0 0 0 {input_strategy['cmd_prefix']} --context=experiment-wide && "
+    cmd += f"pyprophet levels-context protein --pi0_lambda=0 0 0 {input_strategy['cmd_prefix']} --context=global && "
 
     # export
-    cmdline += " export --in=test_data.osw --max_rs_peakgroup_qvalue=1 --format=legacy_merged"
+    cmd += f"pyprophet export tsv {input_strategy['cmd_prefix']} --out={temp_folder}/test_data.tsv --max_rs_peakgroup_qvalue=1 --format=legacy_merged"
 
     if not transition_quantification:
-        cmdline += " --no-transition_quantification"
-
+        cmd += " --no-transition_quantification"
     if not peptide:
-        cmdline += " --no-peptide"
-
+        cmd += " --no-peptide"
     if not protein:
-        cmdline += " --no-protein"
+        cmd += " --no-protein"
 
-    stdout = _run_cmdline(cmdline)
+    run_pyprophet_command(cmd, temp_folder)
+    validate_export_results(
+        regtest,
+        input_strategy["path"],
+        input_strategy["reader"],
+        f"{temp_folder}/test_data.tsv",
+    )
 
-    print(pd.read_csv("test_data.tsv", sep="\t", nrows=100).sort_index(axis=1),file=regtest)
 
-def _run_osw_unscored(regtest, temp_folder, transition_quantification=False, peptide=False, protein=False):
-    os.chdir(temp_folder)
-    data_path = os.path.join(DATA_FOLDER, "test_data.osw")
-    shutil.copy(data_path, temp_folder)
+def test_osw_unscored(input_strategy, temp_folder, regtest):
+    """Test export of unscored OSW data"""
+    cmd = f"pyprophet export tsv {input_strategy['cmd_prefix']} --out={temp_folder}/test_data.tsv --format=legacy_merged"
+    run_pyprophet_command(cmd, temp_folder)
+    validate_export_results(
+        regtest,
+        input_strategy["path"],
+        input_strategy["reader"],
+        f"{temp_folder}/test_data.tsv",
+    )
 
-    # export
-    cmdline = "pyprophet export --in=test_data.osw --out=test_data.tsv --format=legacy_merged"
 
-    stdout = _run_cmdline(cmdline)
-
-    print(pd.read_csv("test_data.tsv", sep="\t", nrows=100).sort_index(axis=1),file=regtest)
-
-def _run_ipf(regtest, temp_folder, transition_quantification=False, ipf="disable"):
-    os.chdir(temp_folder)
-    data_path = os.path.join(DATA_FOLDER, "test_data.osw")
-    shutil.copy(data_path, temp_folder)
+@pytest.mark.parametrize(
+    "transition_quantification,ipf",
+    [
+        (False, "disable"),
+        (True, "disable"),
+        (False, "peptidoform"),
+        (False, "augmented"),
+    ],
+)
+def test_ipf_analysis(
+    test_data_osw, temp_folder, regtest, transition_quantification, ipf
+):
+    """Test IPF analysis with different options"""
     # MS1-level
-    cmdline = "pyprophet score --in=test_data.osw --level=ms1 --test --pi0_lambda=0.1 0 0 --ss_iteration_fdr=0.02"
+    cmd = f"pyprophet score --in={test_data_osw} --level=ms1 --test --pi0_lambda=0.1 0 0 --ss_iteration_fdr=0.02 && "
 
     # MS2-level
-    cmdline += " score --in=test_data.osw --level=ms2 --test --pi0_lambda=0.001 0 0 --ss_iteration_fdr=0.02"
+    cmd += f"pyprophet score --in={test_data_osw} --level=ms2 --test --pi0_lambda=0.001 0 0 --ss_iteration_fdr=0.02 && "
 
     # transition-level
-    cmdline += " score --in=test_data.osw --level=transition --test --pi0_lambda=0.1 0 0 --ss_iteration_fdr=0.02"
+    cmd += f"pyprophet score --in={test_data_osw} --level=transition --test --pi0_lambda=0.1 0 0 --ss_iteration_fdr=0.02 && "
 
     # IPF
-    cmdline += " ipf --in=test_data.osw"
+    cmd += f"pyprophet ipf --in={test_data_osw} && "
 
     # export
-    cmdline += " export --in=test_data.osw --no-peptide --no-protein --ipf_max_peptidoform_pep=1  --max_rs_peakgroup_qvalue=1 --format=legacy_merged"
+    cmd += f"pyprophet export tsv --in={test_data_osw} --out={temp_folder}/test_data.tsv --no-peptide --no-protein --ipf_max_peptidoform_pep=1 --max_rs_peakgroup_qvalue=1 --format=legacy_merged"
 
     if not transition_quantification:
-        cmdline += " --no-transition_quantification"
+        cmd += " --no-transition_quantification"
 
-    cmdline += " --ipf=" + ipf
+    cmd += f" --ipf={ipf}"
 
-    stdout = _run_cmdline(cmdline)
-
-    print(pd.read_csv("test_data.tsv", sep="\t", nrows=100).sort_index(axis=1),file=regtest)
-    
-def _run_compound_unscored(regtest, temp_folder):
-    os.chdir(temp_folder)
-    data_path= os.path.join(DATA_FOLDER, "test_data_compound.osw")
-    shutil.copy(data_path, temp_folder)
-    
-    # export
-    cmdline = "pyprophet export-compound --in=test_data_compound.osw --out=test_data_compound_unscored.tsv --format=legacy_merged"
-    stdout = _run_cmdline(cmdline)
-
-    print(pd.read_csv("test_data_compound_unscored.tsv", sep="\t", nrows=100).sort_index(axis=1),file=regtest)
-
-def _run_compound_ms1(regtest, temp_folder):
-    os.chdir(temp_folder)
-    data_path= os.path.join(DATA_FOLDER, "test_data_compound.osw")
-    shutil.copy(data_path, temp_folder)
-    
-    # MS1-level
-    cmdline = "pyprophet score --in=test_data_compound.osw --level=ms1 --test"
-
-    # export
-    cmdline += " export-compound --in=test_data_compound.osw --out=test_data_compound_ms1.tsv --max_rs_peakgroup_qvalue=0.05 --format=legacy_merged"
-    stdout = _run_cmdline(cmdline)
-
-    print(pd.read_csv("test_data_compound_ms1.tsv", sep="\t", nrows=100).sort_index(axis=1),file=regtest)
-    
-def _run_compound_ms2(regtest, temp_folder):
-    os.chdir(temp_folder)
-    data_path= os.path.join(DATA_FOLDER, "test_data_compound.osw")
-    shutil.copy(data_path, temp_folder)
-    
-    # MS2-level
-    cmdline = "pyprophet score --in=test_data_compound.osw --level=ms2 --test"
-
-    # export
-    cmdline += " export-compound --in=test_data_compound.osw --out=test_data_compound_ms2.tsv --max_rs_peakgroup_qvalue=0.05 --format=legacy_merged"
-
-    stdout = _run_cmdline(cmdline)
-
-    print(pd.read_csv("test_data_compound_ms2.tsv", sep="\t", nrows=100).sort_index(axis=1),file=regtest)
+    run_pyprophet_command(cmd, temp_folder)
+    validate_export_results(
+        regtest, test_data_osw, "osw", f"{temp_folder}/test_data.tsv"
+    )
 
 
-def test_osw_0(tmpdir, regtest):
-    _run_osw(regtest, tmpdir.strpath, False, False, False)
+# Compound tests (only support OSW)
+def test_compound_unscored(test_data_compound_osw, temp_folder, regtest):
+    """Test export of unscored compound data"""
+    cmd = f"pyprophet export compound --in={test_data_compound_osw} --out={temp_folder}/test_data_compound_unscored.tsv --format=legacy_merged"
+    run_pyprophet_command(cmd, temp_folder)
 
-def test_osw_1(tmpdir, regtest):
-    _run_osw(regtest, tmpdir.strpath, True, False, False)
+    df = pd.read_csv(
+        f"{temp_folder}/test_data_compound_unscored.tsv",
+        sep="\t",
+        nrows=100,
+    )
+    print(df.sort_index(axis=1), file=regtest)
 
-def test_osw_2(tmpdir, regtest):
-    _run_osw(regtest, tmpdir.strpath, False, True, False)
 
-def test_osw_3(tmpdir, regtest):
-    _run_osw(regtest, tmpdir.strpath, False, False, True)
+def test_compound_ms1(test_data_compound_osw, temp_folder, regtest):
+    """Test compound analysis with MS1-level scoring"""
+    cmd = f"pyprophet score --in={test_data_compound_osw} --level=ms1 --test &&"
+    cmd += f"pyprophet export compound --in={test_data_compound_osw} --out={temp_folder}/test_data_compound_ms1.tsv --max_rs_peakgroup_qvalue=0.05 --format=legacy_merged"
 
-def test_ipf_0(tmpdir, regtest):
-    _run_ipf(regtest, tmpdir.strpath, False, "disable")
+    run_pyprophet_command(cmd, temp_folder)
 
-def test_ipf_1(tmpdir, regtest):
-    _run_ipf(regtest, tmpdir.strpath, True, "disable")
+    df = pd.read_csv(f"{temp_folder}/test_data_compound_ms1.tsv", sep="\t", nrows=100)
+    print(df.sort_index(axis=1), file=regtest)
 
-def test_ipf_2(tmpdir, regtest):
-    _run_ipf(regtest, tmpdir.strpath, False, "peptidoform")
 
-def test_ipf_3(tmpdir, regtest):
-    _run_ipf(regtest, tmpdir.strpath, False, "augmented")
+def test_compound_ms2(test_data_compound_osw, temp_folder, regtest):
+    """Test compound analysis with MS2-level scoring"""
+    cmd = f"pyprophet score --in={test_data_compound_osw} --level=ms2 --test &&"
+    cmd += f"pyprophet export compound --in={test_data_compound_osw} --out={temp_folder}/test_data_compound_ms2.tsv --max_rs_peakgroup_qvalue=0.05 --format=legacy_merged"
 
-def test_compound_0(tmpdir, regtest):
-    _run_compound_ms1(regtest, tmpdir.strpath)
-    
-def test_compound_1(tmpdir, regtest):
-    _run_compound_ms2(regtest, tmpdir.strpath)
+    run_pyprophet_command(cmd, temp_folder)
 
-def test_compound_unscored(tmpdir, regtest):
-	_run_compound_unscored(regtest, tmpdir.strpath)
-	
-def test_osw_unscored(tmpdir, regtest):
-	_run_osw_unscored(regtest, tmpdir.strpath)
+    df = pd.read_csv(f"{temp_folder}/test_data_compound_ms2.tsv", sep="\t", nrows=100)
+    print(df.sort_index(axis=1), file=regtest)

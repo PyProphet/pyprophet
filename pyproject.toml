@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyprophet"
-version = "2.3.4"
+version = "3.0.0"
 description = "PyProphet: Semi-supervised learning and scoring of OpenSWATH results."
 readme = { file = "README.md", content-type = "text/markdown" }
 license = { text = "BSD" }
@@ -19,6 +19,7 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Chemistry"
 ]
 keywords = ["bioinformatics", "openSWATH", "mass spectrometry"]
+requires-python = ">=3.10, <=3.13"
 
 # Dependencies required for runtime
 dependencies = [
@@ -34,20 +35,21 @@ dependencies = [
     "cython",
     "numexpr >= 2.10.1",
     "scikit-learn >= 1.5",
-    "xgboost",
-    "hyperopt",
+    "xgboost >= 2.1.4",
     "statsmodels >= 0.8.0",
     "matplotlib",
     "seaborn",
     "tabulate",
     "pyarrow",
     "pypdf",
-    "psutil"
+    "psutil",
+    "pyopenms"
 ]
 
 # Optional dependencies 
 [project.optional-dependencies]
-testing = ["pytest", "pytest-regtest"]
+testing = ["pytest", "pytest-regtest", "pytest-xdist"]
+docs = ["sphinx", "sphinx-copybutton", "sphinx_rtd_theme", "pydata_sphinx_theme", "sphinx-click"]
 
 # Define console entry points
 [project.scripts]

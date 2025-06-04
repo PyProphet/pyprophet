@@ -23,7 +23,7 @@ from .cli.util import (
 )
 from .filter import filter_osw, filter_sqmass
 from .io.util import check_sqlite_table
-from .levels_contexts import (
+from .util import (
     backpropagate_oswr,
     reduce_osw,
     subsample_osw,

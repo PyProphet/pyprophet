@@ -67,7 +67,6 @@ def handle_plot_errors(func):
 
 
 def color_blind_friendly(color_palette):
-
     color_dict = {
         "normal": ["#F5793A", "#0F2080"],
         "protan": ["#AE9C45", "#052955"],
@@ -335,7 +334,6 @@ class PlotGenerator:
         )
 
         if cutoffs is not None:
-
             s_value_cutoff = svalues[argmin(abs(qvalues - 0.01))]
             d_cutoff_at_1_pcnt = cutoffs[svalues == s_value_cutoff][-1]
             ax.axvline(x=d_cutoff_at_1_pcnt, color="grey", linestyle="--", linewidth=2)
@@ -395,10 +393,11 @@ class PlotGenerator:
                 )
                 ax.legend(loc=2)
             except Exception as e:
+                n_nans = f"Number of NaNs in top_targets:\n{np.isnan(top_targets).sum()}\ntop_decoys: {np.isnan(top_decoys).sum()}"
                 ax.text(
                     0.5,
                     0.5,
-                    f"Could not plot densities:\n{str(e)}",
+                    f"Could not plot densities:\n{str(e)}\n{n_nans}",
                     ha="center",
                     va="center",
                     color="red",
@@ -516,9 +515,14 @@ class PlotGenerator:
             if summary.empty:
                 continue
             summary_rows = summary.round(2).astype(str).values.tolist()
-            logger.info(
-                f"Summary for {thresh_label}:\n{pd.DataFrame(summary_rows).rename(columns={0: 'run_id', 1: 'num_ids', 2: 'min_area', 3: 'mean_area', 4: 'max_area'})}"
+            logger.opt(raw=True, colors=True).info("=" * 80)
+            logger.opt(raw=True, colors=True).info(f"\n  Summary for {thresh_label}:\n")
+            logger.opt(raw=True, colors=True).info("=" * 80)
+            logger.opt(raw=True, colors=True).info("\n")
+            logger.opt(raw=True, colors=True).info(
+                f"{pd.DataFrame(summary_rows).rename(columns={0: 'run_id', 1: 'num_ids', 2: 'min_area', 3: 'mean_area', 4: 'max_area'})}"
             )
+            logger.opt(raw=True, colors=True).info("\n")
             table_blocks.append((thresh_label, summary_rows))
 
         # Layout
@@ -649,46 +653,60 @@ def save_report(
                 logger.warning("Unknown level specified. Defaulting to precursor_id.")
                 id_key = "precursor_id"
 
-            skip_quant_dist = level in ("peptide", "protein", "gene")
-            skip_quant_corr = skip_quant_dist
+            # Check how many runs there are
+            n_runs = df["run_id"].nunique()
 
-            if df["run_id"].isna().all() and level in ("peptide", "protein", "gene"):
+            if df["run_id"].isna().all() and level in (
+                "peptide",
+                "protein",
+                "gene",
+            ):
                 df["run_id"] = "global"
-                skip_consistency = skip_jaccard = True
-            else:
-                skip_consistency = skip_jaccard = False
 
-            filtered_df = filter_identifications(df, id_key, 0.05)
+            if n_runs > 1:
+                skip_quant_dist = level in ("peptide", "protein", "gene")
+                skip_quant_corr = skip_quant_dist
 
-            # First set of plots
-            try:
-                fig, axes = plt.subplots(2, 2, figsize=(12, 10))
-                plotter.add_id_barplot(axes[0, 0], filtered_df, id_key)
-                if not skip_consistency:
-                    plotter.plot_identification_consistency(
-                        axes[0, 1], filtered_df, id_key
-                    )
-                if not skip_quant_dist:
-                    plotter.add_violinplot(axes[1, 0], filtered_df, id_key)
-                    plotter.plot_cv_distribution(axes[1, 1], filtered_df, id_key)
-                plt.tight_layout()
-                pdf.savefig(fig)
-                plt.close(fig)
-            except Exception as e:
-                logger.error(f"Failed to generate first set of plots: {str(e)}")
+                if df["run_id"].isna().all() and level in (
+                    "peptide",
+                    "protein",
+                    "gene",
+                ):
+                    skip_consistency = skip_jaccard = True
+                else:
+                    skip_consistency = skip_jaccard = False
 
-            # Second set of plots
-            try:
-                fig, axes = plt.subplots(2, 1, figsize=(10, 12))
-                if not skip_jaccard:
-                    plotter.plot_jaccard_similarity(axes[0], filtered_df, id_key)
-                if not skip_quant_corr:
-                    plotter.plot_intensity_correlation(axes[1], filtered_df, id_key)
-                plt.tight_layout()
-                pdf.savefig(fig)
-                plt.close(fig)
-            except Exception as e:
-                logger.error(f"Failed to generate second set of plots: {str(e)}")
+                filtered_df = filter_identifications(df, id_key, 0.05)
+
+                # First set of plots
+                try:
+                    fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+                    plotter.add_id_barplot(axes[0, 0], filtered_df, id_key)
+                    if not skip_consistency:
+                        plotter.plot_identification_consistency(
+                            axes[0, 1], filtered_df, id_key
+                        )
+                    if not skip_quant_dist:
+                        plotter.add_violinplot(axes[1, 0], filtered_df, id_key)
+                        plotter.plot_cv_distribution(axes[1, 1], filtered_df, id_key)
+                    plt.tight_layout()
+                    pdf.savefig(fig)
+                    plt.close(fig)
+                except Exception as e:
+                    logger.error(f"Failed to generate first set of plots: {str(e)}")
+
+                # Second set of plots
+                try:
+                    fig, axes = plt.subplots(2, 1, figsize=(10, 12))
+                    if not skip_jaccard:
+                        plotter.plot_jaccard_similarity(axes[0], filtered_df, id_key)
+                    if not skip_quant_corr:
+                        plotter.plot_intensity_correlation(axes[1], filtered_df, id_key)
+                    plt.tight_layout()
+                    pdf.savefig(fig)
+                    plt.close(fig)
+                except Exception as e:
+                    logger.error(f"Failed to generate second set of plots: {str(e)}")
 
             # Summary tables
             try:
@@ -707,7 +725,6 @@ def save_report(
 
 
 def plot_scores(df, out, color_palette="normal"):
-
     if plt is None:
         raise ImportError(
             "Error: The matplotlib package is required to create a report."
@@ -1460,7 +1477,6 @@ def post_scoring_report(df, outfile, color_palette="normal"):
 
 
 def plot_hist(x, title, xlabel, ylabel, pdf_path="histogram_plot.png"):
-
     if plt is not None:
         # Clear figures
         plt.close("all")
@@ -1486,7 +1502,6 @@ def main_score_selection_report(
     pdf_path="main_score_selection_report.pdf",
     worker_num=1,
 ):
-
     if plt is None:
         raise ImportError(
             "Error: The matplotlib package is required to create a report."

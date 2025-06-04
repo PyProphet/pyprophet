@@ -1,6 +1,6 @@
+import os
 import pytest
 import pandas as pd
-from hyperopt import hp
 
 from pyprophet.io.scoring.osw import OSWReader
 from pyprophet.io.scoring.parquet import ParquetReader
@@ -8,14 +8,11 @@ from pyprophet.io.scoring.split_parquet import SplitParquetReader
 from pyprophet.io.scoring.tsv import TSVReader  # legacy, limited support
 from pyprophet._config import RunnerIOConfig, RunnerConfig
 
+pd.options.display.expand_frame_repr = False
+pd.options.display.precision = 4
+pd.options.display.max_columns = None
 
-xgb_hyperparams = {
-    "autotune": False,
-    "autotune_num_rounds": 10,
-    "num_boost_round": 100,
-    "early_stopping_rounds": 10,
-    "test_size": 0.33,
-}
+DATA_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 
 xgb_params = {
     "eta": 0.3,
@@ -35,19 +32,6 @@ xgb_params = {
     "eval_metric": "auc",
 }
 
-xgb_params_space = {
-    "eta": hp.uniform("eta", 0.0, 0.3),
-    "gamma": hp.uniform("gamma", 0.0, 0.5),
-    "max_depth": hp.quniform("max_depth", 2, 8, 1),
-    "min_child_weight": hp.quniform("min_child_weight", 1, 5, 1),
-    "lambda": hp.uniform("lambda", 0.0, 1.0),
-    "alpha": hp.uniform("alpha", 0.0, 1.0),
-    "objective": "binary:logitraw",
-    "nthread": 1,
-    "eval_metric": "auc",
-    "scale_pos_weight": 1.0,
-    "verbosity": 0,
-}
 
 # ================== TEST UTILITIES ==================
 
@@ -63,9 +47,7 @@ def create_reader_config(level, infile, outfile):
         context="score_learn",
         level=level,
         runner=RunnerConfig(
-            xgb_hyperparams=xgb_hyperparams,
             xgb_params=xgb_params,
-            xgb_params_space=xgb_params_space,
         ),
     )
 
@@ -159,37 +141,37 @@ def get_comparison_columns(reader_type, level):
 # ================== FIXTURES ==================
 # Helper functions for reader creation
 def _create_osw_reader(level):
-    config = create_reader_config(
-        level, "./data/test_data.osw", "./data/tmp_test_data.osw"
-    )
+    infile = os.path.join(DATA_FOLDER, "test_data.osw")
+    outfile = os.path.join(DATA_FOLDER, "tmp_test_data.osw")
+    config = create_reader_config(level, infile, outfile)
     return OSWReader(config)
 
 
 def _create_parquet_reader(level):
-    config = create_reader_config(
-        level, "./data/test_data.parquet", "./data/tmp_test_data.parquet"
-    )
+    infile = os.path.join(DATA_FOLDER, "test_data.parquet")
+    outfile = os.path.join(DATA_FOLDER, "tmp_test_data.parquet")
+    config = create_reader_config(level, infile, outfile)
     return ParquetReader(config)
 
 
 def _create_split_parquet_reader(level):
-    config = create_reader_config(
-        level, "./data/test_data.oswpq/", "./data/tmp_test_data.oswpq/"
-    )
+    infile = os.path.join(DATA_FOLDER, "test_data.oswpq")
+    outfile = os.path.join(DATA_FOLDER, "tmp_test_data.oswpq")
+    config = create_reader_config(level, infile, outfile)
     return SplitParquetReader(config)
 
 
 def _create_split_parquet_multi_reader(level):
-    config = create_reader_config(
-        level, "./data/test_data.oswpqd/", "./data/tmp_test_data.oswpqd/"
-    )
+    infile = os.path.join(DATA_FOLDER, "test_data.oswpqd")
+    outfile = os.path.join(DATA_FOLDER, "tmp_test_data.oswpqd")
+    config = create_reader_config(level, infile, outfile)
     return SplitParquetReader(config)
 
 
 def _create_tsv_reader(level):
-    config = create_reader_config(
-        level, "./data/test_data.txt", "./data/tmp_test_data.txt"
-    )
+    infile = os.path.join(DATA_FOLDER, "test_data.txt")
+    outfile = os.path.join(DATA_FOLDER, "tmp_test_data.txt")
+    config = create_reader_config(level, infile, outfile)
     return TSVReader(config)
 
 
@@ -249,9 +231,9 @@ def test_reader_level(request, level, reader_fixture):
     df = reader.read()
 
     # Basic checks for all readers
-    assert isinstance(
-        df, pd.DataFrame
-    ), f"{reader.__class__.__name__} returned an invalid type"
+    assert isinstance(df, pd.DataFrame), (
+        f"{reader.__class__.__name__} returned an invalid type"
+    )
     assert not df.empty, f"{reader.__class__.__name__} returned an empty DataFrame"
 
     # Legacy handling for TSVReader

@@ -96,9 +96,7 @@ LEFT JOIN SCORE_MS2_PART_GLYCAN ON SCORE_MS2_PART_GLYCAN.FEATURE_ID = FEATURE.ID
 %s
 ORDER BY transition_group_id,
          peak_group_rank;
-""" % (
-        qvalue_filter
-    )
+""" % (qvalue_filter)
 
     con.executescript(idx_query)
     data = pd.read_sql_query(query, con)
@@ -445,7 +443,6 @@ def export_tsv(
     glycopeptide=True,
     max_global_glycopeptide_qvalue=0.01,
 ):
-
     osw = sqlite3.connect(infile)
 
     click.echo("Info: Reading peak group-level results.")

@@ -1,15 +1,88 @@
-import multiprocessing
-from pathlib import Path
-import sys
+"""
+Utility functions and classes for PyProphet CLI.
+
+This module provides a collection of utility functions, decorators, and custom classes
+to support various functionalities in PyProphet, such as logging, memory profiling,
+CLI enhancements, and parameter transformations.
+
+Key Features:
+--------------
+1. **Logging Utilities**:
+    - `setup_logger`: Configures the logger with custom formatting and log levels.
+    - `write_logfile`: Writes logs to a specified file with a custom format.
+
+2. **Custom Click Enhancements**:
+    - `GlobalLogLevelGroup`: A custom Click group for setting global log levels.
+    - `AdvancedHelpGroup` and `AdvancedHelpCommand`: Add advanced help options to Click commands.
+    - `CombinedGroup`: Combines `GlobalLogLevelGroup` and `AdvancedHelpGroup`.
+    - `PythonLiteralOption`: A custom Click option for parsing Python literals.
+
+3. **Parameter Transformation**:
+    - `transform_pi0_lambda`: Validates and transforms `pi0_lambda` parameters.
+    - `transform_threads`: Adjusts thread count based on system resources.
+    - `transform_subsample_ratio`: Validates the subsample ratio.
+
+4. **Shared CLI Options**:
+    - `shared_statistics_options`: A decorator to add shared statistical options to Click commands.
+
+5. **Memory and Performance Profiling**:
+    - `measure_memory_usage_and_time`: A decorator to measure memory usage and execution time of functions.
+    - `memray_profile`: A decorator to enable memory profiling using `memray`.
+
+6. **System Information**:
+    - `get_system_info`: Retrieves OS, Python version, CPU, and RAM information.
+    - `get_execution_context`: Captures the exact CLI command used.
+
+7. **Formatting Utilities**:
+    - `format_bytes`: Converts a size in bytes to a human-readable format.
+    - `format_time`: Converts time in seconds to a human-readable format.
+
+Dependencies:
+--------------
+- `click`: For building CLI commands and options.
+- `loguru`: For advanced logging.
+- `psutil`: For system and memory monitoring.
+- `numpy`: For numerical operations.
+- `memray` (optional): For memory profiling.
+
+Usage:
+------
+This module is intended to be used as a helper library for PyProphet.
+It provides reusable utilities and decorators to enhance functionality
+and streamline development.
+
+Examples:
+---------
+1. Setting up a logger:
+    >>> setup_logger("INFO")
+
+2. Using the `measure_memory_usage_and_time` decorator:
+    >>> @measure_memory_usage_and_time
+    >>> def my_function():
+    >>>     pass
+
+3. Adding shared statistics options to a Click command:
+    >>> @shared_statistics_options
+    >>> @click.command()
+    >>> def my_command():
+    >>>     pass
+"""
+
 import ast
-from importlib.metadata import version
-from datetime import datetime
-import time
-import tracemalloc
+import multiprocessing
+import os
 import platform
+import sys
+import threading
+import time
+from datetime import datetime
+from functools import wraps
+from importlib.metadata import version
+from pathlib import Path
+
+import click
 import numpy as np
 import psutil
-import click
 from loguru import logger
 
 
@@ -427,35 +500,94 @@ def format_time(seconds):
 
 
 def measure_memory_usage_and_time(func):
+    """Decorator to measure memory usage and execution time of a function."""
+
+    @wraps(func)
     def wrapper(*args, **kwargs):
-        # Start timing
-        start_at = time.time()
+        process = psutil.Process()
+        start_time = time.perf_counter()
 
-        # Start memory tracking
-        tracemalloc.start()
+        # Memory monitoring
+        peak_rss = process.memory_info().rss
+        sampling_interval = 0.05  # 50ms
 
-        # Call the original function
-        result = func(*args, **kwargs)
+        def memory_monitor():
+            nonlocal peak_rss
+            while getattr(memory_monitor, "running", True):
+                try:
+                    peak_rss = max(peak_rss, process.memory_info().rss)
+                    time.sleep(sampling_interval)
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    break
 
-        # Stop memory tracking
-        snapshot = tracemalloc.take_snapshot()
-        top_stats = snapshot.statistics("lineno")
+        # Start monitoring thread
+        monitor_thread = threading.Thread(target=memory_monitor, daemon=True)
+        memory_monitor.running = True
+        monitor_thread.start()
 
-        # Stop timing
-        end_at = time.time()
-        elapsed_time = end_at - start_at
-        formatted_time = format_time(elapsed_time)
+        try:
+            result = func(*args, **kwargs)
+        finally:
+            # Stop monitoring
+            memory_monitor.running = False
+            monitor_thread.join(timeout=sampling_interval * 2)
+            peak_rss = max(peak_rss, process.memory_info().rss)
 
-        # Get the maximum memory used during execution
-        max_memory = max(stat.size for stat in top_stats)
-        formatted_memory = format_bytes(max_memory)
-
-        # Log the time and memory usage together
         logger.info(
-            f"{func.__name__} completed in {formatted_time}. Peak memory usage: {formatted_memory}"
+            f"pyprophet {func.__name__} took {format_time(time.perf_counter() - start_time)}; "
+            f"Peak Memory Usage: {format_bytes(peak_rss)}."
         )
 
-        # Return the result of the function
         return result
 
     return wrapper
+
+
+def memray_profile(output_file=None):
+    """Decorator that uses memray.Tracker for profiling Click commands."""
+
+    def decorator(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            ctx = click.get_current_context()
+
+            if ctx.params.get("profile", False):
+                try:
+                    import memray  # noqa: F401
+
+                    output_path = output_file or os.path.join(
+                        f"./memray_pyp_{f.__name__}.bin"
+                    )
+
+                    if os.path.exists(output_path):
+                        logger.warning(
+                            f"Output file {output_path} already exists. It will be overwritten."
+                        )
+                        os.remove(output_path)
+
+                    logger.info(
+                        f"Starting memory profiling, output will be saved to {output_path}"
+                    )
+
+                    with memray.Tracker(output_path, native_traces=True):
+                        result = ctx.invoke(f, *args, **kwargs)
+
+                    logger.info(
+                        f"Memory profiling completed. Results saved to {output_path}"
+                    )
+
+                    return result
+
+                except ImportError:
+                    logger.error(
+                        "Memray requested but not installed. Install with: pip install memray"
+                    )
+                except Exception as e:
+                    logger.error(f"Memory profiling failed: {str(e)}")
+
+            # Normal execution path
+            return ctx.invoke(f, *args, **kwargs)
+
+        return wrapper
+
+    return decorator
