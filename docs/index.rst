@@ -1,13 +1,21 @@
 .. PyProphet documentation master file
 
+.. raw:: html
+
+   <div style="visibility: hidden;">
+
+PyProphet
+=========
+
+.. raw:: html
+
+   </div>
+
 .. image:: https://raw.githubusercontent.com/PyProphet/pyprophet/master/assets/PyProphet_Logo.png
    :width: 300px
    :align: center
    :target: https://github.com/PyProphet/pyprophet
    :alt: PyProphet Logo
-
-.. PyProphet
-.. =========
 
 .. container:: badge-container
 
