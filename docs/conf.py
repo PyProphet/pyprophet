@@ -55,7 +55,7 @@ def find_git_directory(start_path):
 project = "PyProphet"
 copyright = f"{datetime.now().year}, PyProphet Team"
 author = "PyProphet Team"
-version = "2.3.4"
+version = "3.0.0"
 release = version
 
 # if the variable is not set (e.g., when building locally and not on RTD)
