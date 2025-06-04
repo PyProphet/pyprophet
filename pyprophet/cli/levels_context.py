@@ -18,7 +18,7 @@ from ..levels_contexts import (
 
 
 def create_levels_context_group():
-    @click.group(name="levels-context", cls=CombinedGroup)
+    @click.group(name="infer", cls=CombinedGroup)
     @click.pass_context
     def levels_context(ctx):
         """Subcommands for FDR estimation at different biological levels."""
