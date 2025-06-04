@@ -8,7 +8,12 @@ PyProphet
 <!-- [![Build Status](https://travis-ci.org/PyProphet/pyprophet.svg?branch=master)](https://travis-ci.org/PyProphet/pyprophet)  -->
 [![continuous-integration](https://github.com/PyProphet/pyprophet/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/PyProphet/pyprophet/actions/workflows/ci.yml)
 [![Project Stats](https://www.openhub.net/p/PyProphet/widgets/project_thin_badge.gif)](https://www.openhub.net/p/PyProphet)
-![PyPI - Version](https://img.shields.io/pypi/v/pyprophet)
+![PyPI - Python Version](https://img.shields.io/pypi/pyversions/pyprophet)
+[![PyPI - Version](https://img.shields.io/pypi/v/pyprophet)](https://pypi.org/project/pyprophet/)
+[![Docker Image Version](https://img.shields.io/docker/v/pyprophet/pyprophet?label=Docker)](https://hub.docker.com/r/pyprophet/pyprophet)
+[![Read the Docs (version)](https://img.shields.io/readthedocs/pyprophet/latest)](https://pyprophet.readthedocs.io/en/latest/index.html)
+
+
 
 
 PyProphet: Semi-supervised learning and scoring of OpenSWATH results.
@@ -67,10 +72,13 @@ Docker
 
 PyProphet is also available from Docker (automated builds):
 
-Pull the stable version (e.g. 2.1.2) of *pyprophet* from DockerHub (synced with releases):
+Pull the latest version of *pyprophet* from DockerHub or Github Container Registry (synced with releases):
 
 ````
-    $ docker pull pyprophet/pyprophet:2.1.2
+    # Dockerhub
+    $ docker pull pyprophet/pyprophet:latest
+    # Github Container Registry
+    $ docker pull ghcr.io/pyprophet/pyprophet:latest
 ````
 
 Running tests
@@ -81,6 +89,6 @@ The *pyprophet* tests are best executed using `py.test` and the `pytest-regtest`
 ````
     $ pip install pytest
     $ pip install pytest-regtest
-    $ py.test ./tests
+    $ py.test -n auto ./tests
 ````
 
