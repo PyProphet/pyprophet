@@ -141,8 +141,5 @@ templates_path = ["templates"]
 
 
 # -- Extension Settings ------------------------------------------------------
-# def setup(app):
-#     # Ensure CLI commands are documented
-#     from sphinx_click.ext import ClickDirective
-
-#     app.add_directive("click", ClickDirective)
+def setup(app):
+    app.add_css_file("custom.css")
