@@ -24,7 +24,7 @@ We can see just how large the OSW files are. Since we have a lot of runs as well
     osw_files=$(find . -maxdepth 1 -name "*.osw")
 
     for osw_file in $osw_files; do
-        pyprophet export parquet --in "$osw_file" --out "${osw_file%.osw}.oswpq" --split_transition_data --split_runs
+        pyprophet export parquet --in "$osw_file" --out "${osw_file%.osw}.oswpq" --split_transition_data
     done
 
     # Lets move the run parquet directories into a single directory for easier management
