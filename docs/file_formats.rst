@@ -107,3 +107,52 @@ Parquet Format (*.parquet*)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 PyProphet supports converting the OpenSWATH SQLite format (*.sqMass*) to a parquet format, for better storage. You can use the :program:`export parquet` subcommand to convert the OpenSWATH SQLite format (*.sqMass*) to a parquet format. 
+
+The Parquet schema used for the XICs is as follows:
+
+.. code-block:: text
+
+    Schema([
+        ('PRECURSOR_ID', Int64),
+        ('TRANSITION_ID', Int64),
+        ('MODIFIED_SEQUENCE', String),
+        ('PRECURSOR_CHARGE', Int64),
+        ('PRODUCT_CHARGE', Int64),
+        ('DETECTING_TRANSITION', Int64),
+        ('PRECURSOR_DECOY', Int64),
+        ('PRODUCT_DECOY', Int64),
+        ('NATIVE_ID', String),
+        ('RT_DATA', Binary),
+        ('INTENSITY_DATA', Binary),
+        ('RT_COMPRESSION', Int64),
+        ('INTENSITY_COMPRESSION', Int64)
+    ])
+
+RT_COMPRESSION and INTENSITY_COMPRESSION are used to store the compression type 
+for the RT and intensity data, respectively. The RT_DATA and INTENSITY_DATA are 
+stored as binary data, which can be decompressed using the appropriate compression 
+algorithm.
+
+The possible values and their decoding for the compression type are as follows:
+
+.. list-table:: Compression Types
+   :header-rows: 1
+
+   * - Value
+     - Compression Type
+   * - 0
+     - No compression
+   * - 1
+     - zlib
+   * - 2
+     - np-linear
+   * - 3
+     - np-slof
+   * - 4
+     - np-pic
+   * - 5
+     - np-linear + zlib
+   * - 6
+     - np-slof + zlib
+   * - 7
+     - np-pic + zlib
