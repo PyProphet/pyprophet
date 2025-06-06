@@ -12,7 +12,12 @@ from .cli.ipf import (
 from .cli.ipf import (
     ipf as ipf_command,
 )
-from .cli.levels_context import create_levels_context_group
+from .cli.levels_context import (
+    create_levels_context_group,
+    peptide as peptide_command,
+    protein as protein_command,
+    gene as gene_command,
+)
 from .cli.merge import create_merge_group
 from .cli.score import score as score_command
 from .cli.util import (
@@ -62,11 +67,7 @@ def cli(ctx, log_level):
 # Semi-supervised learning and scoring of OpenSWATH results
 cli.add_command(score_command, name="score")
 
-# Inference of peptidoforms / glycoforms
-cli.add_command(ipf_command, name="ipf")
-cli.add_command(glycoform_command, name="glycoform")
-
-# Levels contexts for peptide/protein/gene infernce
+# Peptidoform and Levels contexts for peptide/protein/gene infernce
 levels_context = create_levels_context_group()
 cli.add_command(levels_context)
 
@@ -446,3 +447,27 @@ def statistics(infile):
                 )
             )
             click.echo(10 * "=")
+
+
+# ----------------------------------------------------
+# Deprecated commands to be removed in future versions
+
+# We keep these commands for backward compatibility, but they are deprecated.
+# To be removed in future versions of PyProphet. We first ensure documentation of use of the old commans is updated
+
+cli.add_command(ipf_command, name="ipf")
+ipf = cli.get_command(None, "ipf")
+ipf.deprecated = True
+
+# Peptide inference
+cli.add_command(peptide_command, name="peptide")
+peptide = cli.get_command(None, "peptide")
+peptide.deprecated = True
+# Protein inference
+cli.add_command(protein_command, name="protein")
+protein = cli.get_command(None, "protein")
+protein.deprecated = True
+# Gene inference
+cli.add_command(gene_command, name="gene")
+gene = cli.get_command(None, "gene")
+gene.deprecated = True

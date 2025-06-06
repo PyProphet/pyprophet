@@ -119,6 +119,12 @@ def ipf(
     Infer peptidoforms after scoring of MS1, MS2 and transition-level data.
     """
 
+    # Check to see if we're calling from the previous deprecated command call
+    if ctx.command.deprecated:
+        logger.warning(
+            "The 'pyprophet ipf' command is deprecated and will be removed in future versions. Use 'pyprophet infer peptidoform' instead."
+        )
+
     if outfile is None:
         outfile = infile
     else:
