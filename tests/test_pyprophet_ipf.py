@@ -252,7 +252,7 @@ def test_ipf_scoring(
     cmd += f" && pyprophet score {input_strategy['cmd_prefix']} --level=transition --test --pi0_lambda=0.1 0 0 --ss_iteration_fdr=0.02"
 
     # Add IPF command with parameters
-    cmd += f" && pyprophet ipf {input_strategy['cmd_prefix']}"
+    cmd += f" && pyprophet infer peptidoform {input_strategy['cmd_prefix']}"
     cmd += " --ipf_ms1_scoring" if ipf_ms1_scoring else " --no-ipf_ms1_scoring"
     cmd += " --ipf_ms2_scoring" if ipf_ms2_scoring else " --no-ipf_ms2_scoring"
     cmd += " --ipf_h0" if ipf_h0 else " --no-ipf_h0"

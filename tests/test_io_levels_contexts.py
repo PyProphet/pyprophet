@@ -163,7 +163,7 @@ def run_scoring(temp_folder, input_strategy):
 
 def run_level_context(temp_folder, input_strategy, level, context):
     """Run level context inference"""
-    cmd = f"pyprophet levels-context {level} {input_strategy['cmd_prefix']} --context={context} --pi0_lambda=0.001 0 0"
+    cmd = f"pyprophet infer {level} {input_strategy['cmd_prefix']} --context={context} --pi0_lambda=0.001 0 0"
     run_pyprophet_command(cmd, temp_folder)
 
 

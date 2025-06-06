@@ -120,14 +120,14 @@ def test_osw_analysis(
     cmd = f"pyprophet score {input_strategy['cmd_prefix']} --level=ms2 --test --pi0_lambda=0.001 0 0 --ss_iteration_fdr=0.02 && "
 
     # peptide-level
-    cmd += f"pyprophet levels-context peptide --pi0_lambda=0.001 0 0 {input_strategy['cmd_prefix']} --context=run-specific && "
-    cmd += f"pyprophet levels-context peptide --pi0_lambda=0.001 0 0 {input_strategy['cmd_prefix']} --context=experiment-wide && "
-    cmd += f"pyprophet levels-context peptide --pi0_lambda=0.001 0 0 {input_strategy['cmd_prefix']} --context=global && "
+    cmd += f"pyprophet infer peptide --pi0_lambda=0.001 0 0 {input_strategy['cmd_prefix']} --context=run-specific && "
+    cmd += f"pyprophet infer peptide --pi0_lambda=0.001 0 0 {input_strategy['cmd_prefix']} --context=experiment-wide && "
+    cmd += f"pyprophet infer peptide --pi0_lambda=0.001 0 0 {input_strategy['cmd_prefix']} --context=global && "
 
     # protein-level
-    cmd += f"pyprophet levels-context protein --pi0_lambda=0 0 0 {input_strategy['cmd_prefix']} --context=run-specific && "
-    cmd += f"pyprophet levels-context protein --pi0_lambda=0 0 0 {input_strategy['cmd_prefix']} --context=experiment-wide && "
-    cmd += f"pyprophet levels-context protein --pi0_lambda=0 0 0 {input_strategy['cmd_prefix']} --context=global && "
+    cmd += f"pyprophet infer protein --pi0_lambda=0 0 0 {input_strategy['cmd_prefix']} --context=run-specific && "
+    cmd += f"pyprophet infer protein --pi0_lambda=0 0 0 {input_strategy['cmd_prefix']} --context=experiment-wide && "
+    cmd += f"pyprophet infer protein --pi0_lambda=0 0 0 {input_strategy['cmd_prefix']} --context=global && "
 
     # export
     cmd += f"pyprophet export tsv {input_strategy['cmd_prefix']} --out={temp_folder}/test_data.tsv --max_rs_peakgroup_qvalue=1 --format=legacy_merged"
@@ -183,7 +183,7 @@ def test_ipf_analysis(
     cmd += f"pyprophet score --in={test_data_osw} --level=transition --test --pi0_lambda=0.1 0 0 --ss_iteration_fdr=0.02 && "
 
     # IPF
-    cmd += f"pyprophet ipf --in={test_data_osw} && "
+    cmd += f"pyprophet infer peptidoform --in={test_data_osw} && "
 
     # export
     cmd += f"pyprophet export tsv --in={test_data_osw} --out={temp_folder}/test_data.tsv --no-peptide --no-protein --ipf_max_peptidoform_pep=1 --max_rs_peakgroup_qvalue=1 --format=legacy_merged"
