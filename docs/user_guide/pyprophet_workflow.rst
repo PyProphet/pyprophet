@@ -128,11 +128,11 @@ If you performed chromatogram feature alignment using `ARYCAL <https://github.co
 Inference of Peptidoforms (IPF)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-If you are running an IPF workflow, you can perform inference of peptidoforms using the `pyprophet ipf` command. 
+If you are running an IPF workflow, you can perform inference of peptidoforms using the `pyprophet infer peptidoform` command. 
 
 .. code-block:: bash
 
-    pyprophet ipf --in all_runs.oswpqd --no-ipf_ms1_scoring --no-ipf_ms2_scoring --propagate_signal_across_runs --ipf_max_alignment_pep 0.7 --across_run_confidence_threshold 0.5
+    pyprophet infer peptidoform --in all_runs.oswpqd --no-ipf_ms1_scoring --no-ipf_ms2_scoring --propagate_signal_across_runs --ipf_max_alignment_pep 0.7 --across_run_confidence_threshold 0.5
 
 .. note::
     To use the `--propagate_signal_across_runs` parameter, you need to have performed chromatogram feature alignment, and have scored the aligned features at the alignment level. This will allow PyProphet to propagate the signal across runs and improve the inference of peptidoforms.
@@ -142,16 +142,16 @@ If you are running an IPF workflow, you can perform inference of peptidoforms us
 Contexts and FDR
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-To conduct peptide / protein / gene inference, you can use the `pyprophet levels-context` command. This command will infer the levels of peptides, proteins, and genes from the scored features in the parquet files. 
+To conduct peptide / protein / gene inference, you can use the `pyprophet infer` command. This command will infer the levels of peptides, proteins, and genes from the scored features in the parquet files. 
 
 .. code-block:: bash
 
-    pyprophet levels-context peptide --in all_runs.oswpqd --context global
-    pyprophet levels-context peptide --in all_runs.oswpqd --context experiment-wide
-    pyprophet levels-context peptide --in all_runs.oswpqd --context run-specific
-    pyprophet levels-context protein --in all_runs.oswpqd --context global
-    pyprophet levels-context protein --in all_runs.oswpqd --context experiment-wide
-    pyprophet levels-context protein --in all_runs.oswpqd --context run-specific
+    pyprophet infer peptide --in all_runs.oswpqd --context global
+    pyprophet infer peptide --in all_runs.oswpqd --context experiment-wide
+    pyprophet infer peptide --in all_runs.oswpqd --context run-specific
+    pyprophet infer protein --in all_runs.oswpqd --context global
+    pyprophet infer protein --in all_runs.oswpqd --context experiment-wide
+    pyprophet infer protein --in all_runs.oswpqd --context run-specific
 
 See the :ref:`CLI documentation <cli_levels_context>` for more information on the available contexts and parameters.
 
