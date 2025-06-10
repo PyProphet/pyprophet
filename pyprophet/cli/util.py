@@ -276,21 +276,23 @@ def get_execution_context():
 
 def setup_logger(log_level):
     def formatter(record):
-        # Format with module, function, and line number
-        # mod_func_line = f"{record['module']}::{record['function']}:{record['line']}"
-        # return (
-        #     f"[ <green>{record['time']:YYYY-MM-DD at HH:mm:ss}</green> | "
-        #     f"<level>{record['level']: <7}</level> | "
-        #     f"{mod_func_line: <37} ] "
-        #     f"<level>{record['message']}</level>\n"
-        # )
-        mod_func_line = f"{record['module']}::{record['line']}"
-        return (
-            f"[ <green>{record['time']:YYYY-MM-DD at HH:mm:ss}</green> | "
-            f"<level>{record['level']: <7}</level> | "
-            f"{mod_func_line: <27} ] "
-            f"<level>{record['message']}</level>\n"
-        )
+        if log_level != "info":
+            # Format with module, function, and line number
+            mod_func_line = f"{record['name']}::{record['function']}:{record['line']}"
+            return (
+                f"[ <green>{record['time']:YYYY-MM-DD at HH:mm:ss}</green> | "
+                f"<level>{record['level']: <7}</level> | "
+                f"{mod_func_line: <50} ] "
+                f"<level>{record['message']}</level>\n"
+            )
+        else:
+            mod_func_line = f"{record['module']}::{record['line']}"
+            return (
+                f"[ <green>{record['time']:YYYY-MM-DD at HH:mm:ss}</green> | "
+                f"<level>{record['level']: <7}</level> | "
+                f"{mod_func_line: <27} ] "
+                f"<level>{record['message']}</level>\n"
+            )
 
     global _LOGGER_INITIALIZED
     if _LOGGER_INITIALIZED:
