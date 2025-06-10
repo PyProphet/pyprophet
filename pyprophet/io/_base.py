@@ -588,7 +588,7 @@ class BaseWriter(ABC):
         sep = "," if cfg.out_type == "csv" else "\t"
 
         if cfg.export_format == "legacy_split":
-            logger.debug("Exporting results in legacy split format.")
+            logger.info("Exporting results in legacy split format.")
             data = data.drop(["id_run", "id_peptide"], axis=1)
             # filename might contain archive extensions, so we need to remove these
             data["filename"] = data["filename"].apply(
@@ -607,7 +607,7 @@ class BaseWriter(ABC):
                 )
             )
         elif cfg.export_format == "legacy_merged":
-            logger.debug("Exporting results in legacy merged format.")
+            logger.info("Exporting results in legacy merged format.")
             data.drop(["id_run", "id_peptide"], axis=1).to_csv(
                 cfg.outfile, sep=sep, index=False
             )
