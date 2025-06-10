@@ -479,9 +479,9 @@ class SplitParquetReader(BaseSplitParquetReader):
                 SELECT 
                     p1.RUN_ID AS id_run,
                     p1.PEPTIDE_ID AS id_peptide,
-                    MIN(p2.SCORE_PROTEIN_RUN_SPECIFIC_Q_VALUE) AS m_score_protein_run_specific
+                    MIN(p1.SCORE_PROTEIN_RUN_SPECIFIC_Q_VALUE) AS m_score_protein_run_specific
                 FROM precursors p1
-                JOIN precursors p2 ON p1.PROTEIN_ID = p2.PROTEIN_ID AND p1.RUN_ID = p2.RUN_ID
+                -- JOIN precursors p2 ON p1.PROTEIN_ID = p2.PROTEIN_ID AND p1.RUN_ID = p2.RUN_ID
                 WHERE p1.PROTEIN_ID IS NOT NULL
                 GROUP BY p1.RUN_ID, p1.PEPTIDE_ID
             """
@@ -500,9 +500,9 @@ class SplitParquetReader(BaseSplitParquetReader):
                 SELECT 
                     p1.RUN_ID AS id_run,
                     p1.PEPTIDE_ID AS id_peptide,
-                    MIN(p2.SCORE_PROTEIN_EXPERIMENT_WIDE_Q_VALUE) AS m_score_protein_experiment_wide
+                    MIN(p1.SCORE_PROTEIN_EXPERIMENT_WIDE_Q_VALUE) AS m_score_protein_experiment_wide
                 FROM precursors p1
-                JOIN precursors p2 ON p1.PROTEIN_ID = p2.PROTEIN_ID AND p1.RUN_ID = p2.RUN_ID
+                -- JOIN precursors p2 ON p1.PROTEIN_ID = p2.PROTEIN_ID AND p1.RUN_ID = p2.RUN_ID
                 WHERE p1.PROTEIN_ID IS NOT NULL
                 GROUP BY p1.RUN_ID, p1.PEPTIDE_ID
             """
@@ -523,11 +523,11 @@ class SplitParquetReader(BaseSplitParquetReader):
             query = f"""
                 SELECT 
                     p1.PEPTIDE_ID AS id_peptide,
-                    MIN(p2.SCORE_PROTEIN_GLOBAL_Q_VALUE) AS m_score_protein_global
+                    MIN(p1.SCORE_PROTEIN_GLOBAL_Q_VALUE) AS m_score_protein_global
                 FROM precursors p1
-                JOIN precursors p2 ON p1.PROTEIN_ID = p2.PROTEIN_ID
+                -- JOIN precursors p2 ON p1.PROTEIN_ID = p2.PROTEIN_ID
                 WHERE p1.PROTEIN_ID IS NOT NULL
-                AND p2.SCORE_PROTEIN_GLOBAL_Q_VALUE < {self.config.max_global_protein_qvalue}
+                AND p1.SCORE_PROTEIN_GLOBAL_Q_VALUE < {self.config.max_global_protein_qvalue}
                 GROUP BY p1.PEPTIDE_ID
             """
             global_data = con.execute(query).fetchdf()
