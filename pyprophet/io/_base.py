@@ -588,22 +588,30 @@ class BaseWriter(ABC):
         sep = "," if cfg.out_type == "csv" else "\t"
 
         if cfg.export_format == "legacy_split":
+            logger.debug("Exporting results in legacy split format.")
             data = data.drop(["id_run", "id_peptide"], axis=1)
             # filename might contain archive extensions, so we need to remove these
             data["filename"] = data["filename"].apply(
                 lambda x: os.path.splitext(os.path.basename(x))[0]
             )
             data.groupby("filename").apply(
-                lambda x: x.to_csv(
-                    os.path.basename(x["filename"].values[0]) + f".{cfg.out_type}",
-                    sep=sep,
-                    index=False,
+                lambda x: (
+                    x.to_csv(
+                        os.path.basename(x["filename"].values[0]) + f".{cfg.out_type}",
+                        sep=sep,
+                        index=False,
+                    ),
+                    logger.success(
+                        f"Exported results to {os.path.basename(x['filename'].values[0])}.{cfg.out_type}."
+                    ),
                 )
             )
         elif cfg.export_format == "legacy_merged":
+            logger.debug("Exporting results in legacy merged format.")
             data.drop(["id_run", "id_peptide"], axis=1).to_csv(
                 cfg.outfile, sep=sep, index=False
             )
+            logger.success(f"Exported results to {cfg.outfile}.")
         else:
             raise ValueError(f"Unsupported export format: {cfg.export_format}")
 
