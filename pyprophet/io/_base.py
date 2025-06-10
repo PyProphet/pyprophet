@@ -607,7 +607,9 @@ class BaseWriter(ABC):
                 )
             )
         elif cfg.export_format == "legacy_merged":
-            logger.info("Exporting results in legacy merged format.")
+            logger.info(
+                f"Exporting results ({data.shape} | {sys.getsizeof(data) / (1024**2):.2f}MB ) in legacy merged format."
+            )
             data.drop(["id_run", "id_peptide"], axis=1).to_csv(
                 cfg.outfile, sep=sep, index=False
             )
