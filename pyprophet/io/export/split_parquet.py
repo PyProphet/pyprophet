@@ -374,9 +374,11 @@ class SplitParquetReader(BaseSplitParquetReader):
 
         # Initialize with empty DataFrame to ensure consistent structure
         peptide_data = pd.DataFrame()
+        only_global_present = True
 
         # Run-specific peptide scores
         if any(col.startswith("SCORE_PEPTIDE_RUN_SPECIFIC_") for col in self._columns):
+            logger.debug("Adding run-specific peptide scores.")
             query = """
                 SELECT 
                     p.RUN_ID AS id_run,
@@ -387,12 +389,15 @@ class SplitParquetReader(BaseSplitParquetReader):
             """
             run_data = con.execute(query).fetchdf()
             if not run_data.empty:
+                only_global_present = False
                 peptide_data = run_data
+                logger.trace(f"Run-specific peptide data shape: {run_data.shape}")
 
         # Experiment-wide peptide scores
         if any(
             col.startswith("SCORE_PEPTIDE_EXPERIMENT_WIDE_") for col in self._columns
         ):
+            logger.debug("Adding experiment-wide peptide scores.")
             query = """
                 SELECT 
                     p.RUN_ID AS id_run,
@@ -403,15 +408,18 @@ class SplitParquetReader(BaseSplitParquetReader):
             """
             exp_data = con.execute(query).fetchdf()
             if not exp_data.empty:
+                logger.trace(f"Experiment-wide peptide data shape: {exp_data.shape}")
+                only_global_present = False
                 if peptide_data.empty:
                     peptide_data = exp_data
                 else:
                     peptide_data = pd.merge(
-                        peptide_data, exp_data, on=["id_run", "id_peptide"]
+                        peptide_data, exp_data, on=["id_run", "id_peptide"], how="left"
                     )
 
         # Global peptide scores
         if any(col.startswith("SCORE_PEPTIDE_GLOBAL_") for col in self._columns):
+            logger.debug("Adding global peptide scores.")
             query = f"""
                 SELECT 
                     p.PEPTIDE_ID AS id_peptide,
@@ -422,14 +430,35 @@ class SplitParquetReader(BaseSplitParquetReader):
             """
             global_data = con.execute(query).fetchdf()
             if not global_data.empty:
+                # We need to drop duplicates to avoid an explosion on the merge
+                global_data = global_data.drop_duplicates(
+                    subset="id_peptide", keep="first"
+                )
+                logger.trace(f"Global peptide data shape: {global_data.shape}")
                 if peptide_data.empty:
                     peptide_data = global_data
                 else:
-                    peptide_data = pd.merge(peptide_data, global_data, on="id_peptide")
+                    peptide_data = pd.merge(
+                        peptide_data, global_data, on="id_peptide", how="left"
+                    )
 
         if not peptide_data.empty:
-            data = pd.merge(data, peptide_data, on=["id_run", "id_peptide"], how="left")
-
+            key_cols = (
+                ["id_run", "id_peptide"] if not only_global_present else ["id_peptide"]
+            )
+            peptide_data = peptide_data.drop_duplicates(subset=key_cols, keep="first")
+            logger.debug("Merging peptide data into main DataFrame.")
+            logger.trace(f"Data shape before merge: {data.shape}")
+            logger.trace(f"Peptide data shape: {peptide_data.shape}")
+            logger.trace(f"Data head:\n{data.head()}")
+            logger.trace(f"Peptide data head:\n{peptide_data.head()}")
+            if only_global_present:
+                data = pd.merge(data, peptide_data, on=["id_peptide"], how="left")
+            else:
+                data = pd.merge(
+                    data, peptide_data, on=["id_run", "id_peptide"], how="left"
+                )
+            logger.trace(f"Merged data shape: {data.shape}")
         return data
 
     def _add_protein_error_data(self, data, con) -> pd.DataFrame:
@@ -441,9 +470,11 @@ class SplitParquetReader(BaseSplitParquetReader):
 
         # Initialize with empty DataFrame to ensure consistent structure
         protein_data = pd.DataFrame()
+        only_global_present = True
 
         # Run-specific protein scores
         if any(col.startswith("SCORE_PROTEIN_RUN_SPECIFIC_") for col in self._columns):
+            logger.debug("Adding run-specific protein scores.")
             query = """
                 SELECT 
                     p1.RUN_ID AS id_run,
@@ -456,12 +487,15 @@ class SplitParquetReader(BaseSplitParquetReader):
             """
             run_data = con.execute(query).fetchdf()
             if not run_data.empty:
+                only_global_present = False
                 protein_data = run_data
+                logger.trace(f"Run-specific protein data shape: {run_data.shape}")
 
         # Experiment-wide protein scores
         if any(
             col.startswith("SCORE_PROTEIN_EXPERIMENT_WIDE_") for col in self._columns
         ):
+            logger.debug("Adding experiment-wide protein scores.")
             query = """
                 SELECT 
                     p1.RUN_ID AS id_run,
@@ -474,15 +508,18 @@ class SplitParquetReader(BaseSplitParquetReader):
             """
             exp_data = con.execute(query).fetchdf()
             if not exp_data.empty:
+                logger.trace(f"Experiment-wide protein data shape: {exp_data.shape}")
+                only_global_present = False
                 if protein_data.empty:
                     protein_data = exp_data
                 else:
                     protein_data = pd.merge(
-                        protein_data, exp_data, on=["id_run", "id_peptide"]
+                        protein_data, exp_data, on=["id_run", "id_peptide"], how="left"
                     )
 
         # Global protein scores
         if any(col.startswith("SCORE_PROTEIN_GLOBAL_") for col in self._columns):
+            logger.debug("Adding global protein scores.")
             query = f"""
                 SELECT 
                     p1.PEPTIDE_ID AS id_peptide,
@@ -495,13 +532,34 @@ class SplitParquetReader(BaseSplitParquetReader):
             """
             global_data = con.execute(query).fetchdf()
             if not global_data.empty:
+                # We need to drop duplicates to avoid an explosion on the merge
+                global_data = global_data.drop_duplicates(
+                    subset="id_peptide", keep="first"
+                )
+                logger.trace(f"Global protein data shape: {global_data.shape}")
                 if protein_data.empty:
                     protein_data = global_data
                 else:
-                    protein_data = pd.merge(protein_data, global_data, on="id_peptide")
+                    protein_data = pd.merge(
+                        protein_data, global_data, on="id_peptide", how="left"
+                    )
 
         if not protein_data.empty:
-            data = pd.merge(data, protein_data, on=["id_run", "id_peptide"], how="left")
+            key_cols = (
+                ["id_run", "id_peptide"] if not only_global_present else ["id_peptide"]
+            )
+            protein_data = protein_data.drop_duplicates(subset=key_cols, keep="first")
+            logger.trace(f"Data shape before merge: {data.shape}")
+            logger.trace(f"Protein data shape: {protein_data.shape}")
+            logger.trace(f"Data head:\n{data.head()}")
+            logger.trace(f"Protein data head:\n{protein_data.head()}")
+            if only_global_present:
+                data = pd.merge(data, protein_data, on=["id_peptide"], how="left")
+            else:
+                data = pd.merge(
+                    data, protein_data, on=["id_run", "id_peptide"], how="left"
+                )
+            logger.trace(f"Merged data shape: {data.shape}")
 
         return data
 
