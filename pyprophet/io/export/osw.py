@@ -2,7 +2,7 @@ import os
 import pickle
 from shutil import copyfile
 import sqlite3
-from typing import Literal
+from typing import Literal, Tuple
 import re
 import duckdb
 import pandas as pd
@@ -735,6 +735,13 @@ class OSWWriter(BaseOSWWriter):
                     )
                     if col[0] not in ["FEATURE_ID", "TRANSITION_ID"]
                 ],
+                "score_ms1_exists": {"SCORE_MS1"}.issubset(table_names),
+                "score_ms2_exists": {"SCORE_MS2"}.issubset(table_names),
+                "score_ipf_exists": {"SCORE_IPF"}.issubset(table_names),
+                "score_peptide_exists": {"SCORE_PEPTIDE"}.issubset(table_names),
+                "score_protein_exists": {"SCORE_PROTEIN"}.issubset(table_names),
+                "score_gene_exists": {"SCORE_GENE"}.issubset(table_names),
+                "score_transition_exists": {"SCORE_TRANSITION"}.issubset(table_names),
             }
 
         return column_info
@@ -856,6 +863,11 @@ class OSWWriter(BaseOSWWriter):
             for col in column_info["feature_ms2_cols"]
         )
 
+        # Check if score tables exist and build score SQLs
+        score_cols_selct, score_table_joins = (
+            self._build_score_column_selection_and_joins(column_info)
+        )
+
         # First get the peptide table and process it with pyopenms
         logger.info("Generating peptide unimod to codename mapping")
         with sqlite3.connect(self.config.infile) as sql_conn:
@@ -954,7 +966,8 @@ class OSWWriter(BaseOSWWriter):
                 FEATURE.LEFT_WIDTH,
                 FEATURE.RIGHT_WIDTH,
                 {feature_ms1_cols_sql},
-                {feature_ms2_cols_sql}
+                {feature_ms2_cols_sql},
+                {score_cols_selct}
             FROM sqlite_scan('{self.config.infile}', 'PRECURSOR') AS PRECURSOR
             INNER JOIN sqlite_scan('{self.config.infile}', 'PRECURSOR_PEPTIDE_MAPPING') AS PRECURSOR_PEPTIDE_MAPPING 
                 ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
@@ -975,6 +988,7 @@ class OSWWriter(BaseOSWWriter):
                 ON FEATURE.ID = FEATURE_MS2.FEATURE_ID
             INNER JOIN sqlite_scan('{self.config.infile}', 'RUN') AS RUN 
                 ON FEATURE.RUN_ID = RUN.ID
+            {score_table_joins}
             """
 
     def _build_transition_query(self, column_info: dict) -> str:
@@ -1346,6 +1360,35 @@ class OSWWriter(BaseOSWWriter):
                     ON PEPTIDE_GENE_MAPPING.GENE_ID = GENE.ID
             """
         return ""
+
+    def _build_score_column_selection_and_joins(
+        self, column_info: dict
+    ) -> Tuple[str, str]:
+        """Build score column selection and joins based on available score tables"""
+        score_columns_to_select = []
+        score_tables_to_join = []
+        if column_info["score_ms1_exists"]:
+            logger.debug("SCORE_MS1 table exists, adding score columns to selection")
+            score_columns_to_select.append(
+                "SCORE_MS1.SCORE AS SCORE_MS1_SCORE, SCORE_MS1.RANK AS SCORE_MS1_RANK, SCORE_MS1.PVALUE AS SCORE_MS1_P_VALUE, SCORE_MS1.QVALUE AS SCORE_MS1_Q_VALUE, SCORE_MS1.PEP AS SCORE_MS1_PEP"
+            )
+            score_tables_to_join.append(
+                f"INNER JOIN sqlite_scan('{self.config.infile}', 'SCORE_MS1') AS SCORE_MS1 ON FEATURE.ID = SCORE_MS1.FEATURE_ID"
+            )
+
+        if column_info["score_ms2_exists"]:
+            logger.debug("SCORE_MS2 table exists, adding score columns to selection")
+            score_columns_to_select.append(
+                "SCORE_MS2.SCORE AS SCORE_MS2_SCORE, SCORE_MS2.RANK AS SCORE_MS2_PEAK_GROUP_RANK, SCORE_MS2.PVALUE AS SCORE_MS2_P_VALUE, SCORE_MS2.QVALUE AS SCORE_MS2_Q_VALUE, SCORE_MS2.PEP AS SCORE_MS2_PEP"
+            )
+            score_tables_to_join.append(
+                f"INNER JOIN sqlite_scan('{self.config.infile}', 'SCORE_MS2') AS SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID"
+            )
+
+        return (
+            ", ".join(score_columns_to_select),
+            " ".join(score_tables_to_join),
+        )
 
     def _execute_copy_query(self, conn, query: str, path: str) -> None:
         """Execute COPY query with configured compression settings"""
