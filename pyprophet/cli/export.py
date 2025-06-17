@@ -37,6 +37,7 @@ def create_export_group():
         pass
 
     export.add_command(export_tsv, name="tsv")
+    export.add_command(export_library, name='library')
     export.add_command(export_matrix, name="matrix")
     export.add_command(export_parquet, name="parquet")
     export.add_command(export_compound, name="compound")
@@ -347,6 +348,78 @@ def export_matrix(
     df = reader.read()
     writer.export_quant_matrix(df)
 
+# Export to Library to be used in OpenSWATH
+@click.command(name="library", cls=AdvancedHelpCommand)
+@click.option(
+    "--in",
+    "infile",
+    required=True,
+    type=click.Path(exists=True),
+    help="PyProphet OSW input file.",
+)
+@click.option(
+    "--out",
+    "outfile",
+    required=False,
+    type=click.Path(exists=False),
+    help="Output tsv library.",
+)
+@click.option(
+    "--max_peakgroup_qvalue",
+    default=0.01,
+    show_default=True,
+    type=float,
+    help="Filter results to maximum run-specific peak group-level q-value, should not use values > 0.01.",
+)
+@click.option(
+    "--max_global_peptide_qvalue",
+    default=0.01,
+    show_default=True,
+    type=float,
+    help="Filter results to maximum global peptide-level q-value, should not use values > 0.01.",
+)
+@click.option(
+    "--max_global_protein_qvalue",
+    default=0.01,
+    show_default=True,
+    type=float,
+    help="Filter results to maximum global protein-level q-value, should not use values > 0.01.",
+)
+@measure_memory_usage_and_time
+def export_library(
+    infile,
+    outfile,
+    max_peakgroup_qvalue,
+    max_global_peptide_qvalue,
+    max_global_protein_qvalue,
+):
+    """
+    Export OSW to tsv library format
+    """
+    config = ExportIOConfig(
+        infile=infile,
+        outfile=outfile,
+        subsample_ratio=1.0,  # Not used in export
+        level="export",
+        context="export",
+        export_format=format,
+        out_type="tsv",
+        max_rs_peakgroup_qvalue=max_peakgroup_qvalue,
+        max_global_peptide_qvalue=max_global_peptide_qvalue,
+        max_global_protein_qvalue=max_global_protein_qvalue,
+    )
+
+    reader = ReaderDispatcher.get_reader(config)
+    writer = WriterDispatcher.get_writer(config)
+
+    df = reader.read_for_library()
+    logger.debug(df.columns)
+    logger.info(f"Library Contains {len(df['Precursor'].drop_duplicates())} Precursors")
+    logger.info(f"Precursor Fragment Distribution")
+    num_frags_per_prec = df[['Precursor', 'Annotation']].groupby("Precursor").count().reset_index(names='Precursor').groupby('Annotation').count()
+    for frag, count in num_frags_per_prec.iterrows():
+        logger.info(f"There are {count['Precursor']} precursors with {frag} fragment(s)")
+    writer.export_library(df)
 
 # Export to Parquet
 @click.command(name="parquet", cls=AdvancedHelpCommand)

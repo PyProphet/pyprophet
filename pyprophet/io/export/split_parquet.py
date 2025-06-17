@@ -85,6 +85,23 @@ class SplitParquetReader(BaseSplitParquetReader):
             return self._augment_data(data, con)
         finally:
             con.close()
+    
+    def read_for_library(self) -> pd.DataFrame:
+        """
+        Read data specifically for library generation, which may not include all features.
+        """
+        con = duckdb.connect()
+        try:
+            self._init_duckdb_views(con)
+
+            if self._is_unscored_file():
+                raise logger.exception("Files must be scored for library generation.")
+            
+            logger.info("Reading standard OpenSWATH data for library from split Parquet files.")
+            return self._read_library_data(con)
+        finally:
+            con.close()
+
 
     def _is_unscored_file(self) -> bool:
         """
@@ -257,6 +274,39 @@ class SplitParquetReader(BaseSplitParquetReader):
 
         return pd.merge(data, ipf_data, on="id", how="left")
 
+    def _read_library_data(self, con) -> pd.DataFrame:
+        """
+        Read data specifically for precursors for library generation. This does not include all output in standard output
+        """
+        logger.debug("Reading library data!!!!!")
+        query = f"""
+            SELECT
+                p.EXP_RT AS RT,
+                p.UNMODIFIED_SEQUENCE AS PeptideSequence,
+                p.MODIFIED_SEQUENCE AS ModifiedPeptideSequence,
+                p.PRECURSOR_CHARGE AS Charge,
+                (p.MODIFIED_SEQUENCE || '_' || CAST(p.PRECURSOR_ID AS VARCHAR)) AS Precursor,
+                p.PRECURSOR_MZ AS mz,
+                p.FEATURE_MS2_AREA_INTENSITY AS Intensity,
+                t.FEATURE_ID AS id,
+                t.FEATURE_TRANSITION_AREA_INTENSITY AS FragmentIonIntensity,
+                t.ANNOTATION as Annotation,
+                t.PRODUCT_MZ as ProductMz,
+                t.TRANSITION_CHARGE as FragmentCharge,
+                t.TRANSITION_TYPE as FragmentType,
+                t.TRANSITION_ORDINAL as FragmentSeriesNumber
+            FROM precursors p
+            INNER JOIN transition t ON p.FEATURE_ID = t.FEATURE_ID
+            WHERE p.PRECURSOR_DECOY is false and t.TRANSITION_DECOY is false and
+                  p.SCORE_MS2_Q_VALUE < {self.config.max_rs_peakgroup_qvalue} and
+                  p.SCORE_PROTEIN_GLOBAL_Q_VALUE < {self.config.max_global_protein_qvalue} and
+                  p.SCORE_PEPTIDE_GLOBAL_Q_VALUE < {self.config.max_global_peptide_qvalue} and
+                  p.SCORE_MS2_PEAK_GROUP_RANK = 1
+
+            ORDER BY p.FEATURE_ID
+        """
+        return con.execute(query).fetchdf()
+    
     def _read_standard_data(self, con) -> pd.DataFrame:
         """
         Read standard OpenSWATH data without IPF from split files.

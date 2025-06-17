@@ -617,6 +617,17 @@ class BaseWriter(ABC):
         else:
             raise ValueError(f"Unsupported export format: {cfg.export_format}")
 
+    def export_library(self, data: pd.DataFrame) -> pd.DataFrame:
+        """
+        Export library data at specified level.
+
+        Args:
+            data: Input DataFrame with library data
+
+        """
+        cfg = self.config
+        data.to_csv(cfg.outfile, sep='\t', index=False)
+
     def export_quant_matrix(self, data: pd.DataFrame) -> pd.DataFrame:
         """
         Export quantification matrix at specified level with optional normalization.
