@@ -662,6 +662,12 @@ class ExportIOConfig(BaseIOConfig):
 
         # SqMass: Export to parquet
         pqp_file (Optional[str]): Path to PQP file for precursor/transition mapping.
+
+        # Export to library
+        rt_calibration (bool): If True, will use emperical RT values as oppose to the original library RT values
+        im_calibration (bool): If True, will use emperical IM values as oppose to the original library IM values
+        intensity_calibration (bool): If True, will use emperical intensity values as oppose to the original library intensity values
+        min_fragments (int): Minimum number of fragments required to include the peak group in the library, only relevant if intensity_calibration is True
     """
 
     export_format: Literal[
@@ -691,3 +697,9 @@ class ExportIOConfig(BaseIOConfig):
 
     # SqMass: Export to parquet
     pqp_file: Optional[str] = None  # Path to PQP file for precursor/transition mapping
+
+    # Export to library
+    rt_calibration: bool = True
+    im_calibration: bool = True
+    intensity_calibration: bool = True
+    min_fragments: int = 6

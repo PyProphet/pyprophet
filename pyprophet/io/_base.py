@@ -617,15 +617,45 @@ class BaseWriter(ABC):
         else:
             raise ValueError(f"Unsupported export format: {cfg.export_format}")
 
-    def export_library(self, data: pd.DataFrame) -> pd.DataFrame:
+    def clean_and_export_library(self, data: pd.DataFrame) -> pd.DataFrame:
         """
-        Export library data at specified level.
+        This function cleans the original dataframe and exports the library
 
         Args:
             data: Input DataFrame with library data
 
         """
         cfg = self.config
+
+        # For precursors found in more than one run, select the run with the smallest q value
+        data = data.sort_values(by='Q_Value').groupby("TransitionId").head(1)
+        assert (len(data['TransitionId'].drop_duplicates()) == len(data))
+
+        # Remove Annotation Column if all NAN
+        if data['Annotation'].isnull().all() or data['Annotation'].eq("NA").all():
+            logger.debug("Annotation column is empty, dropping it.")
+            data.drop(columns=['Annotation'], inplace=True)
+
+        import sklearn.preprocessing as preprocessing
+        if cfg.rt_calibration:
+            data['NormalizedRetentionTime'] = preprocessing.MinMaxScaler().fit_transform(data[['NormalizedRetentionTime']]) * 100
+        if cfg.intensity_calibration:
+            data['LibraryIntensity'] = (
+            data['LibraryIntensity'] /
+            data.groupby('Precursor')['LibraryIntensity'].transform('max') *
+            10000)
+
+        
+        ## Print Library statistics
+        logger.info(f"Library Contains {len(data['Precursor'].drop_duplicates())} Precursors")
+        logger.info(f"Precursor Fragment Distribution")
+        num_frags_per_prec = data[['Precursor', 'TransitionId']].groupby("Precursor").count().reset_index(names='Precursor').groupby('TransitionId').count()
+        for frag, count in num_frags_per_prec.iterrows():
+            logger.info(f"There are {count['Precursor']} precursors with {frag} fragment(s)")
+        
+        data.drop(columns=['TransitionId', 'Q_Value'], inplace=True)
+
+        logger.info("Exporting library to file.")
         data.to_csv(cfg.outfile, sep='\t', index=False)
 
     def export_quant_matrix(self, data: pd.DataFrame) -> pd.DataFrame:

@@ -385,6 +385,31 @@ def export_matrix(
     type=float,
     help="Filter results to maximum global protein-level q-value, should not use values > 0.01.",
 )
+@click.option(
+    "--rt_calibration/--no-rt_calibration",
+    default=True,
+    show_default=True,
+    help="Use empirical RT values as oppose to the original library RT values."
+)
+@click.option(
+    "--im_calibration/--no-im_calibration",
+    default=True,
+    show_default=True,
+    help="Use empirical IM values as oppose to the original library IM values."
+)
+@click.option(
+    "--intensity_calibration/--no-intensity_calibration",
+    default=True,
+    show_default=True,
+    help="Use empirical intensity values as oppose to the original library intensity values."
+)
+@click.option(
+    "--min_fragments",
+    default=3,
+    show_default=True,
+    type=int,
+    help="Minimum number of fragments required to include the peak group in the library, only relevant if intensityCalibration is True."
+)
 @measure_memory_usage_and_time
 def export_library(
     infile,
@@ -392,6 +417,10 @@ def export_library(
     max_peakgroup_qvalue,
     max_global_peptide_qvalue,
     max_global_protein_qvalue,
+    rt_calibration,
+    im_calibration,
+    intensity_calibration,
+    min_fragments,
 ):
     """
     Export OSW to tsv library format
@@ -407,19 +436,17 @@ def export_library(
         max_rs_peakgroup_qvalue=max_peakgroup_qvalue,
         max_global_peptide_qvalue=max_global_peptide_qvalue,
         max_global_protein_qvalue=max_global_protein_qvalue,
+        rt_calibration=rt_calibration,
+        im_calibration=im_calibration,
+        intensity_calibration=intensity_calibration,
+        min_fragments=min_fragments,
     )
 
     reader = ReaderDispatcher.get_reader(config)
     writer = WriterDispatcher.get_writer(config)
 
     df = reader.read_for_library()
-    logger.debug(df.columns)
-    logger.info(f"Library Contains {len(df['Precursor'].drop_duplicates())} Precursors")
-    logger.info(f"Precursor Fragment Distribution")
-    num_frags_per_prec = df[['Precursor', 'Annotation']].groupby("Precursor").count().reset_index(names='Precursor').groupby('Annotation').count()
-    for frag, count in num_frags_per_prec.iterrows():
-        logger.info(f"There are {count['Precursor']} precursors with {frag} fragment(s)")
-    writer.export_library(df)
+    writer.clean_and_export_library(df)
 
 # Export to Parquet
 @click.command(name="parquet", cls=AdvancedHelpCommand)

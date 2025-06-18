@@ -278,23 +278,38 @@ class SplitParquetReader(BaseSplitParquetReader):
         """
         Read data specifically for precursors for library generation. This does not include all output in standard output
         """
-        logger.debug("Reading library data!!!!!")
+        if self.config.rt_calibration:
+            rt_query = "p.Norm_RT as NormalizedRetentionTime"
+        else:
+            rt_query = "p.EXP_RT as NormalizedRetentionTime"
+
+        if self.config.im_calibration:
+            im_query = "p.PRECURSOR_LIBRARY_DRIFT_TIME as PrecursorIonMobility"
+        else:
+            im_query = "p.EXP_IM as PrecursorIonMobility"
+
+        if self.config.intensity_calibration:
+            intensity_query = 't.FEATURE_TRANSITION_AREA_INTENSITY AS LibraryIntensity'
+        else:
+            intensity_query = 't.TRANSITION_LIBRARY_INTENSITY AS LibraryIntensity'
+
         query = f"""
             SELECT
-                p.EXP_RT AS RT,
+                {rt_query},
+                {im_query},
+                {intensity_query},
+                p.SCORE_MS2_Q_VALUE as Q_Value,
                 p.UNMODIFIED_SEQUENCE AS PeptideSequence,
                 p.MODIFIED_SEQUENCE AS ModifiedPeptideSequence,
                 p.PRECURSOR_CHARGE AS Charge,
                 (p.MODIFIED_SEQUENCE || '_' || CAST(p.PRECURSOR_ID AS VARCHAR)) AS Precursor,
-                p.PRECURSOR_MZ AS mz,
-                p.FEATURE_MS2_AREA_INTENSITY AS Intensity,
-                t.FEATURE_ID AS id,
-                t.FEATURE_TRANSITION_AREA_INTENSITY AS FragmentIonIntensity,
+                p.PRECURSOR_MZ AS PrecursorMz,
                 t.ANNOTATION as Annotation,
                 t.PRODUCT_MZ as ProductMz,
                 t.TRANSITION_CHARGE as FragmentCharge,
                 t.TRANSITION_TYPE as FragmentType,
-                t.TRANSITION_ORDINAL as FragmentSeriesNumber
+                t.TRANSITION_ORDINAL as FragmentSeriesNumber,
+                t.TRANSITION_ID as TransitionId
             FROM precursors p
             INNER JOIN transition t ON p.FEATURE_ID = t.FEATURE_ID
             WHERE p.PRECURSOR_DECOY is false and t.TRANSITION_DECOY is false and
