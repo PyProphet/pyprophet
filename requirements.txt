@@ -209,7 +209,7 @@ typing-extensions==4.14.0
     #   pypdf
 tzdata==2025.2
     # via pandas
-urllib3==2.4.0
+urllib3==2.5.0
     # via requests
 xgboost==2.1.4
     # via pyprophet (setup.py)
