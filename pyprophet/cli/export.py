@@ -360,7 +360,7 @@ def export_matrix(
 @click.option(
     "--out",
     "outfile",
-    required=False,
+    required=True, # need to name the library or else get error in os.path.splittext line 75, in __post_init__in _base.
     type=click.Path(exists=False),
     help="Output tsv library.",
 )
