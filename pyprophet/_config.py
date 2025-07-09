@@ -702,4 +702,4 @@ class ExportIOConfig(BaseIOConfig):
     rt_calibration: bool = True
     im_calibration: bool = True
     intensity_calibration: bool = True
-    min_fragments: int = 6
+    min_fragments: int = 4
