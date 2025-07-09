@@ -405,7 +405,7 @@ def export_matrix(
 )
 @click.option(
     "--min_fragments",
-    default=3,
+    default=4,
     show_default=True,
     type=int,
     help="Minimum number of fragments required to include the peak group in the library, only relevant if intensityCalibration is True."
