@@ -644,14 +644,22 @@ class BaseWriter(ABC):
             data['LibraryIntensity'] /
             data.groupby('Precursor')['LibraryIntensity'].transform('max') *
             10000)
-
+            data = data[data['LibraryIntensity'] > 0] # Remove rows with zero intensity
         
         ## Print Library statistics
         logger.info(f"Library Contains {len(data['Precursor'].drop_duplicates())} Precursors")
-        logger.info(f"Precursor Fragment Distribution")
+
+        logger.info(f"Precursor Fragment Distribution (Before Filtering)")
         num_frags_per_prec = data[['Precursor', 'TransitionId']].groupby("Precursor").count().reset_index(names='Precursor').groupby('TransitionId').count()
         for frag, count in num_frags_per_prec.iterrows():
             logger.info(f"There are {count['Precursor']} precursors with {frag} fragment(s)")
+        
+        logger.info(f"Filter library to precursors containing {cfg.min_fragments} or more fragments")
+        ids_to_keep = data[['Precursor', 'Annotation']].groupby('Precursor').count()
+        ids_to_keep = ids_to_keep[ ids_to_keep['Annotation'] >= cfg.min_fragments ].index
+        data = data[ data['Precursor'].isin(ids_to_keep) ]
+
+        logger.info(f"After filtering, library contains {len(data['Precursor'].drop_duplicates())} Precursors")
         
         data.drop(columns=['TransitionId', 'Q_Value'], inplace=True)
 
