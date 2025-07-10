@@ -88,7 +88,7 @@ class SplitParquetReader(BaseSplitParquetReader):
     
     def read_for_library(self) -> pd.DataFrame:
         """
-        Read data specifically for library generation, which may not include all features.
+        Read data specifically for library generation
         """
         con = duckdb.connect()
         try:
@@ -279,14 +279,14 @@ class SplitParquetReader(BaseSplitParquetReader):
         Read data specifically for precursors for library generation. This does not include all output in standard output
         """
         if self.config.rt_calibration:
-            rt_query = "p.Norm_RT as NormalizedRetentionTime"
-        else:
             rt_query = "p.EXP_RT as NormalizedRetentionTime"
+        else:
+            rt_query = "p.PRECURSOR_LIBRARY_RT as NormalizedRetentionTime"
 
         if self.config.im_calibration:
-            im_query = "p.PRECURSOR_LIBRARY_DRIFT_TIME as PrecursorIonMobility"
-        else:
             im_query = "p.EXP_IM as PrecursorIonMobility"
+        else:
+            im_query = "p.PRECURSOR_LIBRARY_DRIFT_TIME as PrecursorIonMobility"
 
         if self.config.intensity_calibration:
             intensity_query = 't.FEATURE_TRANSITION_AREA_INTENSITY AS LibraryIntensity'
@@ -301,8 +301,8 @@ class SplitParquetReader(BaseSplitParquetReader):
                 p.SCORE_MS2_Q_VALUE as Q_Value,
                 p.UNMODIFIED_SEQUENCE AS PeptideSequence,
                 p.MODIFIED_SEQUENCE AS ModifiedPeptideSequence,
-                p.PRECURSOR_CHARGE AS Charge,
-                (p.MODIFIED_SEQUENCE || '_' || CAST(p.PRECURSOR_ID AS VARCHAR)) AS Precursor,
+                p.PRECURSOR_CHARGE AS PrecursorCharge,
+                (p.MODIFIED_SEQUENCE || '_' || CAST(p.PRECURSOR_CHARGE AS VARCHAR)) AS Precursor,
                 p.PRECURSOR_MZ AS PrecursorMz,
                 t.ANNOTATION as Annotation,
                 t.PRODUCT_MZ as ProductMz,
