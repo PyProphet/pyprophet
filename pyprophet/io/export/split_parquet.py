@@ -279,31 +279,32 @@ class SplitParquetReader(BaseSplitParquetReader):
         Read data specifically for precursors for library generation. This does not include all output in standard output
         """
         if self.config.rt_calibration:
-            rt_query = "p.EXP_RT as NormalizedRetentionTime"
+            rt_col = "p.EXP_RT"
         else:
-            rt_query = "p.PRECURSOR_LIBRARY_RT as NormalizedRetentionTime"
+            rt_col = "p.PRECURSOR_LIBRARY_RT"
 
         if self.config.im_calibration:
-            im_query = "p.EXP_IM as PrecursorIonMobility"
+            im_col = "p.EXP_IM"
         else:
-            im_query = "p.PRECURSOR_LIBRARY_DRIFT_TIME as PrecursorIonMobility"
+            im_col = "p.PRECURSOR_LIBRARY_DRIFT_TIME"
 
         if self.config.intensity_calibration:
-            intensity_query = 't.FEATURE_TRANSITION_AREA_INTENSITY AS LibraryIntensity'
+            intensity_col = 't.FEATURE_TRANSITION_AREA_INTENSITY'
         else:
-            intensity_query = 't.TRANSITION_LIBRARY_INTENSITY AS LibraryIntensity'
+            intensity_col = 't.TRANSITION_LIBRARY_INTENSITY'
 
         query = f"""
             SELECT
-                {rt_query},
-                {im_query},
-                {intensity_query},
+                {rt_col} as NormalizedRetentionTime,
+                {im_col} as PrecursorIonMobility,
+                {intensity_col} as LibraryIntensity,
                 p.SCORE_MS2_Q_VALUE as Q_Value,
                 p.UNMODIFIED_SEQUENCE AS PeptideSequence,
                 p.MODIFIED_SEQUENCE AS ModifiedPeptideSequence,
                 p.PRECURSOR_CHARGE AS PrecursorCharge,
                 (p.MODIFIED_SEQUENCE || '_' || CAST(p.PRECURSOR_CHARGE AS VARCHAR)) AS Precursor,
                 p.PRECURSOR_MZ AS PrecursorMz,
+                STRING_AGG(p.PROTEIN_ACCESSION, ';') AS ProteinName,
                 t.ANNOTATION as Annotation,
                 t.PRODUCT_MZ as ProductMz,
                 t.TRANSITION_CHARGE as FragmentCharge,
@@ -318,7 +319,10 @@ class SplitParquetReader(BaseSplitParquetReader):
                   p.SCORE_PEPTIDE_GLOBAL_Q_VALUE < {self.config.max_global_peptide_qvalue} and
                   p.SCORE_MS2_PEAK_GROUP_RANK = 1
 
-            ORDER BY p.FEATURE_ID
+            GROUP BY {rt_col}, {im_col}, {intensity_col}, p.SCORE_MS2_Q_VALUE,
+                     p.UNMODIFIED_SEQUENCE, p.MODIFIED_SEQUENCE, p.PRECURSOR_CHARGE,
+                     p.PRECURSOR_MZ, p.FEATURE_ID, t.ANNOTATION, t.PRODUCT_MZ,
+                     t.TRANSITION_CHARGE, t.TRANSITION_TYPE, t.TRANSITION_ORDINAL, t.TRANSITION_ID
         """
         return con.execute(query).fetchdf()
     
