@@ -633,8 +633,9 @@ class BaseWriter(ABC):
 
         # Remove Annotation Column if all NAN
         if data['Annotation'].isnull().all() or data['Annotation'].eq("NA").all():
-            logger.debug("Annotation column is empty, dropping it.")
+            logger.debug("Annotation column is empty, so computing it manually.")
             data.drop(columns=['Annotation'], inplace=True)
+            data['Annotation'] = data['FragmentType'] + data['FragmentSeriesNumber'].astype(str) + '^' + data['FragmentCharge'].astype(str)
 
         import sklearn.preprocessing as preprocessing
         if cfg.rt_calibration:
