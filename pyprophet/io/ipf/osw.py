@@ -307,17 +307,20 @@ class OSWReader(BaseOSWReader):
                 f"Perform feature alignment using ARYCAL, and apply scoring to alignment-level data before running IPF.\nTable Info:\n{self._fetch_tables_duckdb(con)}"
             )
 
+        subquery = """
+    SELECT 
+        FEATURE_ID,
+        MIN(PEP) AS pep
+    FROM osw.SCORE_ALIGNMENT
+    GROUP BY FEATURE_ID
+        """
         query = f"""
             SELECT
                 DENSE_RANK() OVER (ORDER BY fma.PRECURSOR_ID, fma.ALIGNMENT_ID) AS ALIGNMENT_GROUP_ID,
                 fma.ALIGNED_FEATURE_ID      AS FEATURE_ID
             FROM osw.FEATURE_MS2_ALIGNMENT AS fma
             JOIN (
-                SELECT 
-                    FEATURE_ID,
-                    MIN(PEP) AS pep
-                FROM osw.SCORE_ALIGNMENT
-                GROUP BY FEATURE_ID
+                {subquery}
             ) AS sa
             ON sa.FEATURE_ID = fma.ALIGNED_FEATURE_ID
             WHERE fma.LABEL = 1
