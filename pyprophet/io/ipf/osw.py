@@ -307,25 +307,49 @@ class OSWReader(BaseOSWReader):
                 f"Perform feature alignment using ARYCAL, and apply scoring to alignment-level data before running IPF.\nTable Info:\n{self._fetch_tables_duckdb(con)}"
             )
 
-        subquery = """
-    SELECT 
-        FEATURE_ID,
-        MIN(PEP) AS pep
-    FROM osw.SCORE_ALIGNMENT
-    GROUP BY FEATURE_ID
-        """
         query = f"""
-            SELECT
-                DENSE_RANK() OVER (ORDER BY fma.PRECURSOR_ID, fma.ALIGNMENT_ID) AS ALIGNMENT_GROUP_ID,
-                fma.ALIGNED_FEATURE_ID      AS FEATURE_ID
-            FROM osw.FEATURE_MS2_ALIGNMENT AS fma
-            JOIN (
-                {subquery}
+            SELECT 
+                DENSE_RANK() OVER (ORDER BY merged.PRECURSOR_ID, merged.ALIGNMENT_ID) AS ALIGNMENT_GROUP_ID,
+                merged.ALIGNMENT_ID,
+                merged.FEATURE_ID,
+                merged.PRECURSOR_ID,
+                merged.FEATURE_TYPE
+            FROM (
+                SELECT DISTINCT
+                    fma.ALIGNMENT_ID,
+                    fma.REFERENCE_FEATURE_ID AS FEATURE_ID,
+                    fma.PRECURSOR_ID,
+                    'REFERENCE' AS FEATURE_TYPE
+                FROM osw.FEATURE_MS2_ALIGNMENT AS fma
+                WHERE fma.LABEL = 1
+                AND fma.REFERENCE_FEATURE_ID != fma.ALIGNED_FEATURE_ID
+
+                UNION
+
+                SELECT DISTINCT
+                    fma.ALIGNMENT_ID,
+                    fma.ALIGNED_FEATURE_ID AS FEATURE_ID,
+                    fma.PRECURSOR_ID,
+                    'QUERY' AS FEATURE_TYPE
+                FROM osw.FEATURE_MS2_ALIGNMENT AS fma
+                WHERE fma.LABEL = 1
+                AND fma.REFERENCE_FEATURE_ID != fma.ALIGNED_FEATURE_ID
+            ) AS merged
+            LEFT JOIN (
+                SELECT 
+                    FEATURE_ID,
+                    MIN(PEP) AS pep
+                FROM osw.SCORE_ALIGNMENT
+                WHERE PEP <= {pep_threshold}
+                GROUP BY FEATURE_ID
             ) AS sa
-            ON sa.FEATURE_ID = fma.ALIGNED_FEATURE_ID
-            WHERE fma.LABEL = 1
-            AND sa.pep < {pep_threshold}
-            ORDER BY ALIGNMENT_GROUP_ID
+            ON merged.FEATURE_ID = sa.FEATURE_ID
+            ORDER BY 
+                ALIGNMENT_GROUP_ID,
+                CASE merged.FEATURE_TYPE 
+                    WHEN 'REFERENCE' THEN 0 
+                    WHEN 'QUERY' THEN 1 
+                END;
         """
 
         df = con.execute(query).fetchdf()
