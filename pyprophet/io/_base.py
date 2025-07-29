@@ -384,7 +384,9 @@ class BaseWriter(ABC):
             #     logger.info(
             #         "Exploding protein_id column to handle multiple proteins per feature."
             #     )
-            df = df.explode("protein_id")
+            pl_df = pl.from_pandas(df)
+            pl_df = pl_df.explode("protein_id")
+            df = pl_df.to_pandas()
 
         if level == "transition":
             if self.file_type in ("parquet", "parquet_split", "parquet_split_multi"):

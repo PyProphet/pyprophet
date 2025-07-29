@@ -9,7 +9,7 @@ try:
 except ImportError:
     plt = None
 
-from pypdf import PdfMerger, PdfReader
+from pypdf import PdfWriter, PdfReader
 import sys
 import os
 
@@ -1508,7 +1508,7 @@ def main_score_selection_report(
         )
 
     # Create output to merge pdges
-    output = PdfMerger()
+    output = PdfWriter()
     # Generate colors
     t_col, d_col = color_blind_friendly(color_palette)
 
