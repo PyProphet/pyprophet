@@ -55,8 +55,13 @@ except NameError:
     ),
     help="Set global logging level.",
 )
+@click.option(
+    "--log-colorize/--no-log-colorize",
+    default=True,
+    help="Turn on/off colorized logging output.",
+)
 @click.pass_context
-def cli(ctx, log_level):
+def cli(ctx, log_level, log_colorize):
     """
     PyProphet: Semi-supervised learning and scoring of OpenSWATH results.
 
