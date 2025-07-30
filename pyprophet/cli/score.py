@@ -12,7 +12,7 @@ from .util import (
     memray_profile,
 )
 from .._config import RunnerIOConfig
-from ..scoring.runner import PyProphetLearner, PyProphetWeightApplier
+from ..scoring.runner import PyProphetLearner, PyProphetWeightApplier, PyProphetMultiLearner
 
 
 # PyProphet semi-supervised learning and scoring
@@ -43,7 +43,7 @@ from ..scoring.runner import PyProphetLearner, PyProphetWeightApplier
     "--classifier",
     default="LDA",
     show_default=True,
-    type=click.Choice(["LDA", "SVM", "XGBoost"]),
+    type=click.Choice(["LDA", "SVM", "XGBoost", "LDA_XGBoost"]),
     help='Either a "LDA", "SVM" or "XGBoost" classifier is used for semi-supervised learning.',
 )
 @click.option(
@@ -400,10 +400,18 @@ def score(
             else:
                 PyProphetWeightApplier(weights_path, config).run()
         else:
-            logger.info(
+            if config.runner.classifier == "LDA_XGBoost":
+                logger.info(
+                    f"Conducting {level} semi-supervised learning with LDA followed by XGBoost.",
+                )
+                PyProphetMultiLearner(config).run()
+
+
+            else:
+                logger.info(
                 f"Conducting {level} semi-supervised learning.",
-            )
-            PyProphetLearner(config).run()
+                )
+                PyProphetLearner(config).run()
     else:
         logger.info(
             f"Applying {level} weights from {apply_weights} to the full data set.",

@@ -152,7 +152,7 @@ class BaseReader(ABC):
                 f"Main score ({main_score}) not found in input columns: {df.columns}"
             )
 
-        if self.classifier == "XGBoost" and self.level != "alignment":
+        if self.classifier in ["XGBoost", "LDA_XGBoost"] and self.level != "alignment":
             logger.info(
                 "Enable number of transitions & precursor / product charge scores for XGBoost-based classifier"
             )
