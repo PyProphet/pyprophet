@@ -668,6 +668,7 @@ class ExportIOConfig(BaseIOConfig):
         im_calibration (bool): If True, will use emperical IM values as oppose to the original library IM values
         intensity_calibration (bool): If True, will use emperical intensity values as oppose to the original library intensity values
         min_fragments (int): Minimum number of fragments required to include the peak group in the library, only relevant if intensity_calibration is True
+        keep_decoys (bool): Whether to keep decoy entries in the library, will only keep decoys that pass the thresholds specified
     """
 
     export_format: Literal[
@@ -703,3 +704,4 @@ class ExportIOConfig(BaseIOConfig):
     im_calibration: bool = True
     intensity_calibration: bool = True
     min_fragments: int = 4
+    keep_decoys: bool = False  # Whether to keep decoy entries in the library

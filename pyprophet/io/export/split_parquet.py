@@ -292,6 +292,11 @@ class SplitParquetReader(BaseSplitParquetReader):
             intensity_col = 't.FEATURE_TRANSITION_AREA_INTENSITY'
         else:
             intensity_col = 't.TRANSITION_LIBRARY_INTENSITY'
+        
+        if self.config.keep_decoys:
+            decoy_query = ""
+        else:
+            decoy_query ="p.PRECURSOR_DECOY is false and t.TRANSITION_DECOY is false and" 
 
         query = f"""
             SELECT
@@ -310,10 +315,11 @@ class SplitParquetReader(BaseSplitParquetReader):
                 t.TRANSITION_CHARGE as FragmentCharge,
                 t.TRANSITION_TYPE as FragmentType,
                 t.TRANSITION_ORDINAL as FragmentSeriesNumber,
-                t.TRANSITION_ID as TransitionId
+                t.TRANSITION_ID as TransitionId,
+                p.PRECURSOR_DECOY as Decoy
             FROM precursors p
             INNER JOIN transition t ON p.FEATURE_ID = t.FEATURE_ID
-            WHERE p.PRECURSOR_DECOY is false and t.TRANSITION_DECOY is false and
+            WHERE {decoy_query} 
                   p.SCORE_MS2_Q_VALUE < {self.config.max_rs_peakgroup_qvalue} and
                   p.SCORE_PROTEIN_GLOBAL_Q_VALUE < {self.config.max_global_protein_qvalue} and
                   p.SCORE_PEPTIDE_GLOBAL_Q_VALUE < {self.config.max_global_peptide_qvalue} and
@@ -322,7 +328,7 @@ class SplitParquetReader(BaseSplitParquetReader):
             GROUP BY {rt_col}, {im_col}, {intensity_col}, p.SCORE_MS2_Q_VALUE,
                      p.UNMODIFIED_SEQUENCE, p.MODIFIED_SEQUENCE, p.PRECURSOR_CHARGE,
                      p.PRECURSOR_MZ, p.FEATURE_ID, t.ANNOTATION, t.PRODUCT_MZ,
-                     t.TRANSITION_CHARGE, t.TRANSITION_TYPE, t.TRANSITION_ORDINAL, t.TRANSITION_ID
+                     t.TRANSITION_CHARGE, t.TRANSITION_TYPE, t.TRANSITION_ORDINAL, t.TRANSITION_ID, p.PRECURSOR_DECOY
         """
         return con.execute(query).fetchdf()
     

@@ -410,6 +410,13 @@ def export_matrix(
     type=int,
     help="Minimum number of fragments required to include the peak group in the library, only relevant if intensityCalibration is True."
 )
+@click.option(
+    "--keep_decoys/--no-keep_decoys",
+    default=True,
+    show_default=True,
+    type=bool,
+    help="Whether to keep decoys in the exported library. Default is False, which means decoys are filtered out. Only keeps decoys passing thresholds specified above"
+)
 @measure_memory_usage_and_time
 def export_library(
     infile,
@@ -421,6 +428,7 @@ def export_library(
     im_calibration,
     intensity_calibration,
     min_fragments,
+    keep_decoys
 ):
     """
     Export OSW to tsv library format
@@ -440,6 +448,7 @@ def export_library(
         im_calibration=im_calibration,
         intensity_calibration=intensity_calibration,
         min_fragments=min_fragments,
+        keep_decoys=keep_decoys
     )
 
     reader = ReaderDispatcher.get_reader(config)

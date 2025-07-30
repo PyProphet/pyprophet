@@ -663,7 +663,9 @@ class BaseWriter(ABC):
         data = data[ data['Precursor'].isin(ids_to_keep) ]
 
         logger.info(f"After filtering, library contains {len(data['Precursor'].drop_duplicates())} Precursors")
-        
+        if cfg.keep_decoys:
+            logger.info("Of Which {} are decoys".format(len(data[data['Decoy'] == 1]['Precursor'].drop_duplicates())))
+
         data.drop(columns=['TransitionId', 'Q_Value'], inplace=True)
 
         logger.info("Exporting library to file.")
