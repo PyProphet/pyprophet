@@ -415,7 +415,7 @@ def export_matrix(
     default=True,
     show_default=True,
     type=bool,
-    help="Whether to keep decoys in the exported library. Default is False, which means decoys are filtered out. Only keeps decoys passing thresholds specified above"
+    help="(Experimental) Whether to keep decoys in the exported library. Default is False, which means decoys are filtered out. Only keeps decoys passing thresholds specified above"
 )
 @measure_memory_usage_and_time
 def export_library(
