@@ -281,7 +281,7 @@ class PyProphetMultiLearner(PyProphetRunner):
             (result_lda, scorer_lda, weights_lda) = PyProphet(config_lda).learn_and_apply(table_lda)
             self.table['main_var_lda_score'] = result_lda.scored_tables['d_score']
 
-            logger.info("LDA scores computed! Now running XGBoost on top of LDA scores.")
+            logger.info("LDA scores computed! Now running XGBoost using the LDA score as the main score")
 
             # rename the column that was the main score
             found = False
