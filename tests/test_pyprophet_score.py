@@ -190,6 +190,8 @@ class OSWTestStrategy(TestStrategy):
                 level_cmd += " --classifier=XGBoost"
             if kwargs.get("xgboost_tune"):
                 level_cmd += " --autotune"
+            if kwargs.get("lda_xgboost"):
+                level_cmd += " --classifier=LDA_XGBoost"
             if kwargs.get("score_filter"):
                 level_cmd = self.config.add_score_filter(level_cmd, level)
 
@@ -769,6 +771,19 @@ def test_osw_9(test_runner, test_config, regtest):
 
 def test_osw_10(test_runner, test_config, regtest):
     run_metabo_test(test_runner, test_config, regtest, ms1ms2=True, score_filter=True)
+
+# Tests LDA then XGBoost
+def test_osw_11(test_runner, test_config, regtest):
+    run_generic_test(
+        test_runner,
+        test_config,
+        OSWTestStrategy,
+        regtest,
+        pfdr=True,
+        pi0_lambda="0 0 0",
+        ms1ms2=True,
+        lda_xgboost=True,
+    )
 
 
 # Parquet Tests
