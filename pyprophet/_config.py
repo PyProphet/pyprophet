@@ -635,6 +635,7 @@ class ExportIOConfig(BaseIOConfig):
             - "legacy_split": Split TSV files for each run.
             - "parquet": Single Parquet file with merged results.
             - "parquet_split": Split Parquet files for each run.
+            - "library" : .tsv library file
         out_type (Literal["tsv", "csv"]): Output file type for exported results.
         transition_quantification (bool): Report aggregated transition-level quantification.
         max_transition_pep (float): Maximum PEP to retain scored transitions for quantification (requires transition-level scoring).
@@ -673,7 +674,7 @@ class ExportIOConfig(BaseIOConfig):
     """
 
     export_format: Literal[
-        "matrix", "legacy_merged", "legacy_split", "parquet", "parquet_split"
+        "matrix", "legacy_merged", "legacy_split", "parquet", "parquet_split", "library"
     ] = "legacy_merged"
     out_type: Literal["tsv", "csv"] = "tsv"
     transition_quantification: bool = False
@@ -701,7 +702,7 @@ class ExportIOConfig(BaseIOConfig):
     # SqMass: Export to parquet
     pqp_file: Optional[str] = None  # Path to PQP file for precursor/transition mapping
 
-    # Export to library
+    # Export to library options
     rt_calibration: bool = True
     im_calibration: bool = True
     intensity_calibration: bool = True

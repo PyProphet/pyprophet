@@ -68,6 +68,14 @@ class SplitParquetReader(BaseSplitParquetReader):
         try:
             self._init_duckdb_views(con)
 
+            if self.config.export_format == "library":
+                if self._is_unscored_file():
+                    raise logger.exception("Files must be scored for library generation.")
+                if not self._has_peptide_protein_global_scores():
+                    raise logger.exception("Files must have peptide and protein level global scores for library generation.")
+                logger.info("Reading standard OpenSWATH data for library from split Parquet files.")
+                return self._read_library_data(con)
+
             if self._is_unscored_file():
                 logger.info("Reading unscored data from split Parquet files.")
                 return self._read_unscored_data(con)
@@ -82,26 +90,18 @@ class SplitParquetReader(BaseSplitParquetReader):
                 logger.info("Reading standard OpenSWATH data from split Parquet files.")
                 data = self._read_standard_data(con)
 
-            return self._augment_data(data, con)
+                return self._augment_data(data, con)
         finally:
             con.close()
     
-    def read_for_library(self) -> pd.DataFrame:
+    def _has_peptide_protein_global_scores(self) -> bool:
         """
-        Read data specifically for library generation
+        Check if files contain peptide and protein global scores
         """
-        con = duckdb.connect()
-        try:
-            self._init_duckdb_views(con)
-
-            if self._is_unscored_file():
-                raise logger.exception("Files must be scored for library generation.")
-            
-            logger.info("Reading standard OpenSWATH data for library from split Parquet files.")
-            return self._read_library_data(con)
-        finally:
-            con.close()
-
+        print(self._columns)
+        has_peptide = any(col.startswith("SCORE_PEPTIDE_GLOBAL") for col in self._columns)
+        has_protein = any(col.startswith("SCORE_PROTEIN_GLOBAL") for col in self._columns)
+        return has_peptide and has_protein
 
     def _is_unscored_file(self) -> bool:
         """

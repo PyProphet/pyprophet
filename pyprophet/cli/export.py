@@ -445,7 +445,7 @@ def export_library(
         subsample_ratio=1.0,  # Not used in export
         level="export",
         context="export",
-        export_format=format,
+        export_format="library",
         out_type="tsv",
         max_rs_peakgroup_qvalue=max_peakgroup_qvalue,
         max_global_peptide_qvalue=max_global_peptide_qvalue,
@@ -461,7 +461,7 @@ def export_library(
     reader = ReaderDispatcher.get_reader(config)
     writer = WriterDispatcher.get_writer(config)
 
-    df = reader.read_for_library()
+    df = reader.read()
     writer.clean_and_export_library(df)
 
 # Export to Parquet
