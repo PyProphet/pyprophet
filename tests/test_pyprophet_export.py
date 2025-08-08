@@ -147,6 +147,40 @@ def test_osw_analysis(
         f"{temp_folder}/test_data.tsv",
     )
 
+@pytest.mark.parametrize(
+    "calib",
+    [ True, False]
+)
+def test_osw_analysis_libExport(test_data_split_parquet, temp_folder, regtest, calib
+):
+    # TODO extend to other inputs as well, for now just use split_parquet
+    input_strategy = {
+            "path": test_data_split_parquet,
+            "reader": "parquet_split",
+            "cmd_prefix": f"--in={test_data_split_parquet}",
+        }
+
+    cmd = f"pyprophet score {input_strategy['cmd_prefix']} --level=ms2 --test --pi0_lambda=0.001 0 0 --ss_iteration_fdr=0.02 && "
+
+    # peptide-level
+    cmd += f"pyprophet infer peptide --pi0_lambda=0.001 0 0 {input_strategy['cmd_prefix']} --context=global && "
+
+    # protein-level
+    cmd += f"pyprophet infer protein --pi0_lambda=0 0 0 {input_strategy['cmd_prefix']} --context=global && "
+
+    # export
+    if calib:
+        cmd += f"pyprophet export library {input_strategy['cmd_prefix']} --out={temp_folder}/test_lib.tsv --test --max_peakgroup_qvalue=1 --max_global_peptide_qvalue=1 --max_global_protein_qvalue=1"
+    else:
+        cmd += f"pyprophet export library {input_strategy['cmd_prefix']} --out={temp_folder}/test_lib.tsv --test --max_peakgroup_qvalue=1 --max_global_peptide_qvalue=1 --max_global_protein_qvalue=1 --no-rt_calibration --no-im_calibration --no-intensity_calibration"
+
+    run_pyprophet_command(cmd, temp_folder)
+    validate_export_results(
+        regtest,
+        input_strategy["path"],
+        input_strategy["reader"],
+        f"{temp_folder}/test_lib.tsv",
+    )
 
 def test_osw_unscored(input_strategy, temp_folder, regtest):
     """Test export of unscored OSW data"""

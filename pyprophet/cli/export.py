@@ -417,6 +417,11 @@ def export_matrix(
     type=bool,
     help="(Experimental) Whether to keep decoys in the exported library. Default is False, which means decoys are filtered out. Only keeps decoys passing thresholds specified above"
 )
+@click.option(
+    "--test/--no-test",
+    default=False,
+    show_default=True,
+    help="Enable test mode with deterministic behavior, test mode will sort libraries by precursor, fragmentType, fragmentSeriesNumber and fragmentCharge")
 @measure_memory_usage_and_time
 def export_library(
     infile,
@@ -428,7 +433,8 @@ def export_library(
     im_calibration,
     intensity_calibration,
     min_fragments,
-    keep_decoys
+    keep_decoys,
+    test
 ):
     """
     Export OSW to tsv library format
@@ -448,7 +454,8 @@ def export_library(
         im_calibration=im_calibration,
         intensity_calibration=intensity_calibration,
         min_fragments=min_fragments,
-        keep_decoys=keep_decoys
+        keep_decoys=keep_decoys,
+        test=test
     )
 
     reader = ReaderDispatcher.get_reader(config)

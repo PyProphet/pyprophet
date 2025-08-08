@@ -667,6 +667,8 @@ class BaseWriter(ABC):
             logger.info("Of Which {} are decoys".format(len(data[data['Decoy'] == 1]['Precursor'].drop_duplicates())))
 
         data.drop(columns=['TransitionId', 'Q_Value'], inplace=True)
+        if cfg.test:
+            data = data.sort_values(by=['Precursor', 'FragmentType', 'FragmentSeriesNumber', 'FragmentCharge', 'ProductMz'])
 
         logger.info("Exporting library to file.")
         data.to_csv(cfg.outfile, sep='\t', index=False)

@@ -653,6 +653,7 @@ class ExportIOConfig(BaseIOConfig):
         top_n (int): Number of top intense features to use for summarization
         consistent_top (bool): Whether to use same top features across all runs
         normalization (Literal["none", "median", "medianmedian", "quantile"]): Normalization method
+        test: bool = False: Whether to enable test mode with deterministic behavior, test mode will sort libraries by precursor, fragmentType, fragmentSeriesNumber and fragmentCharge
 
         # OSW: Export to parquet
         compression_method (Literal["none", "snappy", "gzip", "brotli", "zstd"]): Compression method for parquet files.
@@ -684,6 +685,7 @@ class ExportIOConfig(BaseIOConfig):
     max_global_peptide_qvalue: float = 0.01
     protein: bool = True
     max_global_protein_qvalue: float = 0.01
+    test: bool = False
 
     # Quantification matrix options
     top_n: int = 3
