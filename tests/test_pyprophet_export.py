@@ -91,7 +91,10 @@ def run_pyprophet_command(cmd, temp_folder):
         ).decode()
     except subprocess.CalledProcessError as error:
         print(f"Command failed: {cmd}\n{error.output.decode()}", file=sys.stderr)
-        raise
+        if "NotImplementedError" in error.output.decode(): # attempt to catch the specific error rather than the CalledProcessError
+            raise NotImplementedError
+        else:
+            raise 
 
 
 def validate_export_results(
@@ -151,15 +154,8 @@ def test_osw_analysis(
     "calib",
     [ True, False]
 )
-def test_osw_analysis_libExport(test_data_split_parquet, temp_folder, regtest, calib
+def test_osw_analysis_libExport(input_strategy, temp_folder, regtest, calib
 ):
-    # TODO extend to other inputs as well, for now just use split_parquet
-    input_strategy = {
-            "path": test_data_split_parquet,
-            "reader": "parquet_split",
-            "cmd_prefix": f"--in={test_data_split_parquet}",
-        }
-
     cmd = f"pyprophet score {input_strategy['cmd_prefix']} --level=ms2 --test --pi0_lambda=0.001 0 0 --ss_iteration_fdr=0.02 && "
 
     # peptide-level
@@ -174,13 +170,17 @@ def test_osw_analysis_libExport(test_data_split_parquet, temp_folder, regtest, c
     else:
         cmd += f"pyprophet export library {input_strategy['cmd_prefix']} --out={temp_folder}/test_lib.tsv --test --max_peakgroup_qvalue=1 --max_global_peptide_qvalue=1 --max_global_protein_qvalue=1 --no-rt_calibration --no-im_calibration --no-intensity_calibration"
 
-    run_pyprophet_command(cmd, temp_folder)
-    validate_export_results(
-        regtest,
-        input_strategy["path"],
-        input_strategy["reader"],
-        f"{temp_folder}/test_lib.tsv",
-    )
+    if not input_strategy["reader"] == "parquet_split":
+        with pytest.raises(NotImplementedError):
+            run_pyprophet_command(cmd, temp_folder)
+    else:
+        run_pyprophet_command(cmd, temp_folder)
+        validate_export_results(
+            regtest,
+            input_strategy["path"],
+            input_strategy["reader"],
+            f"{temp_folder}/test_lib.tsv",
+        )
 
 def test_osw_unscored(input_strategy, temp_folder, regtest):
     """Test export of unscored OSW data"""
