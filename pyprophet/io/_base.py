@@ -640,7 +640,7 @@ class BaseWriter(ABC):
             data['Annotation'] = data['FragmentType'] + data['FragmentSeriesNumber'].astype(str) + '^' + data['FragmentCharge'].astype(str)
 
         import sklearn.preprocessing as preprocessing
-        if cfg.rt_calibration:
+        if cfg.rt_calibration and cfg.rt_unit == "iRT":
             data['NormalizedRetentionTime'] = preprocessing.MinMaxScaler().fit_transform(data[['NormalizedRetentionTime']]) * 100
         if cfg.intensity_calibration:
             data['LibraryIntensity'] = (

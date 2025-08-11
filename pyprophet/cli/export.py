@@ -418,6 +418,14 @@ def export_matrix(
     help="(Experimental) Whether to keep decoys in the exported library. Default is False, which means decoys are filtered out. Only keeps decoys passing thresholds specified above"
 )
 @click.option(
+    "--rt_unit",
+    default="iRT",
+    show_default=True,
+    type=click.Choice(["iRT", "RT"]),
+    help='Unit of retention time in the library, only relevant if rt_calibration is True. If "iRT" is selected, the retention times will be scaled to the iRT scale (0-100) in the library.',
+    hidden=True
+)
+@click.option(
     "--test/--no-test",
     default=False,
     show_default=True,
@@ -434,6 +442,7 @@ def export_library(
     intensity_calibration,
     min_fragments,
     keep_decoys,
+    rt_unit,
     test
 ):
     """
@@ -455,6 +464,7 @@ def export_library(
         intensity_calibration=intensity_calibration,
         min_fragments=min_fragments,
         keep_decoys=keep_decoys,
+        rt_unit=rt_unit,
         test=test
     )
 

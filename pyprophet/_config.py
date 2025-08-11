@@ -671,6 +671,7 @@ class ExportIOConfig(BaseIOConfig):
         intensity_calibration (bool): If True, will use emperical intensity values as oppose to the original library intensity values
         min_fragments (int): Minimum number of fragments required to include the peak group in the library, only relevant if intensity_calibration is True
         keep_decoys (bool): Whether to keep decoy entries in the library, will only keep decoys that pass the thresholds specified
+        rt_unit (Literal["iRT", "RT"], default = 'iRT') = "iRT": Unit of retention time in the library, only relevant if rt_calibration is True. If "iRT" is selected, the retention times will be scaled to the iRT scale (0-100) in the library
     """
 
     export_format: Literal[
@@ -708,3 +709,4 @@ class ExportIOConfig(BaseIOConfig):
     intensity_calibration: bool = True
     min_fragments: int = 4
     keep_decoys: bool = False  # Whether to keep decoy entries in the library
+    rt_unit: Literal["iRT", "RT"] = "iRT"
