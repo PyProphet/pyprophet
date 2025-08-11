@@ -412,7 +412,7 @@ def export_matrix(
 )
 @click.option(
     "--keep_decoys/--no-keep_decoys",
-    default=True,
+    default=False,
     show_default=True,
     type=bool,
     help="(Experimental) Whether to keep decoys in the exported library. Default is False, which means decoys are filtered out. Only keeps decoys passing thresholds specified above"
