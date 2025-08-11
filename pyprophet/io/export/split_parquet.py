@@ -98,7 +98,6 @@ class SplitParquetReader(BaseSplitParquetReader):
         """
         Check if files contain peptide and protein global scores
         """
-        print(self._columns)
         has_peptide = any(col.startswith("SCORE_PEPTIDE_GLOBAL") for col in self._columns)
         has_protein = any(col.startswith("SCORE_PROTEIN_GLOBAL") for col in self._columns)
         return has_peptide and has_protein
