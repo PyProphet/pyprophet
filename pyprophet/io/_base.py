@@ -630,7 +630,8 @@ class BaseWriter(ABC):
         cfg = self.config
 
         # For precursors found in more than one run, select the run with the smallest q value
-        data = data.sort_values(by='Q_Value').groupby("TransitionId").head(1)
+        # If q values are the same, select the first run
+        data = data.sort_values(by=['Q_Value', 'RunId']).groupby("TransitionId").head(1)
         assert (len(data['TransitionId'].drop_duplicates()) == len(data))
 
         # Remove Annotation Column if all NAN
@@ -666,7 +667,7 @@ class BaseWriter(ABC):
         if cfg.keep_decoys:
             logger.info("Of Which {} are decoys".format(len(data[data['Decoy'] == 1]['Precursor'].drop_duplicates())))
 
-        data.drop(columns=['TransitionId', 'Q_Value'], inplace=True)
+        data.drop(columns=['TransitionId', 'Q_Value', 'RunId'], inplace=True)
         if cfg.test:
             data = data.sort_values(by=['Precursor', 'FragmentType', 'FragmentSeriesNumber', 'FragmentCharge', 'ProductMz'])
 

@@ -306,6 +306,7 @@ class SplitParquetReader(BaseSplitParquetReader):
                 p.UNMODIFIED_SEQUENCE AS PeptideSequence,
                 p.MODIFIED_SEQUENCE AS ModifiedPeptideSequence,
                 p.PRECURSOR_CHARGE AS PrecursorCharge,
+                p.RUN_ID AS RunId,
                 (p.MODIFIED_SEQUENCE || '_' || CAST(p.PRECURSOR_CHARGE AS VARCHAR)) AS Precursor,
                 p.PRECURSOR_MZ AS PrecursorMz,
                 STRING_AGG(p.PROTEIN_ACCESSION, ';') AS ProteinName,
@@ -327,7 +328,7 @@ class SplitParquetReader(BaseSplitParquetReader):
             GROUP BY {rt_col}, {im_col}, {intensity_col}, p.SCORE_MS2_Q_VALUE,
                      p.UNMODIFIED_SEQUENCE, p.MODIFIED_SEQUENCE, p.PRECURSOR_CHARGE,
                      p.PRECURSOR_MZ, p.FEATURE_ID, t.ANNOTATION, t.PRODUCT_MZ,
-                     t.TRANSITION_CHARGE, t.TRANSITION_TYPE, t.TRANSITION_ORDINAL, t.TRANSITION_ID, p.PRECURSOR_DECOY
+                     t.TRANSITION_CHARGE, t.TRANSITION_TYPE, t.TRANSITION_ORDINAL, t.TRANSITION_ID, p.PRECURSOR_DECOY, p.RUN_ID
         """
         return con.execute(query).fetchdf()
     
