@@ -12,7 +12,7 @@ from .util import (
     memray_profile,
 )
 from .._config import RunnerIOConfig
-from ..scoring.runner import PyProphetLearner, PyProphetWeightApplier, PyProphetMultiLearner
+from ..scoring.runner import PyProphetLearner, PyProphetWeightApplier, LDA_XGBoostMultiLearner
 
 
 # PyProphet semi-supervised learning and scoring
@@ -404,7 +404,7 @@ def score(
                 logger.info(
                     f"Conducting {level} semi-supervised learning with LDA followed by XGBoost.",
                 )
-                PyProphetMultiLearner(config).run()
+                LDA_XGBoostMultiLearner(config).run()
 
             else:
                 logger.info(
