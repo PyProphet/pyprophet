@@ -48,6 +48,7 @@ import click
 import duckdb
 import pandas as pd
 import polars as pl
+import sklearn.preprocessing as preprocessing
 from loguru import logger
 
 from .._base import BaseIOConfig
@@ -632,7 +633,7 @@ class BaseWriter(ABC):
         # For precursors found in more than one run, select the run with the smallest q value
         # If q values are the same, select the first run
         data = data.sort_values(by=['Q_Value', 'RunId']).groupby("TransitionId").head(1)
-        assert (len(data['TransitionId'].drop_duplicates()) == len(data))
+        assert (len(data['TransitionId'].drop_duplicates()) == len(data), "After filtering by Q_Value and RunId, duplicate transition IDs found.")
 
         # Remove Annotation Column if all NAN
         if data['Annotation'].isnull().all() or data['Annotation'].eq("NA").all():
@@ -640,7 +641,6 @@ class BaseWriter(ABC):
             data.drop(columns=['Annotation'], inplace=True)
             data['Annotation'] = data['FragmentType'] + data['FragmentSeriesNumber'].astype(str) + '^' + data['FragmentCharge'].astype(str)
 
-        import sklearn.preprocessing as preprocessing
         if cfg.rt_calibration and cfg.rt_unit == "iRT":
             data['NormalizedRetentionTime'] = preprocessing.MinMaxScaler().fit_transform(data[['NormalizedRetentionTime']]) * 100
         if cfg.intensity_calibration:
@@ -648,6 +648,7 @@ class BaseWriter(ABC):
             data['LibraryIntensity'] /
             data.groupby('Precursor')['LibraryIntensity'].transform('max') *
             10000)
+            logger.debug("Removing {} rows with zero intensity.".format(len(data[data['LibraryIntensity'] <= 0])))
             data = data[data['LibraryIntensity'] > 0] # Remove rows with zero intensity
         
         ## Print Library statistics
