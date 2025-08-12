@@ -292,16 +292,13 @@ class LDA_XGBoostMultiLearner(PyProphetMultiLearner):
         table_lda = self.table.drop(columns=["var_precursor_charge", "var_product_charge", "var_transition_count"], errors='ignore')
 
         (result_lda, scorer_lda, weights_lda) = PyProphet(config_lda).learn_and_apply(table_lda)
+
+        # rename the column that was the main score
+        self.table.columns = self.table.columns.str.replace('^main', '', regex=True)
+
         self.table['main_var_lda_score'] = result_lda.scored_tables['d_score']
 
         logger.info("LDA scores computed! Now running XGBoost using the LDA score as the main score")
-
-        # rename the column that was the main score
-        found = False
-        for col in self.table.columns:
-            if col.startswith("main") and not found:
-                self.table = self.table.rename(columns={col:col[5:]})
-                found = True
 
         config_xgb = self.config.copy()
         config_xgb.runner.ss_main_score = 'var_lda_score' # use lda score as the main score for XGBoost
