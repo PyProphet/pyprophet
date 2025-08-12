@@ -406,7 +406,6 @@ def score(
                 )
                 PyProphetMultiLearner(config).run()
 
-
             else:
                 logger.info(
                 f"Conducting {level} semi-supervised learning.",
