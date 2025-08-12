@@ -37,6 +37,7 @@ def create_export_group():
         pass
 
     export.add_command(export_tsv, name="tsv")
+    export.add_command(export_library, name='library')
     export.add_command(export_matrix, name="matrix")
     export.add_command(export_parquet, name="parquet")
     export.add_command(export_compound, name="compound")
@@ -347,6 +348,131 @@ def export_matrix(
     df = reader.read()
     writer.export_quant_matrix(df)
 
+# Export to Library to be used in OpenSWATH
+@click.command(name="library", cls=AdvancedHelpCommand)
+@click.option(
+    "--in",
+    "infile",
+    required=True,
+    type=click.Path(exists=True),
+    help="PyProphet OSW input file.",
+)
+@click.option(
+    "--out",
+    "outfile",
+    required=True, # need to name the library or else get error in os.path.splittext line 75, in __post_init__in _base.
+    type=click.Path(exists=False),
+    help="Output tsv library.",
+)
+@click.option(
+    "--max_peakgroup_qvalue",
+    default=0.01,
+    show_default=True,
+    type=float,
+    help="Filter results to maximum run-specific peak group-level q-value, using values greater than final statistical filtering (in most cases > 0.01), may lead to an overestimation in identification rates. If there are multiple runs with the same precursors, the run with the lowest q value is used",
+)
+@click.option(
+    "--max_global_peptide_qvalue",
+    default=0.01,
+    show_default=True,
+    type=float,
+    help="Filter results to maximum global peptide-level q-value, using values greater than final statistical filtering (in most cases > 0.01), may lead to an overestimation in identification rates."
+)
+@click.option(
+    "--max_global_protein_qvalue",
+    default=0.01,
+    show_default=True,
+    type=float,
+    help="Filter results to maximum global protein-level q-value, using values greater than final statistical filtering (in most cases > 0.01), may lead to an overestimation in identification rates."
+)
+@click.option(
+    "--rt_calibration/--no-rt_calibration",
+    default=True,
+    show_default=True,
+    help="Use empirical RT values as oppose to the original library RT values."
+)
+@click.option(
+    "--im_calibration/--no-im_calibration",
+    default=True,
+    show_default=True,
+    help="Use empirical IM values as oppose to the original library IM values."
+)
+@click.option(
+    "--intensity_calibration/--no-intensity_calibration",
+    default=True,
+    show_default=True,
+    help="Use empirical intensity values as oppose to the original library intensity values."
+)
+@click.option(
+    "--min_fragments",
+    default=4,
+    show_default=True,
+    type=int,
+    help="Minimum number of fragments required to include the peak group in the library, only relevant if intensityCalibration is True."
+)
+@click.option(
+    "--keep_decoys/--no-keep_decoys",
+    default=False,
+    show_default=True,
+    type=bool,
+    help="(Experimental) Whether to keep decoys in the exported library. Default is False, which means decoys are filtered out. Only keeps decoys passing thresholds specified above"
+)
+@click.option(
+    "--rt_unit",
+    default="iRT",
+    show_default=True,
+    type=click.Choice(["iRT", "RT"]),
+    help='Unit of retention time in the library, only relevant if rt_calibration is True. If "iRT" is selected, the retention times will be scaled to the iRT scale (0-100) in the library.',
+    hidden=True
+)
+@click.option(
+    "--test/--no-test",
+    default=False,
+    show_default=True,
+    help="Enable test mode with deterministic behavior, test mode will sort libraries by precursor, fragmentType, fragmentSeriesNumber and fragmentCharge")
+@measure_memory_usage_and_time
+def export_library(
+    infile,
+    outfile,
+    max_peakgroup_qvalue,
+    max_global_peptide_qvalue,
+    max_global_protein_qvalue,
+    rt_calibration,
+    im_calibration,
+    intensity_calibration,
+    min_fragments,
+    keep_decoys,
+    rt_unit,
+    test
+):
+    """
+    Export OSW to tsv library format
+    """
+    config = ExportIOConfig(
+        infile=infile,
+        outfile=outfile,
+        subsample_ratio=1.0,  # Not used in export
+        level="export",
+        context="export",
+        export_format="library",
+        out_type="tsv",
+        max_rs_peakgroup_qvalue=max_peakgroup_qvalue,
+        max_global_peptide_qvalue=max_global_peptide_qvalue,
+        max_global_protein_qvalue=max_global_protein_qvalue,
+        rt_calibration=rt_calibration,
+        im_calibration=im_calibration,
+        intensity_calibration=intensity_calibration,
+        min_fragments=min_fragments,
+        keep_decoys=keep_decoys,
+        rt_unit=rt_unit,
+        test=test
+    )
+
+    reader = ReaderDispatcher.get_reader(config)
+    writer = WriterDispatcher.get_writer(config)
+
+    df = reader.read()
+    writer.clean_and_export_library(df)
 
 # Export to Parquet
 @click.command(name="parquet", cls=AdvancedHelpCommand)
