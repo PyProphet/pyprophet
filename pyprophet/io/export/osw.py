@@ -124,7 +124,7 @@ class OSWReader(BaseOSWReader):
         cfg = self.config
 
         if self.config.export_format == "library":
-            raise NotImplementedError("Library export from non-split .parquet files is not supported")
+            raise NotImplementedError("Library export from sqlite OSW files is not supported")
  
         if self._is_unscored_file(con):
             logger.info("Reading unscored data from Parquet file.")
