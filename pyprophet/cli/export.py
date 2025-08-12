@@ -369,21 +369,21 @@ def export_matrix(
     default=0.01,
     show_default=True,
     type=float,
-    help="Filter results to maximum run-specific peak group-level q-value, should not use values > 0.01.",
+    help="Filter results to maximum run-specific peak group-level q-value, using values greater than final statistical filtering (in most cases > 0.01), may lead to an overestimation in identification rates. If there are multiple runs with the same precursors, the run with the lowest q value is used",
 )
 @click.option(
     "--max_global_peptide_qvalue",
     default=0.01,
     show_default=True,
     type=float,
-    help="Filter results to maximum global peptide-level q-value, should not use values > 0.01.",
+    help="Filter results to maximum global peptide-level q-value, using values greater than final statistical filtering (in most cases > 0.01), may lead to an overestimation in identification rates."
 )
 @click.option(
     "--max_global_protein_qvalue",
     default=0.01,
     show_default=True,
     type=float,
-    help="Filter results to maximum global protein-level q-value, should not use values > 0.01.",
+    help="Filter results to maximum global protein-level q-value, using values greater than final statistical filtering (in most cases > 0.01), may lead to an overestimation in identification rates."
 )
 @click.option(
     "--rt_calibration/--no-rt_calibration",
