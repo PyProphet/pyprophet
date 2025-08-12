@@ -151,10 +151,10 @@ def test_osw_analysis(
     )
 
 @pytest.mark.parametrize(
-    "calib",
-    [ True, False]
+    "calib, rt_unit",
+    [ (True, 'iRT'), (False, 'iRT'), (True, 'RT'), (False, 'RT')]
 )
-def test_osw_analysis_libExport(input_strategy, temp_folder, regtest, calib
+def test_osw_analysis_libExport(input_strategy, temp_folder, regtest, calib, rt_unit
 ):
     cmd = f"pyprophet score {input_strategy['cmd_prefix']} --level=ms2 --test --pi0_lambda=0.001 0 0 --ss_iteration_fdr=0.02 && "
 
@@ -164,11 +164,12 @@ def test_osw_analysis_libExport(input_strategy, temp_folder, regtest, calib
     # protein-level
     cmd += f"pyprophet infer protein --pi0_lambda=0 0 0 {input_strategy['cmd_prefix']} --context=global && "
 
+
     # export
     if calib:
-        cmd += f"pyprophet export library {input_strategy['cmd_prefix']} --out={temp_folder}/test_lib.tsv --test --max_peakgroup_qvalue=1 --max_global_peptide_qvalue=1 --max_global_protein_qvalue=1"
+        cmd += f"pyprophet export library {input_strategy['cmd_prefix']} --out={temp_folder}/test_lib.tsv --test --max_peakgroup_qvalue=1 --max_global_peptide_qvalue=1 --max_global_protein_qvalue=1 --rt_unit={rt_unit}"
     else:
-        cmd += f"pyprophet export library {input_strategy['cmd_prefix']} --out={temp_folder}/test_lib.tsv --test --max_peakgroup_qvalue=1 --max_global_peptide_qvalue=1 --max_global_protein_qvalue=1 --no-rt_calibration --no-im_calibration --no-intensity_calibration"
+        cmd += f"pyprophet export library {input_strategy['cmd_prefix']} --out={temp_folder}/test_lib.tsv --test --max_peakgroup_qvalue=1 --max_global_peptide_qvalue=1 --max_global_protein_qvalue=1 --no-rt_calibration --no-im_calibration --no-intensity_calibration --rt_unit={rt_unit}"
 
     if not input_strategy["reader"] == "parquet_split":
         with pytest.raises(NotImplementedError):
