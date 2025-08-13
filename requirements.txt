@@ -128,7 +128,7 @@ pyopenms==3.4.0
     # via pyprophet (setup.py)
 pyparsing==3.2.3
     # via matplotlib
-pypdf==5.6.0
+pypdf==6.0.0
     # via pyprophet (setup.py)
 pytest==8.4.0
     # via
