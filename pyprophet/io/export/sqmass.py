@@ -304,8 +304,6 @@ class SqMassWriter(BaseWriter):
         conn = duckdb.connect(":memory:")
         load_sqlite_scanner(conn)
 
-        #self._initialize_connection()
-        #self._create_indexes()
         query = self._build_export_query()
 
         if self.config.export_format == "parquet":
