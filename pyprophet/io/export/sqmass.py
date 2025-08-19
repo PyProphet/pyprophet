@@ -315,8 +315,28 @@ class SqMassWriter(BaseWriter):
     
 
     def _build_export_query(self) -> str:
+        """Build the complete export query by combining all subqueries"""
+        pqp_cte = self._build_pqp_data_cte()
+        chrom_cte = self._build_chrom_data_cte()
+        prec_meta_cte = self._build_prec_meta_cte()
+        prec_merged_cte = self._build_chrom_prec_merged_cte()
+        trans_merged_cte = self._build_chrom_trans_merged_cte()
+        combined_cte = self._build_chrom_combined_cte()
+        final_select = self._build_final_select()
+        
         return f"""
-        WITH pqp_data AS (
+        WITH {pqp_cte},
+        {chrom_cte},
+        {prec_meta_cte},
+        {prec_merged_cte},
+        {trans_merged_cte},
+        {combined_cte}
+        {final_select}
+        """
+
+    def _build_pqp_data_cte(self) -> str:
+        """Build the PQP data CTE that extracts precursor and transition information"""
+        return f"""pqp_data AS (
             SELECT
                 PRECURSOR.ID AS PRECURSOR_ID,
                 TRANSITION.ID AS TRANSITION_ID,
@@ -337,8 +357,11 @@ class SqMassWriter(BaseWriter):
                 ON PRECURSOR.ID = TRANSITION_PRECURSOR_MAPPING.PRECURSOR_ID
             INNER JOIN sqlite_scan('{self.config.pqp_file}', 'TRANSITION') as TRANSITION
                 ON TRANSITION_PRECURSOR_MAPPING.TRANSITION_ID = TRANSITION.ID
-        ),
-        chrom_data AS (
+        )"""
+
+    def _build_chrom_data_cte(self) -> str:
+        """Build the chromatogram data CTE that extracts raw chromatogram information"""
+        return f"""chrom_data AS (
             SELECT
                 CHROMATOGRAM.NATIVE_ID,
                 DATA.COMPRESSION,
@@ -347,16 +370,22 @@ class SqMassWriter(BaseWriter):
             FROM sqlite_scan('{self.config.infile}', 'CHROMATOGRAM') as CHROMATOGRAM
             INNER JOIN sqlite_scan('{self.config.infile}', 'DATA') as DATA
                 ON DATA.CHROMATOGRAM_ID = CHROMATOGRAM.ID
-        ),
-        prec_meta AS (
+        )"""
+
+    def _build_prec_meta_cte(self) -> str:
+        """Build the precursor metadata CTE"""
+        return """prec_meta AS (
             SELECT DISTINCT
                 PRECURSOR_ID,
                 MODIFIED_SEQUENCE,
                 PRECURSOR_CHARGE,
                 PRECURSOR_DECOY
             FROM pqp_data
-        ),
-        chrom_prec_merged AS (
+        )"""
+
+    def _build_chrom_prec_merged_cte(self) -> str:
+        """Build the CTE that merges precursor chromatogram data"""
+        return """chrom_prec_merged AS (
             SELECT
                 p.PRECURSOR_ID,
                 NULL AS TRANSITION_ID,
@@ -374,10 +403,13 @@ class SqMassWriter(BaseWriter):
                 c.DATA
             FROM prec_meta p
             INNER JOIN chrom_data c 
-                ON p.PRECURSOR_ID = CAST(REGEXP_EXTRACT(c.NATIVE_ID, '(\\d+)_Precursor_i\\d+', 1) AS STRING)
-            WHERE REGEXP_MATCHES(c.NATIVE_ID, '_Precursor_i\\d+')
-        ),
-        chrom_trans_merged AS (
+                ON p.PRECURSOR_ID = CAST(REGEXP_EXTRACT(c.NATIVE_ID, '(\\\\d+)_Precursor_i\\\\d+', 1) AS STRING)
+            WHERE REGEXP_MATCHES(c.NATIVE_ID, '_Precursor_i\\\\d+')
+        )"""
+
+    def _build_chrom_trans_merged_cte(self) -> str:
+        """Build the CTE that merges transition chromatogram data"""
+        return """chrom_trans_merged AS (
             SELECT
                 p.PRECURSOR_ID,
                 p.TRANSITION_ID,
@@ -396,13 +428,19 @@ class SqMassWriter(BaseWriter):
             FROM pqp_data p
             INNER JOIN chrom_data c ON p.TRANSITION_ID = CAST(c.NATIVE_ID AS STRING)
             WHERE NOT REGEXP_MATCHES(c.NATIVE_ID, '_Precursor_i\\d+')
-        ),
-        chrom_combined AS (
+        )"""
+
+    def _build_chrom_combined_cte(self) -> str:
+        """Build the CTE that combines precursor and transition chromatogram data"""
+        return """chrom_combined AS (
             SELECT * FROM chrom_prec_merged
             UNION ALL
             SELECT * FROM chrom_trans_merged
-        )
-        SELECT
+        )"""
+
+    def _build_final_select(self) -> str:
+        """Build the final SELECT statement with aggregation and ordering"""
+        return """SELECT
             PRECURSOR_ID,
             TRANSITION_ID,
             MODIFIED_SEQUENCE,
@@ -433,5 +471,4 @@ class SqMassWriter(BaseWriter):
             NATIVE_ID
         ORDER BY PRECURSOR_ID, 
             CASE WHEN TRANSITION_ID IS NULL THEN 0 ELSE 1 END,
-            TRANSITION_ID
-    """
+            TRANSITION_ID"""
