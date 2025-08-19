@@ -301,7 +301,7 @@ class SqMassWriter(BaseWriter):
         """Handle parquet export based on configuration"""
         if self.config.file_type != "sqmass":
             raise ValueError("Parquet export only supported from sqMass files")
-        
+
         conn = duckdb.connect(":memory:")
         self.reader._create_indexes()
         load_sqlite_scanner(conn)
@@ -312,11 +312,31 @@ class SqMassWriter(BaseWriter):
             self._execute_copy_query(conn, query, self.config.outfile)
         else:
             raise ValueError(f"Unsupported export format: {self.config.export_format}")
-    
 
     def _build_export_query(self) -> str:
+        """Assemble the export SQL query from smaller parts."""
+        pqp_cte = self._cte_pqp_data()
+        chrom_cte = self._cte_chrom_data()
+        prec_meta_cte = self._cte_prec_meta()
+        chrom_prec_cte = self._cte_chrom_prec_merged()
+        chrom_trans_cte = self._cte_chrom_trans_merged()
+        chrom_combined_cte = self._cte_chrom_combined()
+        final_select = self._final_select_from_combined()
+
         return f"""
-        WITH pqp_data AS (
+        WITH pqp_data AS ( {pqp_cte}),
+        chrom_data AS ( {chrom_cte}),
+        prec_meta AS ( {prec_meta_cte}),
+        chrom_prec_merged AS ( {chrom_prec_cte}),
+        chrom_trans_merged AS ( {chrom_trans_cte}),
+        chrom_combined AS ( {chrom_combined_cte})
+        {final_select}
+        """
+
+    # --- Helper builders for the SQL query parts ---
+    def _cte_pqp_data(self) -> str:
+        """CTE body for pqp_data: library metadata joined across PQP tables."""
+        return f"""
             SELECT
                 PRECURSOR.ID AS PRECURSOR_ID,
                 TRANSITION.ID AS TRANSITION_ID,
@@ -337,8 +357,10 @@ class SqMassWriter(BaseWriter):
                 ON PRECURSOR.ID = TRANSITION_PRECURSOR_MAPPING.PRECURSOR_ID
             INNER JOIN sqlite_scan('{self.config.pqp_file}', 'TRANSITION') as TRANSITION
                 ON TRANSITION_PRECURSOR_MAPPING.TRANSITION_ID = TRANSITION.ID
-        ),
-        chrom_data AS (
+        """
+    def _cte_chrom_data(self) -> str:
+        """CTE body for chrom_data: raw chromatogram rows from sqMass (xic)."""
+        return f"""
             SELECT
                 CHROMATOGRAM.NATIVE_ID,
                 DATA.COMPRESSION,
@@ -347,16 +369,22 @@ class SqMassWriter(BaseWriter):
             FROM sqlite_scan('{self.config.infile}', 'CHROMATOGRAM') as CHROMATOGRAM
             INNER JOIN sqlite_scan('{self.config.infile}', 'DATA') as DATA
                 ON DATA.CHROMATOGRAM_ID = CHROMATOGRAM.ID
-        ),
-        prec_meta AS (
+        """
+
+    def _cte_prec_meta(self) -> str:
+        """CTE body for precursor metadata: distinct precursor-level metadata."""
+        return """
             SELECT DISTINCT
                 PRECURSOR_ID,
                 MODIFIED_SEQUENCE,
                 PRECURSOR_CHARGE,
                 PRECURSOR_DECOY
             FROM pqp_data
-        ),
-        chrom_prec_merged AS (
+        """
+
+    def _cte_chrom_prec_merged(self) -> str:
+        """CTE body for chrom_prec_merged: precursor chromatograms with null transition fields."""
+        return """
             SELECT
                 p.PRECURSOR_ID,
                 NULL AS TRANSITION_ID,
@@ -376,8 +404,11 @@ class SqMassWriter(BaseWriter):
             INNER JOIN chrom_data c 
                 ON p.PRECURSOR_ID = CAST(REGEXP_EXTRACT(c.NATIVE_ID, '(\\d+)_Precursor_i\\d+', 1) AS STRING)
             WHERE REGEXP_MATCHES(c.NATIVE_ID, '_Precursor_i\\d+')
-        ),
-        chrom_trans_merged AS (
+        """
+
+    def _cte_chrom_trans_merged(self) -> str:
+        """CTE body for chrom_trans_merged: transition chromatograms by matching NATIVE_ID."""
+        return """
             SELECT
                 p.PRECURSOR_ID,
                 p.TRANSITION_ID,
@@ -396,12 +427,19 @@ class SqMassWriter(BaseWriter):
             FROM pqp_data p
             INNER JOIN chrom_data c ON p.TRANSITION_ID = CAST(c.NATIVE_ID AS STRING)
             WHERE NOT REGEXP_MATCHES(c.NATIVE_ID, '_Precursor_i\\d+')
-        ),
-        chrom_combined AS (
+        """
+
+    def _cte_chrom_combined(self) -> str:
+        """CTE body for chrom_combined: union of precursor and transition chromatograms with metadata"""
+        return """
             SELECT * FROM chrom_prec_merged
             UNION ALL
             SELECT * FROM chrom_trans_merged
-        )
+        """
+
+    def _final_select_from_combined(self) -> str:
+        """Final SELECT aggregating and ordering the chromatogram arrays."""
+        return """
         SELECT
             PRECURSOR_ID,
             TRANSITION_ID,
@@ -434,4 +472,4 @@ class SqMassWriter(BaseWriter):
         ORDER BY PRECURSOR_ID, 
             CASE WHEN TRANSITION_ID IS NULL THEN 0 ELSE 1 END,
             TRANSITION_ID
-    """
+        """
