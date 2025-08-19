@@ -323,6 +323,8 @@ class SqMassWriter(BaseWriter):
                 PRECURSOR.CHARGE AS PRECURSOR_CHARGE,
                 TRANSITION.CHARGE AS PRODUCT_CHARGE,
                 TRANSITION.DETECTING AS DETECTING_TRANSITION,
+                TRANSITION.ORDINAL AS TRANSITION_ORDINAL,
+                TRANSITION.TYPE AS TRANSITION_TYPE,
                 PRECURSOR.DECOY AS PRECURSOR_DECOY,
                 TRANSITION.DECOY AS PRODUCT_DECOY
             FROM sqlite_scan('{self.config.pqp_file}', 'PRECURSOR') as PRECURSOR
@@ -360,6 +362,8 @@ class SqMassWriter(BaseWriter):
                 p.MODIFIED_SEQUENCE,
                 p.PRECURSOR_CHARGE,
                 NULL AS PRODUCT_CHARGE,
+                NULL AS TRANSITION_ORDINAL,
+                NULL AS TRANSITION_TYPE,
                 1 AS DETECTING_TRANSITION,
                 p.PRECURSOR_DECOY,
                 NULL AS PRODUCT_DECOY,
@@ -382,6 +386,8 @@ class SqMassWriter(BaseWriter):
                 p.DETECTING_TRANSITION,
                 p.PRECURSOR_DECOY,
                 p.PRODUCT_DECOY,
+                p.TRANSITION_ORDINAL,
+                p.TRANSITION_TYPE,
                 c.NATIVE_ID,
                 c.COMPRESSION,
                 c.DATA_TYPE,
@@ -404,6 +410,8 @@ class SqMassWriter(BaseWriter):
             DETECTING_TRANSITION,
             PRECURSOR_DECOY,
             PRODUCT_DECOY,
+            TRANSITION_ORDINAL,
+            TRANSITION_TYPE,
             NATIVE_ID,
             MAX(CASE WHEN DATA_TYPE = 2 THEN DATA END) AS RT_DATA,
             MAX(CASE WHEN DATA_TYPE = 1 THEN DATA END) AS INTENSITY_DATA,
@@ -419,7 +427,9 @@ class SqMassWriter(BaseWriter):
             DETECTING_TRANSITION,
             PRECURSOR_DECOY,
             PRODUCT_DECOY,
-            NATIVE_ID
+            TRANSITION_ORDINAL,
+            TRANSITION_TYPE,
+            NATIVE_ID,
         ORDER BY PRECURSOR_ID, 
             CASE WHEN TRANSITION_ID IS NULL THEN 0 ELSE 1 END,
             TRANSITION_ID
