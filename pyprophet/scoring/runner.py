@@ -303,7 +303,7 @@ class LDA_XGBoostMultiLearner(PyProphetMultiLearner):
         config_xgb = self.config.copy()
         config_xgb.runner.ss_main_score = 'var_lda_score' # use lda score as the main score for XGBoost
         config_xgb.runner.classifier = "XGBoost"
-        config_xgb.runner.ss_use_dynamic_main_score = False # since using lda score do not ned to dynamically select the main score
+        config_xgb.runner.ss_use_dynamic_main_score = False # since using lda score do not need to dynamically select the main score
         self.config.runner.classifier = "XGBoost" # need to change to XGBoost for saving the weights
 
         (result_xgb, scorer_xgb, weights_xgb) = PyProphet(config_xgb).learn_and_apply(self.table)

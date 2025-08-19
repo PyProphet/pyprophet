@@ -360,7 +360,7 @@ def score(
         config.subsample_ratio = 1.0
 
     if not apply_weights:
-        if config.subsample_ratio < 1.0:
+        if config.subsample_ratio < 1.0: # currently LDA_XGBoostMultiLearner does not support subsampling
             logger.info(
                 f"Conducting {level} semi-supervised learning on {config.subsample_ratio * 100}% of the data.",
             )
@@ -399,7 +399,7 @@ def score(
                     PyProphetWeightApplier(weights_path, run_config).run()
             else:
                 PyProphetWeightApplier(weights_path, config).run()
-        else:
+        else:  # No subsampling
             if config.runner.classifier == "LDA_XGBoost":
                 logger.info(
                     f"Conducting {level} semi-supervised learning with LDA followed by XGBoost.",
