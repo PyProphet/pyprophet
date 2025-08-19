@@ -280,7 +280,6 @@ class SqMassWriter(BaseWriter):
 
     def __init__(self, config: ExportIOConfig):
         super().__init__(config)
-        self.reader = SqMassReader(config)
 
     def save_results(self, result, pi0):
         raise NotImplementedError(
@@ -301,13 +300,127 @@ class SqMassWriter(BaseWriter):
         """Handle parquet export based on configuration"""
         if self.config.file_type != "sqmass":
             raise ValueError("Parquet export only supported from sqMass files")
+        
+        conn = duckdb.connect(":memory:")
+        load_sqlite_scanner(conn)
 
-        # Read data using the reader
-        df = self.reader.read()
+        #self._initialize_connection()
+        #self._create_indexes()
+        query = self._build_export_query()
 
-        # Write to parquet using configured compression
-        df.to_parquet(
-            self.config.outfile,
-            compression=self.config.compression_method,
-            compression_level=self.config.compression_level,
+        if self.config.export_format == "parquet":
+            return self._execute_copy_query(conn, query, self.config.outfile)
+        raise ValueError(f"Unsupported export format: {self.config.export_format}")
+    
+
+    def _build_export_query(self) -> str:
+        return f"""
+        WITH pqp_data AS (
+            SELECT
+                PRECURSOR.ID AS PRECURSOR_ID,
+                TRANSITION.ID AS TRANSITION_ID,
+                PEPTIDE.MODIFIED_SEQUENCE,
+                PRECURSOR.CHARGE AS PRECURSOR_CHARGE,
+                TRANSITION.CHARGE AS PRODUCT_CHARGE,
+                TRANSITION.DETECTING AS DETECTING_TRANSITION,
+                PRECURSOR.DECOY AS PRECURSOR_DECOY,
+                TRANSITION.DECOY AS PRODUCT_DECOY
+            FROM sqlite_scan('{self.config.pqp_file}', 'PRECURSOR') as PRECURSOR
+            INNER JOIN sqlite_scan('{self.config.pqp_file}',  'PRECURSOR_PEPTIDE_MAPPING')  as PRECURSOR_PEPTIDE_MAPPING
+                ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
+            INNER JOIN sqlite_scan('{self.config.pqp_file}', 'PEPTIDE') as PEPTIDE
+                ON PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
+            INNER JOIN sqlite_scan('{self.config.pqp_file}', 'TRANSITION_PRECURSOR_MAPPING') as TRANSITION_PRECURSOR_MAPPING
+                ON PRECURSOR.ID = TRANSITION_PRECURSOR_MAPPING.PRECURSOR_ID
+            INNER JOIN sqlite_scan('{self.config.pqp_file}', 'TRANSITION') as TRANSITION
+                ON TRANSITION_PRECURSOR_MAPPING.TRANSITION_ID = TRANSITION.ID
+        ),
+        chrom_data AS (
+            SELECT
+                CHROMATOGRAM.NATIVE_ID,
+                DATA.COMPRESSION,
+                DATA.DATA_TYPE,
+                DATA.DATA
+            FROM sqlite_scan('{self.config.infile}', 'CHROMATOGRAM') as CHROMATOGRAM
+            INNER JOIN sqlite_scan('{self.config.infile}', 'DATA') as DATA
+                ON DATA.CHROMATOGRAM_ID = CHROMATOGRAM.ID
+        ),
+        prec_meta AS (
+            SELECT DISTINCT
+                PRECURSOR_ID,
+                MODIFIED_SEQUENCE,
+                PRECURSOR_CHARGE,
+                PRECURSOR_DECOY
+            FROM pqp_data
+        ),
+        chrom_prec_merged AS (
+            SELECT
+                p.PRECURSOR_ID,
+                NULL AS TRANSITION_ID,
+                p.MODIFIED_SEQUENCE,
+                p.PRECURSOR_CHARGE,
+                NULL AS PRODUCT_CHARGE,
+                1 AS DETECTING_TRANSITION,
+                p.PRECURSOR_DECOY,
+                NULL AS PRODUCT_DECOY,
+                c.NATIVE_ID,
+                c.COMPRESSION,
+                c.DATA_TYPE,
+                c.DATA
+            FROM prec_meta p
+            INNER JOIN chrom_data c 
+                ON p.PRECURSOR_ID = CAST(REGEXP_EXTRACT(c.NATIVE_ID, '(\\d+)_Precursor_i\\d+', 1) AS STRING)
+            WHERE REGEXP_MATCHES(c.NATIVE_ID, '_Precursor_i\\d+')
+        ),
+        chrom_trans_merged AS (
+            SELECT
+                p.PRECURSOR_ID,
+                p.TRANSITION_ID,
+                p.MODIFIED_SEQUENCE,
+                p.PRECURSOR_CHARGE,
+                p.PRODUCT_CHARGE,
+                p.DETECTING_TRANSITION,
+                p.PRECURSOR_DECOY,
+                p.PRODUCT_DECOY,
+                c.NATIVE_ID,
+                c.COMPRESSION,
+                c.DATA_TYPE,
+                c.DATA
+            FROM pqp_data p
+            INNER JOIN chrom_data c ON p.TRANSITION_ID = CAST(c.NATIVE_ID AS STRING)
+            WHERE NOT REGEXP_MATCHES(c.NATIVE_ID, '_Precursor_i\\d+')
+        ),
+        chrom_combined AS (
+            SELECT * FROM chrom_prec_merged
+            UNION ALL
+            SELECT * FROM chrom_trans_merged
         )
+        SELECT
+            PRECURSOR_ID,
+            TRANSITION_ID,
+            MODIFIED_SEQUENCE,
+            PRECURSOR_CHARGE,
+            PRODUCT_CHARGE,
+            DETECTING_TRANSITION,
+            PRECURSOR_DECOY,
+            PRODUCT_DECOY,
+            NATIVE_ID,
+            MAX(CASE WHEN DATA_TYPE = 2 THEN DATA END) AS RT_DATA,
+            MAX(CASE WHEN DATA_TYPE = 1 THEN DATA END) AS INTENSITY_DATA,
+            MAX(CASE WHEN DATA_TYPE = 2 THEN COMPRESSION END) AS RT_COMPRESSION,
+            MAX(CASE WHEN DATA_TYPE = 1 THEN COMPRESSION END) AS INTENSITY_COMPRESSION
+        FROM chrom_combined
+        GROUP BY
+            PRECURSOR_ID,
+            TRANSITION_ID,
+            MODIFIED_SEQUENCE,
+            PRECURSOR_CHARGE,
+            PRODUCT_CHARGE,
+            DETECTING_TRANSITION,
+            PRECURSOR_DECOY,
+            PRODUCT_DECOY,
+            NATIVE_ID
+        ORDER BY PRECURSOR_ID, 
+            CASE WHEN TRANSITION_ID IS NULL THEN 0 ELSE 1 END,
+            TRANSITION_ID
+    """
