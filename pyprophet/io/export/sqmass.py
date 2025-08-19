@@ -310,7 +310,8 @@ class SqMassWriter(BaseWriter):
 
         if self.config.export_format == "parquet":
             self._execute_copy_query(conn, query, self.config.outfile)
-        raise ValueError(f"Unsupported export format: {self.config.export_format}")
+        else:
+            raise ValueError(f"Unsupported export format: {self.config.export_format}")
     
 
     def _build_export_query(self) -> str:
