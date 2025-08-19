@@ -632,7 +632,7 @@ class BaseWriter(ABC):
 
         # For precursors found in more than one run, select the run with the smallest q value
         # If q values are the same, select the first run
-        data = data.sort_values(by=['Q_Value', 'RunId']).groupby("TransitionId").head(1)
+        data = data.sort_values(by=['Q_Value', 'Intensity', 'RunId']).groupby("TransitionId").head(1)
         assert (len(data['TransitionId'].drop_duplicates()) == len(data), "After filtering by Q_Value and RunId, duplicate transition IDs found.")
 
         # Remove Annotation Column if all NAN
@@ -668,7 +668,7 @@ class BaseWriter(ABC):
         if cfg.keep_decoys:
             logger.info("Of Which {} are decoys".format(len(data[data['Decoy'] == 1]['Precursor'].drop_duplicates())))
 
-        data.drop(columns=['TransitionId', 'Q_Value', 'RunId'], inplace=True)
+        data.drop(columns=['TransitionId', 'Q_Value', 'RunId', 'Intensity'], inplace=True)
         if cfg.test:
             data = data.sort_values(by=['Precursor', 'FragmentType', 'FragmentSeriesNumber', 'FragmentCharge', 'ProductMz'])
 

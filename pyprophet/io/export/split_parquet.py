@@ -306,6 +306,7 @@ class SplitParquetReader(BaseSplitParquetReader):
                 p.UNMODIFIED_SEQUENCE AS PeptideSequence,
                 p.MODIFIED_SEQUENCE AS ModifiedPeptideSequence,
                 p.PRECURSOR_CHARGE AS PrecursorCharge,
+                p.FEATURE_MS2_AREA_INTENSITY AS Intensity,
                 p.RUN_ID AS RunId,
                 (p.MODIFIED_SEQUENCE || '_' || CAST(p.PRECURSOR_CHARGE AS VARCHAR)) AS Precursor,
                 p.PRECURSOR_MZ AS PrecursorMz,
