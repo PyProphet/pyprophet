@@ -307,7 +307,7 @@ class SqMassWriter(BaseWriter):
         query = self._build_export_query()
 
         if self.config.export_format == "parquet":
-            return self._execute_copy_query(conn, query, self.config.outfile)
+            self._execute_copy_query(conn, query, self.config.outfile)
         raise ValueError(f"Unsupported export format: {self.config.export_format}")
     
 
@@ -427,7 +427,7 @@ class SqMassWriter(BaseWriter):
             PRODUCT_DECOY,
             TRANSITION_ORDINAL,
             TRANSITION_TYPE,
-            NATIVE_ID,
+            NATIVE_ID
         ORDER BY PRECURSOR_ID, 
             CASE WHEN TRANSITION_ID IS NULL THEN 0 ELSE 1 END,
             TRANSITION_ID
