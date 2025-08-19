@@ -70,9 +70,13 @@ class SplitParquetReader(BaseSplitParquetReader):
 
             if self.config.export_format == "library":
                 if self._is_unscored_file():
-                    raise logger.exception("Files must be scored for library generation.")
+                    descr= "Files must be scored for library generation."
+                    logger.exception(descr)
+                    raise ValueError(descr)
                 if not self._has_peptide_protein_global_scores():
-                    raise logger.exception("Files must have peptide and protein level global scores for library generation.")
+                    descr= "Files must have peptide and protein level global scores for library generation."
+                    logger.exception(descr)
+                    raise ValueError(descr)
                 logger.info("Reading standard OpenSWATH data for library from split Parquet files.")
                 return self._read_library_data(con)
 

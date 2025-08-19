@@ -48,7 +48,7 @@ import click
 import duckdb
 import pandas as pd
 import polars as pl
-import sklearn.preprocessing as preprocessing
+import sklearn.preprocessing as preprocessing # For MinMaxScaler
 from loguru import logger
 
 from .._base import BaseIOConfig
@@ -633,7 +633,7 @@ class BaseWriter(ABC):
         # For precursors found in more than one run, select the run with the smallest q value
         # If q values are the same, select the first run
         data = data.sort_values(by=['Q_Value', 'Intensity', 'RunId']).groupby("TransitionId").head(1)
-        assert (len(data['TransitionId'].drop_duplicates()) == len(data), "After filtering by Q_Value and RunId, duplicate transition IDs found.")
+        assert len(data['TransitionId'].drop_duplicates()) == len(data), "After filtering by Q_Value Intensity and RunId, duplicate transition IDs found."
 
         # Remove Annotation Column if all NAN
         if data['Annotation'].isnull().all() or data['Annotation'].eq("NA").all():
@@ -649,7 +649,8 @@ class BaseWriter(ABC):
             data.groupby('Precursor')['LibraryIntensity'].transform('max') *
             10000)
             logger.debug("Removing {} rows with zero intensity.".format(len(data[data['LibraryIntensity'] <= 0])))
-            data = data[data['LibraryIntensity'] > 0] # Remove rows with zero intensity
+            # Remove rows with zero intensity
+            data = data[data['LibraryIntensity'] > 0] 
         
         ## Print Library statistics
         logger.info(f"Library Contains {len(data['Precursor'].drop_duplicates())} Precursors")
