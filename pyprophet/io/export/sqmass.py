@@ -279,6 +279,7 @@ class SqMassWriter(BaseWriter):
     """
 
     def __init__(self, config: ExportIOConfig):
+        self.reader = SqMassReader(config)
         super().__init__(config)
 
     def save_results(self, result, pi0):
@@ -302,6 +303,7 @@ class SqMassWriter(BaseWriter):
             raise ValueError("Parquet export only supported from sqMass files")
         
         conn = duckdb.connect(":memory:")
+        self.reader._create_indexes()
         load_sqlite_scanner(conn)
 
         query = self._build_export_query()
