@@ -385,7 +385,6 @@ def print_parquet_tree(root_dir, precursors, transitions, alignment=None, max_ru
 def unimod_to_codename(seq):
     """
     Convert a sequence with unimod modifications to a codename.
-    This is a placeholder function; actual implementation may vary.
     """
     seq_poms = poms.AASequence.fromString(seq)
     codename = seq_poms.toString()
