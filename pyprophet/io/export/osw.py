@@ -811,7 +811,6 @@ class OSWWriter(BaseOSWWriter):
         )
         logger.info(f"Exporting precursor data to {precursor_path}")
         precursor_query = self._build_precursor_query(conn, column_info)
-        print(precursor_query)
         self._execute_copy_query(conn, precursor_query, precursor_path)
 
         # Export transition data
@@ -1505,8 +1504,8 @@ class OSWWriter(BaseOSWWriter):
                     safe_context = context.upper().replace("-", "_")
                     score_columns_to_select.append(
                         f"score_{table.lower()}_view.SCORE_{table.upper()}_{safe_context}_SCORE AS SCORE_{table.upper()}_{safe_context}_SCORE, "
-                        f"score_{table.lower()}_view.SCORE_{table.upper()}_{safe_context}_PVALUE AS SCORE_{table.upper()}_{safe_context}_PVALUE, "
-                        f"score_{table.lower()}_view.SCORE_{table.upper()}_{safe_context}_QVALUE AS SCORE_{table.upper()}_{safe_context}_QVALUE, "
+                        f"score_{table.lower()}_view.SCORE_{table.upper()}_{safe_context}_PVALUE AS SCORE_{table.upper()}_{safe_context}_P_VALUE, "
+                        f"score_{table.lower()}_view.SCORE_{table.upper()}_{safe_context}_QVALUE AS SCORE_{table.upper()}_{safe_context}_Q_VALUE, "
                         f"score_{table.lower()}_view.SCORE_{table.upper()}_{safe_context}_PEP AS SCORE_{table.upper()}_{safe_context}_PEP"
                     )
                 
