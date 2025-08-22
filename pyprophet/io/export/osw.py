@@ -1396,12 +1396,12 @@ class OSWWriter(BaseOSWWriter):
                     f"ANY_VALUE(CASE WHEN context = '{context}' THEN QVALUE END) as {score_table}_{safe_context}_QVALUE",
                     f"ANY_VALUE(CASE WHEN context = '{context}' THEN PEP END) as {score_table}_{safe_context}_PEP"
                 ])
-        
+
         pivot_cols_str = ", ".join(pivot_cols)
-        
+
         # Non-global contexts pivot query
         if pivot_cols_str:  # Only if there are non-global contexts
-            nonGlobal_query = f"""
+            non_global_query = f"""
             SELECT {id_col}, RUN_ID, {pivot_cols_str}
             FROM sqlite_scan('{self.config.infile}', '{score_table}')
             WHERE context != 'global'
@@ -1409,7 +1409,7 @@ class OSWWriter(BaseOSWWriter):
             """
         else:
             # If no non-global contexts, create empty result with same structure
-            nonGlobal_query = f"""
+            non_global_query = f"""
             SELECT {id_col}, RUN_ID
             FROM sqlite_scan('{self.config.infile}', '{score_table}')
             WHERE 1=0
@@ -1427,7 +1427,7 @@ class OSWWriter(BaseOSWWriter):
             FROM sqlite_scan('{self.config.infile}', '{score_table}') 
             WHERE context = 'global'
             """
-        
+
         # Build final merged query based on what exists
         if pivot_cols_str and global_exists:
             # Both non-global and global contexts exist
@@ -1437,12 +1437,12 @@ class OSWWriter(BaseOSWWriter):
                 g.{score_table}_GLOBAL_PVALUE, 
                 g.{score_table}_GLOBAL_QVALUE, 
                 g.{score_table}_GLOBAL_PEP
-            FROM ({nonGlobal_query}) ng
+            FROM ({non_global_query}) ng
             LEFT JOIN ({glob_query}) g ON ng.{id_col} = g.{id_col}
             """
         elif pivot_cols_str and not global_exists:
             # Only non-global contexts exist
-            merged_query = nonGlobal_query
+            merged_query = non_global_query
         elif not pivot_cols_str and global_exists:
             # Only global context exists
             merged_query = glob_query
