@@ -98,7 +98,7 @@ Precursors Features Parquet Schema
 .. raw:: html
 
     <details>
-    <summary>Click to expand the Precursors Features Parquet Schema</summary>
+    <summary>Click to expand the Precursors Features Parquet Schema. Note that not all columns listed here are in every parquet file.</summary>
     <pre>
     Schema([
         ('PROTEIN_ID', Int64),
@@ -200,8 +200,28 @@ Precursors Features Parquet Schema
         ('SCORE_PEPTIDE_RUN_SPECIFIC_SCORE', Float64),
         ('SCORE_PEPTIDE_RUN_SPECIFIC_P_VALUE', Float64),
         ('SCORE_PEPTIDE_RUN_SPECIFIC_Q_VALUE', Float64),
-        ('SCORE_PEPTIDE_RUN_SPECIFIC_PEP', Float64)
-    ])
+        ('SCORE_PEPTIDE_RUN_SPECIFIC_PEP', Float64),
+        ('SCORE_PEPTIDE_EXPERIMENT_WIDE_SCORE', Float64),
+        ('SCORE_PEPTIDE_EXPERIMENT_WIDE_P_VALUE', Float64),
+        ('SCORE_PEPTIDE_EXPERIMENT_WIDE_Q_VALUE', Float64),
+        ('SCORE_PEPTIDE_EXPERIMENT_WIDE_PEP', Float64),
+        ('SCORE_PEPTIDE_GLOBAL_SCORE', Float64),
+        ('SCORE_PEPTIDE_GLOBAL_P_VALUE', Float64),
+        ('SCORE_PEPTIDE_GLOBAL_Q_VALUE', Float64),
+        ('SCORE_PEPTIDE_GLOBAL_PEP', Float64),
+        ('SCORE_PROTEIN_RUN_SPECIFIC_SCORE', Float64),
+        ('SCORE_PROTEIN_RUN_SPECIFIC_P_VALUE', Float64),
+        ('SCORE_PROTEIN_RUN_SPECIFIC_Q_VALUE', Float64),
+        ('SCORE_PROTEIN_RUN_SPECIFIC_PEP', Float64),
+        ('SCORE_PROTEIN_EXPERIMENT_WIDE_SCORE', Float64),
+        ('SCORE_PROTEIN_EXPERIMENT_WIDE_P_VALUE', Float64),
+        ('SCORE_PROTEIN_EXPERIMENT_WIDE_Q_VALUE', Float64),
+        ('SCORE_PROTEIN_EXPERIMENT_WIDE_PEP', Float64),
+        ('SCORE_PROTEIN_GLOBAL_SCORE', Float64),
+        ('SCORE_PROTEIN_GLOBAL_P_VALUE', Float64),
+        ('SCORE_PROTEIN_GLOBAL_Q_VALUE', Float64),
+        ('SCORE_PROTEIN_GLOBAL_PEP', Float64)])
+
     </pre>
     </details>
     <br>
@@ -213,7 +233,7 @@ Transition Features Parquet Schema
 .. raw:: html
 
     <details>
-    <summary>Click to expand the Transition Feature Parquet Schema</summary>
+    <summary>Click to expand the Transition Feature Parquet Schema. Note that not all columns listed here are in every parquet file. </summary>
     <pre>
     Schema([
         ('RUN_ID', Int64),

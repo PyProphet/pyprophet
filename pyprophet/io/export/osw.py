@@ -35,12 +35,8 @@ class OSWReader(BaseOSWReader):
         """
         Read data from the OpenSWATH workflow OSW-sqlite based file.
         """
-        if False:
-            con = duckdb.connect(self.infile)
-            return self._read_duckdb(con)
-        else:
-            con = sqlite3.connect(self.infile)
-            return self._read_sqlite(con)
+        con = sqlite3.connect(self.infile)
+        return self._read_sqlite(con)
 
     def _create_indexes(self):
         """
@@ -744,6 +740,13 @@ class OSWWriter(BaseOSWWriter):
                 "score_transition_exists": {"SCORE_TRANSITION"}.issubset(table_names),
             }
 
+            if column_info["score_protein_exists"]:
+                logger.debug("Checking SCORE_PROTEIN contexts")
+                column_info['score_protein_contexts'] = self._check_contexts(sql_conn, "SCORE_PROTEIN")
+            if column_info["score_peptide_exists"]:
+                logger.debug("Checking SCORE_PEPTIDE contexts")
+                column_info['score_peptide_contexts'] = self._check_contexts(sql_conn, "SCORE_PEPTIDE")
+
         return column_info
 
     def _export_split_by_run(self, conn, column_info: dict) -> None:
@@ -864,7 +867,7 @@ class OSWWriter(BaseOSWWriter):
         )
 
         # Check if score tables exist and build score SQLs
-        score_cols_selct, score_table_joins = (
+        score_cols_selct, score_table_joins, score_column_views = (
             self._build_score_column_selection_and_joins(column_info)
         )
 
@@ -878,7 +881,7 @@ class OSWWriter(BaseOSWWriter):
             unimod_to_codename
         )
 
-        # Create the merged mapping as you did in your example
+        # Create the merged mapping 
         unimod_mask = peptide_df["MODIFIED_SEQUENCE"].str.contains("UniMod")
         merged_df = pd.merge(
             peptide_df[unimod_mask][["codename", "ID"]],
@@ -935,6 +938,7 @@ class OSWWriter(BaseOSWWriter):
             --    JOIN ipf_groups g USING (NORMALIZED_SEQUENCE)
             --) 
 
+            {score_column_views}
             SELECT 
                 PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID AS PROTEIN_ID,
                 PEPTIDE.ID AS PEPTIDE_ID,
@@ -1361,12 +1365,107 @@ class OSWWriter(BaseOSWWriter):
             """
         return ""
 
+    def _check_contexts(self, conn, score_table) -> list:
+        """Get list of contexts available in score table"""
+        contexts_query = f""" SELECT DISTINCT context FROM {score_table} """
+        result = conn.execute(contexts_query).fetchall()
+        logger.debug("result of contexts query: ", result)
+        return [row[0] for row in result]
+
+    def _get_peptide_protein_score_table(self, level, contexts: list) -> str:
+        """Create a DuckDB view for peptide/protein score data and return the view name"""
+        if level == "peptide":
+            id_col = "PEPTIDE_ID"
+            score_table = "SCORE_PEPTIDE"
+        else:  # level == 'protein'
+            id_col = "PROTEIN_ID"
+            score_table = "SCORE_PROTEIN"
+
+        view_name = f"{score_table.lower()}_view"
+
+        # Build pivot columns for available contexts
+        pivot_cols = []
+        for context in contexts:
+            # Skip 'global' context as it will be handled separately
+            if context != 'global':
+                # Convert context to column-safe format: 'run-specific' -> 'RUN_SPECIFIC'
+                safe_context = context.upper().replace("-", "_")
+                pivot_cols.extend([
+                    f"ANY_VALUE(CASE WHEN context = '{context}' THEN SCORE END) as {score_table}_{safe_context}_SCORE",
+                    f"ANY_VALUE(CASE WHEN context = '{context}' THEN PVALUE END) as {score_table}_{safe_context}_PVALUE",
+                    f"ANY_VALUE(CASE WHEN context = '{context}' THEN QVALUE END) as {score_table}_{safe_context}_QVALUE",
+                    f"ANY_VALUE(CASE WHEN context = '{context}' THEN PEP END) as {score_table}_{safe_context}_PEP"
+                ])
+
+        pivot_cols_str = ", ".join(pivot_cols)
+
+        # Non-global contexts pivot query
+        if pivot_cols_str:  # Only if there are non-global contexts
+            non_global_query = f"""
+            SELECT {id_col}, RUN_ID, {pivot_cols_str}
+            FROM sqlite_scan('{self.config.infile}', '{score_table}')
+            WHERE context != 'global'
+            GROUP BY {id_col}, RUN_ID
+            """
+        else:
+            # If no non-global contexts, create empty result with same structure
+            non_global_query = f"""
+            SELECT {id_col}, RUN_ID
+            FROM sqlite_scan('{self.config.infile}', '{score_table}')
+            WHERE 1=0
+            """
+
+        global_exists = 'global' in contexts
+        # Global data query (only if global context exists)
+        if global_exists:
+            glob_query = f"""
+            SELECT {id_col}, 
+                SCORE as {score_table}_GLOBAL_SCORE, 
+                PVALUE as {score_table}_GLOBAL_PVALUE, 
+                QVALUE as {score_table}_GLOBAL_QVALUE, 
+                PEP as {score_table}_GLOBAL_PEP
+            FROM sqlite_scan('{self.config.infile}', '{score_table}') 
+            WHERE context = 'global'
+            """
+
+        # Build final merged query based on what exists
+        if pivot_cols_str and global_exists:
+            # Both non-global and global contexts exist
+            merged_query = f"""
+            SELECT ng.*, 
+                g.{score_table}_GLOBAL_SCORE, 
+                g.{score_table}_GLOBAL_PVALUE, 
+                g.{score_table}_GLOBAL_QVALUE, 
+                g.{score_table}_GLOBAL_PEP
+            FROM ({non_global_query}) ng
+            LEFT JOIN ({glob_query}) g ON ng.{id_col} = g.{id_col}
+            """
+        elif pivot_cols_str and not global_exists:
+            # Only non-global contexts exist
+            merged_query = non_global_query
+        elif not pivot_cols_str and global_exists:
+            # Only global context exists
+            merged_query = glob_query
+        else:
+            # No contexts exist - return empty result with ID columns
+            merged_query = f"""
+            SELECT {id_col}, RUN_ID
+            FROM sqlite_scan('{self.config.infile}', '{score_table}')
+            WHERE 1=0
+            """
+
+        # Create the view in DuckDB
+        return f"{view_name} AS ({merged_query})"
+        
+
     def _build_score_column_selection_and_joins(
         self, column_info: dict
-    ) -> Tuple[str, str]:
+    ) -> Tuple[str, str, str]:
         """Build score column selection and joins based on available score tables"""
         score_columns_to_select = []
         score_tables_to_join = []
+        score_views = []
+        
         if column_info["score_ms1_exists"]:
             logger.debug("SCORE_MS1 table exists, adding score columns to selection")
             score_columns_to_select.append(
@@ -1385,9 +1484,40 @@ class OSWWriter(BaseOSWWriter):
                 f"INNER JOIN sqlite_scan('{self.config.infile}', 'SCORE_MS2') AS SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID"
             )
 
+        # Create views for peptide and protein score tables if they exist
+        if column_info["score_peptide_exists"]:
+            logger.debug("SCORE_PEPTIDE table exists, adding score table view to query")
+            score_views.append(self._get_peptide_protein_score_table("peptide", column_info["score_peptide_contexts"]))
+            # Add JOIN for peptide score view
+            score_tables_to_join.append("INNER JOIN score_peptide_view ON PEPTIDE.ID = score_peptide_view.PEPTIDE_ID AND FEATURE.RUN_ID = score_peptide_view.RUN_ID")
+        if column_info["score_protein_exists"]:
+            logger.debug("SCORE_PROTEIN table exists, adding score table view to query")
+            score_views.append(self._get_peptide_protein_score_table("protein", column_info["score_protein_contexts"]))
+            # Add JOIN for protein score view
+            score_tables_to_join.append("INNER JOIN score_protein_view ON PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID = score_protein_view.PROTEIN_ID AND FEATURE.RUN_ID = score_protein_view.RUN_ID")
+
+        # Add score columns for peptide and protein contexts
+        for table in ["peptide", "protein"]:
+            if column_info[f"score_{table}_exists"]:
+                logger.debug(f"SCORE_{table.upper()} table exists, adding score columns to selection")
+                for context in column_info[f"score_{table}_contexts"]:
+                    safe_context = context.upper().replace("-", "_")
+                    score_columns_to_select.append(
+                        f"score_{table.lower()}_view.SCORE_{table.upper()}_{safe_context}_SCORE AS SCORE_{table.upper()}_{safe_context}_SCORE, "
+                        f"score_{table.lower()}_view.SCORE_{table.upper()}_{safe_context}_PVALUE AS SCORE_{table.upper()}_{safe_context}_P_VALUE, "
+                        f"score_{table.lower()}_view.SCORE_{table.upper()}_{safe_context}_QVALUE AS SCORE_{table.upper()}_{safe_context}_Q_VALUE, "
+                        f"score_{table.lower()}_view.SCORE_{table.upper()}_{safe_context}_PEP AS SCORE_{table.upper()}_{safe_context}_PEP"
+                    )
+                
+        # Properly format the WITH clause
+        with_clause = ""
+        if score_views:
+            with_clause = "WITH " + ", ".join(score_views)
+            
         return (
             ", ".join(score_columns_to_select),
             " ".join(score_tables_to_join),
+            with_clause
         )
 
     def _execute_copy_query(self, conn, query: str, path: str) -> None:
