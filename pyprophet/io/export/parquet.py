@@ -36,6 +36,9 @@ class ParquetReader(BaseParquetReader):
         try:
             self._init_duckdb_views(con)
 
+            if self.config.export_format == "library":
+                raise NotImplementedError("Library export from non-split .parquet files is not supported")
+            
             if self._is_unscored_file():
                 logger.info("Reading unscored data from Parquet file.")
                 return self._read_unscored_data(con)
