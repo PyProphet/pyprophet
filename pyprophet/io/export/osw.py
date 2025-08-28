@@ -119,6 +119,9 @@ class OSWReader(BaseOSWReader):
         """Main entry point for reading SQLite data, delegates to specific methods."""
         cfg = self.config
 
+        if self.config.export_format == "library":
+            raise NotImplementedError("Library export from sqlite OSW files is not supported")
+ 
         if self._is_unscored_file(con):
             logger.info("Reading unscored data from Parquet file.")
             return self._read_unscored_data(con)

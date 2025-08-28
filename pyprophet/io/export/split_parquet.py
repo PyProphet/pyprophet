@@ -68,6 +68,18 @@ class SplitParquetReader(BaseSplitParquetReader):
         try:
             self._init_duckdb_views(con)
 
+            if self.config.export_format == "library":
+                if self._is_unscored_file():
+                    descr= "Files must be scored for library generation."
+                    logger.exception(descr)
+                    raise ValueError(descr)
+                if not self._has_peptide_protein_global_scores():
+                    descr= "Files must have peptide and protein level global scores for library generation."
+                    logger.exception(descr)
+                    raise ValueError(descr)
+                logger.info("Reading standard OpenSWATH data for library from split Parquet files.")
+                return self._read_library_data(con)
+
             if self._is_unscored_file():
                 logger.info("Reading unscored data from split Parquet files.")
                 return self._read_unscored_data(con)
@@ -82,9 +94,17 @@ class SplitParquetReader(BaseSplitParquetReader):
                 logger.info("Reading standard OpenSWATH data from split Parquet files.")
                 data = self._read_standard_data(con)
 
-            return self._augment_data(data, con)
+                return self._augment_data(data, con)
         finally:
             con.close()
+    
+    def _has_peptide_protein_global_scores(self) -> bool:
+        """
+        Check if files contain peptide and protein global scores
+        """
+        has_peptide = any(col.startswith("SCORE_PEPTIDE_GLOBAL") for col in self._columns)
+        has_protein = any(col.startswith("SCORE_PROTEIN_GLOBAL") for col in self._columns)
+        return has_peptide and has_protein
 
     def _is_unscored_file(self) -> bool:
         """
@@ -257,6 +277,66 @@ class SplitParquetReader(BaseSplitParquetReader):
 
         return pd.merge(data, ipf_data, on="id", how="left")
 
+    def _read_library_data(self, con) -> pd.DataFrame:
+        """
+        Read data specifically for precursors for library generation. This does not include all output in standard output
+        """
+        if self.config.rt_calibration:
+            rt_col = "p.EXP_RT"
+        else:
+            rt_col = "p.PRECURSOR_LIBRARY_RT"
+
+        if self.config.im_calibration:
+            im_col = "p.EXP_IM"
+        else:
+            im_col = "p.PRECURSOR_LIBRARY_DRIFT_TIME"
+
+        if self.config.intensity_calibration:
+            intensity_col = 't.FEATURE_TRANSITION_AREA_INTENSITY'
+        else:
+            intensity_col = 't.TRANSITION_LIBRARY_INTENSITY'
+        
+        if self.config.keep_decoys:
+            decoy_query = ""
+        else:
+            decoy_query ="p.PRECURSOR_DECOY is false and t.TRANSITION_DECOY is false and" 
+
+        query = f"""
+            SELECT
+                {rt_col} as NormalizedRetentionTime,
+                {im_col} as PrecursorIonMobility,
+                {intensity_col} as LibraryIntensity,
+                p.SCORE_MS2_Q_VALUE as Q_Value,
+                p.UNMODIFIED_SEQUENCE AS PeptideSequence,
+                p.MODIFIED_SEQUENCE AS ModifiedPeptideSequence,
+                p.PRECURSOR_CHARGE AS PrecursorCharge,
+                p.FEATURE_MS2_AREA_INTENSITY AS Intensity,
+                p.RUN_ID AS RunId,
+                (p.MODIFIED_SEQUENCE || '_' || CAST(p.PRECURSOR_CHARGE AS VARCHAR)) AS Precursor,
+                p.PRECURSOR_MZ AS PrecursorMz,
+                STRING_AGG(p.PROTEIN_ACCESSION, ';') AS ProteinName,
+                t.ANNOTATION as Annotation,
+                t.PRODUCT_MZ as ProductMz,
+                t.TRANSITION_CHARGE as FragmentCharge,
+                t.TRANSITION_TYPE as FragmentType,
+                t.TRANSITION_ORDINAL as FragmentSeriesNumber,
+                t.TRANSITION_ID as TransitionId,
+                p.PRECURSOR_DECOY as Decoy
+            FROM precursors p
+            INNER JOIN transition t ON p.FEATURE_ID = t.FEATURE_ID
+            WHERE {decoy_query} 
+                  p.SCORE_MS2_Q_VALUE < {self.config.max_rs_peakgroup_qvalue} and
+                  p.SCORE_PROTEIN_GLOBAL_Q_VALUE < {self.config.max_global_protein_qvalue} and
+                  p.SCORE_PEPTIDE_GLOBAL_Q_VALUE < {self.config.max_global_peptide_qvalue} and
+                  p.SCORE_MS2_PEAK_GROUP_RANK = 1
+
+            GROUP BY {rt_col}, {im_col}, {intensity_col}, p.SCORE_MS2_Q_VALUE,
+                     p.UNMODIFIED_SEQUENCE, p.MODIFIED_SEQUENCE, p.PRECURSOR_CHARGE,
+                     p.PRECURSOR_MZ, p.FEATURE_ID, t.ANNOTATION, t.PRODUCT_MZ,
+                     t.TRANSITION_CHARGE, t.TRANSITION_TYPE, t.TRANSITION_ORDINAL, t.TRANSITION_ID, p.PRECURSOR_DECOY, p.RUN_ID, p.FEATURE_MS2_AREA_INTENSITY
+        """
+        return con.execute(query).fetchdf()
+    
     def _read_standard_data(self, con) -> pd.DataFrame:
         """
         Read standard OpenSWATH data without IPF from split files.
