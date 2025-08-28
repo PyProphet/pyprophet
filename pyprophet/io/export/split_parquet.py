@@ -333,7 +333,7 @@ class SplitParquetReader(BaseSplitParquetReader):
             GROUP BY {rt_col}, {im_col}, {intensity_col}, p.SCORE_MS2_Q_VALUE,
                      p.UNMODIFIED_SEQUENCE, p.MODIFIED_SEQUENCE, p.PRECURSOR_CHARGE,
                      p.PRECURSOR_MZ, p.FEATURE_ID, t.ANNOTATION, t.PRODUCT_MZ,
-                     t.TRANSITION_CHARGE, t.TRANSITION_TYPE, t.TRANSITION_ORDINAL, t.TRANSITION_ID, p.PRECURSOR_DECOY, p.RUN_ID
+                     t.TRANSITION_CHARGE, t.TRANSITION_TYPE, t.TRANSITION_ORDINAL, t.TRANSITION_ID, p.PRECURSOR_DECOY, p.RUN_ID, p.FEATURE_MS2_AREA_INTENSITY
         """
         return con.execute(query).fetchdf()
     
