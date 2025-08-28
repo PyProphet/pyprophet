@@ -255,6 +255,60 @@ class PyProphetRunner(object):
             logger.opt(raw=True).info("\n")
 
 
+class PyProphetMultiLearner(PyProphetRunner):
+    """
+    Implements the learning and scoring workflow for PyProphet with multiple classifiers run sequentially.
+    """
+
+    __metaclass__ = abc.ABCMeta
+
+    @abc.abstractmethod
+    def run_algo(self, part=None):
+        if self.glyco:
+            raise click.ClickException(
+                "Multi-classifier learning is not supported for glycopeptide workflows."
+            )
+
+   
+class LDA_XGBoostMultiLearner(PyProphetMultiLearner):
+    """
+    Implements the learning and scoring workflow for PyProphet with multiple classifiers run sequentially
+    """
+
+    def run_algo(self, part=None):
+        """
+        Runs the learning and scoring algorithm for multiple classifiers.
+
+        Returns:
+            tuple: A tuple containing the result, scorer, and weights.
+        """
+
+        super(LDA_XGBoostMultiLearner, self).run_algo(part)
+
+        config_lda = self.config.copy()
+        config_lda.runner.classifier = "LDA"
+                
+        # remove columns that are not needed for LDA
+        table_lda = self.table.drop(columns=["var_precursor_charge", "var_product_charge", "var_transition_count"], errors='ignore')
+
+        (result_lda, scorer_lda, weights_lda) = PyProphet(config_lda).learn_and_apply(table_lda)
+
+        # rename the column that was the main score
+        self.table.columns = self.table.columns.str.replace('^main', '', regex=True)
+
+        self.table['main_var_lda_score'] = result_lda.scored_tables['d_score']
+
+        logger.info("LDA scores computed! Now running XGBoost using the LDA score as the main score")
+
+        config_xgb = self.config.copy()
+        config_xgb.runner.ss_main_score = 'var_lda_score' # use lda score as the main score for XGBoost
+        config_xgb.runner.classifier = "XGBoost"
+        config_xgb.runner.ss_use_dynamic_main_score = False # since using lda score do not need to dynamically select the main score
+        self.config.runner.classifier = "XGBoost" # need to change to XGBoost for saving the weights
+
+        (result_xgb, scorer_xgb, weights_xgb) = PyProphet(config_xgb).learn_and_apply(self.table)
+        return (result_xgb, scorer_xgb, weights_xgb)
+
 class PyProphetLearner(PyProphetRunner):
     """
     Implements the learning and scoring workflow for PyProphet.
