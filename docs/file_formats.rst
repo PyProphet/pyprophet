@@ -311,6 +311,8 @@ The Parquet schema used for the XICs is as follows:
         ('DETECTING_TRANSITION', Int64),
         ('PRECURSOR_DECOY', Int64),
         ('PRODUCT_DECOY', Int64),
+        ('TRANSITION_ORDINAL', Int64), 
+        ('TRANSITION_TYPE', String),
         ('NATIVE_ID', String),
         ('RT_DATA', Binary),
         ('INTENSITY_DATA', Binary),
