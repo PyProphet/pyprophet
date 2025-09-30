@@ -14,6 +14,7 @@ from ..export.export_report import (
 from ..export.export_report import (
     export_scored_report as _export_scored_report,
 )
+from ..export.calibration_report import generate_report as generate_calibration_report
 from ..glyco.export import (
     export_score_plots as export_glyco_score_plots,
 )
@@ -37,13 +38,14 @@ def create_export_group():
         pass
 
     export.add_command(export_tsv, name="tsv")
-    export.add_command(export_library, name='library')
+    export.add_command(export_library, name="library")
     export.add_command(export_matrix, name="matrix")
     export.add_command(export_parquet, name="parquet")
     export.add_command(export_compound, name="compound")
     export.add_command(export_glyco, name="glyco")
     export.add_command(export_score_plots, name="score-plots")
     export.add_command(export_scored_report, name="score-report")
+    export.add_command(export_calibration_report, name="calibration-report")
 
     return export
 
@@ -348,6 +350,7 @@ def export_matrix(
     df = reader.read()
     writer.export_quant_matrix(df)
 
+
 # Export to Library to be used in OpenSWATH
 @click.command(name="library", cls=AdvancedHelpCommand)
 @click.option(
@@ -360,7 +363,7 @@ def export_matrix(
 @click.option(
     "--out",
     "outfile",
-    required=True, # need to name the library or else get error in os.path.splittext line 75, in __post_init__in _base.
+    required=True,  # need to name the library or else get error in os.path.splittext line 75, in __post_init__in _base.
     type=click.Path(exists=False),
     help="Output tsv library.",
 )
@@ -376,46 +379,46 @@ def export_matrix(
     default=0.01,
     show_default=True,
     type=float,
-    help="Filter results to maximum global peptide-level q-value, using values greater than final statistical filtering (in most cases > 0.01), may lead to an overestimation in identification rates."
+    help="Filter results to maximum global peptide-level q-value, using values greater than final statistical filtering (in most cases > 0.01), may lead to an overestimation in identification rates.",
 )
 @click.option(
     "--max_global_protein_qvalue",
     default=0.01,
     show_default=True,
     type=float,
-    help="Filter results to maximum global protein-level q-value, using values greater than final statistical filtering (in most cases > 0.01), may lead to an overestimation in identification rates."
+    help="Filter results to maximum global protein-level q-value, using values greater than final statistical filtering (in most cases > 0.01), may lead to an overestimation in identification rates.",
 )
 @click.option(
     "--rt_calibration/--no-rt_calibration",
     default=True,
     show_default=True,
-    help="Use empirical RT values as oppose to the original library RT values."
+    help="Use empirical RT values as oppose to the original library RT values.",
 )
 @click.option(
     "--im_calibration/--no-im_calibration",
     default=True,
     show_default=True,
-    help="Use empirical IM values as oppose to the original library IM values."
+    help="Use empirical IM values as oppose to the original library IM values.",
 )
 @click.option(
     "--intensity_calibration/--no-intensity_calibration",
     default=True,
     show_default=True,
-    help="Use empirical intensity values as oppose to the original library intensity values."
+    help="Use empirical intensity values as oppose to the original library intensity values.",
 )
 @click.option(
     "--min_fragments",
     default=4,
     show_default=True,
     type=int,
-    help="Minimum number of fragments required to include the peak group in the library, only relevant if intensityCalibration is True."
+    help="Minimum number of fragments required to include the peak group in the library, only relevant if intensityCalibration is True.",
 )
 @click.option(
     "--keep_decoys/--no-keep_decoys",
     default=False,
     show_default=True,
     type=bool,
-    help="(Experimental) Whether to keep decoys in the exported library. Default is False, which means decoys are filtered out. Only keeps decoys passing thresholds specified above"
+    help="(Experimental) Whether to keep decoys in the exported library. Default is False, which means decoys are filtered out. Only keeps decoys passing thresholds specified above",
 )
 @click.option(
     "--rt_unit",
@@ -423,13 +426,14 @@ def export_matrix(
     show_default=True,
     type=click.Choice(["iRT", "RT"]),
     help='Unit of retention time in the library, only relevant if rt_calibration is True. If "iRT" is selected, the retention times will be scaled to the iRT scale (0-100) in the library.',
-    hidden=True
+    hidden=True,
 )
 @click.option(
     "--test/--no-test",
     default=False,
     show_default=True,
-    help="Enable test mode with deterministic behavior, test mode will sort libraries by precursor, fragmentType, fragmentSeriesNumber and fragmentCharge")
+    help="Enable test mode with deterministic behavior, test mode will sort libraries by precursor, fragmentType, fragmentSeriesNumber and fragmentCharge",
+)
 @measure_memory_usage_and_time
 def export_library(
     infile,
@@ -443,7 +447,7 @@ def export_library(
     min_fragments,
     keep_decoys,
     rt_unit,
-    test
+    test,
 ):
     """
     Export OSW to tsv library format
@@ -465,7 +469,7 @@ def export_library(
         min_fragments=min_fragments,
         keep_decoys=keep_decoys,
         rt_unit=rt_unit,
-        test=test
+        test=test,
     )
 
     reader = ReaderDispatcher.get_reader(config)
@@ -473,6 +477,7 @@ def export_library(
 
     df = reader.read()
     writer.clean_and_export_library(df)
+
 
 # Export to Parquet
 @click.command(name="parquet", cls=AdvancedHelpCommand)
@@ -864,3 +869,91 @@ def export_scored_report(infile):
     outfile = Path(infile).stem + "_score_plots.pdf"
     logger.info(f"Exporting score plots to {outfile}")
     _export_scored_report(infile, outfile)
+
+
+# Export OpenSwath Calibration debug plots
+@click.command(name="calibration-report", cls=AdvancedHelpCommand)
+@click.option(
+    "--wd",
+    "wd",
+    default=".",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True),
+    show_default=True,
+    help="Working directory containing debugging files.",
+)
+@click.option(
+    "--im-cal-pattern",
+    "im_cal_pattern",
+    default="_debug_calibration_im.txt",
+    show_default=True,
+    help="Ion mobility debug file pattern.",
+)
+@click.option(
+    "--mz-cal-pattern",
+    "mz_cal_pattern",
+    default="_debug_calibration_mz.txt",
+    show_default=True,
+    help="m/z debug file pattern.",
+)
+@click.option(
+    "--irt-trafo-pattern",
+    "irt_trafo_pattern",
+    default="_debug_calibration_irt.trafoXML",
+    show_default=True,
+    help="iRT trafoXML pattern.",
+)
+@click.option(
+    "--irt-mzml-pattern",
+    "irt_mzml_pattern",
+    default="_debug_calibration_irt_chrom.mzML",
+    show_default=True,
+    help="iRT XIC mzML pattern.",
+)
+@click.option(
+    "--report-file",
+    "report_file",
+    default="calibration_report.pdf",
+    type=click.Path(dir_okay=False, writable=True),
+    show_default=True,
+    help="Output PDF path.",
+)
+@click.option(
+    "--zoom-in-xic/--no-zoom-in-xic",
+    "zoom_in_xic",
+    default=True,
+    show_default=True,
+    help="Zoom into XICs ±50 s around RT apex.",
+)
+@click.option(
+    "--verbose",
+    "verbose",
+    type=click.IntRange(0, 2),  # ← integers 0..2
+    default=0,
+    show_default=True,
+    help="Verbosity level 0/1/2.",
+)
+@measure_memory_usage_and_time
+def export_calibration_report(
+    wd,
+    im_cal_pattern,
+    mz_cal_pattern,
+    irt_trafo_pattern,
+    irt_mzml_pattern,
+    report_file,
+    zoom_in_xic,
+    verbose,
+):
+    """
+    Generate a calibration report from OpenSwathWorkflow debug calibration files
+    """
+
+    generate_calibration_report(
+        wd=wd,
+        im_cal_pattern=im_cal_pattern,
+        mz_cal_pattern=mz_cal_pattern,
+        irt_trafo_pattern=irt_trafo_pattern,
+        irt_mzml_pattern=irt_mzml_pattern,
+        report_file=report_file,
+        zoom_in_xic=zoom_in_xic,
+        verbose=int(verbose),
+    )

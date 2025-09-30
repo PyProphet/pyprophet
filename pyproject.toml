@@ -43,7 +43,8 @@ dependencies = [
     "pyarrow",
     "pypdf",
     "psutil",
-    "pyopenms"
+    "pyopenms",
+    "lxml"
 ]
 
 # Optional dependencies 
