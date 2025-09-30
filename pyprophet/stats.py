@@ -190,6 +190,10 @@ def pi0est(
     if isinstance(lambda_, np.ndarray):
         ll = len(lambda_)
         lambda_ = np.sort(lambda_)
+    elif isinstance(lambda_, tuple) and len(lambda_) == 3:
+        lambda_ = np.arange(lambda_[0], lambda_[1], lambda_[2])
+        ll = len(lambda_)
+        lambda_ = np.sort(lambda_)
 
     if min(p) < 0 or max(p) > 1:
         raise click.ClickException("p-values not in valid range [0,1].")
