@@ -1522,11 +1522,3 @@ class OSWWriter(BaseOSWWriter):
             " ".join(score_tables_to_join),
             with_clause
         )
-
-    def _execute_copy_query(self, conn, query: str, path: str) -> None:
-        """Execute COPY query with configured compression settings"""
-        conn.execute(
-            f"COPY ({query}) TO '{path}' "
-            f"(FORMAT 'parquet', COMPRESSION '{self.config.compression_method}', "
-            f"COMPRESSION_LEVEL {self.config.compression_level})"
-        )
