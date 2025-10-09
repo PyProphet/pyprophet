@@ -37,8 +37,13 @@ class ParquetReader(BaseParquetReader):
             self._init_duckdb_views(con)
 
             if self.config.export_format == "library":
-                raise NotImplementedError("Library export from non-split .parquet files is not supported")
-            
+                raise NotImplementedError(
+                    "Library export from non-split .parquet files is not supported"
+                )
+
+            if self.config.context == "export_scored_report":
+                return self._read_for_export_scored_report(con)
+
             if self._is_unscored_file():
                 logger.info("Reading unscored data from Parquet file.")
                 return self._read_unscored_data(con)
@@ -553,6 +558,48 @@ class ParquetReader(BaseParquetReader):
                 feature_vars.append(f"{col} AS var_ms2_{var_name}")
 
         return ", " + ", ".join(feature_vars) if feature_vars else ""
+
+    ##################################
+    # Export-specific readers below
+    ##################################
+
+    def _read_for_export_scored_report(self, con) -> pd.DataFrame:
+        """
+        Lightweight reader that returns the minimal scored-report columns from a Parquet file.
+        """
+        cfg = self.config
+
+        select_cols = [
+            "RUN_ID",
+            "PROTEIN_ID",
+            "PEPTIDE_ID",
+            "PRECURSOR_ID",
+            "PRECURSOR_DECOY",
+            "FEATURE_MS2_AREA_INTENSITY",
+            "SCORE_MS2_SCORE",
+            "SCORE_MS2_PEAK_GROUP_RANK",
+            "SCORE_MS2_Q_VALUE",
+            "SCORE_PEPTIDE_GLOBAL_SCORE",
+            "SCORE_PEPTIDE_GLOBAL_Q_VALUE",
+            "SCORE_PEPTIDE_EXPERIMENT_WIDE_SCORE",
+            "SCORE_PEPTIDE_EXPERIMENT_WIDE_Q_VALUE",
+            "SCORE_PEPTIDE_RUN_SPECIFIC_SCORE",
+            "SCORE_PEPTIDE_RUN_SPECIFIC_Q_VALUE",
+            "SCORE_PROTEIN_GLOBAL_SCORE",
+            "SCORE_PROTEIN_GLOBAL_Q_VALUE",
+            "SCORE_PROTEIN_EXPERIMENT_WIDE_SCORE",
+            "SCORE_PROTEIN_EXPERIMENT_WIDE_Q_VALUE",
+            "SCORE_IPF_QVALUE",
+        ]
+
+        # Filter select cols based on available columns in the input file
+        cols_infile = get_parquet_column_names(cfg.infile)
+        select_cols = [col for col in select_cols if col in cols_infile]
+
+        # Load the input data
+        df = pd.read_parquet(cfg.infile, columns=select_cols)
+
+        return df
 
 
 class ParquetWriter(BaseParquetWriter):
