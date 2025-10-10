@@ -12,7 +12,7 @@ from .util import (
     memray_profile,
 )
 from .._config import RunnerIOConfig
-from ..scoring.runner import PyProphetLearner, PyProphetWeightApplier
+from ..scoring.runner import PyProphetLearner, PyProphetWeightApplier, LDA_XGBoostMultiLearner
 
 
 # PyProphet semi-supervised learning and scoring
@@ -43,7 +43,7 @@ from ..scoring.runner import PyProphetLearner, PyProphetWeightApplier
     "--classifier",
     default="LDA",
     show_default=True,
-    type=click.Choice(["LDA", "SVM", "XGBoost"]),
+    type=click.Choice(["LDA", "SVM", "XGBoost", "LDA_XGBoost"]),
     help='Either a "LDA", "SVM" or "XGBoost" classifier is used for semi-supervised learning.',
 )
 @click.option(
@@ -360,7 +360,7 @@ def score(
         config.subsample_ratio = 1.0
 
     if not apply_weights:
-        if config.subsample_ratio < 1.0:
+        if config.subsample_ratio < 1.0: # currently LDA_XGBoostMultiLearner does not support subsampling
             logger.info(
                 f"Conducting {level} semi-supervised learning on {config.subsample_ratio * 100}% of the data.",
             )
@@ -399,11 +399,18 @@ def score(
                     PyProphetWeightApplier(weights_path, run_config).run()
             else:
                 PyProphetWeightApplier(weights_path, config).run()
-        else:
-            logger.info(
+        else:  # No subsampling
+            if config.runner.classifier == "LDA_XGBoost":
+                logger.info(
+                    f"Conducting {level} semi-supervised learning with LDA followed by XGBoost.",
+                )
+                LDA_XGBoostMultiLearner(config).run()
+
+            else:
+                logger.info(
                 f"Conducting {level} semi-supervised learning.",
-            )
-            PyProphetLearner(config).run()
+                )
+                PyProphetLearner(config).run()
     else:
         logger.info(
             f"Applying {level} weights from {apply_weights} to the full data set.",

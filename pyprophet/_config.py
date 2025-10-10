@@ -90,7 +90,7 @@ class RunnerConfig:
     Configuration for scoring, classifier setup, learning parameters, and optional features.
 
     Attributes:
-        classifier (str): Classifier type used for semi-supervised learning ('LDA', 'SVM' or 'XGBoost').
+        classifier (str): Classifier type used for semi-supervised learning Can either be a single classifier ('LDA', 'SVM', 'XGBoost') or a multiclassifier ('LDA_XGBoost').
         autotune (bool): Whether to autotune hyperparameters for the classifier (XGBoost / SVM)
         ss_main_score (str): Starting main score for semi-supervised learning (can be 'auto').
         main_score_selection_report (bool): Whether to generate a report for main score selection.
@@ -127,7 +127,7 @@ class RunnerConfig:
     """
 
     # Scoring / classifier options
-    classifier: Literal["LDA", "SVM", "XGBoost"] = "LDA"
+    classifier: Literal["LDA", "SVM", "XGBoost", 'LDA_XGBoost'] = "LDA"
     autotune: bool = False
     ss_main_score: str = "auto"
     main_score_selection_report: bool = False
