@@ -377,7 +377,6 @@ class HistGBCLearner(AbstractLearner):
         assert isinstance(decoy_peaks, Experiment)
         assert isinstance(target_peaks, Experiment)
 
-
         X0 = decoy_peaks.get_feature_matrix(use_main_score)
         X1 = target_peaks.get_feature_matrix(use_main_score)
         X = np.vstack((X0, X1))
@@ -386,14 +385,19 @@ class HistGBCLearner(AbstractLearner):
 
         # Configure classifier with user params or defaults
         clf_params = dict(self.hgb_params)
+        clf_params.setdefault("learning_rate", 0.3)
         clf_params.setdefault("random_state", 42)
         clf_params.setdefault("max_iter", 100)
+        clf_params.setdefault("max_depth", 6)
         clf_params.setdefault("early_stopping", True)
         clf_params.setdefault("validation_fraction", 0.1)
 
         # Filter out any params not accepted by HistGradientBoostingClassifier
         import inspect
-        valid_params = inspect.signature(HistGradientBoostingClassifier.__init__).parameters
+
+        valid_params = inspect.signature(
+            HistGradientBoostingClassifier.__init__
+        ).parameters
         clf_params = {k: v for k, v in clf_params.items() if k in valid_params}
 
         classifier = HistGradientBoostingClassifier(**clf_params)
@@ -407,10 +411,13 @@ class HistGBCLearner(AbstractLearner):
         else:
             # Use permutation importance as fallback
             from sklearn.inspection import permutation_importance
-            result = permutation_importance(classifier, X, y, n_repeats=5, random_state=42, n_jobs=1)
+
+            result = permutation_importance(
+                classifier, X, y, n_repeats=5, random_state=42, n_jobs=1
+            )
             feats = result.importances_mean
             self.importance = {f"f{i}": float(v) for i, v in enumerate(feats)}
-        
+
         # Store importance on the classifier object itself so it survives set_parameters
         classifier._pyprophet_importance = self.importance
 
@@ -430,7 +437,7 @@ class HistGBCLearner(AbstractLearner):
     def set_parameters(self, classifier):
         """Set the parameters of the model."""
         self.classifier = classifier
-        
+
         # Try to get importance from the classifier's custom attribute (if we stored it there)
         if hasattr(classifier, "_pyprophet_importance"):
             self.importance = classifier._pyprophet_importance
