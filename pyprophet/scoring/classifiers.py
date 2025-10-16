@@ -410,6 +410,9 @@ class HistGBCLearner(AbstractLearner):
             result = permutation_importance(classifier, X, y, n_repeats=5, random_state=42, n_jobs=1)
             feats = result.importances_mean
             self.importance = {f"f{i}": float(v) for i, v in enumerate(feats)}
+        
+        # Store importance on the classifier object itself so it survives set_parameters
+        classifier._pyprophet_importance = self.importance
 
         return self
 
@@ -427,10 +430,16 @@ class HistGBCLearner(AbstractLearner):
     def set_parameters(self, classifier):
         """Set the parameters of the model."""
         self.classifier = classifier
-        if hasattr(classifier, "feature_importances_"):
+        
+        # Try to get importance from the classifier's custom attribute (if we stored it there)
+        if hasattr(classifier, "_pyprophet_importance"):
+            self.importance = classifier._pyprophet_importance
+        elif hasattr(classifier, "feature_importances_"):
             feats = classifier.feature_importances_
             self.importance = {f"f{i}": float(v) for i, v in enumerate(feats)}
         else:
+            # HistGradientBoostingClassifier doesn't have feature_importances_
+            # We'll set a placeholder - importance should have been set during learn()
             self.importance = {}
         return self
 
