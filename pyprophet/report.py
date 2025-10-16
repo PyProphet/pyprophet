@@ -9,7 +9,7 @@ try:
 except ImportError:
     plt = None
 
-from pypdf import PdfMerger, PdfReader
+from pypdf import PdfWriter, PdfReader
 import sys
 import os
 
@@ -1096,7 +1096,10 @@ def prepare_filtered_df(df, level, q_value_cols):
         f"Filtered DataFrame for {level} level with the following filters:\nprecursor_decoy == 0\nscore_ms2_peak_group_rank == 1\nscore_ms2_q_value <= 0.01\n{available_q_value_col} <= 0.01"
     )
 
-    if "score_ipf_qvalue" in filtered_df.columns:
+    if (
+        "score_ipf_qvalue" in filtered_df.columns
+        and filtered_df["score_ipf_qvalue"].notna().all()
+    ):
         logger.opt(raw=True, colors=True).trace("score_ipf_qvalue <= 0.01\n")
         filtered_df = filtered_df[filtered_df["score_ipf_qvalue"] <= 0.01].copy()
 
@@ -1200,7 +1203,7 @@ def create_summary_table(pdf, df):
             "Filtered precursor_df with the following conditions:\nprecursor_decoy == 0\nscore_ms2_peak_group_rank == 1\nscore_ms2_q_value <= 0.01"
         )
 
-        if "score_ipf_qvalue" in df.columns:
+        if "score_ipf_qvalue" in df.columns and df["score_ipf_qvalue"].notna().all():
             logger.opt(raw=True, colors=True).trace("score_ipf_qvalue <= 0.01\n")
             precursor_df = precursor_df[precursor_df["score_ipf_qvalue"] <= 0.01].copy()
 
@@ -1223,7 +1226,10 @@ def create_summary_table(pdf, df):
                 f"Filtered peptide_df with the following conditions:\nprecursor_decoy == 0\nscore_ms2_peak_group_rank == 1\nscore_ms2_q_value <= 0.01\n{peptide_q_col} <= 0.01"
             )
 
-            if "score_ipf_qvalue" in df.columns:
+            if (
+                "score_ipf_qvalue" in df.columns
+                and df["score_ipf_qvalue"].notna().all()
+            ):
                 logger.opt(raw=True, colors=True).trace("score_ipf_qvalue <= 0.01\n")
                 peptide_df = peptide_df[peptide_df["score_ipf_qvalue"] <= 0.01].copy()
 
@@ -1257,7 +1263,10 @@ def create_summary_table(pdf, df):
             logger.trace(
                 f"Filtered protein_df with the following conditions:\nprecursor_decoy == 0\nscore_ms2_peak_group_rank == 1\nscore_ms2_q_value <= 0.01\n{protein_q_col} <= 0.01"
             )
-            if "score_ipf_qvalue" in df.columns:
+            if (
+                "score_ipf_qvalue" in df.columns
+                and df["score_ipf_qvalue"].notna().all()
+            ):
                 logger.opt(raw=True, colors=True).trace("score_ipf_qvalue <= 0.01\n")
                 protein_df = protein_df[protein_df["score_ipf_qvalue"] <= 0.01].copy()
 
@@ -1289,6 +1298,9 @@ def create_summary_table(pdf, df):
                 protein_df[protein_df["run_id"] == run_id]["protein_id"].nunique()
                 if "protein_id" in protein_df.columns
                 else 0
+            )
+            logger.info(
+                f"Run ID: {run_id}, Precursors: {precursor_count}, Peptides: {peptide_count}, Proteins: {protein_count}"
             )
 
             summary_data.append(
@@ -1508,7 +1520,7 @@ def main_score_selection_report(
         )
 
     # Create output to merge pdges
-    output = PdfMerger()
+    output = PdfWriter()
     # Generate colors
     t_col, d_col = color_blind_friendly(color_palette)
 

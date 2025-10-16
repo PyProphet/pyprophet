@@ -48,6 +48,7 @@ import click
 import duckdb
 import pandas as pd
 import polars as pl
+import sklearn.preprocessing as preprocessing # For MinMaxScaler
 from loguru import logger
 
 from .._base import BaseIOConfig
@@ -384,7 +385,9 @@ class BaseWriter(ABC):
             #     logger.info(
             #         "Exploding protein_id column to handle multiple proteins per feature."
             #     )
-            df = df.explode("protein_id")
+            pl_df = pl.from_pandas(df)
+            pl_df = pl_df.explode("protein_id")
+            df = pl_df.to_pandas()
 
         if level == "transition":
             if self.file_type in ("parquet", "parquet_split", "parquet_split_multi"):
@@ -588,24 +591,90 @@ class BaseWriter(ABC):
         sep = "," if cfg.out_type == "csv" else "\t"
 
         if cfg.export_format == "legacy_split":
+            logger.info("Exporting results in legacy split format.")
             data = data.drop(["id_run", "id_peptide"], axis=1)
             # filename might contain archive extensions, so we need to remove these
             data["filename"] = data["filename"].apply(
                 lambda x: os.path.splitext(os.path.basename(x))[0]
             )
             data.groupby("filename").apply(
-                lambda x: x.to_csv(
-                    os.path.basename(x["filename"].values[0]) + f".{cfg.out_type}",
-                    sep=sep,
-                    index=False,
+                lambda x: (
+                    x.to_csv(
+                        os.path.basename(x["filename"].values[0]) + f".{cfg.out_type}",
+                        sep=sep,
+                        index=False,
+                    ),
+                    logger.success(
+                        f"Exported results to {os.path.basename(x['filename'].values[0])}.{cfg.out_type}."
+                    ),
                 )
             )
         elif cfg.export_format == "legacy_merged":
+            logger.info(
+                f"Exporting results ({data.shape} | {sys.getsizeof(data) / (1024**2):.2f}MB ) in legacy merged format."
+            )
             data.drop(["id_run", "id_peptide"], axis=1).to_csv(
                 cfg.outfile, sep=sep, index=False
             )
+            logger.success(f"Exported results to {cfg.outfile}.")
         else:
             raise ValueError(f"Unsupported export format: {cfg.export_format}")
+
+    def clean_and_export_library(self, data: pd.DataFrame) -> pd.DataFrame:
+        """
+        This function cleans the original dataframe and exports the library
+
+        Args:
+            data: Input DataFrame with library data
+
+        """
+        cfg = self.config
+
+        # For precursors found in more than one run, select the run with the smallest q value
+        # If q values are the same, select the first run
+        data = data.sort_values(by=['Q_Value', 'Intensity', 'RunId']).groupby("TransitionId").head(1)
+        assert len(data['TransitionId'].drop_duplicates()) == len(data), "After filtering by Q_Value Intensity and RunId, duplicate transition IDs found."
+
+        # Remove Annotation Column if all NAN
+        if data['Annotation'].isnull().all() or data['Annotation'].eq("NA").all():
+            logger.debug("Annotation column is empty, so computing it manually.")
+            data.drop(columns=['Annotation'], inplace=True)
+            data['Annotation'] = data['FragmentType'] + data['FragmentSeriesNumber'].astype(str) + '^' + data['FragmentCharge'].astype(str)
+
+        if cfg.rt_calibration and cfg.rt_unit == "iRT":
+            data['NormalizedRetentionTime'] = preprocessing.MinMaxScaler().fit_transform(data[['NormalizedRetentionTime']]) * 100
+        if cfg.intensity_calibration:
+            data['LibraryIntensity'] = (
+            data['LibraryIntensity'] /
+            data.groupby('Precursor')['LibraryIntensity'].transform('max') *
+            10000)
+            logger.debug("Removing {} rows with zero intensity.".format(len(data[data['LibraryIntensity'] <= 0])))
+            # Remove rows with zero intensity
+            data = data[data['LibraryIntensity'] > 0] 
+        
+        ## Print Library statistics
+        logger.info(f"Library Contains {len(data['Precursor'].drop_duplicates())} Precursors")
+
+        logger.info(f"Precursor Fragment Distribution (Before Filtering)")
+        num_frags_per_prec = data[['Precursor', 'TransitionId']].groupby("Precursor").count().reset_index(names='Precursor').groupby('TransitionId').count()
+        for frag, count in num_frags_per_prec.iterrows():
+            logger.info(f"There are {count['Precursor']} precursors with {frag} fragment(s)")
+        
+        logger.info(f"Filter library to precursors containing {cfg.min_fragments} or more fragments")
+        ids_to_keep = data[['Precursor', 'Annotation']].groupby('Precursor').count()
+        ids_to_keep = ids_to_keep[ ids_to_keep['Annotation'] >= cfg.min_fragments ].index
+        data = data[ data['Precursor'].isin(ids_to_keep) ]
+
+        logger.info(f"After filtering, library contains {len(data['Precursor'].drop_duplicates())} Precursors")
+        if cfg.keep_decoys:
+            logger.info("Of Which {} are decoys".format(len(data[data['Decoy'] == 1]['Precursor'].drop_duplicates())))
+
+        data.drop(columns=['TransitionId', 'Q_Value', 'RunId', 'Intensity'], inplace=True)
+        if cfg.test:
+            data = data.sort_values(by=['Precursor', 'FragmentType', 'FragmentSeriesNumber', 'FragmentCharge', 'ProductMz'])
+
+        logger.info("Exporting library to file.")
+        data.to_csv(cfg.outfile, sep='\t', index=False)
 
     def export_quant_matrix(self, data: pd.DataFrame) -> pd.DataFrame:
         """
@@ -853,6 +922,14 @@ class BaseWriter(ABC):
             raise ImportError(
                 "scikit-learn is required for quantile normalization"
             ) from exc
+    
+    def _execute_copy_query(self, conn, query: str, path: str) -> None:
+        """Execute COPY query with configured compression settings"""
+        conn.execute(
+            f"COPY ({query}) TO '{path}' "
+            f"(FORMAT 'parquet', COMPRESSION '{self.config.compression_method}', "
+            f"COMPRESSION_LEVEL {self.config.compression_level})"
+        )
 
 
 @dataclass

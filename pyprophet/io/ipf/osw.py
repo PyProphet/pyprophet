@@ -308,21 +308,48 @@ class OSWReader(BaseOSWReader):
             )
 
         query = f"""
-            SELECT  
-                DENSE_RANK() OVER (ORDER BY PRECURSOR_ID, ALIGNMENT_ID) AS ALIGNMENT_GROUP_ID,
-                ALIGNED_FEATURE_ID AS FEATURE_ID 
+            SELECT 
+                DENSE_RANK() OVER (ORDER BY merged.PRECURSOR_ID, merged.ALIGNMENT_ID) AS ALIGNMENT_GROUP_ID,
+                merged.ALIGNMENT_ID,
+                merged.FEATURE_ID,
+                merged.PRECURSOR_ID,
+                merged.FEATURE_TYPE
             FROM (
-                SELECT DISTINCT * FROM osw.FEATURE_MS2_ALIGNMENT
-            ) AS FEATURE_MS2_ALIGNMENT
-            INNER JOIN (
-                SELECT DISTINCT *, MIN(QVALUE) 
-                FROM osw.SCORE_ALIGNMENT 
+                SELECT DISTINCT
+                    fma.ALIGNMENT_ID,
+                    fma.REFERENCE_FEATURE_ID AS FEATURE_ID,
+                    fma.PRECURSOR_ID,
+                    'REFERENCE' AS FEATURE_TYPE
+                FROM osw.FEATURE_MS2_ALIGNMENT AS fma
+                WHERE fma.LABEL = 1
+                AND fma.REFERENCE_FEATURE_ID != fma.ALIGNED_FEATURE_ID
+
+                UNION
+
+                SELECT DISTINCT
+                    fma.ALIGNMENT_ID,
+                    fma.ALIGNED_FEATURE_ID AS FEATURE_ID,
+                    fma.PRECURSOR_ID,
+                    'QUERY' AS FEATURE_TYPE
+                FROM osw.FEATURE_MS2_ALIGNMENT AS fma
+                WHERE fma.LABEL = 1
+                AND fma.REFERENCE_FEATURE_ID != fma.ALIGNED_FEATURE_ID
+            ) AS merged
+            LEFT JOIN (
+                SELECT 
+                    FEATURE_ID,
+                    MIN(PEP) AS pep
+                FROM osw.SCORE_ALIGNMENT
+                WHERE PEP <= {pep_threshold}
                 GROUP BY FEATURE_ID
-            ) AS SCORE_ALIGNMENT 
-            ON SCORE_ALIGNMENT.FEATURE_ID = FEATURE_MS2_ALIGNMENT.ALIGNED_FEATURE_ID
-            WHERE LABEL = 1
-            AND SCORE_ALIGNMENT.PEP < {pep_threshold}
-            ORDER BY ALIGNMENT_GROUP_ID
+            ) AS sa
+            ON merged.FEATURE_ID = sa.FEATURE_ID
+            ORDER BY 
+                ALIGNMENT_GROUP_ID,
+                CASE merged.FEATURE_TYPE 
+                    WHEN 'REFERENCE' THEN 0 
+                    WHEN 'QUERY' THEN 1 
+                END;
         """
 
         df = con.execute(query).fetchdf()

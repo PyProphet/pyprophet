@@ -199,7 +199,7 @@ def test_peptide_levels(input_strategy, temp_folder, regtest, context):
     cmd = f"pyprophet score {input_strategy['cmd_prefix']} --level=ms2 --test --pi0_lambda=0.001 0 0 --ss_iteration_fdr=0.02"
 
     # Add peptide command
-    cmd += f" && pyprophet levels-context peptide --pi0_lambda=0.001 0 0 {input_strategy['cmd_prefix']} --context={context}"
+    cmd += f" && pyprophet infer peptide --pi0_lambda=0.001 0 0 {input_strategy['cmd_prefix']} --context={context}"
 
     # Execute commands
     run_pyprophet_command(cmd, temp_folder)
@@ -217,7 +217,7 @@ def test_protein_levels(input_strategy, temp_folder, regtest, context):
     cmd = f"pyprophet score {input_strategy['cmd_prefix']} --level=ms2 --test --pi0_lambda=0.001 0 0 --ss_iteration_fdr=0.02"
 
     # Add protein command
-    cmd += f" && pyprophet levels-context protein --pi0_lambda=0 0 0 {input_strategy['cmd_prefix']} --context={context}"
+    cmd += f" && pyprophet infer protein --pi0_lambda=0 0 0 {input_strategy['cmd_prefix']} --context={context}"
 
     # Execute commands
     run_pyprophet_command(cmd, temp_folder)

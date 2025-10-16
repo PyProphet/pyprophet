@@ -1,0 +1,19 @@
+# .dockerignore
+.git
+.gitignore
+**/__pycache__/
+**/*.pyc
+build/
+dist/
+*.egg-info/
+*.whl
+*.tar.gz
+tests/
+notebooks/
+data/
+examples/
+.tmp/
+.DS_Store
+sandbox/
+.pytest_cache/
+.ruff_cache/

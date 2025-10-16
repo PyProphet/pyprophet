@@ -238,7 +238,11 @@ from ..scoring.runner import PyProphetLearner, PyProphetWeightApplier
     help="Run in test mode with fixed seed.",
     hidden=True,
 )
-@click.option("--profile", is_flag=True, help="Enable Memray profiling.")
+@click.option(
+    "--profile",
+    is_flag=True,
+    help="Enable memory allocation tracking and profiling. Requires memrary to be installed.",
+)
 @click.pass_context
 @memray_profile()
 @measure_memory_usage_and_time

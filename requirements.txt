@@ -67,6 +67,8 @@ kiwisolver==1.4.7
     # via matplotlib
 loguru==0.7.3
     # via pyprophet (setup.py)
+lxml==6.0.2
+    # via pyprophet (setup.py)
 markupsafe==3.0.2
     # via jinja2
 matplotlib==3.9.4
@@ -106,7 +108,7 @@ pandas==2.2.3
     #   statsmodels
 patsy==1.0.1
     # via statsmodels
-pillow==11.2.1
+pillow==11.3.0
     # via matplotlib
 pluggy==1.6.0
     # via pytest
@@ -128,7 +130,7 @@ pyopenms==3.4.0
     # via pyprophet (setup.py)
 pyparsing==3.2.3
     # via matplotlib
-pypdf==5.6.0
+pypdf==6.0.0
     # via pyprophet (setup.py)
 pytest==8.4.0
     # via
@@ -145,7 +147,7 @@ python-dateutil==2.9.0.post0
     #   pandas
 pytz==2025.2
     # via pandas
-requests==2.32.3
+requests==2.32.4
     # via sphinx
 scikit-learn==1.6.1
     # via pyprophet (setup.py)
@@ -209,7 +211,7 @@ typing-extensions==4.14.0
     #   pypdf
 tzdata==2025.2
     # via pandas
-urllib3==2.4.0
+urllib3==2.5.0
     # via requests
 xgboost==2.1.4
     # via pyprophet (setup.py)

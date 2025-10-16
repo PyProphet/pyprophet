@@ -1,9 +1,16 @@
 name: continuous-integration
 
-on: [push]
+on:
+  push:
+  pull_request:
 
 jobs:
   test:
+    # Add concurrency to cancel previous runs
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
+
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -28,4 +35,4 @@ jobs:
 
     - name: Test
       run: |
-        python -m pytest -n auto tests/ 
+        python -m pytest -n auto tests/

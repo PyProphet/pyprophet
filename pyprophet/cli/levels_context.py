@@ -8,6 +8,7 @@ from .util import (
     write_logfile,
     measure_memory_usage_and_time,
 )
+from .ipf import ipf as ipf_command, glycoform as glycoform_command
 from .._config import LevelContextIOConfig
 from ..levels_contexts import (
     infer_glycopeptides,
@@ -18,12 +19,17 @@ from ..levels_contexts import (
 
 
 def create_levels_context_group():
-    @click.group(name="levels-context", cls=CombinedGroup)
+    @click.group(name="infer", cls=CombinedGroup)
     @click.pass_context
     def levels_context(ctx):
-        """Subcommands for FDR estimation at different biological levels."""
+        """Subcommands for peptidoform inference and FDR estimation at different biological levels."""
         pass
 
+    # Pepidoform-level inference
+    levels_context.add_command(ipf_command, name="peptidoform")
+    levels_context.add_command(glycoform_command, name="glycoform")
+
+    # Macromolecule-level inference
     levels_context.add_command(peptide, name="peptide")
     levels_context.add_command(glycopeptide, name="glycopeptide")
     levels_context.add_command(gene, name="gene")
@@ -90,6 +96,12 @@ def peptide(
     """
     Infer peptides and conduct error-rate estimation in different contexts.
     """
+
+    # Check to see if we're calling from the previous deprecated command call
+    if ctx.command.deprecated:
+        logger.warning(
+            "The 'pyprophet peptide' command is deprecated and will be removed in future versions. Use 'pyprophet infer peptide' instead."
+        )
 
     if outfile is None:
         outfile = infile
@@ -269,6 +281,12 @@ def gene(
     Infer genes and conduct error-rate estimation in different contexts.
     """
 
+    # Check to see if we're calling from the previous deprecated command call
+    if ctx.command.deprecated:
+        logger.warning(
+            "The 'pyprophet gene' command is deprecated and will be removed in future versions. Use 'pyprophet infer gene' instead."
+        )
+
     if outfile is None:
         outfile = infile
     else:
@@ -362,6 +380,12 @@ def protein(
     """
     Infer proteins and conduct error-rate estimation in different contexts.
     """
+
+    # Check to see if we're calling from the previous deprecated command call
+    if ctx.command.deprecated:
+        logger.warning(
+            "The 'pyprophet protein' command is deprecated and will be removed in future versions. Use 'pyprophet infer protein' instead."
+        )
 
     if outfile is None:
         outfile = infile

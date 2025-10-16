@@ -92,6 +92,216 @@ To further split the data by run, you can use the `--split_runs` option. This wi
         │   └── 📄 transition_features.parquet
         │   ... (236 more run(s) collapsed)
 
+Precursors Features Parquet Schema
+**********************************
+
+.. raw:: html
+
+    <details>
+    <summary>Click to expand the Precursors Features Parquet Schema. Note that not all columns listed here are in every parquet file.</summary>
+    <pre>
+    Schema([
+        ('PROTEIN_ID', Int64),
+        ('PEPTIDE_ID', Int64),
+        ('IPF_PEPTIDE_ID', Int64),
+        ('PRECURSOR_ID', Int64),
+        ('PROTEIN_ACCESSION', String),
+        ('UNMODIFIED_SEQUENCE', String),
+        ('MODIFIED_SEQUENCE', String),
+        ('PRECURSOR_TRAML_ID', String),
+        ('PRECURSOR_GROUP_LABEL', String),
+        ('PRECURSOR_MZ', Float64),
+        ('PRECURSOR_CHARGE', Int64),
+        ('PRECURSOR_LIBRARY_INTENSITY', Float64),
+        ('PRECURSOR_LIBRARY_RT', Float64),
+        ('PRECURSOR_LIBRARY_DRIFT_TIME', Float64),
+        ('GENE_ID', Int64),
+        ('GENE_NAME', String),
+        ('GENE_DECOY', Int64),
+        ('PROTEIN_DECOY', Int64),
+        ('PEPTIDE_DECOY', Int64),
+        ('PRECURSOR_DECOY', Int64),
+        ('RUN_ID', Int64),
+        ('FILENAME', String),
+        ('FEATURE_ID', Int64),
+        ('EXP_RT', Float64),
+        ('EXP_IM', Float64),
+        ('NORM_RT', Float64),
+        ('DELTA_RT', Float64),
+        ('LEFT_WIDTH', Float64),
+        ('RIGHT_WIDTH', Float64),
+        ('FEATURE_MS1_AREA_INTENSITY', Float64),
+        ('FEATURE_MS1_APEX_INTENSITY', Float64),
+        ('FEATURE_MS1_EXP_IM', Float64),
+        ('FEATURE_MS1_DELTA_IM', Float64),
+        ('FEATURE_MS1_VAR_MASSDEV_SCORE', Float64),
+        ('FEATURE_MS1_VAR_MI_SCORE', Float64),
+        ('FEATURE_MS1_VAR_MI_CONTRAST_SCORE', Float64),
+        ('FEATURE_MS1_VAR_MI_COMBINED_SCORE', Float64),
+        ('FEATURE_MS1_VAR_ISOTOPE_CORRELATION_SCORE', Float64),
+        ('FEATURE_MS1_VAR_ISOTOPE_OVERLAP_SCORE', Float64),
+        ('FEATURE_MS1_VAR_IM_MS1_DELTA_SCORE', Float64),
+        ('FEATURE_MS1_VAR_XCORR_COELUTION', Float64),
+        ('FEATURE_MS1_VAR_XCORR_COELUTION_CONTRAST', Float64),
+        ('FEATURE_MS1_VAR_XCORR_COELUTION_COMBINED', Float64),
+        ('FEATURE_MS1_VAR_XCORR_SHAPE', Float64),
+        ('FEATURE_MS1_VAR_XCORR_SHAPE_CONTRAST', Float64),
+        ('FEATURE_MS1_VAR_XCORR_SHAPE_COMBINED', Float64),
+        ('FEATURE_MS2_AREA_INTENSITY', Float64),
+        ('FEATURE_MS2_TOTAL_AREA_INTENSITY', Float64),
+        ('FEATURE_MS2_APEX_INTENSITY', Float64),
+        ('FEATURE_MS2_EXP_IM', Float64),
+        ('FEATURE_MS2_EXP_IM_LEFTWIDTH', Float64),
+        ('FEATURE_MS2_EXP_IM_RIGHTWIDTH', Float64),
+        ('FEATURE_MS2_DELTA_IM', Float64),
+        ('FEATURE_MS2_TOTAL_MI', Float64),
+        ('FEATURE_MS2_VAR_BSERIES_SCORE', Float64),
+        ('FEATURE_MS2_VAR_DOTPROD_SCORE', Float64),
+        ('FEATURE_MS2_VAR_INTENSITY_SCORE', Float64),
+        ('FEATURE_MS2_VAR_ISOTOPE_CORRELATION_SCORE', Float64),
+        ('FEATURE_MS2_VAR_ISOTOPE_OVERLAP_SCORE', Float64),
+        ('FEATURE_MS2_VAR_LIBRARY_CORR', Float64),
+        ('FEATURE_MS2_VAR_LIBRARY_DOTPROD', Float64),
+        ('FEATURE_MS2_VAR_LIBRARY_MANHATTAN', Float64),
+        ('FEATURE_MS2_VAR_LIBRARY_RMSD', Float64),
+        ('FEATURE_MS2_VAR_LIBRARY_ROOTMEANSQUARE', Float64),
+        ('FEATURE_MS2_VAR_LIBRARY_SANGLE', Float64),
+        ('FEATURE_MS2_VAR_LOG_SN_SCORE', Float64),
+        ('FEATURE_MS2_VAR_MANHATTAN_SCORE', Float64),
+        ('FEATURE_MS2_VAR_MASSDEV_SCORE', Float64),
+        ('FEATURE_MS2_VAR_MASSDEV_SCORE_WEIGHTED', Float64),
+        ('FEATURE_MS2_VAR_MI_SCORE', Float64),
+        ('FEATURE_MS2_VAR_MI_WEIGHTED_SCORE', Float64),
+        ('FEATURE_MS2_VAR_MI_RATIO_SCORE', Float64),
+        ('FEATURE_MS2_VAR_NORM_RT_SCORE', Float64),
+        ('FEATURE_MS2_VAR_XCORR_COELUTION', Float64),
+        ('FEATURE_MS2_VAR_XCORR_COELUTION_WEIGHTED', Float64),
+        ('FEATURE_MS2_VAR_XCORR_SHAPE', Float64),
+        ('FEATURE_MS2_VAR_XCORR_SHAPE_WEIGHTED', Float64),
+        ('FEATURE_MS2_VAR_YSERIES_SCORE', Float64),
+        ('FEATURE_MS2_VAR_ELUTION_MODEL_FIT_SCORE', Float64),
+        ('FEATURE_MS2_VAR_IM_XCORR_SHAPE', Float64),
+        ('FEATURE_MS2_VAR_IM_XCORR_COELUTION', Float64),
+        ('FEATURE_MS2_VAR_IM_DELTA_SCORE', Float64),
+        ('FEATURE_MS2_VAR_SONAR_LAG', Float64),
+        ('FEATURE_MS2_VAR_SONAR_SHAPE', Float64),
+        ('FEATURE_MS2_VAR_SONAR_LOG_SN', Float64),
+        ('FEATURE_MS2_VAR_SONAR_LOG_DIFF', Float64),
+        ('FEATURE_MS2_VAR_SONAR_LOG_TREND', Float64),
+        ('FEATURE_MS2_VAR_SONAR_RSQ', Float64),
+        ('SCORE_MS2_SCORE', Float64),
+        ('SCORE_MS2_PEAK_GROUP_RANK', Float64),
+        ('SCORE_MS2_P_VALUE', Float64),
+        ('SCORE_MS2_Q_VALUE', Float64),
+        ('SCORE_MS2_PEP', Float64),
+        ('SCORE_IPF_PRECURSOR_PEAKGROUP_PEP', Float64),
+        ('SCORE_IPF_QVALUE', Float64),
+        ('SCORE_IPF_PEP', Float64),
+        ('SCORE_PEPTIDE_RUN_SPECIFIC_SCORE', Float64),
+        ('SCORE_PEPTIDE_RUN_SPECIFIC_P_VALUE', Float64),
+        ('SCORE_PEPTIDE_RUN_SPECIFIC_Q_VALUE', Float64),
+        ('SCORE_PEPTIDE_RUN_SPECIFIC_PEP', Float64),
+        ('SCORE_PEPTIDE_EXPERIMENT_WIDE_SCORE', Float64),
+        ('SCORE_PEPTIDE_EXPERIMENT_WIDE_P_VALUE', Float64),
+        ('SCORE_PEPTIDE_EXPERIMENT_WIDE_Q_VALUE', Float64),
+        ('SCORE_PEPTIDE_EXPERIMENT_WIDE_PEP', Float64),
+        ('SCORE_PEPTIDE_GLOBAL_SCORE', Float64),
+        ('SCORE_PEPTIDE_GLOBAL_P_VALUE', Float64),
+        ('SCORE_PEPTIDE_GLOBAL_Q_VALUE', Float64),
+        ('SCORE_PEPTIDE_GLOBAL_PEP', Float64),
+        ('SCORE_PROTEIN_RUN_SPECIFIC_SCORE', Float64),
+        ('SCORE_PROTEIN_RUN_SPECIFIC_P_VALUE', Float64),
+        ('SCORE_PROTEIN_RUN_SPECIFIC_Q_VALUE', Float64),
+        ('SCORE_PROTEIN_RUN_SPECIFIC_PEP', Float64),
+        ('SCORE_PROTEIN_EXPERIMENT_WIDE_SCORE', Float64),
+        ('SCORE_PROTEIN_EXPERIMENT_WIDE_P_VALUE', Float64),
+        ('SCORE_PROTEIN_EXPERIMENT_WIDE_Q_VALUE', Float64),
+        ('SCORE_PROTEIN_EXPERIMENT_WIDE_PEP', Float64),
+        ('SCORE_PROTEIN_GLOBAL_SCORE', Float64),
+        ('SCORE_PROTEIN_GLOBAL_P_VALUE', Float64),
+        ('SCORE_PROTEIN_GLOBAL_Q_VALUE', Float64),
+        ('SCORE_PROTEIN_GLOBAL_PEP', Float64)])
+
+    </pre>
+    </details>
+    <br>
+
+
+Transition Features Parquet Schema
+**********************************
+
+.. raw:: html
+
+    <details>
+    <summary>Click to expand the Transition Feature Parquet Schema. Note that not all columns listed here are in every parquet file. </summary>
+    <pre>
+    Schema([
+        ('RUN_ID', Int64),
+        ('IPF_PEPTIDE_ID', Int64),
+        ('PRECURSOR_ID', Int64),
+        ('TRANSITION_ID', Int64),
+        ('TRANSITION_TRAML_ID', String),
+        ('PRODUCT_MZ', Float64),
+        ('TRANSITION_CHARGE', Int64),
+        ('TRANSITION_TYPE', String),
+        ('TRANSITION_ORDINAL', Int64),
+        ('ANNOTATION', String),
+        ('TRANSITION_DETECTING', Int64),
+        ('TRANSITION_LIBRARY_INTENSITY', Float64),
+        ('TRANSITION_DECOY', Int64),
+        ('FEATURE_ID', Int64),
+        ('FEATURE_TRANSITION_AREA_INTENSITY', Float64),
+        ('FEATURE_TRANSITION_TOTAL_AREA_INTENSITY', Float64),
+        ('FEATURE_TRANSITION_APEX_RT', Float64),
+        ('FEATURE_TRANSITION_APEX_INTENSITY', Float64),
+        ('FEATURE_TRANSITION_RT_FWHM', Float64),
+        ('FEATURE_TRANSITION_MASSERROR_PPM', Float64),
+        ('FEATURE_TRANSITION_TOTAL_MI', Float64),
+        ('FEATURE_TRANSITION_VAR_INTENSITY_SCORE', Float64),
+        ('FEATURE_TRANSITION_VAR_INTENSITY_RATIO_SCORE', Float64),
+        ('FEATURE_TRANSITION_VAR_LOG_INTENSITY', Float64),
+        ('FEATURE_TRANSITION_VAR_XCORR_COELUTION', Float64),
+        ('FEATURE_TRANSITION_VAR_XCORR_SHAPE', Float64),
+        ('FEATURE_TRANSITION_VAR_LOG_SN_SCORE', Float64),
+        ('FEATURE_TRANSITION_VAR_MASSDEV_SCORE', Float64),
+        ('FEATURE_TRANSITION_VAR_MI_SCORE', Float64),
+        ('FEATURE_TRANSITION_VAR_MI_RATIO_SCORE', Float64),
+        ('FEATURE_TRANSITION_VAR_ISOTOPE_CORRELATION_SCORE', Float64),
+        ('FEATURE_TRANSITION_VAR_ISOTOPE_OVERLAP_SCORE', Float64),
+        ('FEATURE_TRANSITION_START_POSITION_AT_5', Float64),
+        ('FEATURE_TRANSITION_END_POSITION_AT_5', Float64),
+        ('FEATURE_TRANSITION_START_POSITION_AT_10', Float64),
+        ('FEATURE_TRANSITION_END_POSITION_AT_10', Float64),
+        ('FEATURE_TRANSITION_START_POSITION_AT_50', Float64),
+        ('FEATURE_TRANSITION_END_POSITION_AT_50', Float64),
+        ('FEATURE_TRANSITION_TOTAL_WIDTH', Float64),
+        ('FEATURE_TRANSITION_TAILING_FACTOR', Float64),
+        ('FEATURE_TRANSITION_ASYMMETRY_FACTOR', Float64),
+        ('FEATURE_TRANSITION_SLOPE_OF_BASELINE', Float64),
+        ('FEATURE_TRANSITION_BASELINE_DELTA_2_HEIGHT', Float64),
+        ('FEATURE_TRANSITION_POINTS_ACROSS_BASELINE', Float64),
+        ('FEATURE_TRANSITION_POINTS_ACROSS_HALF_HEIGHT', Float64),
+        ('FEATURE_TRANSITION_EXP_IM', Float64),
+        ('FEATURE_TRANSITION_EXP_IM_LEFTWIDTH', Float64),
+        ('FEATURE_TRANSITION_EXP_IM_RIGHTWIDTH', Float64),
+        ('FEATURE_TRANSITION_DELTA_IM', Float64),
+        ('FEATURE_TRANSITION_VAR_IM_DELTA_SCORE', Float64),
+        ('FEATURE_TRANSITION_VAR_IM_LOG_INTENSITY', Float64),
+        ('FEATURE_TRANSITION_VAR_IM_XCORR_COELUTION_CONTRAST', Binary),
+        ('FEATURE_TRANSITION_VAR_IM_XCORR_SHAPE_CONTRAST', Binary),
+        ('FEATURE_TRANSITION_VAR_IM_XCORR_COELUTION_COMBINED', Binary),
+        ('FEATURE_TRANSITION_VAR_IM_XCORR_SHAPE_COMBINED', Binary),
+        ('SCORE_TRANSITION_SCORE', Float32),
+        ('SCORE_TRANSITION_RANK', UInt32),
+        ('SCORE_TRANSITION_P_VALUE', Float64),
+        ('SCORE_TRANSITION_Q_VALUE', Float64),
+        ('SCORE_TRANSITION_PEP', Float64)
+    ])
+    </pre>
+    </details>
+    <br>
+
+
 
 Extracted Ion Chromatograms (XICs)
 ----------------------------------
@@ -107,3 +317,54 @@ Parquet Format (*.parquet*)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 PyProphet supports converting the OpenSWATH SQLite format (*.sqMass*) to a parquet format, for better storage. You can use the :program:`export parquet` subcommand to convert the OpenSWATH SQLite format (*.sqMass*) to a parquet format. 
+
+The Parquet schema used for the XICs is as follows:
+
+.. code-block:: text
+
+    Schema([
+        ('PRECURSOR_ID', Int64),
+        ('TRANSITION_ID', Int64),
+        ('MODIFIED_SEQUENCE', String),
+        ('PRECURSOR_CHARGE', Int64),
+        ('PRODUCT_CHARGE', Int64),
+        ('DETECTING_TRANSITION', Int64),
+        ('PRECURSOR_DECOY', Int64),
+        ('PRODUCT_DECOY', Int64),
+        ('TRANSITION_ORDINAL', Int64), 
+        ('TRANSITION_TYPE', String),
+        ('NATIVE_ID', String),
+        ('RT_DATA', Binary),
+        ('INTENSITY_DATA', Binary),
+        ('RT_COMPRESSION', Int64),
+        ('INTENSITY_COMPRESSION', Int64)
+    ])
+
+RT_COMPRESSION and INTENSITY_COMPRESSION are used to store the compression type 
+for the RT and intensity data, respectively. The RT_DATA and INTENSITY_DATA are 
+stored as binary data, which can be decompressed using the appropriate compression 
+algorithm.
+
+The possible values and their decoding for the compression type are as follows:
+
+.. list-table:: Compression Types
+   :header-rows: 1
+
+   * - Value
+     - Compression Type
+   * - 0
+     - No compression
+   * - 1
+     - zlib
+   * - 2
+     - np-linear
+   * - 3
+     - np-slof
+   * - 4
+     - np-pic
+   * - 5
+     - np-linear + zlib
+   * - 6
+     - np-slof + zlib
+   * - 7
+     - np-pic + zlib

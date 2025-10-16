@@ -35,22 +35,22 @@ Inference of Peptidoforms
 -------------------------
 .. _cli_ipf:
 
-For PTM analyses, PyProphet provides the :program:`ipf` subcommand. This command allows you to perform inference of peptidoforms, for site-localization of peptidoforms in large-scale DIA experiments.
+For PTM analyses, PyProphet provides the :program:`infer peptidoform` subcommand. This command allows you to perform inference of peptidoforms, for site-localization of peptidoforms in large-scale DIA experiments.
 
 Refer to `Rosenberger, G. et. al. (2017) <https://www.nature.com/articles/nbt.3908#Abs2>`_ to learn more about the inference of peptidoforms workflow.
 
 .. currentmodule:: pyprophet.cli.ipf
 
 .. click:: pyprophet.cli.ipf:ipf
-   :prog: pyprophet ipf
+   :prog: pyprophet infer peptidoform
    :nested: none
 
-For glycoform inference, you can use the :program:`glycoform` subcommand, which is specifically designed for glycopeptide analyses.
+For glycoform inference, you can use the :program:`infer glycoform` subcommand, which is specifically designed for glycopeptide analyses.
 
 .. currentmodule:: pyprophet.cli.ipf
 
 .. click:: pyprophet.cli.ipf:glycoform
-   :prog: pyprophet glycoform
+   :prog: pyprophet infer glycoform
    :nested: none
 
 Refer to `Yang, Y. et. al. (2021) <https://www.nature.com/articles/s41467-021-26246-3#Abs1>`_ to learn more about the glycoform inference workflow.
@@ -59,7 +59,7 @@ Peptide / Protein / Gene Inference
 ----------------------------------
 .. _cli_levels_context:
 
-To perform inference at different levels of biological context and different experimental contexts (global, experiment-wide and run-specific), PyProphet provides the :program:`levels-context` subcommand. This command allows you to infer peptide, glycopeptide, protein, and gene levels from your data.
+To perform inference at different levels of biological context and different experimental contexts (global, experiment-wide and run-specific), PyProphet provides the :program:`infer` subcommand. This command allows you to infer peptide, glycopeptide, protein, and gene levels from your data.
 
 Refer to `Rosenberger, G. et. al. (2017) <https://www.nature.com/articles/nmeth.4398>`_ to learn more about the levels context inference.
 
@@ -68,23 +68,23 @@ For more information about glycopeptide inference, refer to `Yang, Y.. et. al. (
 .. currentmodule:: pyprophet.cli.levels_context
 
 .. click:: pyprophet.cli.levels_context:peptide
-   :prog: pyprophet levels-context peptide
+   :prog: pyprophet infer peptide
    :nested: none
 
 The :program:`peptide` command accepts a :option:`helphelp` argument to display its advanced options that are not shown here.
 
 .. click:: pyprophet.cli.levels_context:glycopeptide
-   :prog: pyprophet levels-context glycopeptide
+   :prog: pyprophet infer glycopeptide
    :nested: none
 
 .. click:: pyprophet.cli.levels_context:protein
-   :prog: pyprophet levels-context protein
+   :prog: pyprophet infer protein
    :nested: none
 
 The :program:`protein` command accepts a :option:`helphelp` argument to display its advanced options that are not shown here.
 
 .. click:: pyprophet.cli.levels_context:gene
-   :prog: pyprophet levels-context gene
+   :prog: pyprophet infer gene
    :nested: none
 
 The :program:`gene` command accepts a :option:`helphelp` argument to display its advanced options that are not shown here.

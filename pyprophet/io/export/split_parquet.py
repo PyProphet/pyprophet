@@ -68,6 +68,18 @@ class SplitParquetReader(BaseSplitParquetReader):
         try:
             self._init_duckdb_views(con)
 
+            if self.config.export_format == "library":
+                if self._is_unscored_file():
+                    descr= "Files must be scored for library generation."
+                    logger.exception(descr)
+                    raise ValueError(descr)
+                if not self._has_peptide_protein_global_scores():
+                    descr= "Files must have peptide and protein level global scores for library generation."
+                    logger.exception(descr)
+                    raise ValueError(descr)
+                logger.info("Reading standard OpenSWATH data for library from split Parquet files.")
+                return self._read_library_data(con)
+
             if self._is_unscored_file():
                 logger.info("Reading unscored data from split Parquet files.")
                 return self._read_unscored_data(con)
@@ -82,9 +94,17 @@ class SplitParquetReader(BaseSplitParquetReader):
                 logger.info("Reading standard OpenSWATH data from split Parquet files.")
                 data = self._read_standard_data(con)
 
-            return self._augment_data(data, con)
+                return self._augment_data(data, con)
         finally:
             con.close()
+    
+    def _has_peptide_protein_global_scores(self) -> bool:
+        """
+        Check if files contain peptide and protein global scores
+        """
+        has_peptide = any(col.startswith("SCORE_PEPTIDE_GLOBAL") for col in self._columns)
+        has_protein = any(col.startswith("SCORE_PROTEIN_GLOBAL") for col in self._columns)
+        return has_peptide and has_protein
 
     def _is_unscored_file(self) -> bool:
         """
@@ -257,6 +277,66 @@ class SplitParquetReader(BaseSplitParquetReader):
 
         return pd.merge(data, ipf_data, on="id", how="left")
 
+    def _read_library_data(self, con) -> pd.DataFrame:
+        """
+        Read data specifically for precursors for library generation. This does not include all output in standard output
+        """
+        if self.config.rt_calibration:
+            rt_col = "p.EXP_RT"
+        else:
+            rt_col = "p.PRECURSOR_LIBRARY_RT"
+
+        if self.config.im_calibration:
+            im_col = "p.EXP_IM"
+        else:
+            im_col = "p.PRECURSOR_LIBRARY_DRIFT_TIME"
+
+        if self.config.intensity_calibration:
+            intensity_col = 't.FEATURE_TRANSITION_AREA_INTENSITY'
+        else:
+            intensity_col = 't.TRANSITION_LIBRARY_INTENSITY'
+        
+        if self.config.keep_decoys:
+            decoy_query = ""
+        else:
+            decoy_query ="p.PRECURSOR_DECOY is false and t.TRANSITION_DECOY is false and" 
+
+        query = f"""
+            SELECT
+                {rt_col} as NormalizedRetentionTime,
+                {im_col} as PrecursorIonMobility,
+                {intensity_col} as LibraryIntensity,
+                p.SCORE_MS2_Q_VALUE as Q_Value,
+                p.UNMODIFIED_SEQUENCE AS PeptideSequence,
+                p.MODIFIED_SEQUENCE AS ModifiedPeptideSequence,
+                p.PRECURSOR_CHARGE AS PrecursorCharge,
+                p.FEATURE_MS2_AREA_INTENSITY AS Intensity,
+                p.RUN_ID AS RunId,
+                (p.MODIFIED_SEQUENCE || '_' || CAST(p.PRECURSOR_CHARGE AS VARCHAR)) AS Precursor,
+                p.PRECURSOR_MZ AS PrecursorMz,
+                STRING_AGG(p.PROTEIN_ACCESSION, ';') AS ProteinName,
+                t.ANNOTATION as Annotation,
+                t.PRODUCT_MZ as ProductMz,
+                t.TRANSITION_CHARGE as FragmentCharge,
+                t.TRANSITION_TYPE as FragmentType,
+                t.TRANSITION_ORDINAL as FragmentSeriesNumber,
+                t.TRANSITION_ID as TransitionId,
+                p.PRECURSOR_DECOY as Decoy
+            FROM precursors p
+            INNER JOIN transition t ON p.FEATURE_ID = t.FEATURE_ID
+            WHERE {decoy_query} 
+                  p.SCORE_MS2_Q_VALUE < {self.config.max_rs_peakgroup_qvalue} and
+                  p.SCORE_PROTEIN_GLOBAL_Q_VALUE < {self.config.max_global_protein_qvalue} and
+                  p.SCORE_PEPTIDE_GLOBAL_Q_VALUE < {self.config.max_global_peptide_qvalue} and
+                  p.SCORE_MS2_PEAK_GROUP_RANK = 1
+
+            GROUP BY {rt_col}, {im_col}, {intensity_col}, p.SCORE_MS2_Q_VALUE,
+                     p.UNMODIFIED_SEQUENCE, p.MODIFIED_SEQUENCE, p.PRECURSOR_CHARGE,
+                     p.PRECURSOR_MZ, p.FEATURE_ID, t.ANNOTATION, t.PRODUCT_MZ,
+                     t.TRANSITION_CHARGE, t.TRANSITION_TYPE, t.TRANSITION_ORDINAL, t.TRANSITION_ID, p.PRECURSOR_DECOY, p.RUN_ID, p.FEATURE_MS2_AREA_INTENSITY
+        """
+        return con.execute(query).fetchdf()
+    
     def _read_standard_data(self, con) -> pd.DataFrame:
         """
         Read standard OpenSWATH data without IPF from split files.
@@ -374,9 +454,11 @@ class SplitParquetReader(BaseSplitParquetReader):
 
         # Initialize with empty DataFrame to ensure consistent structure
         peptide_data = pd.DataFrame()
+        only_global_present = True
 
         # Run-specific peptide scores
         if any(col.startswith("SCORE_PEPTIDE_RUN_SPECIFIC_") for col in self._columns):
+            logger.debug("Adding run-specific peptide scores.")
             query = """
                 SELECT 
                     p.RUN_ID AS id_run,
@@ -387,12 +469,15 @@ class SplitParquetReader(BaseSplitParquetReader):
             """
             run_data = con.execute(query).fetchdf()
             if not run_data.empty:
+                only_global_present = False
                 peptide_data = run_data
+                logger.trace(f"Run-specific peptide data shape: {run_data.shape}")
 
         # Experiment-wide peptide scores
         if any(
             col.startswith("SCORE_PEPTIDE_EXPERIMENT_WIDE_") for col in self._columns
         ):
+            logger.debug("Adding experiment-wide peptide scores.")
             query = """
                 SELECT 
                     p.RUN_ID AS id_run,
@@ -403,15 +488,18 @@ class SplitParquetReader(BaseSplitParquetReader):
             """
             exp_data = con.execute(query).fetchdf()
             if not exp_data.empty:
+                logger.trace(f"Experiment-wide peptide data shape: {exp_data.shape}")
+                only_global_present = False
                 if peptide_data.empty:
                     peptide_data = exp_data
                 else:
                     peptide_data = pd.merge(
-                        peptide_data, exp_data, on=["id_run", "id_peptide"]
+                        peptide_data, exp_data, on=["id_run", "id_peptide"], how="left"
                     )
 
         # Global peptide scores
         if any(col.startswith("SCORE_PEPTIDE_GLOBAL_") for col in self._columns):
+            logger.debug("Adding global peptide scores.")
             query = f"""
                 SELECT 
                     p.PEPTIDE_ID AS id_peptide,
@@ -422,14 +510,35 @@ class SplitParquetReader(BaseSplitParquetReader):
             """
             global_data = con.execute(query).fetchdf()
             if not global_data.empty:
+                # We need to drop duplicates to avoid an explosion on the merge
+                global_data = global_data.drop_duplicates(
+                    subset="id_peptide", keep="first"
+                )
+                logger.trace(f"Global peptide data shape: {global_data.shape}")
                 if peptide_data.empty:
                     peptide_data = global_data
                 else:
-                    peptide_data = pd.merge(peptide_data, global_data, on="id_peptide")
+                    peptide_data = pd.merge(
+                        peptide_data, global_data, on="id_peptide", how="left"
+                    )
 
         if not peptide_data.empty:
-            data = pd.merge(data, peptide_data, on=["id_run", "id_peptide"], how="left")
-
+            key_cols = (
+                ["id_run", "id_peptide"] if not only_global_present else ["id_peptide"]
+            )
+            peptide_data = peptide_data.drop_duplicates(subset=key_cols, keep="first")
+            logger.debug("Merging peptide data into main DataFrame.")
+            logger.trace(f"Data shape before merge: {data.shape}")
+            logger.trace(f"Peptide data shape: {peptide_data.shape}")
+            logger.trace(f"Data head:\n{data.head()}")
+            logger.trace(f"Peptide data head:\n{peptide_data.head()}")
+            if only_global_present:
+                data = pd.merge(data, peptide_data, on=["id_peptide"], how="left")
+            else:
+                data = pd.merge(
+                    data, peptide_data, on=["id_run", "id_peptide"], how="left"
+                )
+            logger.trace(f"Merged data shape: {data.shape}")
         return data
 
     def _add_protein_error_data(self, data, con) -> pd.DataFrame:
@@ -441,67 +550,96 @@ class SplitParquetReader(BaseSplitParquetReader):
 
         # Initialize with empty DataFrame to ensure consistent structure
         protein_data = pd.DataFrame()
+        only_global_present = True
 
         # Run-specific protein scores
         if any(col.startswith("SCORE_PROTEIN_RUN_SPECIFIC_") for col in self._columns):
+            logger.debug("Adding run-specific protein scores.")
             query = """
                 SELECT 
                     p1.RUN_ID AS id_run,
                     p1.PEPTIDE_ID AS id_peptide,
-                    MIN(p2.SCORE_PROTEIN_RUN_SPECIFIC_Q_VALUE) AS m_score_protein_run_specific
+                    MIN(p1.SCORE_PROTEIN_RUN_SPECIFIC_Q_VALUE) AS m_score_protein_run_specific
                 FROM precursors p1
-                JOIN precursors p2 ON p1.PROTEIN_ID = p2.PROTEIN_ID AND p1.RUN_ID = p2.RUN_ID
+                -- JOIN precursors p2 ON p1.PROTEIN_ID = p2.PROTEIN_ID AND p1.RUN_ID = p2.RUN_ID
                 WHERE p1.PROTEIN_ID IS NOT NULL
                 GROUP BY p1.RUN_ID, p1.PEPTIDE_ID
             """
             run_data = con.execute(query).fetchdf()
             if not run_data.empty:
+                only_global_present = False
                 protein_data = run_data
+                logger.trace(f"Run-specific protein data shape: {run_data.shape}")
 
         # Experiment-wide protein scores
         if any(
             col.startswith("SCORE_PROTEIN_EXPERIMENT_WIDE_") for col in self._columns
         ):
+            logger.debug("Adding experiment-wide protein scores.")
             query = """
                 SELECT 
                     p1.RUN_ID AS id_run,
                     p1.PEPTIDE_ID AS id_peptide,
-                    MIN(p2.SCORE_PROTEIN_EXPERIMENT_WIDE_Q_VALUE) AS m_score_protein_experiment_wide
+                    MIN(p1.SCORE_PROTEIN_EXPERIMENT_WIDE_Q_VALUE) AS m_score_protein_experiment_wide
                 FROM precursors p1
-                JOIN precursors p2 ON p1.PROTEIN_ID = p2.PROTEIN_ID AND p1.RUN_ID = p2.RUN_ID
+                -- JOIN precursors p2 ON p1.PROTEIN_ID = p2.PROTEIN_ID AND p1.RUN_ID = p2.RUN_ID
                 WHERE p1.PROTEIN_ID IS NOT NULL
                 GROUP BY p1.RUN_ID, p1.PEPTIDE_ID
             """
             exp_data = con.execute(query).fetchdf()
             if not exp_data.empty:
+                logger.trace(f"Experiment-wide protein data shape: {exp_data.shape}")
+                only_global_present = False
                 if protein_data.empty:
                     protein_data = exp_data
                 else:
                     protein_data = pd.merge(
-                        protein_data, exp_data, on=["id_run", "id_peptide"]
+                        protein_data, exp_data, on=["id_run", "id_peptide"], how="left"
                     )
 
         # Global protein scores
         if any(col.startswith("SCORE_PROTEIN_GLOBAL_") for col in self._columns):
+            logger.debug("Adding global protein scores.")
             query = f"""
                 SELECT 
                     p1.PEPTIDE_ID AS id_peptide,
-                    MIN(p2.SCORE_PROTEIN_GLOBAL_Q_VALUE) AS m_score_protein_global
+                    MIN(p1.SCORE_PROTEIN_GLOBAL_Q_VALUE) AS m_score_protein_global
                 FROM precursors p1
-                JOIN precursors p2 ON p1.PROTEIN_ID = p2.PROTEIN_ID
+                -- JOIN precursors p2 ON p1.PROTEIN_ID = p2.PROTEIN_ID
                 WHERE p1.PROTEIN_ID IS NOT NULL
-                AND p2.SCORE_PROTEIN_GLOBAL_Q_VALUE < {self.config.max_global_protein_qvalue}
+                AND p1.SCORE_PROTEIN_GLOBAL_Q_VALUE < {self.config.max_global_protein_qvalue}
                 GROUP BY p1.PEPTIDE_ID
             """
             global_data = con.execute(query).fetchdf()
             if not global_data.empty:
+                # We need to drop duplicates to avoid an explosion on the merge
+                global_data = global_data.drop_duplicates(
+                    subset="id_peptide", keep="first"
+                )
+                logger.trace(f"Global protein data shape: {global_data.shape}")
                 if protein_data.empty:
                     protein_data = global_data
                 else:
-                    protein_data = pd.merge(protein_data, global_data, on="id_peptide")
+                    protein_data = pd.merge(
+                        protein_data, global_data, on="id_peptide", how="left"
+                    )
 
         if not protein_data.empty:
-            data = pd.merge(data, protein_data, on=["id_run", "id_peptide"], how="left")
+            key_cols = (
+                ["id_run", "id_peptide"] if not only_global_present else ["id_peptide"]
+            )
+            protein_data = protein_data.drop_duplicates(subset=key_cols, keep="first")
+            logger.trace(f"Data shape before merge: {data.shape}")
+            logger.trace(f"Protein data shape: {protein_data.shape}")
+            logger.trace(f"Data head:\n{data.head()}")
+            logger.trace(f"Protein data head:\n{protein_data.head()}")
+            if only_global_present:
+                data = pd.merge(data, protein_data, on=["id_peptide"], how="left")
+            else:
+                data = pd.merge(
+                    data, protein_data, on=["id_run", "id_peptide"], how="left"
+                )
+            logger.trace(f"Merged data shape: {data.shape}")
 
         return data
 

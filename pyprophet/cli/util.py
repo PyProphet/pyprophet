@@ -93,8 +93,13 @@ class GlobalLogLevelGroup(click.Group):
 
     def invoke(self, ctx):
         log_level = ctx.params.get("log_level", "INFO").upper()
-        header = setup_logger(log_level=log_level)
-        ctx.obj = {"LOG_LEVEL": log_level, "LOG_HEADER": header}
+        log_colorize = ctx.params.get("log_colorize", True)
+        header = setup_logger(log_level=log_level, log_colorize=log_colorize)
+        ctx.obj = {
+            "LOG_LEVEL": log_level,
+            "LOG_HEADER": header,
+            "LOG_COLORIZE": log_colorize,
+        }
         return super().invoke(ctx)
 
 
@@ -274,23 +279,25 @@ def get_execution_context():
     return " ".join([sys.executable] + sys.argv)
 
 
-def setup_logger(log_level):
+def setup_logger(log_level, log_colorize):
     def formatter(record):
-        # Format with module, function, and line number
-        # mod_func_line = f"{record['module']}::{record['function']}:{record['line']}"
-        # return (
-        #     f"[ <green>{record['time']:YYYY-MM-DD at HH:mm:ss}</green> | "
-        #     f"<level>{record['level']: <7}</level> | "
-        #     f"{mod_func_line: <37} ] "
-        #     f"<level>{record['message']}</level>\n"
-        # )
-        mod_func_line = f"{record['module']}::{record['line']}"
-        return (
-            f"[ <green>{record['time']:YYYY-MM-DD at HH:mm:ss}</green> | "
-            f"<level>{record['level']: <7}</level> | "
-            f"{mod_func_line: <27} ] "
-            f"<level>{record['message']}</level>\n"
-        )
+        if log_level.lower() != "info":
+            # Format with module, function, and line number
+            mod_func_line = f"{record['name']}::{record['function']}:{record['line']}"
+            return (
+                f"[ <green>{record['time']:YYYY-MM-DD at HH:mm:ss}</green> | "
+                f"<level>{record['level']: <7}</level> | "
+                f"{mod_func_line: <50} ] "
+                f"<level>{record['message']}</level>\n"
+            )
+        else:
+            mod_func_line = f"{record['module']}::{record['line']}"
+            return (
+                f"[ <green>{record['time']:YYYY-MM-DD at HH:mm:ss}</green> | "
+                f"<level>{record['level']: <7}</level> | "
+                f"{mod_func_line: <27} ] "
+                f"<level>{record['message']}</level>\n"
+            )
 
     global _LOGGER_INITIALIZED
     if _LOGGER_INITIALIZED:
@@ -317,7 +324,7 @@ def setup_logger(log_level):
 
     # Main console logger
     # logger.remove()  # Remove default logger
-    logger.add(sys.stdout, colorize=True, format=formatter, level=log_level)
+    logger.add(sys.stdout, colorize=log_colorize, format=formatter, level=log_level)
 
     _LOGGER_INITIALIZED = True
 

@@ -635,6 +635,7 @@ class ExportIOConfig(BaseIOConfig):
             - "legacy_split": Split TSV files for each run.
             - "parquet": Single Parquet file with merged results.
             - "parquet_split": Split Parquet files for each run.
+            - "library" : .tsv library file
         out_type (Literal["tsv", "csv"]): Output file type for exported results.
         transition_quantification (bool): Report aggregated transition-level quantification.
         max_transition_pep (float): Maximum PEP to retain scored transitions for quantification (requires transition-level scoring).
@@ -653,6 +654,7 @@ class ExportIOConfig(BaseIOConfig):
         top_n (int): Number of top intense features to use for summarization
         consistent_top (bool): Whether to use same top features across all runs
         normalization (Literal["none", "median", "medianmedian", "quantile"]): Normalization method
+        test: bool = False: Whether to enable test mode with deterministic behavior, test mode will sort libraries by precursor, fragmentType, fragmentSeriesNumber and fragmentCharge
 
         # OSW: Export to parquet
         compression_method (Literal["none", "snappy", "gzip", "brotli", "zstd"]): Compression method for parquet files.
@@ -662,10 +664,18 @@ class ExportIOConfig(BaseIOConfig):
 
         # SqMass: Export to parquet
         pqp_file (Optional[str]): Path to PQP file for precursor/transition mapping.
+
+        # Export to library
+        rt_calibration (bool): If True, will use emperical RT values as oppose to the original library RT values
+        im_calibration (bool): If True, will use emperical IM values as oppose to the original library IM values
+        intensity_calibration (bool): If True, will use emperical intensity values as oppose to the original library intensity values
+        min_fragments (int): Minimum number of fragments required to include the peak group in the library, only relevant if intensity_calibration is True
+        keep_decoys (bool): Whether to keep decoy entries in the library, will only keep decoys that pass the thresholds specified
+        rt_unit (Literal["iRT", "RT"], default = 'iRT') = "iRT": Unit of retention time in the library, only relevant if rt_calibration is True. If "iRT" is selected, the retention times will be scaled to the iRT scale (0-100) in the library
     """
 
     export_format: Literal[
-        "matrix", "legacy_merged", "legacy_split", "parquet", "parquet_split"
+        "matrix", "legacy_merged", "legacy_split", "parquet", "parquet_split", "library"
     ] = "legacy_merged"
     out_type: Literal["tsv", "csv"] = "tsv"
     transition_quantification: bool = False
@@ -677,6 +687,7 @@ class ExportIOConfig(BaseIOConfig):
     max_global_peptide_qvalue: float = 0.01
     protein: bool = True
     max_global_protein_qvalue: float = 0.01
+    test: bool = False
 
     # Quantification matrix options
     top_n: int = 3
@@ -691,3 +702,11 @@ class ExportIOConfig(BaseIOConfig):
 
     # SqMass: Export to parquet
     pqp_file: Optional[str] = None  # Path to PQP file for precursor/transition mapping
+
+    # Export to library options
+    rt_calibration: bool = True
+    im_calibration: bool = True
+    intensity_calibration: bool = True
+    min_fragments: int = 4
+    keep_decoys: bool = False  # Whether to keep decoy entries in the library
+    rt_unit: Literal["iRT", "RT"] = "iRT"
