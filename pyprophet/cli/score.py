@@ -43,14 +43,14 @@ from ..scoring.runner import PyProphetLearner, PyProphetWeightApplier
     "--classifier",
     default="LDA",
     show_default=True,
-    type=click.Choice(["LDA", "SVM", "XGBoost"]),
-    help='Either a "LDA", "SVM" or "XGBoost" classifier is used for semi-supervised learning.',
+    type=click.Choice(["LDA", "SVM", "XGBoost", "HistGradientBoosting"]),
+    help='Either a "LDA", "SVM", "XGBoost" or "HistGradientBoosting" classifier is used for semi-supervised learning.',
 )
 @click.option(
     "--autotune/--no-autotune",
     default=False,
     show_default=True,
-    help="Autotune hyperparameters for XGBoost/SVM.",
+    help="Autotune hyperparameters for XGBoost/SVM/HistGradientBoosting.",
     hidden=True,
 )
 @click.option(

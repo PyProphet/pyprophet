@@ -240,7 +240,7 @@ class PyProphetRunner(object):
             return self.config.extra_writes.get("trained_weights_path")
         elif self.runner_config.classifier == "SVM":
             return self.config.extra_writes.get("trained_weights_path")
-        elif self.runner_config.classifier == "XGBoost":
+        elif self.runner_config.classifier in ("XGBoost", "HistGradientBoosting"):
             return self.config.extra_writes.get(
                 f"trained_model_path_{self.config.level}"
             )
@@ -328,7 +328,7 @@ class PyProphetWeightApplier(PyProphetRunner):
 
                     traceback.print_exc()
                     raise
-            elif self.classifier == "XGBoost":
+            elif self.classifier in ("XGBoost", "HistGradientBoosting"):
                 with open(apply_weights, "rb") as file:
                     self.persisted_weights = pickle.load(file)
         elif self.config.file_type == "osw":
@@ -355,13 +355,13 @@ class PyProphetWeightApplier(PyProphetRunner):
 
                     traceback.print_exc()
                     raise
-            elif self.classifier == "XGBoost":
+            elif self.classifier in ("XGBoost", "HistGradientBoosting"):
                 try:
                     con = sqlite3.connect(apply_weights)
 
                     if not check_sqlite_table(con, "PYPROPHET_XGB"):
                         raise click.ClickException(
-                            "PYPROPHET_XGB table is not present in file, cannot apply weights for XGBoost classifier! Make sure you have run the scoring on a subset of the data first, or that you supplied the right `--classifier` parameter."
+                            "PYPROPHET_XGB table is not present in file, cannot apply weights for XGBoost/HistGradientBoosting classifier! Make sure you have run the scoring on a subset of the data first, or that you supplied the right `--classifier` parameter."
                         )
                     data = con.execute(
                         "SELECT xgb FROM PYPROPHET_XGB WHERE LEVEL=='%s'" % self.level

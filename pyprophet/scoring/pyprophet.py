@@ -40,7 +40,7 @@ from ..stats import (
     posterior_chromatogram_hypotheses_fast,
     summary_err_table,
 )
-from .classifiers import LDALearner, SVMLearner, XGBLearner
+from .classifiers import LDALearner, SVMLearner, XGBLearner, HistGBCLearner
 from .data_handling import Experiment, prepare_data_table
 from .semi_supervised import StandardSemiSupervisedLearner
 
@@ -332,6 +332,12 @@ class PyProphet:
                 self.rc.xgb_params,
                 self.rc.threads,
             )
+        elif self.rc.classifier == "HistGradientBoosting":
+            base_learner = HistGBCLearner(
+                self.rc.autotune,
+                self.rc.xgb_params,
+                self.rc.threads,
+            )
         else:
             raise click.ClickException(
                 f"Classifier {self.rc.classifier} not supported."
@@ -398,7 +404,7 @@ class PyProphet:
                         f"length current data scores: {len(score_columns)}\n"
                         f"length weights file scores: {len(loaded_weights['score'].values)}"
                     )
-            elif self.rc.classifier == "XGBoost":
+            elif self.rc.classifier in ("XGBoost", "HistGradientBoosting"):
                 weights = loaded_weights
 
             final_classifier = self._apply_weights_on_exp(experiment, weights)
@@ -434,7 +440,7 @@ class PyProphet:
                 max_iter=learner.inner_learner.max_iter,
                 autotune=learner.inner_learner.autotune,
             )
-        else:  # XGBoost
+        else:  # XGBoost or HistGradientBoosting
             return learner.set_learner(weights)
 
     @profile

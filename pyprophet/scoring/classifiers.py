@@ -301,20 +301,34 @@ class SVMLearner(LinearLearner):
 
 
 class HistGBCLearner(AbstractLearner):
-    def __init__(self, autotune=False, threads=1):
+    """
+    Implements a scikit-learn HistGradientBoostingClassifier-based learner for scoring.
+
+    Methods:
+        - tune: Tune hyperparameters using RandomizedSearchCV.
+        - learn: Train the HistGradientBoosting model using decoy and target peaks.
+        - score: Score the given peaks using the trained model.
+        - get_parameters: Retrieve the parameters of the model.
+        - set_parameters: Set the parameters of the model.
+    """
+
+    def __init__(self, autotune=False, hgb_params=None, threads=1):
         self.classifier = None
         self.importance = None
         self.autotune = autotune
         self.threads = threads
+        self.hgb_params = hgb_params or {}
 
     def tune(
         self, decoy_peaks, target_peaks, use_main_score=True, cv_splits=3, n_jobs=-1
     ):
-        raise NotImplementedError(
-            "Hyperparameter tuning for HistGradientBoostingClassifier is not implemented."
+        """
+        Tune hyperparameters using RandomizedSearchCV.
+        """
+        logger.info(
+            "Autotuning of HistGradientBoosting hyperparameters using RandomizedSearchCV."
         )
 
-    def learn(self, decoy_peaks, target_peaks, use_main_score=True):
         assert isinstance(decoy_peaks, Experiment)
         assert isinstance(target_peaks, Experiment)
 
@@ -324,14 +338,87 @@ class HistGBCLearner(AbstractLearner):
         y = np.zeros((X.shape[0],))
         y[X0.shape[0] :] = 1.0
 
-        classifier = HistGradientBoostingClassifier(
-            random_state=42, max_iter=100, early_stopping=True, validation_fraction=0.1
+        param_dist = {
+            "learning_rate": np.linspace(0.01, 0.3, num=30),
+            "max_depth": list(range(2, 9)),
+            "max_leaf_nodes": [None] + list(range(15, 65, 5)),
+            "min_samples_leaf": [1, 2, 3, 5, 10],
+            "l2_regularization": np.linspace(0.0, 1.0, num=20),
+        }
+
+        base_model = HistGradientBoostingClassifier(random_state=42)
+
+        random_search = RandomizedSearchCV(
+            estimator=base_model,
+            param_distributions=param_dist,
+            n_iter=10,
+            cv=KFold(n_splits=cv_splits, shuffle=True, random_state=42),
+            n_jobs=n_jobs,
+            scoring="roc_auc",
+            verbose=3,
+            random_state=42,
         )
+
+        random_search.fit(X, y)
+
+        best_params = random_search.best_params_
+        self.hgb_params.update(best_params)
+
+        best_params_str = [
+            f"{key}: {str(value).replace('{', '[').replace('}', ']')} | "
+            for key, value in self.hgb_params.items()
+        ]
+        logger.info(f"Optimal hyperparameters: {best_params_str}")
+
+        return self
+
+    def learn(self, decoy_peaks, target_peaks, use_main_score=True):
+        """Train the HistGradientBoosting model using decoy and target peaks."""
+        assert isinstance(decoy_peaks, Experiment)
+        assert isinstance(target_peaks, Experiment)
+
+        X0 = decoy_peaks.get_feature_matrix(use_main_score)
+        X1 = target_peaks.get_feature_matrix(use_main_score)
+        X = np.vstack((X0, X1))
+        y = np.zeros((X.shape[0],))
+        y[X0.shape[0] :] = 1.0
+
+        # Configure classifier with user params or defaults
+        clf_params = dict(self.hgb_params)
+        clf_params.setdefault("random_state", 42)
+        clf_params.setdefault("max_iter", 100)
+        clf_params.setdefault("early_stopping", True)
+        clf_params.setdefault("validation_fraction", 0.1)
+
+        classifier = HistGradientBoostingClassifier(**clf_params)
         classifier.fit(X, y)
 
         self.classifier = classifier
-        # self.importance = classifier.feature_importances_
+        # Store feature importances as dict keyed by f{index} to match XGBoost format
+        feats = classifier.feature_importances_
+        self.importance = {f"f{i}": float(v) for i, v in enumerate(feats)}
 
+        return self
+
+    def score(self, peaks, use_main_score):
+        """Score the given peaks using the HistGradientBoosting model."""
+        X = peaks.get_feature_matrix(use_main_score)
+        # Use decision_function for compatibility with XGBoost scoring
+        result = self.classifier.decision_function(X)
+        return result.astype(np.float32)
+
+    def get_parameters(self):
+        """Retrieve the parameters of the model."""
+        return self.classifier
+
+    def set_parameters(self, classifier):
+        """Set the parameters of the model."""
+        self.classifier = classifier
+        if hasattr(classifier, "feature_importances_"):
+            feats = classifier.feature_importances_
+            self.importance = {f"f{i}": float(v) for i, v in enumerate(feats)}
+        else:
+            self.importance = {}
         return self
 
 
