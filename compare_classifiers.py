@@ -19,21 +19,21 @@ import pandas as pd
 def run_comparison(infile: str, level: str = "ms2"):
     """
     Run scoring with both XGBoost and HistGradientBoosting and compare results.
-    
+
     Args:
         infile: Path to input OSW/parquet file
         level: Scoring level (ms1, ms2, ms1ms2, transition)
     """
     from pyprophet._config import RunnerIOConfig
     from pyprophet.scoring.runner import PyProphetLearner
-    
+
     results = {}
-    
+
     for classifier_name in ["XGBoost", "HistGradientBoosting"]:
-        print(f"\n{'='*80}")
+        print(f"\n{'=' * 80}")
         print(f"Running with {classifier_name} classifier")
-        print(f"{'='*80}\n")
-        
+        print(f"{'=' * 80}\n")
+
         # Create config
         config = RunnerIOConfig.from_cli_args(
             infile=infile,
@@ -54,7 +54,7 @@ def run_comparison(infile: str, level: str = "ms2"):
             group_id="group_id",
             parametric=False,
             pfdr=False,
-            pi0_lambda=(0.1, 0.5, 0.05),
+            pi0_lambda=(0.0, 0.0, 0.0),
             pi0_method="bootstrap",
             pi0_smooth_df=3,
             pi0_smooth_log_pi0=False,
@@ -77,33 +77,33 @@ def run_comparison(infile: str, level: str = "ms2"):
             color_palette="normal",
             main_score_selection_report=False,
         )
-        
+
         # Run scoring
         start_time = time.time()
         learner = PyProphetLearner(config)
         learner.run()
         elapsed_time = time.time() - start_time
-        
+
         # Store results
         results[classifier_name] = {
             "time": elapsed_time,
             "config": config,
         }
-        
+
         print(f"\n{classifier_name} completed in {elapsed_time:.2f} seconds")
-    
+
     # Compare results
-    print(f"\n{'='*80}")
+    print(f"\n{'=' * 80}")
     print("COMPARISON SUMMARY")
-    print(f"{'='*80}\n")
-    
+    print(f"{'=' * 80}\n")
+
     print("Runtime:")
     for name, res in results.items():
         print(f"  {name:25s}: {res['time']:.2f} seconds")
-    
+
     speedup = results["XGBoost"]["time"] / results["HistGradientBoosting"]["time"]
     print(f"\nSpeedup: {speedup:.2f}x")
-    
+
     print("\nTo compare FDR and q-values, check the output files:")
     for name in results.keys():
         print(f"  - {results[name]['config'].outfile}")
@@ -125,6 +125,6 @@ if __name__ == "__main__":
         choices=["ms1", "ms2", "ms1ms2", "transition"],
         help="Scoring level",
     )
-    
+
     args = parser.parse_args()
     run_comparison(args.infile, args.level)
