@@ -411,11 +411,43 @@ class HistGBCLearner(AbstractLearner):
         else:
             # Use permutation importance as fallback
             from sklearn.inspection import permutation_importance
+            from sklearn.metrics import make_scorer, log_loss
+
+            # For stability and speed, compute permutation importance on a stratified subsample
+            rs = np.random.RandomState(42)
+            n_samples = X.shape[0]
+            max_samples = min(2000, n_samples)  # cap to 2000 for speed
+            if n_samples > max_samples:
+                idx0 = rs.choice(np.where(y == 0)[0], size=max_samples // 2, replace=False)
+                idx1 = rs.choice(np.where(y == 1)[0], size=max_samples - idx0.shape[0], replace=False)
+                idx = np.concatenate([idx0, idx1])
+                X_imp, y_imp = X[idx], y[idx]
+            else:
+                X_imp, y_imp = X, y
+
+            # Create a custom scorer similar to XGBoost's gain:
+            # We want to measure the DROP in log loss when feature is shuffled (higher = more important)
+            # This is equivalent to measuring how much the feature reduces loss (like gain)
+            def loss_gain_score(y_true, y_pred_proba, **kwargs):
+                """Score based on negative log loss - higher is better, like XGBoost gain."""
+                # Return negative log loss (so higher score = better = lower loss)
+                return -log_loss(y_true, y_pred_proba, labels=[0, 1])
+            
+            gain_scorer = make_scorer(loss_gain_score, greater_is_better=True, needs_proba=True)
 
             result = permutation_importance(
-                classifier, X, y, n_repeats=5, random_state=42, n_jobs=1
+                classifier, X_imp, y_imp,
+                scoring=gain_scorer,  # Use custom gain-like scorer
+                n_repeats=5,
+                random_state=42,
+                n_jobs=-1,
             )
             feats = result.importances_mean
+            # Clamp negatives to zero (permutation importance can be slightly negative due to noise)
+            feats = np.maximum(feats, 0.0)
+            # Scale to be more comparable to XGBoost gain values (typically 0-100 range)
+            # Multiply by 100 to get similar scale
+            feats = feats * 100.0
             self.importance = {f"f{i}": float(v) for i, v in enumerate(feats)}
 
         # Store importance on the classifier object itself so it survives set_parameters
