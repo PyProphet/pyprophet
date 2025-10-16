@@ -377,33 +377,34 @@ class HistGBCLearner(AbstractLearner):
         assert isinstance(decoy_peaks, Experiment)
         assert isinstance(target_peaks, Experiment)
 
+
         X0 = decoy_peaks.get_feature_matrix(use_main_score)
         X1 = target_peaks.get_feature_matrix(use_main_score)
         X = np.vstack((X0, X1))
         y = np.zeros((X.shape[0],))
         y[X0.shape[0] :] = 1.0
 
-    # Configure classifier with user params or defaults
-    clf_params = dict(self.hgb_params)
-    clf_params.setdefault("random_state", 42)
-    clf_params.setdefault("max_iter", 100)
-    clf_params.setdefault("early_stopping", True)
-    clf_params.setdefault("validation_fraction", 0.1)
+        # Configure classifier with user params or defaults
+        clf_params = dict(self.hgb_params)
+        clf_params.setdefault("random_state", 42)
+        clf_params.setdefault("max_iter", 100)
+        clf_params.setdefault("early_stopping", True)
+        clf_params.setdefault("validation_fraction", 0.1)
 
-    # Filter out any params not accepted by HistGradientBoostingClassifier
-    import inspect
-    valid_params = inspect.signature(HistGradientBoostingClassifier.__init__).parameters
-    clf_params = {k: v for k, v in clf_params.items() if k in valid_params}
+        # Filter out any params not accepted by HistGradientBoostingClassifier
+        import inspect
+        valid_params = inspect.signature(HistGradientBoostingClassifier.__init__).parameters
+        clf_params = {k: v for k, v in clf_params.items() if k in valid_params}
 
-    classifier = HistGradientBoostingClassifier(**clf_params)
-    classifier.fit(X, y)
+        classifier = HistGradientBoostingClassifier(**clf_params)
+        classifier.fit(X, y)
 
-    self.classifier = classifier
-    # Store feature importances as dict keyed by f{index} to match XGBoost format
-    feats = classifier.feature_importances_
-    self.importance = {f"f{i}": float(v) for i, v in enumerate(feats)}
+        self.classifier = classifier
+        # Store feature importances as dict keyed by f{index} to match XGBoost format
+        feats = classifier.feature_importances_
+        self.importance = {f"f{i}": float(v) for i, v in enumerate(feats)}
 
-    return self
+        return self
 
     def score(self, peaks, use_main_score):
         """Score the given peaks using the HistGradientBoosting model."""
