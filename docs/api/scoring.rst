@@ -69,6 +69,7 @@ Classifiers
    LDALearner
    SVMLearner
    XGBLearner
+   HistGBCLearner
 
 Data Handling
 ----------------
