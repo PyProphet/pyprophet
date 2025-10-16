@@ -401,8 +401,15 @@ class HistGBCLearner(AbstractLearner):
 
         self.classifier = classifier
         # Store feature importances as dict keyed by f{index} to match XGBoost format
-        feats = classifier.feature_importances_
-        self.importance = {f"f{i}": float(v) for i, v in enumerate(feats)}
+        if hasattr(classifier, "feature_importances_"):
+            feats = classifier.feature_importances_
+            self.importance = {f"f{i}": float(v) for i, v in enumerate(feats)}
+        else:
+            # Use permutation importance as fallback
+            from sklearn.inspection import permutation_importance
+            result = permutation_importance(classifier, X, y, n_repeats=5, random_state=42, n_jobs=1)
+            feats = result.importances_mean
+            self.importance = {f"f{i}": float(v) for i, v in enumerate(feats)}
 
         return self
 
