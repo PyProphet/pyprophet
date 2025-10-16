@@ -552,12 +552,15 @@ class PyProphet:
                 logger.info(f"Weight of {feat}: {weight}")
         else:
             classifier_table = final_classifier.get_parameters()
-            mapper = {"f{0}".format(i): v for i, v in enumerate(score_columns)}
-            mapped = {mapper[k]: v for k, v in final_classifier.importance.items()}
-            for feat, importance in sorted(
-                mapped.items(), key=operator.itemgetter(1), reverse=True
-            ):
-                logger.info(f"Importance of {feat}: {importance}")
+            if hasattr(final_classifier, 'importance') and final_classifier.importance:
+                mapper = {"f{0}".format(i): v for i, v in enumerate(score_columns)}
+                mapped = {mapper[k]: v for k, v in final_classifier.importance.items()}
+                for feat, importance in sorted(
+                    mapped.items(), key=operator.itemgetter(1), reverse=True
+                ):
+                    logger.info(f"Importance of {feat}: {importance}")
+            else:
+                logger.warning(f"Classifier {self.rc.classifier} does not have importance scores available.")
 
         # Score the table
         scorer = Scorer(
