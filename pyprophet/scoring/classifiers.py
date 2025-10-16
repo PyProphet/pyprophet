@@ -404,51 +404,50 @@ class HistGBCLearner(AbstractLearner):
         classifier.fit(X, y)
 
         self.classifier = classifier
-        # Store feature importances as dict keyed by f{index} to match XGBoost format
-        if hasattr(classifier, "feature_importances_"):
-            feats = classifier.feature_importances_
-            self.importance = {f"f{i}": float(v) for i, v in enumerate(feats)}
+        
+        # Compute feature importances using gain-like permutation importance
+        # Note: HistGradientBoostingClassifier has feature_importances_ but it uses
+        # split-based importance (like XGBoost's "weight"), not gain-based.
+        # We want gain-like importance to match XGBoost's default "gain" metric.
+        from sklearn.inspection import permutation_importance
+        from sklearn.metrics import make_scorer, log_loss
+
+        # For stability and speed, compute permutation importance on a stratified subsample
+        rs = np.random.RandomState(42)
+        n_samples = X.shape[0]
+        max_samples = min(2000, n_samples)  # cap to 2000 for speed
+        if n_samples > max_samples:
+            idx0 = rs.choice(np.where(y == 0)[0], size=max_samples // 2, replace=False)
+            idx1 = rs.choice(np.where(y == 1)[0], size=max_samples - idx0.shape[0], replace=False)
+            idx = np.concatenate([idx0, idx1])
+            X_imp, y_imp = X[idx], y[idx]
         else:
-            # Use permutation importance as fallback
-            from sklearn.inspection import permutation_importance
-            from sklearn.metrics import make_scorer, log_loss
+            X_imp, y_imp = X, y
 
-            # For stability and speed, compute permutation importance on a stratified subsample
-            rs = np.random.RandomState(42)
-            n_samples = X.shape[0]
-            max_samples = min(2000, n_samples)  # cap to 2000 for speed
-            if n_samples > max_samples:
-                idx0 = rs.choice(np.where(y == 0)[0], size=max_samples // 2, replace=False)
-                idx1 = rs.choice(np.where(y == 1)[0], size=max_samples - idx0.shape[0], replace=False)
-                idx = np.concatenate([idx0, idx1])
-                X_imp, y_imp = X[idx], y[idx]
-            else:
-                X_imp, y_imp = X, y
+        # Create a custom scorer similar to XGBoost's gain:
+        # We want to measure the DROP in log loss when feature is shuffled (higher = more important)
+        # This is equivalent to measuring how much the feature reduces loss (like gain)
+        def loss_gain_score(y_true, y_pred_proba, **kwargs):
+            """Score based on negative log loss - higher is better, like XGBoost gain."""
+            # Return negative log loss (so higher score = better = lower loss)
+            return -log_loss(y_true, y_pred_proba, labels=[0, 1])
+        
+        gain_scorer = make_scorer(loss_gain_score, greater_is_better=True, needs_proba=True)
 
-            # Create a custom scorer similar to XGBoost's gain:
-            # We want to measure the DROP in log loss when feature is shuffled (higher = more important)
-            # This is equivalent to measuring how much the feature reduces loss (like gain)
-            def loss_gain_score(y_true, y_pred_proba, **kwargs):
-                """Score based on negative log loss - higher is better, like XGBoost gain."""
-                # Return negative log loss (so higher score = better = lower loss)
-                return -log_loss(y_true, y_pred_proba, labels=[0, 1])
-            
-            gain_scorer = make_scorer(loss_gain_score, greater_is_better=True, needs_proba=True)
-
-            result = permutation_importance(
-                classifier, X_imp, y_imp,
-                scoring=gain_scorer,  # Use custom gain-like scorer
-                n_repeats=5,
-                random_state=42,
-                n_jobs=-1,
-            )
-            feats = result.importances_mean
-            # Clamp negatives to zero (permutation importance can be slightly negative due to noise)
-            feats = np.maximum(feats, 0.0)
-            # Scale to be more comparable to XGBoost gain values (typically 0-100 range)
-            # Multiply by 100 to get similar scale
-            feats = feats * 100.0
-            self.importance = {f"f{i}": float(v) for i, v in enumerate(feats)}
+        result = permutation_importance(
+            classifier, X_imp, y_imp,
+            scoring=gain_scorer,  # Use custom gain-like scorer
+            n_repeats=5,
+            random_state=42,
+            n_jobs=-1,
+        )
+        feats = result.importances_mean
+        # Clamp negatives to zero (permutation importance can be slightly negative due to noise)
+        feats = np.maximum(feats, 0.0)
+        # Scale to be more comparable to XGBoost gain values (typically 0-100 range)
+        # Multiply by 100 to get similar scale
+        feats = feats * 100.0
+        self.importance = {f"f{i}": float(v) for i, v in enumerate(feats)}
 
         # Store importance on the classifier object itself so it survives set_parameters
         classifier._pyprophet_importance = self.importance
@@ -477,8 +476,8 @@ class HistGBCLearner(AbstractLearner):
             feats = classifier.feature_importances_
             self.importance = {f"f{i}": float(v) for i, v in enumerate(feats)}
         else:
-            # HistGradientBoostingClassifier doesn't have feature_importances_
-            # We'll set a placeholder - importance should have been set during learn()
+            # No importance information available
+            # This should not happen in normal operation
             self.importance = {}
         return self
 
