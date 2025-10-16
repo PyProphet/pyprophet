@@ -383,22 +383,27 @@ class HistGBCLearner(AbstractLearner):
         y = np.zeros((X.shape[0],))
         y[X0.shape[0] :] = 1.0
 
-        # Configure classifier with user params or defaults
-        clf_params = dict(self.hgb_params)
-        clf_params.setdefault("random_state", 42)
-        clf_params.setdefault("max_iter", 100)
-        clf_params.setdefault("early_stopping", True)
-        clf_params.setdefault("validation_fraction", 0.1)
+    # Configure classifier with user params or defaults
+    clf_params = dict(self.hgb_params)
+    clf_params.setdefault("random_state", 42)
+    clf_params.setdefault("max_iter", 100)
+    clf_params.setdefault("early_stopping", True)
+    clf_params.setdefault("validation_fraction", 0.1)
 
-        classifier = HistGradientBoostingClassifier(**clf_params)
-        classifier.fit(X, y)
+    # Filter out any params not accepted by HistGradientBoostingClassifier
+    import inspect
+    valid_params = inspect.signature(HistGradientBoostingClassifier.__init__).parameters
+    clf_params = {k: v for k, v in clf_params.items() if k in valid_params}
 
-        self.classifier = classifier
-        # Store feature importances as dict keyed by f{index} to match XGBoost format
-        feats = classifier.feature_importances_
-        self.importance = {f"f{i}": float(v) for i, v in enumerate(feats)}
+    classifier = HistGradientBoostingClassifier(**clf_params)
+    classifier.fit(X, y)
 
-        return self
+    self.classifier = classifier
+    # Store feature importances as dict keyed by f{index} to match XGBoost format
+    feats = classifier.feature_importances_
+    self.importance = {f"f{i}": float(v) for i, v in enumerate(feats)}
+
+    return self
 
     def score(self, peaks, use_main_score):
         """Score the given peaks using the HistGradientBoosting model."""
