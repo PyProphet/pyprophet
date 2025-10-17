@@ -107,6 +107,27 @@ class PyProphetRunner(object):
         """
         Executes the PyProphet workflow, including scoring, error estimation, and saving results.
         """
+        if self.classifier == "HistGradientBoosting":
+            # We need to adjust the parallelism used throughout scoring to avoid oversubscription, since HistGradientBoosting uses multiple threads internally
+            total_threads = int(os.getenv("TOTAL_CPUS", os.cpu_count()))
+            # Assert threads is not greater than total_threads
+            assert self.runner_config.threads <= total_threads, (
+                f"You requested {self.runner_config.threads} threads, but only {total_threads} are available."
+            )
+            # Set number of threads for HistGradientBoosting via OMP_NUM_THREADS env variable
+            omp_threads = str(max(1, (total_threads // self.runner_config.threads)))
+            # logger.info(
+            #     f"Setting OMP_NUM_THREADS to {omp_threads} for HistGradientBoosting classifier and using {self.runner_config.threads} threads for semi-supervised learning to avoid oversubscription."
+            # )
+            # os.environ["OMP_NUM_THREADS"] = omp_threads
+            ## For some reason the above does not work unles OMP_NUM_THREADS is set before numpy is imported.
+            ## See: https://stackoverflow.com/questions/30791550/limit-number-of-threads-in-numpy
+            if self.runner_config.threads > 1 and "OMP_NUM_THREADS" not in os.environ:
+                logger.warning(
+                    f"You requested {self.runner_config.threads} threads for semi-supervised learning using the HistGradientBoosting classifier, which uses multi-threading internally. To avoid oversubscription, please set the environment variable OMP_NUM_THREADS to a lower value (e.g. recommended `export OMP_NUM_THREADS={omp_threads}`) before running PyProphet score. For now, we will set semi-supervised learning to use a single thread."
+                )
+                self.runner_config.threads = 1
+
         self.check_cols = [self.runner_config.group_id, "run_id", "decoy"]
 
         if self.glyco and self.level in ["ms2", "ms1ms2"]:
