@@ -13,6 +13,7 @@ Each learner provides methods for training, scoring, and parameter management.
 """
 
 import inspect
+import os
 from typing import List
 
 import numpy as np
@@ -28,6 +29,8 @@ from sklearn.model_selection import (
 )
 from sklearn.svm import LinearSVC
 from sklearn.ensemble import HistGradientBoostingClassifier
+from sklearn.inspection import permutation_importance
+from sklearn.metrics import make_scorer, log_loss
 
 from .data_handling import Experiment
 
@@ -339,14 +342,33 @@ class HistGBCLearner(AbstractLearner):
         y[X0.shape[0] :] = 1.0
 
         param_dist = {
-            "learning_rate": np.linspace(0.01, 0.3, num=30),
-            "max_depth": list(range(2, 9)),
+            "learning_rate": np.linspace(0.01, 1.0, num=30),
+            "max_depth": [None] + list(range(2, 40)),
             "max_leaf_nodes": [None] + list(range(15, 65, 5)),
             "min_samples_leaf": [1, 2, 3, 5, 10],
             "l2_regularization": np.linspace(0.0, 1.0, num=20),
+            "max_iter": [100, 200, 300, 500],
+            "class_weight": [None, "balanced"]
+            + [{1: neg, 0: pos} for neg in (0.1, 1, 10) for pos in (0.1, 1, 10)],
         }
 
         base_model = HistGradientBoostingClassifier(random_state=42)
+
+        # Control the number of threads used by HistGradientBoostingClassifier
+        total_jobs = int(os.getenv("TOTAL_CPUS", os.cpu_count()))
+        preference = os.getenv("PARALLEL_PREFERENCE", "outer")  # 'outer' or 'inner'
+
+        if preference == "outer":
+            n_jobs = total_jobs  # outer parallelism for RandomizedSearchCV
+            n_jobs_inner = 1  # no inner parallelism for HistGradientBoostingClassifier
+        else:  # 'inner'
+            n_jobs = 1  # no outer parallelism for RandomizedSearchCV
+            n_jobs_inner = (
+                total_jobs - 1  # inner parallelism for HistGradientBoostingClassifier
+            )
+
+        # Set OMP_NUM_THREADS for inner parallelism of HistGradientBoostingClassifier
+        os.environ["OMP_NUM_THREADS"] = str(n_jobs_inner)
 
         random_search = RandomizedSearchCV(
             estimator=base_model,
@@ -388,13 +410,14 @@ class HistGBCLearner(AbstractLearner):
         clf_params.setdefault("learning_rate", 0.3)
         clf_params.setdefault("random_state", 42)
         clf_params.setdefault("max_iter", 100)
-        clf_params.setdefault("max_depth", 6)
+        clf_params.setdefault("max_leaf_nodes", 25)
+        clf_params.setdefault("max_depth", 20)
+        clf_params.setdefault("min_samples_leaf", 5)
+        clf_params.setdefault("l2_regularization", 0.10526315789473684)
         clf_params.setdefault("early_stopping", True)
         clf_params.setdefault("validation_fraction", 0.1)
 
         # Filter out any params not accepted by HistGradientBoostingClassifier
-        import inspect
-
         valid_params = inspect.signature(
             HistGradientBoostingClassifier.__init__
         ).parameters
@@ -410,16 +433,21 @@ class HistGBCLearner(AbstractLearner):
             self.importance = {f"f{i}": float(v) for i, v in enumerate(feats)}
         else:
             # Use permutation importance as fallback
-            from sklearn.inspection import permutation_importance
-            from sklearn.metrics import make_scorer, log_loss
-
             # For stability and speed, compute permutation importance on a stratified subsample
-            rs = np.random.RandomState(42)
+            rs = np.random.default_rng(42)
             n_samples = X.shape[0]
-            max_samples = min(2000, n_samples)  # cap to 2000 for speed
+            max_samples = min(2000, n_samples)
+
             if n_samples > max_samples:
-                idx0 = rs.choice(np.where(y == 0)[0], size=max_samples // 2, replace=False)
-                idx1 = rs.choice(np.where(y == 1)[0], size=max_samples - idx0.shape[0], replace=False)
+                idx0_pool = np.where(y == 0)[0]
+                idx1_pool = np.where(y == 1)[0]
+
+                # Clamp to avoid oversampling if one class is very small
+                n_class0 = min(max_samples // 2, len(idx0_pool))
+                n_class1 = min(max_samples - n_class0, len(idx1_pool))
+
+                idx0 = rs.choice(idx0_pool, size=n_class0, replace=False)
+                idx1 = rs.choice(idx1_pool, size=n_class1, replace=False)
                 idx = np.concatenate([idx0, idx1])
                 X_imp, y_imp = X[idx], y[idx]
             else:
@@ -432,11 +460,15 @@ class HistGBCLearner(AbstractLearner):
                 """Score based on negative log loss - higher is better, like XGBoost gain."""
                 # Return negative log loss (so higher score = better = lower loss)
                 return -log_loss(y_true, y_pred_proba, labels=[0, 1])
-            
-            gain_scorer = make_scorer(loss_gain_score, greater_is_better=True, needs_proba=True)
+
+            gain_scorer = make_scorer(
+                loss_gain_score, greater_is_better=True, needs_proba=True
+            )
 
             result = permutation_importance(
-                classifier, X_imp, y_imp,
+                classifier,
+                X_imp,
+                y_imp,
                 scoring=gain_scorer,  # Use custom gain-like scorer
                 n_repeats=5,
                 random_state=42,
