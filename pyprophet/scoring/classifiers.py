@@ -307,6 +307,9 @@ class HistGBCLearner(AbstractLearner):
     """
     Implements a scikit-learn HistGradientBoostingClassifier-based learner for scoring.
 
+    .. note::
+        HistGradientBoostingClassifier uses internal parallelism via OpenMP, which can be controlled by setting the OMP_NUM_THREADS environment variable.
+
     Methods:
         - tune: Tune hyperparameters using RandomizedSearchCV.
         - learn: Train the HistGradientBoosting model using decoy and target peaks.

@@ -293,6 +293,15 @@ def score(
 ):
     """
     Conduct semi-supervised learning and error-rate estimation for MS1, MS2 and transition-level data.
+
+    .. note::
+        When using --classifier HistGradientBoosting, it may be useful to set the OMP_NUM_THREADS environment variable to avoid over-subscription of CPU threads from the HistGradientBoostingClassifier and the semi-supervised learning parallelization. For example, if your machine has 20 CPU threads and you want to use 3 threads for semi-supervised learning, set OMP_NUM_THREADS to 6 (20 / 3) before running the pyprophet score.
+
+    Example
+
+    .. code-block:: bash
+        OMP_NUM_THREADS=6 pyprophet score --in input.osw --classifier HistGradientBoosting --threads 3
+
     """
 
     if outfile is None:
