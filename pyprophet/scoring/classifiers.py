@@ -416,7 +416,7 @@ class HistGBCLearner(AbstractLearner):
         clf_params.setdefault("max_leaf_nodes", 25)
         clf_params.setdefault("max_depth", 20)
         clf_params.setdefault("min_samples_leaf", 5)
-        clf_params.setdefault("l2_regularization", 0.10526315789473684)
+        clf_params.setdefault("l2_regularization", 1.0)
         clf_params.setdefault("early_stopping", True)
         clf_params.setdefault("validation_fraction", 0.1)
 
