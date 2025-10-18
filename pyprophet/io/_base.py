@@ -48,7 +48,7 @@ import click
 import duckdb
 import pandas as pd
 import polars as pl
-import sklearn.preprocessing as preprocessing # For MinMaxScaler
+import sklearn.preprocessing as preprocessing  # For MinMaxScaler
 from loguru import logger
 
 from .._base import BaseIOConfig
@@ -343,7 +343,7 @@ class BaseWriter(ABC):
             self._save_tsv_weights(weights)
         elif self.classifier == "SVM":
             self._save_tsv_weights(weights)
-        elif self.classifier == "XGBoost":
+        elif self.classifier == "XGBoost" or self.classifier == "HistGradientBoosting":
             self._save_bin_weights(weights)
         else:
             raise NotImplementedError(
@@ -632,49 +632,99 @@ class BaseWriter(ABC):
 
         # For precursors found in more than one run, select the run with the smallest q value
         # If q values are the same, select the first run
-        data = data.sort_values(by=['Q_Value', 'Intensity', 'RunId']).groupby("TransitionId").head(1)
-        assert len(data['TransitionId'].drop_duplicates()) == len(data), "After filtering by Q_Value Intensity and RunId, duplicate transition IDs found."
+        data = (
+            data.sort_values(by=["Q_Value", "Intensity", "RunId"])
+            .groupby("TransitionId")
+            .head(1)
+        )
+        assert len(data["TransitionId"].drop_duplicates()) == len(data), (
+            "After filtering by Q_Value Intensity and RunId, duplicate transition IDs found."
+        )
 
         # Remove Annotation Column if all NAN
-        if data['Annotation'].isnull().all() or data['Annotation'].eq("NA").all():
+        if data["Annotation"].isnull().all() or data["Annotation"].eq("NA").all():
             logger.debug("Annotation column is empty, so computing it manually.")
-            data.drop(columns=['Annotation'], inplace=True)
-            data['Annotation'] = data['FragmentType'] + data['FragmentSeriesNumber'].astype(str) + '^' + data['FragmentCharge'].astype(str)
+            data.drop(columns=["Annotation"], inplace=True)
+            data["Annotation"] = (
+                data["FragmentType"]
+                + data["FragmentSeriesNumber"].astype(str)
+                + "^"
+                + data["FragmentCharge"].astype(str)
+            )
 
         if cfg.rt_calibration and cfg.rt_unit == "iRT":
-            data['NormalizedRetentionTime'] = preprocessing.MinMaxScaler().fit_transform(data[['NormalizedRetentionTime']]) * 100
+            data["NormalizedRetentionTime"] = (
+                preprocessing.MinMaxScaler().fit_transform(
+                    data[["NormalizedRetentionTime"]]
+                )
+                * 100
+            )
         if cfg.intensity_calibration:
-            data['LibraryIntensity'] = (
-            data['LibraryIntensity'] /
-            data.groupby('Precursor')['LibraryIntensity'].transform('max') *
-            10000)
-            logger.debug("Removing {} rows with zero intensity.".format(len(data[data['LibraryIntensity'] <= 0])))
+            data["LibraryIntensity"] = (
+                data["LibraryIntensity"]
+                / data.groupby("Precursor")["LibraryIntensity"].transform("max")
+                * 10000
+            )
+            logger.debug(
+                "Removing {} rows with zero intensity.".format(
+                    len(data[data["LibraryIntensity"] <= 0])
+                )
+            )
             # Remove rows with zero intensity
-            data = data[data['LibraryIntensity'] > 0] 
-        
+            data = data[data["LibraryIntensity"] > 0]
+
         ## Print Library statistics
-        logger.info(f"Library Contains {len(data['Precursor'].drop_duplicates())} Precursors")
+        logger.info(
+            f"Library Contains {len(data['Precursor'].drop_duplicates())} Precursors"
+        )
 
         logger.info(f"Precursor Fragment Distribution (Before Filtering)")
-        num_frags_per_prec = data[['Precursor', 'TransitionId']].groupby("Precursor").count().reset_index(names='Precursor').groupby('TransitionId').count()
+        num_frags_per_prec = (
+            data[["Precursor", "TransitionId"]]
+            .groupby("Precursor")
+            .count()
+            .reset_index(names="Precursor")
+            .groupby("TransitionId")
+            .count()
+        )
         for frag, count in num_frags_per_prec.iterrows():
-            logger.info(f"There are {count['Precursor']} precursors with {frag} fragment(s)")
-        
-        logger.info(f"Filter library to precursors containing {cfg.min_fragments} or more fragments")
-        ids_to_keep = data[['Precursor', 'Annotation']].groupby('Precursor').count()
-        ids_to_keep = ids_to_keep[ ids_to_keep['Annotation'] >= cfg.min_fragments ].index
-        data = data[ data['Precursor'].isin(ids_to_keep) ]
+            logger.info(
+                f"There are {count['Precursor']} precursors with {frag} fragment(s)"
+            )
 
-        logger.info(f"After filtering, library contains {len(data['Precursor'].drop_duplicates())} Precursors")
+        logger.info(
+            f"Filter library to precursors containing {cfg.min_fragments} or more fragments"
+        )
+        ids_to_keep = data[["Precursor", "Annotation"]].groupby("Precursor").count()
+        ids_to_keep = ids_to_keep[ids_to_keep["Annotation"] >= cfg.min_fragments].index
+        data = data[data["Precursor"].isin(ids_to_keep)]
+
+        logger.info(
+            f"After filtering, library contains {len(data['Precursor'].drop_duplicates())} Precursors"
+        )
         if cfg.keep_decoys:
-            logger.info("Of Which {} are decoys".format(len(data[data['Decoy'] == 1]['Precursor'].drop_duplicates())))
+            logger.info(
+                "Of Which {} are decoys".format(
+                    len(data[data["Decoy"] == 1]["Precursor"].drop_duplicates())
+                )
+            )
 
-        data.drop(columns=['TransitionId', 'Q_Value', 'RunId', 'Intensity'], inplace=True)
+        data.drop(
+            columns=["TransitionId", "Q_Value", "RunId", "Intensity"], inplace=True
+        )
         if cfg.test:
-            data = data.sort_values(by=['Precursor', 'FragmentType', 'FragmentSeriesNumber', 'FragmentCharge', 'ProductMz'])
+            data = data.sort_values(
+                by=[
+                    "Precursor",
+                    "FragmentType",
+                    "FragmentSeriesNumber",
+                    "FragmentCharge",
+                    "ProductMz",
+                ]
+            )
 
         logger.info("Exporting library to file.")
-        data.to_csv(cfg.outfile, sep='\t', index=False)
+        data.to_csv(cfg.outfile, sep="\t", index=False)
 
     def export_quant_matrix(self, data: pd.DataFrame) -> pd.DataFrame:
         """
@@ -922,7 +972,7 @@ class BaseWriter(ABC):
             raise ImportError(
                 "scikit-learn is required for quantile normalization"
             ) from exc
-    
+
     def _execute_copy_query(self, conn, query: str, path: str) -> None:
         """Execute COPY query with configured compression settings"""
         conn.execute(

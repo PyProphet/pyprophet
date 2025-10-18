@@ -190,6 +190,10 @@ class OSWTestStrategy(TestStrategy):
                 level_cmd += " --classifier=XGBoost"
             if kwargs.get("xgboost_tune"):
                 level_cmd += " --autotune"
+            if kwargs.get("histgbc"):
+                level_cmd += " --classifier=HistGradientBoosting"
+            if kwargs.get("histgbc_tune"):
+                level_cmd += " --autotune"
             if kwargs.get("score_filter"):
                 level_cmd = self.config.add_score_filter(level_cmd, level)
 
@@ -252,6 +256,10 @@ class ParquetTestStrategy(TestStrategy):
             if kwargs.get("xgboost"):
                 level_cmd += " --classifier=XGBoost"
             if kwargs.get("xgboost_tune"):
+                level_cmd += " --autotune"
+            if kwargs.get("histgbc"):
+                level_cmd += " --classifier=HistGradientBoosting"
+            if kwargs.get("histgbc_tune"):
                 level_cmd += " --autotune"
             if kwargs.get("score_filter"):
                 level_cmd = self.config.add_score_filter(level_cmd, level)
@@ -359,6 +367,10 @@ class SplitParquetTestStrategy(TestStrategy):
             if kwargs.get("xgboost"):
                 level_cmd += " --classifier=XGBoost"
             if kwargs.get("xgboost_tune"):
+                level_cmd += " --autotune"
+            if kwargs.get("histgbc"):
+                level_cmd += " --classifier=HistGradientBoosting"
+            if kwargs.get("histgbc_tune"):
                 level_cmd += " --autotune"
             if kwargs.get("score_filter"):
                 level_cmd = self.config.add_score_filter(level_cmd, level)
@@ -483,6 +495,10 @@ class MultiSplitParquetTestStrategy(TestStrategy):
             if kwargs.get("xgboost"):
                 level_cmd += " --classifier=XGBoost"
             if kwargs.get("xgboost_tune"):
+                level_cmd += " --autotune"
+            if kwargs.get("histgbc"):
+                level_cmd += " --classifier=HistGradientBoosting"
+            if kwargs.get("histgbc_tune"):
                 level_cmd += " --autotune"
             if kwargs.get("score_filter"):
                 level_cmd = self.config.add_score_filter(level_cmd, level)
@@ -734,6 +750,24 @@ def test_osw_5(test_runner, test_config, regtest):
     )
 
 
+def test_osw_histgbc(test_runner, test_config, regtest):
+    """Test HistGradientBoosting classifier"""
+    strategy = OSWTestStrategy(test_runner, test_config)
+    strategy.prepare()
+    strategy.execute(histgbc=True, pfdr=True, pi0_lambda="0 0 0")
+
+    strategy.verify(regtest)
+
+
+def test_osw_histgbc_tune(test_runner, test_config, regtest):
+    """Test HistGradientBoosting classifier with autotuning"""
+    strategy = OSWTestStrategy(test_runner, test_config)
+    strategy.prepare()
+    strategy.execute(histgbc=True, histgbc_tune=True, pfdr=True, pi0_lambda="0 0 0")
+
+    strategy.verify(regtest)
+
+
 def test_osw_6(test_runner, test_config, regtest):
     run_generic_test(
         test_runner,
@@ -769,6 +803,19 @@ def test_osw_9(test_runner, test_config, regtest):
 
 def test_osw_10(test_runner, test_config, regtest):
     run_metabo_test(test_runner, test_config, regtest, ms1ms2=True, score_filter=True)
+
+
+def test_osw_histgbc_multilevel(test_runner, test_config, regtest):
+    """Test HistGradientBoosting classifier with multiple levels"""
+    run_generic_test(
+        test_runner,
+        test_config,
+        OSWTestStrategy,
+        regtest,
+        pfdr=True,
+        pi0_lambda="0 0 0",
+        histgbc=True,
+    )
 
 
 # Parquet Tests
@@ -851,6 +898,33 @@ def test_parquet_9(test_runner, test_config, regtest):
         regtest,
         pi0_lambda="0 0 0",
         subample_ratio=0.5,
+    )
+
+
+def test_parquet_histgbc(test_runner, test_config, regtest):
+    """Test HistGradientBoosting classifier with Parquet files"""
+    run_generic_test(
+        test_runner,
+        test_config,
+        ParquetTestStrategy,
+        regtest,
+        pfdr=True,
+        pi0_lambda="0 0 0",
+        histgbc=True,
+    )
+
+
+def test_parquet_histgbc_tune(test_runner, test_config, regtest):
+    """Test HistGradientBoosting classifier with autotuning on Parquet files"""
+    run_generic_test(
+        test_runner,
+        test_config,
+        ParquetTestStrategy,
+        regtest,
+        pfdr=True,
+        pi0_lambda="0 0 0",
+        histgbc=True,
+        histgbc_tune=True,
     )
 
 
@@ -952,6 +1026,19 @@ def test_split_parquet_9(test_runner, test_config, regtest):
     )
 
 
+def test_split_parquet_histgbc(test_runner, test_config, regtest):
+    """Test HistGradientBoosting classifier with split Parquet files"""
+    run_generic_test(
+        test_runner,
+        test_config,
+        SplitParquetTestStrategy,
+        regtest,
+        pfdr=True,
+        pi0_lambda="0 0 0",
+        histgbc=True,
+    )
+
+
 def test_split_parquet_apply_weights(test_runner, test_config, regtest):
     # Apply weights
     run_generic_test_apply_weights(
@@ -1047,6 +1134,19 @@ def test_multi_split_parquet_9(test_runner, test_config, regtest):
         regtest,
         pi0_lambda="0 0 0",
         subample_ratio=0.5,
+    )
+
+
+def test_multi_split_parquet_histgbc(test_runner, test_config, regtest):
+    """Test HistGradientBoosting classifier with multi-split Parquet files"""
+    run_generic_test(
+        test_runner,
+        test_config,
+        MultiSplitParquetTestStrategy,
+        regtest,
+        pfdr=True,
+        pi0_lambda="0 0 0",
+        histgbc=True,
     )
 
 

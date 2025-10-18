@@ -13,6 +13,7 @@ Each learner provides methods for training, scoring, and parameter management.
 """
 
 import inspect
+import os
 from typing import List
 
 import numpy as np
@@ -27,6 +28,10 @@ from sklearn.model_selection import (
     train_test_split,
 )
 from sklearn.svm import LinearSVC
+from sklearn.ensemble import HistGradientBoostingClassifier
+from sklearn.inspection import permutation_importance
+from sklearn.metrics import make_scorer, log_loss
+from threadpoolctl import threadpool_limits
 
 from .data_handling import Experiment
 
@@ -296,6 +301,255 @@ class SVMLearner(LinearLearner):
         """Set the parameters of the SVM model."""
         # self.weights = w
         self.classifier = classifier
+        return self
+
+
+class HistGBCLearner(AbstractLearner):
+    """
+    Implements a scikit-learn HistGradientBoostingClassifier-based learner for scoring.
+
+    .. note::
+        HistGradientBoostingClassifier uses internal parallelism via OpenMP. To control thread usage
+        and avoid CPU oversubscription, set the OMP_NUM_THREADS environment variable BEFORE launching
+        pyprophet:
+        
+        .. code-block:: bash
+        
+            export OMP_NUM_THREADS=6
+            pyprophet score --in data.osw --classifier HistGradientBoosting --threads 3
+        
+        The CLI will automatically set OMP_NUM_THREADS if not already set, but explicit control is
+        more reliable. Setting it after Python/NumPy/Sklearn imports will have no effect.
+        
+        Use threadpoolctl within the code as a runtime fallback, but OMP_NUM_THREADS must be set
+        before import for guaranteed effect.
+
+    Methods:
+        - tune: Tune hyperparameters using RandomizedSearchCV.
+        - learn: Train the HistGradientBoosting model using decoy and target peaks.
+        - score: Score the given peaks using the trained model.
+        - get_parameters: Retrieve the parameters of the model.
+        - set_parameters: Set the parameters of the model.
+    """
+
+    def __init__(self, autotune=False, hgb_params=None, threads=1):
+        self.classifier = None
+        self.importance = None
+        self.autotune = autotune
+        self.threads = threads
+        self.hgb_params = hgb_params or {}
+
+    def tune(
+        self, decoy_peaks, target_peaks, use_main_score=True, cv_splits=3, n_jobs=-1
+    ):
+        """
+        Tune hyperparameters using RandomizedSearchCV.
+        """
+        logger.info(
+            "Autotuning of HistGradientBoosting hyperparameters using RandomizedSearchCV."
+        )
+
+        assert isinstance(decoy_peaks, Experiment)
+        assert isinstance(target_peaks, Experiment)
+
+        X0 = decoy_peaks.get_feature_matrix(use_main_score)
+        X1 = target_peaks.get_feature_matrix(use_main_score)
+        X = np.vstack((X0, X1))
+        y = np.zeros((X.shape[0],))
+        y[X0.shape[0] :] = 1.0
+
+        param_dist = {
+            "learning_rate": np.linspace(0.01, 1.0, num=30),
+            "max_depth": [None] + list(range(2, 40)),
+            "max_leaf_nodes": [None] + list(range(15, 65, 5)),
+            "min_samples_leaf": [1, 2, 3, 5, 10],
+            "l2_regularization": np.linspace(0.0, 1.0, num=20),
+            "max_iter": [100, 200, 300, 500],
+            "class_weight": [None, "balanced"]
+            + [{1: neg, 0: pos} for neg in (0.1, 1, 10) for pos in (0.1, 1, 10)],
+        }
+
+        base_model = HistGradientBoostingClassifier(random_state=42)
+
+        # Control the number of threads used by HistGradientBoostingClassifier
+        # Safe handling when os.cpu_count() returns None and when env var is malformed
+        total_cpus_env = os.getenv("TOTAL_CPUS")
+        cpu_count = os.cpu_count() or 1
+        try:
+            total_jobs = int(total_cpus_env) if total_cpus_env else cpu_count
+        except (TypeError, ValueError):
+            total_jobs = cpu_count
+        total_jobs = max(1, int(total_jobs))
+
+        preference = os.getenv("PARALLEL_PREFERENCE", "outer").lower()  # 'outer' or 'inner'
+
+        if preference == "outer":
+            # Prefer outer parallelism in RandomizedSearchCV
+            n_jobs = max(1, total_jobs)
+            n_jobs_inner = 1  # avoid oversubscription inside HGB
+        else:  # 'inner'
+            # Prefer inner parallelism in HistGradientBoosting (OpenMP)
+            n_jobs = 1
+            n_jobs_inner = max(1, total_jobs - 1)
+
+        # Prefer runtime control of OpenMP threads over late env var changes
+        # Note: runner.py warns that setting OMP_NUM_THREADS post-import may not take effect.
+        # We still set it as a best-effort fallback if not already specified by user.
+        if "OMP_NUM_THREADS" not in os.environ:
+            os.environ["OMP_NUM_THREADS"] = str(n_jobs_inner)
+
+        random_search = RandomizedSearchCV(
+            estimator=base_model,
+            param_distributions=param_dist,
+            n_iter=10,
+            cv=KFold(n_splits=cv_splits, shuffle=True, random_state=42),
+            n_jobs=n_jobs,
+            scoring="roc_auc",
+            verbose=3,
+            random_state=42,
+        )
+
+        # Limit OpenMP threads during fitting to avoid oversubscription
+        with threadpool_limits(limits=n_jobs_inner, user_api="openmp"):
+            random_search.fit(X, y)
+
+        best_params = random_search.best_params_
+        self.hgb_params.update(best_params)
+
+        best_params_str = [
+            f"{key}: {str(value).replace('{', '[').replace('}', ']')} | "
+            for key, value in self.hgb_params.items()
+        ]
+        logger.info(f"Optimal hyperparameters: {best_params_str}")
+
+        return self
+
+    def learn(self, decoy_peaks, target_peaks, use_main_score=True):
+        """Train the HistGradientBoosting model using decoy and target peaks."""
+        assert isinstance(decoy_peaks, Experiment)
+        assert isinstance(target_peaks, Experiment)
+
+        X0 = decoy_peaks.get_feature_matrix(use_main_score)
+        X1 = target_peaks.get_feature_matrix(use_main_score)
+        X = np.vstack((X0, X1))
+        y = np.zeros((X.shape[0],))
+        y[X0.shape[0] :] = 1.0
+
+        # Configure classifier with user params or defaults
+        clf_params = dict(self.hgb_params)
+        clf_params.setdefault("learning_rate", 0.3)
+        clf_params.setdefault("random_state", 42)
+        clf_params.setdefault("max_iter", 100)
+        clf_params.setdefault("max_leaf_nodes", 25)
+        clf_params.setdefault("max_depth", 20)
+        clf_params.setdefault("min_samples_leaf", 5)
+        clf_params.setdefault("l2_regularization", 1.0)
+        clf_params.setdefault("early_stopping", True)
+        clf_params.setdefault("validation_fraction", 0.1)
+
+        # Filter out any params not accepted by HistGradientBoostingClassifier
+        valid_params = inspect.signature(
+            HistGradientBoostingClassifier.__init__
+        ).parameters
+        clf_params = {k: v for k, v in clf_params.items() if k in valid_params}
+
+        classifier = HistGradientBoostingClassifier(**clf_params)
+        # Limit OpenMP threads at runtime during fit to avoid oversubscription
+        omp_env = os.getenv("OMP_NUM_THREADS")
+        try:
+            omp_threads = int(omp_env) if omp_env else 1
+        except (TypeError, ValueError):
+            omp_threads = 1
+        omp_threads = max(1, omp_threads)
+        with threadpool_limits(limits=omp_threads, user_api="openmp"):
+            classifier.fit(X, y)
+
+        self.classifier = classifier
+        # Store feature importances as dict keyed by f{index} to match XGBoost format
+        if hasattr(classifier, "feature_importances_"):
+            feats = classifier.feature_importances_
+            self.importance = {f"f{i}": float(v) for i, v in enumerate(feats)}
+        else:
+            # Use permutation importance as fallback
+            # For stability and speed, compute permutation importance on a stratified subsample
+            rs = np.random.default_rng(42)
+            n_samples = X.shape[0]
+            max_samples = min(2000, n_samples)
+
+            if n_samples > max_samples:
+                idx0_pool = np.where(y == 0)[0]
+                idx1_pool = np.where(y == 1)[0]
+
+                # Clamp to avoid oversampling if one class is very small
+                n_class0 = min(max_samples // 2, len(idx0_pool))
+                n_class1 = min(max_samples - n_class0, len(idx1_pool))
+
+                idx0 = rs.choice(idx0_pool, size=n_class0, replace=False)
+                idx1 = rs.choice(idx1_pool, size=n_class1, replace=False)
+                idx = np.concatenate([idx0, idx1])
+                X_imp, y_imp = X[idx], y[idx]
+            else:
+                X_imp, y_imp = X, y
+
+            # Create a custom scorer similar to XGBoost's gain:
+            # We want to measure the DROP in log loss when feature is shuffled (higher = more important)
+            # This is equivalent to measuring how much the feature reduces loss (like gain)
+            def loss_gain_score(y_true, y_pred_proba, **kwargs):
+                """Score based on negative log loss - higher is better, like XGBoost gain."""
+                # Return negative log loss (so higher score = better = lower loss)
+                return -log_loss(y_true, y_pred_proba, labels=[0, 1])
+
+            gain_scorer = make_scorer(
+                loss_gain_score, greater_is_better=True, needs_proba=True
+            )
+
+            result = permutation_importance(
+                classifier,
+                X_imp,
+                y_imp,
+                scoring=gain_scorer,  # Use custom gain-like scorer
+                n_repeats=5,
+                random_state=42,
+                n_jobs=-1,
+            )
+            feats = result.importances_mean
+            # Clamp negatives to zero (permutation importance can be slightly negative due to noise)
+            feats = np.maximum(feats, 0.0)
+            # Scale to be more comparable to XGBoost gain values (typically 0-100 range)
+            # Multiply by 100 to get similar scale
+            feats = feats * 100.0
+            self.importance = {f"f{i}": float(v) for i, v in enumerate(feats)}
+
+        # Store importance on the classifier object itself so it survives set_parameters
+        classifier._pyprophet_importance = self.importance
+
+        return self
+
+    def score(self, peaks, use_main_score):
+        """Score the given peaks using the HistGradientBoosting model."""
+        X = peaks.get_feature_matrix(use_main_score)
+        # Use decision_function for compatibility with XGBoost scoring
+        result = self.classifier.decision_function(X)
+        return result.astype(np.float32)
+
+    def get_parameters(self):
+        """Retrieve the parameters of the model."""
+        return self.classifier
+
+    def set_parameters(self, classifier):
+        """Set the parameters of the model."""
+        self.classifier = classifier
+
+        # Try to get importance from the classifier's custom attribute (if we stored it there)
+        if hasattr(classifier, "_pyprophet_importance"):
+            self.importance = classifier._pyprophet_importance
+        elif hasattr(classifier, "feature_importances_"):
+            feats = classifier.feature_importances_
+            self.importance = {f"f{i}": float(v) for i, v in enumerate(feats)}
+        else:
+            # HistGradientBoostingClassifier doesn't have feature_importances_
+            # We'll set a placeholder - importance should have been set during learn()
+            self.importance = {}
         return self
 
 

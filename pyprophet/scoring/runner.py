@@ -107,6 +107,40 @@ class PyProphetRunner(object):
         """
         Executes the PyProphet workflow, including scoring, error estimation, and saving results.
         """
+        if self.classifier == "HistGradientBoosting":
+            # We need to adjust the parallelism used throughout scoring to avoid oversubscription, since HistGradientBoosting uses multiple threads internally
+            total_threads = int(os.getenv("TOTAL_CPUS", os.cpu_count()))
+            # Assert threads is not greater than total_threads
+            assert self.runner_config.threads <= total_threads, (
+                f"You requested {self.runner_config.threads} threads, but only {total_threads} are available."
+            )
+            
+            # Log the OMP_NUM_THREADS value that's currently set
+            omp_value = os.getenv("OMP_NUM_THREADS", "NOT SET")
+            logger.info(
+                f"HistGradientBoosting parallelism: "
+                f"semi-supervised threads={self.runner_config.threads}, "
+                f"OMP_NUM_THREADS={omp_value}, "
+                f"total_cpus={total_threads}"
+            )
+            
+            # Note: OMP_NUM_THREADS should ideally be set BEFORE pyprophet is launched
+            # The CLI now sets it automatically in main.py before any numpy imports
+            if "OMP_NUM_THREADS" not in os.environ:
+                logger.warning(
+                    "OMP_NUM_THREADS was not set. This should have been set automatically by main.py. "
+                    "Something may be wrong with the initialization sequence."
+                )
+            elif os.getenv("_PYPROPHET_OMP_AUTO") == "1":
+                logger.info(
+                    "OMP_NUM_THREADS was automatically set by PyProphet. "
+                    "For explicit control, set it before launching pyprophet."
+                )
+            else:
+                logger.info(
+                    "OMP_NUM_THREADS was set externally (recommended for best control)."
+                )
+
         self.check_cols = [self.runner_config.group_id, "run_id", "decoy"]
 
         if self.glyco and self.level in ["ms2", "ms1ms2"]:
@@ -240,7 +274,7 @@ class PyProphetRunner(object):
             return self.config.extra_writes.get("trained_weights_path")
         elif self.runner_config.classifier == "SVM":
             return self.config.extra_writes.get("trained_weights_path")
-        elif self.runner_config.classifier == "XGBoost":
+        elif self.runner_config.classifier in ("XGBoost", "HistGradientBoosting"):
             return self.config.extra_writes.get(
                 f"trained_model_path_{self.config.level}"
             )
@@ -328,7 +362,7 @@ class PyProphetWeightApplier(PyProphetRunner):
 
                     traceback.print_exc()
                     raise
-            elif self.classifier == "XGBoost":
+            elif self.classifier in ("XGBoost", "HistGradientBoosting"):
                 with open(apply_weights, "rb") as file:
                     self.persisted_weights = pickle.load(file)
         elif self.config.file_type == "osw":
@@ -355,13 +389,13 @@ class PyProphetWeightApplier(PyProphetRunner):
 
                     traceback.print_exc()
                     raise
-            elif self.classifier == "XGBoost":
+            elif self.classifier in ("XGBoost", "HistGradientBoosting"):
                 try:
                     con = sqlite3.connect(apply_weights)
 
                     if not check_sqlite_table(con, "PYPROPHET_XGB"):
                         raise click.ClickException(
-                            "PYPROPHET_XGB table is not present in file, cannot apply weights for XGBoost classifier! Make sure you have run the scoring on a subset of the data first, or that you supplied the right `--classifier` parameter."
+                            "PYPROPHET_XGB table is not present in file, cannot apply weights for XGBoost/HistGradientBoosting classifier! Make sure you have run the scoring on a subset of the data first, or that you supplied the right `--classifier` parameter."
                         )
                     data = con.execute(
                         "SELECT xgb FROM PYPROPHET_XGB WHERE LEVEL=='%s'" % self.level

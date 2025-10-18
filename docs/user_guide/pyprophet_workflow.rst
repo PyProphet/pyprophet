@@ -98,7 +98,12 @@ Peak-Group Level MS1-MS2 Scoring
 This command will score the features in the parquet files at the peak-group level (MS1-MS2) using the XGBoost classifier. All the runs in the `all_runs.oswpqd` directory get processed together during the scoring, which allows PyProphet to learn the weights for the features across all runs. The results scores are then written back to the corresponding parquet files in the `all_runs.oswpqd` directory.
 
 .. note::
-    There are different classifiers available for scoring, such as LDA, SVM and XGBoost. 
+    There are different classifiers available for scoring: **LDA**, **SVM**, **XGBoost**, and **HistGradientBoosting**. 
+    
+    - **LDA** (Linear Discriminant Analysis): Fast, linear classifier suitable for most datasets
+    - **SVM** (Support Vector Machine): Linear SVM with hyperparameter tuning support
+    - **XGBoost**: Gradient boosting classifier with excellent performance (requires xgboost package)
+    - **HistGradientBoosting**: Scikit-learn's histogram-based gradient boosting, similar performance to XGBoost but native to sklearn (no additional dependencies)
 
     If your dataset is really large, you may want to subsample the data to speed up the scoring process, and then apply the learned weights to the rest of the data. This can be done using the `--subsample_ratio` parameter, which allows you to specify the ratio of the data to use for training the classifier. For example, `--subsample_ratio 0.1` will use 10% of the data during the learning and scoring process. 
 

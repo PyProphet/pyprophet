@@ -19,7 +19,7 @@ from loguru import logger
 
 from .._config import RunnerIOConfig
 from ..stats import find_cutoff
-from .classifiers import AbstractLearner, SVMLearner, XGBLearner
+from .classifiers import AbstractLearner, SVMLearner, XGBLearner, HistGBCLearner
 from .data_handling import Experiment, update_chosen_main_score_in_table
 
 try:
@@ -521,6 +521,11 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
         )
 
         if isinstance(self.inner_learner, XGBLearner) and self.inner_learner.autotune:
+            self.inner_learner.tune(td_peaks, bt_peaks, True)
+        elif (
+            isinstance(self.inner_learner, HistGBCLearner)
+            and self.inner_learner.autotune
+        ):
             self.inner_learner.tune(td_peaks, bt_peaks, True)
         elif isinstance(self.inner_learner, SVMLearner) and self.inner_learner.autotune:
             self.inner_learner.tune(td_peaks, bt_peaks, True)

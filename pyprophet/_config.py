@@ -90,12 +90,12 @@ class RunnerConfig:
     Configuration for scoring, classifier setup, learning parameters, and optional features.
 
     Attributes:
-        classifier (str): Classifier type used for semi-supervised learning ('LDA', 'SVM' or 'XGBoost').
-        autotune (bool): Whether to autotune hyperparameters for the classifier (XGBoost / SVM)
+        classifier (str): Classifier type used for semi-supervised learning ('LDA', 'SVM', 'XGBoost' or 'HistGradientBoosting').
+        autotune (bool): Whether to autotune hyperparameters for the classifier (XGBoost / SVM / HistGradientBoosting)
         ss_main_score (str): Starting main score for semi-supervised learning (can be 'auto').
         main_score_selection_report (bool): Whether to generate a report for main score selection.
 
-        xgb_params (dict): Default XGBoost parameters for training.
+        xgb_params (dict): Default parameters for XGBoost/HistGradientBoosting training.
 
         xeval_fraction (float): Fraction of data used in each cross-validation iteration.
         xeval_num_iter (int): Number of cross-validation iterations.
@@ -127,12 +127,12 @@ class RunnerConfig:
     """
 
     # Scoring / classifier options
-    classifier: Literal["LDA", "SVM", "XGBoost"] = "LDA"
+    classifier: Literal["LDA", "SVM", "XGBoost", "HistGradientBoosting"] = "LDA"
     autotune: bool = False
     ss_main_score: str = "auto"
     main_score_selection_report: bool = False
 
-    # XGBoost-related hyperparameters
+    # XGBoost/HistGradientBoosting-related hyperparameters
     xgb_params: dict = field(default_factory=dict)
 
     # Cross-validation settings
@@ -191,8 +191,8 @@ class RunnerConfig:
             f"  main_score_selection_report={self.main_score_selection_report}",
         ]
 
-        # Conditionally add XGBoost-specific parameters
-        if self.classifier == "XGBoost":
+        # Conditionally add XGBoost/HistGradientBoosting-specific parameters
+        if self.classifier in ("XGBoost", "HistGradientBoosting"):
             parts.extend(
                 [
                     f"  xgb_params={self.xgb_params}",

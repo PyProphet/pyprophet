@@ -12,7 +12,8 @@ from .util import (
     memray_profile,
 )
 from .._config import RunnerIOConfig
-from ..scoring.runner import PyProphetLearner, PyProphetWeightApplier
+# Defer import of runner to avoid premature sklearn import before OMP_NUM_THREADS is set
+# from ..scoring.runner import PyProphetLearner, PyProphetWeightApplier
 
 
 # PyProphet semi-supervised learning and scoring
@@ -43,14 +44,14 @@ from ..scoring.runner import PyProphetLearner, PyProphetWeightApplier
     "--classifier",
     default="LDA",
     show_default=True,
-    type=click.Choice(["LDA", "SVM", "XGBoost"]),
-    help='Either a "LDA", "SVM" or "XGBoost" classifier is used for semi-supervised learning.',
+    type=click.Choice(["LDA", "SVM", "XGBoost", "HistGradientBoosting"]),
+    help='Either a "LDA", "SVM", "XGBoost" or "HistGradientBoosting" classifier is used for semi-supervised learning.',
 )
 @click.option(
     "--autotune/--no-autotune",
     default=False,
     show_default=True,
-    help="Autotune hyperparameters for XGBoost/SVM.",
+    help="Autotune hyperparameters for XGBoost/SVM/HistGradientBoosting.",
     hidden=True,
 )
 @click.option(
@@ -293,7 +294,30 @@ def score(
 ):
     """
     Conduct semi-supervised learning and error-rate estimation for MS1, MS2 and transition-level data.
+
+    .. note::
+        When using --classifier HistGradientBoosting, the OMP_NUM_THREADS environment variable controls
+        OpenMP thread usage to avoid CPU oversubscription. The CLI will automatically set it if not already
+        specified, but for best control and performance, set it explicitly before launching pyprophet:
+        
+        For example, if your machine has 20 CPU threads and you want to use 3 threads for semi-supervised
+        learning, set OMP_NUM_THREADS to 7 (ceil(20/3)):
+
+    Example
+
+    .. code-block:: bash
+    
+        export OMP_NUM_THREADS=7
+        pyprophet score --in input.osw --classifier HistGradientBoosting --threads 3
+        
+        # Or in one line (automatic setting):
+        pyprophet score --in input.osw --classifier HistGradientBoosting --threads 3
+
     """
+    
+    # OMP_NUM_THREADS is now set in main.py before any imports (if needed)
+    # Just import the runner classes here
+    from ..scoring.runner import PyProphetLearner, PyProphetWeightApplier
 
     if outfile is None:
         outfile = infile
