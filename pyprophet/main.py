@@ -3,6 +3,9 @@ PyProphet main CLI entry point.
 
 CRITICAL: OMP_NUM_THREADS setup for HistGradientBoosting must happen BEFORE numpy import.
 """
+# Linters: imports are intentionally placed after the OMP pre-import setup.
+# ruff: noqa: E402
+# pylint: disable=C0413
 import os
 import sys
 
