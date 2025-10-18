@@ -39,7 +39,6 @@ dependencies = [
     "statsmodels >= 0.8.0",
     "matplotlib",
     "seaborn",
-    "tabulate",
     "pyarrow",
     "pypdf",
     "psutil",

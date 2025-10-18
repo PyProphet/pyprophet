@@ -195,8 +195,6 @@ sphinxcontrib-serializinghtml==2.0.0
     # via sphinx
 statsmodels==0.14.4
     # via pyprophet (setup.py)
-tabulate==0.9.0
-    # via pyprophet (setup.py)
 threadpoolctl==3.6.0
     # via scikit-learn
 tomli==2.2.1
