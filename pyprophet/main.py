@@ -3,43 +3,49 @@ PyProphet main CLI entry point.
 
 CRITICAL: OMP_NUM_THREADS setup for HistGradientBoosting must happen BEFORE numpy import.
 """
+
 # Linters: imports are intentionally placed after the OMP pre-import setup.
 # ruff: noqa: E402
 # pylint: disable=C0413
 import os
 import sys
 
+
 # Pre-import hook: Set OMP_NUM_THREADS before any numpy/sklearn imports if needed
 # This MUST be the first code that runs to have any effect on OpenMP
 def _setup_omp_threads():
     """
     Pre-configure OMP_NUM_THREADS for HistGradientBoosting if not already set.
-    
+
     This must run before ANY numpy/sklearn imports occur, as OpenMP is initialized
     during the first numpy import and cannot be changed afterwards.
     """
     # Only act if user hasn't explicitly set OMP_NUM_THREADS
     if "OMP_NUM_THREADS" in os.environ:
         return  # User has explicit control
-    
+
     # Check if 'score' command with HistGradientBoosting classifier is being used
     argv = sys.argv
     if "score" not in argv:
         return  # Not a score command
-    
+
     # Look for --classifier=HistGradientBoosting or --classifier HistGradientBoosting
     is_histgbc = False
     for i, arg in enumerate(argv):
         if arg == "--classifier=HistGradientBoosting":
             is_histgbc = True
             break
-        elif arg == "--classifier" and i + 1 < len(argv) and argv[i + 1] == "HistGradientBoosting":
+        elif (
+            arg == "--classifier"
+            and i + 1 < len(argv)
+            and argv[i + 1] == "HistGradientBoosting"
+        ):
             is_histgbc = True
             break
-    
+
     if not is_histgbc:
         return  # Not using HistGBC
-    
+
     # Extract --threads value
     threads = 1
     for i, arg in enumerate(argv):
@@ -53,7 +59,7 @@ def _setup_omp_threads():
                 threads = int(argv[i + 1])
             except ValueError:
                 pass
-    
+
     # Calculate optimal OMP_NUM_THREADS
     total_cpus_env = os.getenv("TOTAL_CPUS")
     try:
@@ -61,21 +67,15 @@ def _setup_omp_threads():
     except (TypeError, ValueError):
         total_cpus = os.cpu_count() or 1
     total_cpus = max(1, total_cpus)
-    
+
     import math
+
     omp_threads = max(1, math.ceil(total_cpus / max(1, threads)))
-    
+
     # Set it NOW before any imports
     os.environ["OMP_NUM_THREADS"] = str(omp_threads)
     os.environ["_PYPROPHET_OMP_AUTO"] = "1"  # Flag that we set it automatically
-    
-    # Optional: print to stderr so user knows what happened
-    # (can't use logger yet as it's not imported)
-    print(
-        f"[pyprophet] Auto-setting OMP_NUM_THREADS={omp_threads} for HistGradientBoosting "
-        f"(CPUs: {total_cpus}, --threads {threads})",
-        file=sys.stderr
-    )
+
 
 # Run the setup before ANY other imports
 _setup_omp_threads()
