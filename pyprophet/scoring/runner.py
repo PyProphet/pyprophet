@@ -115,25 +115,30 @@ class PyProphetRunner(object):
                 f"You requested {self.runner_config.threads} threads, but only {total_threads} are available."
             )
             
+            # Log the OMP_NUM_THREADS value that's currently set
+            omp_value = os.getenv("OMP_NUM_THREADS", "NOT SET")
+            logger.info(
+                f"HistGradientBoosting parallelism: "
+                f"semi-supervised threads={self.runner_config.threads}, "
+                f"OMP_NUM_THREADS={omp_value}, "
+                f"total_cpus={total_threads}"
+            )
+            
             # Note: OMP_NUM_THREADS should ideally be set BEFORE pyprophet is launched
-            # The CLI now sets it automatically if not present, but explicit setting is more reliable
+            # The CLI now sets it automatically in main.py before any numpy imports
             if "OMP_NUM_THREADS" not in os.environ:
-                logger.info(
-                    f"Note: OMP_NUM_THREADS was automatically set by the CLI. "
-                    f"For deterministic behavior, consider setting it before launching pyprophet."
-                )
-            
-            # Legacy code (kept commented for reference):
-            # omp_threads = str(max(1, (total_threads // self.runner_config.threads)))
-            # os.environ["OMP_NUM_THREADS"] = omp_threads
-            ## For some reason the above does not work unless OMP_NUM_THREADS is set before numpy is imported.
-            ## See: https://stackoverflow.com/questions/30791550/limit-number-of-threads-in-numpy
-            
-            # Warn if user wants multi-threading but didn't set OMP_NUM_THREADS externally
-            if self.runner_config.threads > 1 and os.getenv("OMP_NUM_THREADS") is None:
                 logger.warning(
-                    f"You requested {self.runner_config.threads} threads for semi-supervised learning using the HistGradientBoosting classifier, which uses multi-threading internally. "
-                    f"For best control, set OMP_NUM_THREADS before launching pyprophet (the CLI now does this automatically if not set)."
+                    "OMP_NUM_THREADS was not set. This should have been set automatically by main.py. "
+                    "Something may be wrong with the initialization sequence."
+                )
+            elif os.getenv("_PYPROPHET_OMP_AUTO") == "1":
+                logger.info(
+                    "OMP_NUM_THREADS was automatically set by PyProphet. "
+                    "For explicit control, set it before launching pyprophet."
+                )
+            else:
+                logger.info(
+                    "OMP_NUM_THREADS was set externally (recommended for best control)."
                 )
 
         self.check_cols = [self.runner_config.group_id, "run_id", "decoy"]
