@@ -13,8 +13,6 @@ import argparse
 import time
 from pathlib import Path
 
-import pandas as pd
-
 
 def run_comparison(infile: str, level: str = "ms2"):
     """
