@@ -44,7 +44,8 @@ dependencies = [
     "pypdf",
     "psutil",
     "pyopenms",
-    "lxml"
+    "lxml",
+    "packaging"
 ]
 
 # Optional dependencies 

@@ -117,6 +117,7 @@ from .util import (
     subsample_osw,
 )
 from .split import split_merged_parquet, split_osw
+from .version_check import check_for_updates, format_update_message
 
 try:
     profile
@@ -150,6 +151,14 @@ def cli(ctx, log_level, log_colorize):
 
     Visit http://openswath.org for usage instructions and help.
     """
+    
+    # Check for updates and display message if available
+    update_info = check_for_updates()
+    if update_info is not None:
+        current_version, latest_version = update_info
+        message = format_update_message(current_version, latest_version)
+        click.echo(click.style(message, fg='yellow'))
+        click.echo()  
 
 
 # Semi-supervised learning and scoring of OpenSWATH results
