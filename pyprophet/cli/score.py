@@ -12,7 +12,8 @@ from .util import (
     memray_profile,
 )
 from .._config import RunnerIOConfig
-from ..scoring.runner import PyProphetLearner, PyProphetWeightApplier
+# Defer import of runner to avoid premature sklearn import before OMP_NUM_THREADS is set
+# from ..scoring.runner import PyProphetLearner, PyProphetWeightApplier
 
 
 # PyProphet semi-supervised learning and scoring
@@ -295,14 +296,50 @@ def score(
     Conduct semi-supervised learning and error-rate estimation for MS1, MS2 and transition-level data.
 
     .. note::
-        When using --classifier HistGradientBoosting, it may be useful to set the OMP_NUM_THREADS environment variable to avoid over-subscription of CPU threads from the HistGradientBoostingClassifier and the semi-supervised learning parallelization. For example, if your machine has 20 CPU threads and you want to use 3 threads for semi-supervised learning, set OMP_NUM_THREADS to 6 (20 / 3) before running the pyprophet score.
+        When using --classifier HistGradientBoosting, the OMP_NUM_THREADS environment variable controls
+        OpenMP thread usage to avoid CPU oversubscription. The CLI will automatically set it if not already
+        specified, but for best control and performance, set it explicitly before launching pyprophet:
+        
+        For example, if your machine has 20 CPU threads and you want to use 3 threads for semi-supervised
+        learning, set OMP_NUM_THREADS to 7 (ceil(20/3)):
 
     Example
 
     .. code-block:: bash
-        OMP_NUM_THREADS=6 pyprophet score --in input.osw --classifier HistGradientBoosting --threads 3
+    
+        export OMP_NUM_THREADS=7
+        pyprophet score --in input.osw --classifier HistGradientBoosting --threads 3
+        
+        # Or in one line (automatic setting):
+        pyprophet score --in input.osw --classifier HistGradientBoosting --threads 3
 
     """
+    
+    # CRITICAL: Set OMP_NUM_THREADS early for HistGradientBoosting before any numpy/sklearn imports
+    # This must happen before importing runner module which triggers sklearn imports
+    if classifier == "HistGradientBoosting" and "OMP_NUM_THREADS" not in os.environ:
+        # Calculate recommended OpenMP threads to avoid oversubscription
+        total_cpus_env = os.getenv("TOTAL_CPUS")
+        try:
+            total_cpus = int(total_cpus_env) if total_cpus_env else (os.cpu_count() or 1)
+        except (TypeError, ValueError):
+            total_cpus = os.cpu_count() or 1
+        total_cpus = max(1, total_cpus)
+        
+        # Use ceil division to ensure we don't oversubscribe
+        import math
+        omp_threads = max(1, math.ceil(total_cpus / max(1, threads)))
+        
+        os.environ["OMP_NUM_THREADS"] = str(omp_threads)
+        logger.warning(
+            f"HistGradientBoosting selected without OMP_NUM_THREADS set. "
+            f"Automatically setting OMP_NUM_THREADS={omp_threads} "
+            f"(total CPUs: {total_cpus}, threads: {threads}). "
+            f"For best performance, set OMP_NUM_THREADS before launching pyprophet."
+        )
+    
+    # Now safe to import runner (which imports sklearn) after OMP_NUM_THREADS is set
+    from ..scoring.runner import PyProphetLearner, PyProphetWeightApplier
 
     if outfile is None:
         outfile = infile

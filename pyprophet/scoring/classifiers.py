@@ -309,7 +309,20 @@ class HistGBCLearner(AbstractLearner):
     Implements a scikit-learn HistGradientBoostingClassifier-based learner for scoring.
 
     .. note::
-        HistGradientBoostingClassifier uses internal parallelism via OpenMP, which can be controlled by setting the OMP_NUM_THREADS environment variable.
+        HistGradientBoostingClassifier uses internal parallelism via OpenMP. To control thread usage
+        and avoid CPU oversubscription, set the OMP_NUM_THREADS environment variable BEFORE launching
+        pyprophet:
+        
+        .. code-block:: bash
+        
+            export OMP_NUM_THREADS=6
+            pyprophet score --in data.osw --classifier HistGradientBoosting --threads 3
+        
+        The CLI will automatically set OMP_NUM_THREADS if not already set, but explicit control is
+        more reliable. Setting it after Python/NumPy/Sklearn imports will have no effect.
+        
+        Use threadpoolctl within the code as a runtime fallback, but OMP_NUM_THREADS must be set
+        before import for guaranteed effect.
 
     Methods:
         - tune: Tune hyperparameters using RandomizedSearchCV.
