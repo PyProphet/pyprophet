@@ -76,8 +76,6 @@ matplotlib==3.9.4
     #   pyopenms
     #   pyprophet (setup.py)
     #   seaborn
-numexpr==2.10.2
-    # via pyprophet (setup.py)
 numpy==2.0.2
     # via
     #   contourpy
