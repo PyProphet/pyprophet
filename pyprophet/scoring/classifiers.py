@@ -31,6 +31,7 @@ from sklearn.svm import LinearSVC
 from sklearn.ensemble import HistGradientBoostingClassifier
 from sklearn.inspection import permutation_importance
 from sklearn.metrics import make_scorer, log_loss
+from threadpoolctl import threadpool_limits
 
 from .data_handling import Experiment
 
@@ -358,20 +359,31 @@ class HistGBCLearner(AbstractLearner):
         base_model = HistGradientBoostingClassifier(random_state=42)
 
         # Control the number of threads used by HistGradientBoostingClassifier
-        total_jobs = int(os.getenv("TOTAL_CPUS", os.cpu_count()))
-        preference = os.getenv("PARALLEL_PREFERENCE", "outer")  # 'outer' or 'inner'
+        # Safe handling when os.cpu_count() returns None and when env var is malformed
+        total_cpus_env = os.getenv("TOTAL_CPUS")
+        cpu_count = os.cpu_count() or 1
+        try:
+            total_jobs = int(total_cpus_env) if total_cpus_env else cpu_count
+        except (TypeError, ValueError):
+            total_jobs = cpu_count
+        total_jobs = max(1, int(total_jobs))
+
+        preference = os.getenv("PARALLEL_PREFERENCE", "outer").lower()  # 'outer' or 'inner'
 
         if preference == "outer":
-            n_jobs = total_jobs  # outer parallelism for RandomizedSearchCV
-            n_jobs_inner = 1  # no inner parallelism for HistGradientBoostingClassifier
+            # Prefer outer parallelism in RandomizedSearchCV
+            n_jobs = max(1, total_jobs)
+            n_jobs_inner = 1  # avoid oversubscription inside HGB
         else:  # 'inner'
-            n_jobs = 1  # no outer parallelism for RandomizedSearchCV
-            n_jobs_inner = (
-                total_jobs - 1  # inner parallelism for HistGradientBoostingClassifier
-            )
+            # Prefer inner parallelism in HistGradientBoosting (OpenMP)
+            n_jobs = 1
+            n_jobs_inner = max(1, total_jobs - 1)
 
-        # Set OMP_NUM_THREADS for inner parallelism of HistGradientBoostingClassifier
-        os.environ["OMP_NUM_THREADS"] = str(n_jobs_inner)
+        # Prefer runtime control of OpenMP threads over late env var changes
+        # Note: runner.py warns that setting OMP_NUM_THREADS post-import may not take effect.
+        # We still set it as a best-effort fallback if not already specified by user.
+        if "OMP_NUM_THREADS" not in os.environ:
+            os.environ["OMP_NUM_THREADS"] = str(n_jobs_inner)
 
         random_search = RandomizedSearchCV(
             estimator=base_model,
@@ -384,7 +396,9 @@ class HistGBCLearner(AbstractLearner):
             random_state=42,
         )
 
-        random_search.fit(X, y)
+        # Limit OpenMP threads during fitting to avoid oversubscription
+        with threadpool_limits(limits=n_jobs_inner, user_api="openmp"):
+            random_search.fit(X, y)
 
         best_params = random_search.best_params_
         self.hgb_params.update(best_params)
@@ -427,7 +441,15 @@ class HistGBCLearner(AbstractLearner):
         clf_params = {k: v for k, v in clf_params.items() if k in valid_params}
 
         classifier = HistGradientBoostingClassifier(**clf_params)
-        classifier.fit(X, y)
+        # Limit OpenMP threads at runtime during fit to avoid oversubscription
+        omp_env = os.getenv("OMP_NUM_THREADS")
+        try:
+            omp_threads = int(omp_env) if omp_env else 1
+        except (TypeError, ValueError):
+            omp_threads = 1
+        omp_threads = max(1, omp_threads)
+        with threadpool_limits(limits=omp_threads, user_api="openmp"):
+            classifier.fit(X, y)
 
         self.classifier = classifier
         # Store feature importances as dict keyed by f{index} to match XGBoost format
