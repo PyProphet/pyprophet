@@ -1,13 +1,12 @@
-import sqlite3
 import os
 import shutil
-import click
-import pandas as pd
-import duckdb
-import click
-from pathlib import Path
+import sqlite3
 from multiprocessing import Pool, cpu_count
+from pathlib import Path
 from typing import Tuple
+
+import click
+import duckdb
 
 from .io.util import check_sqlite_table
 
@@ -72,21 +71,28 @@ def split_osw(infile: str, threads: int = cpu_count() - 1):
 
     # Connect to the merged OSW file
     conn = sqlite3.connect(infile)
+    cursor = conn.cursor()
 
     # Get unique run IDs from the RUN table
-    run_ids = pd.read_sql("SELECT * FROM RUN", conn)
+    cursor.execute("SELECT * FROM RUN")
+    columns = [description[0] for description in cursor.description]
+    run_rows = cursor.fetchall()
     conn.close()
 
-    if run_ids.shape[0] == 1:
+    if len(run_rows) == 1:
         click.echo(f"Info: Only one run found in {infile}. No splitting necessary.")
         return
 
-    click.echo(f"Info: Splitting {infile} into {run_ids.shape[0]} files.")
+    click.echo(f"Info: Splitting {infile} into {len(run_rows)} files.")
+
+    # Find column indices
+    id_idx = columns.index("ID")
+    filename_idx = columns.index("FILENAME")
 
     run_info_list = []
-    for index, row in run_ids.iterrows():
-        run_file = os.path.basename(row["FILENAME"]).split(".")[0]
-        run_id = row["ID"]
+    for index, row in enumerate(run_rows):
+        run_file = os.path.basename(row[filename_idx]).split(".")[0]
+        run_id = row[id_idx]
         run_info_list.append((index, run_file, run_id, infile, outdir))
 
     if threads == -1:
@@ -98,8 +104,8 @@ def split_osw(infile: str, threads: int = cpu_count() - 1):
     click.echo("Info: Splitting complete.")
 
 
-# Split merged split parquet files into individual files
 def split_merged_parquet(input_dir, output_dir):
+    """Split merged Parquet files into individual files per run."""
     input_dir = Path(input_dir)
     output_dir = Path(output_dir or input_dir)
 
@@ -160,7 +166,7 @@ def split_merged_parquet(input_dir, output_dir):
             f"""
             COPY (
                 SELECT * FROM read_parquet('{transition_file}')
-                WHERE FEATURE_ID IN ({','.join(map(str, feature_ids))})
+                WHERE FEATURE_ID IN ({",".join(map(str, feature_ids))})
             ) TO '{transition_out}' (FORMAT 'parquet', COMPRESSION 'ZSTD');
         """
         )
@@ -180,4 +186,5 @@ def split_merged_parquet(input_dir, output_dir):
         else:
             click.echo(f"Alignment file already exists: {output_alignment}")
 
+    con.close()
     click.echo("Info: Done splitting merged Parquet folder.")
