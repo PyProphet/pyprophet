@@ -120,7 +120,7 @@ class PyProphetRunner(object):
             #     f"Setting OMP_NUM_THREADS to {omp_threads} for HistGradientBoosting classifier and using {self.runner_config.threads} threads for semi-supervised learning to avoid oversubscription."
             # )
             # os.environ["OMP_NUM_THREADS"] = omp_threads
-            ## For some reason the above does not work unles OMP_NUM_THREADS is set before numpy is imported.
+            ## For some reason the above does not work unless OMP_NUM_THREADS is set before numpy is imported.
             ## See: https://stackoverflow.com/questions/30791550/limit-number-of-threads-in-numpy
             if self.runner_config.threads > 1 and "OMP_NUM_THREADS" not in os.environ:
                 logger.warning(
