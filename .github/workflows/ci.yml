@@ -35,4 +35,4 @@ jobs:
 
     - name: Test
       run: |
-        python -m pytest -n auto tests/
+        OMP_NUM_THREADS=1 python -m pytest -n auto tests/
