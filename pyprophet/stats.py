@@ -193,6 +193,7 @@ def pi0est(
     elif isinstance(lambda_, tuple) and len(lambda_) == 3:
         if lambda_[1] == 0 and lambda_[2] == 0:
             lambda_ = lambda_[0]
+            ll = 1
         else:
             lambda_ = np.arange(lambda_[0], lambda_[1], lambda_[2])
             ll = len(lambda_)
