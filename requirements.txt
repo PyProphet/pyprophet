@@ -86,7 +86,6 @@ numpy==2.0.2
     #   pyprophet (setup.py)
     #   scikit-learn
     #   scipy
-    #   statsmodels
     #   xgboost
 nvidia-nccl-cu12==2.26.5
     # via xgboost
@@ -95,14 +94,10 @@ packaging==25.0
     #   matplotlib
     #   pytest
     #   sphinx
-    #   statsmodels
 pandas==2.2.3
     # via
     #   pyopenms
     #   pyprophet (setup.py)
-    #   statsmodels
-patsy==1.0.1
-    # via statsmodels
 pillow==11.3.0
     # via matplotlib
 pluggy==1.6.0
@@ -150,7 +145,6 @@ scipy==1.13.1
     # via
     #   pyprophet (setup.py)
     #   scikit-learn
-    #   statsmodels
     #   xgboost
 six==1.17.0
     # via python-dateutil
@@ -186,8 +180,6 @@ sphinxcontrib-qthelp==2.0.0
     # via sphinx
 sphinxcontrib-serializinghtml==2.0.0
     # via sphinx
-statsmodels==0.14.4
-    # via pyprophet (setup.py)
 threadpoolctl==3.6.0
     # via scikit-learn
 tomli==2.2.1

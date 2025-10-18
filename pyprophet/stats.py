@@ -8,7 +8,7 @@ import scipy as sp
 import pandas as pd
 import scipy.stats
 import scipy.special
-from statsmodels.nonparametric.kde import KDEUnivariate
+from scipy.stats import gaussian_kde
 import click
 from loguru import logger
 
@@ -364,13 +364,19 @@ def lfdr(
 
         # R-like implementation
         bw = bw_nrd0(x)
-        myd = KDEUnivariate(x)
-        myd.fit(bw=adj * bw, gridsize=512)
-        splinefit = sp.interpolate.splrep(myd.support, myd.density)
-        y = sp.interpolate.splev(x, splinefit)
+
+        ## statsmodels KDEUnivariate
+        # myd = KDEUnivariate(x)
+        # myd.fit(bw=adj * bw, gridsize=512)
+        # splinefit = sp.interpolate.splrep(myd.support, myd.density)
+        # y = sp.interpolate.splev(x, splinefit)
+
         # myd = density(x, adjust = 1.5) # R reference function
         # mys = smoothspline(x = myd.rx2('x'), y = myd.rx2('y')) # R reference function
         # y = predict(mys, x).rx2('y') # R reference function
+
+        kde = gaussian_kde(x, bw_method=(adj * bw) / x.std(ddof=1))
+        y = kde(x)
 
         lfdr = pi0 * scipy.stats.norm.pdf(x) / y
     elif transf == "logit":
@@ -378,14 +384,20 @@ def lfdr(
 
         # R-like implementation
         bw = bw_nrd0(x)
-        myd = KDEUnivariate(x)
-        myd.fit(bw=adj * bw, gridsize=512)
 
-        splinefit = sp.interpolate.splrep(myd.support, myd.density)
-        y = sp.interpolate.splev(x, splinefit)
+        ## statsmodels KDEUnivariate
+        # myd = KDEUnivariate(x)
+        # myd.fit(bw=adj * bw, gridsize=512)
+
+        # splinefit = sp.interpolate.splrep(myd.support, myd.density)
+        # y = sp.interpolate.splev(x, splinefit)
+
         # myd = density(x, adjust = 1.5) # R reference function
         # mys = smoothspline(x = myd.rx2('x'), y = myd.rx2('y')) # R reference function
         # y = predict(mys, x).rx2('y') # R reference function
+
+        kde = gaussian_kde(x, bw_method=(adj * bw) / x.std(ddof=1))
+        y = kde(x)
 
         dx = np.exp(x) / np.power((1 + np.exp(x)), 2)
         lfdr = (pi0 * dx) / y

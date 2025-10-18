@@ -35,7 +35,6 @@ dependencies = [
     "cython",
     "scikit-learn >= 1.5",
     "xgboost >= 2.1.4",
-    "statsmodels >= 0.8.0",
     "matplotlib",
     "pyarrow",
     "pypdf",
