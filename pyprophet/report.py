@@ -2,42 +2,35 @@ try:
     import matplotlib
 
     matplotlib.use("Agg")
-    from matplotlib.backends.backend_pdf import PdfPages
-    import pandas as pd
     import matplotlib.pyplot as plt
-    from matplotlib.patches import Rectangle
+    import pandas as pd
+    from matplotlib.backends.backend_pdf import PdfPages
     from matplotlib.colors import TwoSlopeNorm
-    from matplotlib import cm
-    from matplotlib.colors import Normalize, LinearSegmentedColormap
+    from matplotlib.patches import Rectangle
 
 
 except ImportError:
     plt = None
 
-from pypdf import PdfWriter, PdfReader
-import sys
 import os
-
-import click
-from loguru import logger
+import sys
 import warnings
 from functools import wraps
-from sklearn.metrics import jaccard_score
-from scipy.stats import gaussian_kde
-import numpy as np
-from numpy import (
-    linspace,
-    concatenate,
-    around,
-    argmin,
-    sort,
-    arange,
-    interp,
-    array,
-    degrees,
-    arctan,
-)
 
+import numpy as np
+from loguru import logger
+from numpy import (
+    arange,
+    argmin,
+    around,
+    array,
+    concatenate,
+    interp,
+    linspace,
+    sort,
+)
+from pypdf import PdfReader, PdfWriter
+from scipy.stats import gaussian_kde
 
 # ======================
 # Utility Functions
@@ -1673,7 +1666,7 @@ def main_score_selection_report(
         label=["target", "decoy"],
         histtype="bar",
     )
-    plt.title(f"histogram of scores")
+    plt.title("histogram of scores")
     plt.xlabel("score")
     plt.ylabel("density histogram")
     plt.legend(loc=1)
