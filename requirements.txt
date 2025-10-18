@@ -75,7 +75,6 @@ matplotlib==3.9.4
     # via
     #   pyopenms
     #   pyprophet (setup.py)
-    #   seaborn
 numpy==2.0.2
     # via
     #   contourpy
@@ -87,7 +86,6 @@ numpy==2.0.2
     #   pyprophet (setup.py)
     #   scikit-learn
     #   scipy
-    #   seaborn
     #   statsmodels
     #   xgboost
 nvidia-nccl-cu12==2.26.5
@@ -102,7 +100,6 @@ pandas==2.2.3
     # via
     #   pyopenms
     #   pyprophet (setup.py)
-    #   seaborn
     #   statsmodels
 patsy==1.0.1
     # via statsmodels
@@ -155,8 +152,6 @@ scipy==1.13.1
     #   scikit-learn
     #   statsmodels
     #   xgboost
-seaborn==0.13.2
-    # via pyprophet (setup.py)
 six==1.17.0
     # via python-dateutil
 snowballstemmer==3.0.1
