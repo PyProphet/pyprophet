@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyprophet"
-version = "3.0.2"
+version = "3.0.3"
 description = "PyProphet: Semi-supervised learning and scoring of OpenSWATH results."
 readme = { file = "README.md", content-type = "text/markdown" }
 license = { text = "BSD" }
