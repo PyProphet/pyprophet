@@ -114,19 +114,27 @@ class PyProphetRunner(object):
             assert self.runner_config.threads <= total_threads, (
                 f"You requested {self.runner_config.threads} threads, but only {total_threads} are available."
             )
-            # Set number of threads for HistGradientBoosting via OMP_NUM_THREADS env variable
-            omp_threads = str(max(1, (total_threads // self.runner_config.threads)))
-            # logger.info(
-            #     f"Setting OMP_NUM_THREADS to {omp_threads} for HistGradientBoosting classifier and using {self.runner_config.threads} threads for semi-supervised learning to avoid oversubscription."
-            # )
+            
+            # Note: OMP_NUM_THREADS should ideally be set BEFORE pyprophet is launched
+            # The CLI now sets it automatically if not present, but explicit setting is more reliable
+            if "OMP_NUM_THREADS" not in os.environ:
+                logger.info(
+                    f"Note: OMP_NUM_THREADS was automatically set by the CLI. "
+                    f"For deterministic behavior, consider setting it before launching pyprophet."
+                )
+            
+            # Legacy code (kept commented for reference):
+            # omp_threads = str(max(1, (total_threads // self.runner_config.threads)))
             # os.environ["OMP_NUM_THREADS"] = omp_threads
             ## For some reason the above does not work unless OMP_NUM_THREADS is set before numpy is imported.
             ## See: https://stackoverflow.com/questions/30791550/limit-number-of-threads-in-numpy
-            if self.runner_config.threads > 1 and "OMP_NUM_THREADS" not in os.environ:
+            
+            # Warn if user wants multi-threading but didn't set OMP_NUM_THREADS externally
+            if self.runner_config.threads > 1 and os.getenv("OMP_NUM_THREADS") is None:
                 logger.warning(
-                    f"You requested {self.runner_config.threads} threads for semi-supervised learning using the HistGradientBoosting classifier, which uses multi-threading internally. To avoid oversubscription, please set the environment variable OMP_NUM_THREADS to a lower value (e.g. recommended `export OMP_NUM_THREADS={omp_threads}`) before running PyProphet score. For now, we will set semi-supervised learning to use a single thread."
+                    f"You requested {self.runner_config.threads} threads for semi-supervised learning using the HistGradientBoosting classifier, which uses multi-threading internally. "
+                    f"For best control, set OMP_NUM_THREADS before launching pyprophet (the CLI now does this automatically if not set)."
                 )
-                self.runner_config.threads = 1
 
         self.check_cols = [self.runner_config.group_id, "run_id", "decoy"]
 
