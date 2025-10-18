@@ -754,12 +754,8 @@ def test_osw_histgbc(test_runner, test_config, regtest):
     """Test HistGradientBoosting classifier"""
     strategy = OSWTestStrategy(test_runner, test_config)
     strategy.prepare()
-    
-    # Test basic HistGBC
-    cmd = test_config.build_command(strategy.input_file, "ms2")
-    cmd += " --classifier=HistGradientBoosting --pfdr --pi0_lambda=0 0 0"
-    test_runner.run_command(cmd)
-    
+    strategy.execute(histgbc=True, pfdr=True, pi0_lambda="0 0 0")
+
     strategy.verify(regtest)
 
 
@@ -767,12 +763,8 @@ def test_osw_histgbc_tune(test_runner, test_config, regtest):
     """Test HistGradientBoosting classifier with autotuning"""
     strategy = OSWTestStrategy(test_runner, test_config)
     strategy.prepare()
-    
-    # Test HistGBC with autotuning
-    cmd = test_config.build_command(strategy.input_file, "ms2")
-    cmd += " --classifier=HistGradientBoosting --autotune --pfdr --pi0_lambda=0 0 0"
-    test_runner.run_command(cmd)
-    
+    strategy.execute(histgbc=True, histgbc_tune=True, pfdr=True, pi0_lambda="0 0 0")
+
     strategy.verify(regtest)
 
 
