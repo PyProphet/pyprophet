@@ -1,25 +1,23 @@
 from __future__ import division
 
 import os
-from collections import namedtuple
 
-import numpy as np
-import scipy as sp
-import pandas as pd
-import scipy.stats
-import scipy.special
-from scipy.stats import gaussian_kde
 import click
-from loguru import logger
+import numpy as np
+import pandas as pd
+import scipy as sp
+import scipy.interpolate as sp_interp
+import scipy.special
+import scipy.stats
 
-
+from .report import main_score_selection_report, plot_hist
 from .scoring.optimized import (
-    find_nearest_matches as _find_nearest_matches,
     count_num_positives,
     single_chromatogram_hypothesis_fast,
 )
-from .report import plot_hist, main_score_selection_report
-
+from .scoring.optimized import (
+    find_nearest_matches as _find_nearest_matches,
+)
 
 try:
     profile
@@ -323,6 +321,303 @@ def bw_nrd0(x):
     return 0.9 * lo * len(x) ** -0.2
 
 
+def _fast_linbin(x, a, b, M):
+    """
+    Linearly bin 1-D samples onto an equally spaced grid (Fan & Marron, 1994).
+
+    This reproduces the behavior of statsmodels' `fast_linbin` used by
+    `kdensityfft`: each sample contributes linearly to its two nearest grid
+    points using a half-open rule for the upper neighbor to avoid writing past
+    the last index.
+
+    Parameters
+    ----------
+    x : array-like, shape (n,)
+        1-D samples to bin.
+    a : float
+        Lower bound of the grid domain.
+    b : float
+        Upper bound of the grid domain.
+    M : int
+        Number of grid points.
+
+    Returns
+    -------
+    binned : ndarray, shape (M,)
+        Unnormalized binned counts (weights). Statsmodels normalizes by
+        `(delta * n)` later in the FFT pipeline.
+
+    Notes
+    -----
+    - Grid points are placed at `linspace(a, b, M)`, with spacing
+      `delta = (b - a) / (M - 1)`.
+    - Each sample at position `u = (x - a)/delta` splits its weight
+      `1 - r` to index `j = floor(u)` and `r = u - j` to `j + 1`, with the
+      `j + 1` write only occurring when `j < M - 1`.
+
+    References
+    ----------
+    Fan, J. & Marron, J. S. (1994). Fast implementations of nonparametric
+    curve estimators. JCGS 3(1):35–56.
+
+    Adapted from
+    ------------
+    `statsmodels.nonparametric.linbin.fast_linbin` (BSD-3-Clause).
+    """
+    x = np.asarray(x).ravel()
+    delta = (b - a) / (M - 1)
+    u = (x - a) / delta
+    j = np.floor(u).astype(int)
+    r = u - j
+
+    # main bin
+    j0 = np.clip(j, 0, M - 1)
+    binned = np.bincount(j0, weights=(1.0 - r), minlength=M)
+
+    # upper neighbor (half-open; avoid writing past end)
+    mask = j < (M - 1)
+    if np.any(mask):
+        jp1 = j[mask] + 1
+        rp1 = r[mask]
+        binned += np.bincount(jp1, weights=rp1, minlength=M)
+
+    return binned
+
+
+def _forrt(X, M=None):
+    """
+    Munro-style packed real FFT (forward), matching statsmodels `forrt`.
+
+    Packs the real-FFT (RFFT) output of a length-`M` real signal into a
+    length-`M` vector: `[Re(Y_0..Y_{M/2}), Im(Y_1..Y_{M/2-1})]`.
+
+    Parameters
+    ----------
+    X : array-like, shape (M,)
+        Real-valued input sequence.
+    M : int, optional
+        Transform size. Defaults to `len(X)`.
+
+    Returns
+    -------
+    Yp : ndarray, shape (M,)
+        Munro-packed RFFT output (scaled by `1/M`, as in statsmodels).
+
+    Adapted from
+    ------------
+    `statsmodels.nonparametric.kdetools.forrt` (BSD-3-Clause).
+
+    References
+    ----------
+    Munro, H. (1976). Algorithm RFFT/IRFFT: Fast Fourier transform for real
+    data. (Referenced by Silverman AS 176 and statsmodels’ implementation.)
+    """
+    if M is None:
+        M = len(X)
+    y = np.fft.rfft(X, M) / M
+    # concatenate real parts and (1..M/2-1) imag parts (Munro order)
+    return np.r_[y.real, y[1:-1].imag]
+
+
+def _revrt(X, M=None):
+    """
+    Inverse of `_forrt` (Munro packed RFFT → real signal), matching `revrt`.
+
+    Parameters
+    ----------
+    X : array-like, shape (M,)
+        Munro-packed spectrum
+        `[Re(Y_0..Y_{M/2}), Im(Y_1..Y_{M/2-1})]`.
+    M : int, optional
+        Transform size. Defaults to `len(X)`.
+
+    Returns
+    -------
+    x : ndarray, shape (M,)
+        Real-valued time-domain signal, scaled by `* M` to invert `_forrt`.
+
+    Adapted from
+    ------------
+    `statsmodels.nonparametric.kdetools.revrt` (BSD-3-Clause).
+    """
+    if M is None:
+        M = len(X)
+    i = int(M // 2 + 1)
+    # rebuild the packed RFFT array
+    y = X[:i] + np.r_[0, X[i:], 0] * 1j
+    return np.fft.irfft(y, M) * M
+
+
+def _silverman_kernel_fft(bw, M, RANGE):
+    """
+    Closed-form FFT of the Gaussian kernel on the Munro frequency grid,
+    including the boundary-correction factor used by statsmodels.
+
+    Parameters
+    ----------
+    bw : float
+        Kernel bandwidth on the data scale.
+    M : int
+        Grid size (number of points).
+    RANGE : float
+        Domain width used for the FFT grid: `RANGE = b - a`.
+
+    Returns
+    -------
+    K : ndarray, shape (M,)
+        Kernel frequency response packed in Munro order.
+
+    Notes
+    -----
+    Let `J = 0..M/2`. Statsmodels uses (Silverman AS 176 with correction):
+        FAC1 = 2 * (pi * bw / RANGE)^2
+        FAC  = exp(- J^2 * FAC1)
+        BC   = 1 - (J * pi / (3M))^2     # boundary correction
+        K[J] = FAC / BC
+      and mirrors to length M: `K = [K[0..M/2], K[1..M/2-1]]`.
+
+    Adapted from
+    ------------
+    `statsmodels.nonparametric.kdetools.silverman_transform` (BSD-3-Clause).
+
+    References
+    ----------
+    Silverman, B. W. (1982). Algorithm AS 176: Kernel density estimation
+    using the fast Fourier transform. JRSS C, 31(2), 93–99.
+    Jones, M. C. & Lotwick, H. W. (1984). Remark AS R50. JRSS C, 33(1), 120–122.
+    """
+    # J = 0..M/2
+    J = np.arange(M // 2 + 1, dtype=float)
+    FAC1 = 2.0 * (np.pi * bw / RANGE) ** 2
+    JFAC = (J**2) * FAC1
+    # boundary correction factor
+    BC = 1.0 - (1.0 / 3.0) * (J * (np.pi / M)) ** 2
+    FAC = np.exp(-JFAC) / BC
+    # mirror to Munro-packed length M
+    return np.r_[FAC, FAC[1:-1]]
+
+
+def _grid_kde_fft(x, bw, gridsize=512, cut=3):
+    """
+    FFT-grid Gaussian KDE matching `statsmodels.nonparametric.kde.kdensityfft`.
+
+    Computes a univariate Gaussian kernel density estimate on an equally spaced
+    grid using the Silverman/Munro FFT method with linear binning. The steps
+    match statsmodels’ FFT path (up to floating-point roundoff):
+
+      1) Round `M` to next power-of-two: `M = 2^ceil(log2(max(gridsize, n, 512)))`.
+      2) Define the grid over `[a - cut*bw, b + cut*bw]` where `[a, b]` is
+         the min/max of `x`.
+      3) Linearly bin samples to the grid with `fast_linbin` endpoint rules.
+      4) Normalize binned counts by `(delta * n)`.
+      5) Forward Munro RFFT (`_forrt`), multiply by `_silverman_kernel_fft`.
+      6) Inverse Munro RFFT (`_revrt`).
+      7) Renormalize to enforce `∫ density dx = 1`.
+
+    Parameters
+    ----------
+    x : array-like, shape (n,)
+        1-D samples.
+    bw : float
+        Bandwidth on data scale (apply any desired adjust factor before call).
+    gridsize : int, default 512
+        Target grid size; the actual `M` is rounded up as described above.
+    cut : float, default 3
+        Grid extension so the kernel tails decay to ~0 outside the data range.
+
+    Returns
+    -------
+    density : ndarray, shape (M,)
+        KDE evaluated on the uniform grid.
+    grid : ndarray, shape (M,)
+        Grid points used for the FFT evaluation.
+
+    Notes
+    -----
+    - This function intentionally does **not** support weights (matching
+      statsmodels’ FFT path).
+    - For evaluation at arbitrary `x`, statsmodels uses a cubic spline
+      over `(grid, density)`. Do the same for consistency:
+        `tck = splrep(grid, density, s=0); y = splev(x, tck)`.
+
+    Adapted from
+    ------------
+    `statsmodels.nonparametric.kde.kdensityfft` and helpers
+    (`fast_linbin`, `forrt`, `revrt`, `silverman_transform`) under the
+    BSD-3-Clause license.
+
+    References
+    ----------
+    Silverman, 1982 (AS 176); Fan & Marron, 1994; Jones & Lotwick, 1984.
+    """
+    x = np.asarray(x).ravel()
+    n = x.size
+
+    # statsmodels rounds up to power of 2 (at least 512)
+    M = int(2 ** np.ceil(np.log2(max(gridsize, n, 512))))
+    a = x.min() - cut * bw
+    b = x.max() + cut * bw
+    grid, delta = np.linspace(a, b, M, retstep=True)
+    RANGE = b - a
+
+    # linear binning normalized by (delta * n)
+    binned = _fast_linbin(x, a, b, M) / (delta * n)
+
+    # Munro forward transform
+    Y = _forrt(binned, M)
+
+    # multiply by Silverman kernel FFT with boundary correction
+    K = _silverman_kernel_fft(bw, M, RANGE)
+    Z = K * Y
+
+    # inverse transform
+    dens = _revrt(Z, M)
+
+    # numerical guard to ensure exact probability mass
+    dens *= 1.0 / (dens.sum() * delta)
+    return dens, grid
+
+
+def _kde_fft_eval(x, bw, gridsize=512, cut=3):
+    """
+    Evaluate a univariate Gaussian KDE using the Silverman/Munro FFT method.
+
+    This is the same algorithm used by statsmodels' `kdensityfft`:
+    linear binning → Munro packed RFFT (forrt) → multiply by the closed-form
+    Gaussian kernel frequency response with boundary correction →
+    inverse Munro RFFT (revrt). We then spline-interpolate the grid density
+    back at the query locations.
+
+    Parameters
+    ----------
+    x : array-like, shape (n,)
+        Query points; also used to set the FFT grid domain via min/max.
+        (We evaluate the KDE at these same `x` values.)
+    bw : float
+        Bandwidth on the data scale. Apply any adjustment before passing.
+    gridsize : int, default 512
+        Target grid size; will be rounded up to the next power of two (min 512).
+    cut : float, default 3
+        Grid extension on each side in bandwidth units, i.e.,
+        `[min(x) - cut*bw, max(x) + cut*bw]`.
+
+    Returns
+    -------
+    y : ndarray, shape (n,)
+        KDE values evaluated at `x`.
+
+    Notes
+    -----
+    - Portions adapted from `statsmodels.nonparametric.kde.kdensityfft` and
+      helpers (`fast_linbin`, `forrt`, `revrt`, `silverman_transform`), BSD-3.
+    """
+    # Build grid density via FFT
+    dens, grid = _grid_kde_fft(x, bw, gridsize=gridsize, cut=cut)
+    # Evaluate on x with a cubic spline (as statsmodels does)
+    tck = sp_interp.splrep(grid, dens, s=0)
+    return sp_interp.splev(x, tck)
+
+
 @profile
 def lfdr(
     p_values,
@@ -332,19 +627,61 @@ def lfdr(
     transf="probit",
     adj=1.5,
     eps=np.power(10.0, -8),
+    gridsize=512,
+    cut=3,
 ):
-    """Estimate local FDR / posterior error probability from p-values according to bioconductor/qvalue"""
+    """
+    Estimate local FDR / posterior error probability (PEP) from p-values.
+
+    Implements the qvalue-style local FDR on a transformed axis:
+    - probit: x = Φ^{-1}(p), f0(x) = 𝓝(0,1)
+    - logit : x = log(p/(1-p)), f0'(x) = exp(x)/(1+exp(x))^2
+
+    The alternative density f(x) is estimated with a Gaussian KDE using the
+    Silverman/Munro FFT method (bit-for-bit equivalent to
+    statsmodels' `kdensityfft`). Bandwidth is Silverman’s rule-of-thumb
+    (`bw_nrd0`) multiplied by `adj`.
+
+    Parameters
+    ----------
+    p_values : array-like
+        P-values in [0, 1].
+    pi0 : float
+        Prior null proportion (0 ≤ pi0 ≤ 1).
+    trunc : bool, default True
+        Truncate lfdr above 1 to exactly 1.
+    monotone : bool, default True
+        Enforce non-decreasing lfdr in `p` by isotonic pass on sorted p.
+    transf : {"probit", "logit"}, default "probit"
+        Axis transform for the mixture modeling.
+    adj : float, default 1.5
+        Bandwidth adjustment factor: bw = adj * bw_nrd0(x).
+    eps : float, default 1e-8
+        Numerical guard for p clipping (avoids infinities).
+    gridsize : int, default 512
+        KDE FFT grid size (rounded to next power of two, min 512).
+    cut : float, default 3
+        KDE grid extension in bandwidth units.
+
+    Returns
+    -------
+    lfdr_out : ndarray
+        Local FDR / PEP for each input p-value.
+
+    Notes
+    -----
+    - KDE uses the FFT path adapted from statsmodels (BSD-3). No statsmodels
+      runtime dependency is required.
+    - We do not support weights (matching statsmodels’ FFT implementation).
+    - If the transformed data are constant or nearly so, the FFT path remains
+      robust and is still used.
+
+    References
+    ----------
+    Silverman (1982) AS 176; Fan & Marron (1994); Jones & Lotwick (1984).
+    Storey (2002, 2003) qvalue framework.
+    """
     p = np.array(p_values)
-
-    # Compare to bioconductor/qvalue reference implementation
-    # import rpy2
-    # import rpy2.robjects as robjects
-    # from rpy2.robjects import pandas2ri
-    # pandas2ri.activate()
-
-    # density=robjects.r('density')
-    # smoothspline=robjects.r('smooth.spline')
-    # predict=robjects.r('predict')
 
     # Check inputs
     lfdr_out = p
@@ -362,10 +699,9 @@ def lfdr(
         p = np.minimum(p, 1 - eps)
         x = scipy.stats.norm.ppf(p, loc=0, scale=1)
 
-        # R-like implementation
-        bw = bw_nrd0(x)
-
         ## statsmodels KDEUnivariate
+        # R-like implementation
+        # bw = bw_nrd0(x)
         # myd = KDEUnivariate(x)
         # myd.fit(bw=adj * bw, gridsize=512)
         # splinefit = sp.interpolate.splrep(myd.support, myd.density)
@@ -375,17 +711,17 @@ def lfdr(
         # mys = smoothspline(x = myd.rx2('x'), y = myd.rx2('y')) # R reference function
         # y = predict(mys, x).rx2('y') # R reference function
 
-        kde = gaussian_kde(x, bw_method=(adj * bw) / x.std(ddof=1))
-        y = kde(x)
-
-        lfdr = pi0 * scipy.stats.norm.pdf(x) / y
+        # KDE bandwidth (Silverman’s rule) and eval via FFT grid
+        bw = bw_nrd0(x) * adj
+        y = _kde_fft_eval(x, bw, gridsize=gridsize, cut=cut)
+        f0 = scipy.stats.norm.pdf(x)
+        lfdr = pi0 * f0 / y
     elif transf == "logit":
         x = np.log((p + eps) / (1 - p + eps))
 
-        # R-like implementation
-        bw = bw_nrd0(x)
-
         ## statsmodels KDEUnivariate
+        # R-like implementation
+        # bw = bw_nrd0(x)
         # myd = KDEUnivariate(x)
         # myd.fit(bw=adj * bw, gridsize=512)
 
@@ -396,10 +732,9 @@ def lfdr(
         # mys = smoothspline(x = myd.rx2('x'), y = myd.rx2('y')) # R reference function
         # y = predict(mys, x).rx2('y') # R reference function
 
-        kde = gaussian_kde(x, bw_method=(adj * bw) / x.std(ddof=1))
-        y = kde(x)
-
-        dx = np.exp(x) / np.power((1 + np.exp(x)), 2)
+        bw = bw_nrd0(x) * adj
+        y = _kde_fft_eval(x, bw, gridsize=gridsize, cut=cut)
+        dx = np.exp(x) / (1 + np.exp(x)) ** 2
         lfdr = (pi0 * dx) / y
     else:
         raise click.ClickException("Invalid local FDR method.")
