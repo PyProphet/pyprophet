@@ -2,13 +2,11 @@
 
 import numpy as np
 import scipy.stats
-from scipy import fft
+
 from pyprophet.stats import (
-    bw_nrd0,
     _fast_linbin,
-    _silverman_transform,
-    _grid_kde_dct,
-    lfdr,
+    _grid_kde_fft,
+    bw_nrd0,
 )
 
 # Import statsmodels for reference
@@ -75,7 +73,7 @@ print("=" * 70)
 print("OUR FFT-based KDE:")
 print("=" * 70)
 
-density, grid = _grid_kde_dct(x, adj * bw, gridsize=512, cut=3)
+density, grid = _grid_kde_fft(x, adj * bw, gridsize=512, cut=3)
 
 print(f"Grid range: [{grid.min():.6f}, {grid.max():.6f}]")
 print(f"Grid size: {len(grid)}")
@@ -137,7 +135,7 @@ grid = np.linspace(a, b, gridsize)
 delta = grid[1] - grid[0]
 range_ = b - a
 
-print(f"Setup:")
+print("Setup:")
 print(f"  nobs = {nobs}")
 print(f"  bw = {bw:.6f}")
 print(f"  adj * bw = {adj * bw:.6f}")
@@ -160,7 +158,7 @@ print()
 # Check where the data landed in the grid
 idx = np.argmin(np.abs(grid - x[0]))
 print(f"Data point x={x[0]:.6f} is closest to grid[{idx}]={grid[idx]:.6f}")
-print(f"Binned values around data:")
+print("Binned values around data:")
 for i in range(max(0, idx - 3), min(gridsize, idx + 4)):
     print(
         f"  grid[{i}]={grid[i]:8.6f}: binned_raw={binned_raw[i]:.6f}, binned={binned[i]:.6f}"
@@ -210,9 +208,9 @@ bw = bw_nrd0(x)
 print("=" * 70)
 print("Testing our FFT implementation:")
 print("=" * 70)
-density, grid = _grid_kde_dct(x, adj * bw, gridsize=512, cut=3)
+density, grid = _grid_kde_fft(x, adj * bw, gridsize=512, cut=3)
 
 y = np.interp(x[0], grid, density)
 print(f"\nInterpolated density at x={x[0]:.6f}: {y:.6f}")
-print(f"Expected (statsmodels): 0.334720")
+print("Expected (statsmodels): 0.334720")
 print(f"Difference: {abs(y - 0.334720):.6f}")
