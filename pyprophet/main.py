@@ -86,7 +86,6 @@ import sqlite3
 
 import click
 import pandas as pd
-from tabulate import tabulate
 
 from .cli.export import create_export_group
 from .cli.ipf import (
@@ -486,15 +485,13 @@ def statistics(infile):
                 f"Total peakgroups (q-value<{qt}): {len(peakgroups[peakgroups['QVALUE'] < qt]['FEATURE_ID'].drop_duplicates())}"
             )
             click.echo(f"Total peakgroups per run (q-value<{qt}):")
-            click.echo(
-                tabulate(
-                    peakgroups[peakgroups["QVALUE"] < qt]
-                    .groupby(["FILENAME"])["FEATURE_ID"]
-                    .nunique()
-                    .reset_index(),
-                    showindex=False,
-                )
+            df_peak = (
+                peakgroups[peakgroups["QVALUE"] < qt]
+                .groupby(["FILENAME"])["FEATURE_ID"]
+                .nunique()
+                .reset_index()
             )
+            click.echo(df_peak.to_string(index=False))
             click.echo(10 * "=")
 
         if check_sqlite_table(con, "SCORE_PEPTIDE"):
@@ -510,15 +507,13 @@ def statistics(infile):
             click.echo(
                 f"Total peptides (global context) (q-value<{qt}): {len(peptides_global[peptides_global['QVALUE'] < qt]['PEPTIDE_ID'].drop_duplicates())}"
             )
-            click.echo(
-                tabulate(
-                    peptides[peptides["QVALUE"] < qt]
-                    .groupby(["FILENAME"])["PEPTIDE_ID"]
-                    .nunique()
-                    .reset_index(),
-                    showindex=False,
-                )
+            df_pep = (
+                peptides[peptides["QVALUE"] < qt]
+                .groupby(["FILENAME"])["PEPTIDE_ID"]
+                .nunique()
+                .reset_index()
             )
+            click.echo(df_pep.to_string(index=False))
             click.echo(10 * "=")
 
         if check_sqlite_table(con, "SCORE_PROTEIN"):
@@ -534,15 +529,13 @@ def statistics(infile):
             click.echo(
                 f"Total proteins (global context) (q-value<{qt}): {len(proteins_global[proteins_global['QVALUE'] < qt]['PROTEIN_ID'].drop_duplicates())}"
             )
-            click.echo(
-                tabulate(
-                    proteins[proteins["QVALUE"] < qt]
-                    .groupby(["FILENAME"])["PROTEIN_ID"]
-                    .nunique()
-                    .reset_index(),
-                    showindex=False,
-                )
+            df_prot = (
+                proteins[proteins["QVALUE"] < qt]
+                .groupby(["FILENAME"])["PROTEIN_ID"]
+                .nunique()
+                .reset_index()
             )
+            click.echo(df_prot.to_string(index=False))
             click.echo(10 * "=")
 
 

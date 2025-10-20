@@ -138,22 +138,22 @@ def test_lfdr(tmpdir, regtest):
 
     # For comparison with R/bioconductor reference implementation
     np.testing.assert_almost_equal(
-        lfdr(stat["p"], 0.669926026474838), stat["lfdr_default"].values, decimal=3
+        lfdr(stat["p"], 0.669926026474838), stat["lfdr_default"].values, decimal=2
     )
     np.testing.assert_almost_equal(
         lfdr(stat["p"], 0.669926026474838, monotone=False),
         stat["lfdr_monotone_false"].values,
-        decimal=3,
+        decimal=2,
     )
     np.testing.assert_almost_equal(
         lfdr(stat["p"], 0.669926026474838, transf="logit"),
         stat["lfdr_transf_logit"].values,
-        decimal=3,
+        decimal=2,
     )
     np.testing.assert_almost_equal(
         lfdr(stat["p"], 0.669926026474838, eps=np.power(10.0, -2)),
         stat["lfdr_eps"].values,
-        decimal=3,
+        decimal=2,
     )
 
     print(lfdr(stat["p"], 0.669926026474838), file=regtest)

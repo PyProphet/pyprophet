@@ -2,37 +2,35 @@ try:
     import matplotlib
 
     matplotlib.use("Agg")
-    from matplotlib.backends.backend_pdf import PdfPages
-    import seaborn as sns
-    import pandas as pd
     import matplotlib.pyplot as plt
+    import pandas as pd
+    from matplotlib.backends.backend_pdf import PdfPages
+    from matplotlib.colors import TwoSlopeNorm
+    from matplotlib.patches import Rectangle
+
+
 except ImportError:
     plt = None
 
-from pypdf import PdfWriter, PdfReader
-import sys
 import os
-
-import click
-from loguru import logger
+import sys
 import warnings
 from functools import wraps
-from sklearn.metrics import jaccard_score
-from scipy.stats import gaussian_kde
-import numpy as np
-from numpy import (
-    linspace,
-    concatenate,
-    around,
-    argmin,
-    sort,
-    arange,
-    interp,
-    array,
-    degrees,
-    arctan,
-)
 
+import numpy as np
+from loguru import logger
+from numpy import (
+    arange,
+    argmin,
+    around,
+    array,
+    concatenate,
+    interp,
+    linspace,
+    sort,
+)
+from pypdf import PdfReader, PdfWriter
+from scipy.stats import gaussian_kde
 
 # ======================
 # Utility Functions
@@ -125,26 +123,26 @@ class PlotGenerator:
 
     @handle_plot_errors
     def add_id_barplot(self, ax, df, id_key, title=None, ylabel=None, xlabel=None):
-        if title is None:
-            title = f"Identified {id_key} per Run"
-        if ylabel is None:
-            ylabel = f"Number of {id_key}s"
-        if xlabel is None:
-            xlabel = "Run ID"
+        title = title or f"Identified {id_key} per Run"
+        ylabel = ylabel or f"Number of {id_key}s"
+        xlabel = xlabel or "Run ID"
 
         logger.debug(f"Generating identification barplot for {id_key}")
-        id_counts = df.groupby("run_id")[id_key].nunique().reset_index()
-        id_counts.rename(columns={id_key: "num_identified"}, inplace=True)
 
-        sns.barplot(data=id_counts, x="run_id", y="num_identified", ax=ax)
-        ax.set(
-            title=title,
-            ylabel=ylabel,
-            xlabel=xlabel,
+        order = pd.Index(pd.unique(df["run_id"]))  # preserve first-seen order
+        counts = df.groupby("run_id", sort=False)[id_key].nunique()
+        id_counts = counts.reindex(order).reset_index()
+        id_counts.columns = ["run_id", "num_identified"]
+
+        x = np.arange(len(id_counts))
+        ax.bar(x, id_counts["num_identified"].values, align="center")
+        ax.set_xticks(x)
+        ax.set_xticklabels(
+            id_counts["run_id"].astype(str).tolist(), rotation=60, fontsize=6
         )
-        ax.tick_params(axis="x", rotation=60, labelsize=6)
 
-        # Check how many runs there are, if there are more than 10 runs, then turn off the x-axis labels
+        ax.set(title=title, ylabel=ylabel, xlabel=xlabel)
+
         if len(id_counts) > 10:
             ax.tick_params(axis="x", labelbottom=False)
             ax.set_xticklabels([])
@@ -161,8 +159,10 @@ class PlotGenerator:
             xlabel = "Number of Random Runs Sampled"
 
         logger.debug(f"Generating identification consistency plot for {id_key}")
-        run_ids = df["run_id"].unique()
+        run_ids = pd.Index(pd.unique(df["run_id"].dropna()))
         max_k = len(run_ids)
+        if max_k == 0:
+            raise ValueError("No runs after filtering; cannot compute intersections.")
 
         intersect_counts = []
         for k in range(1, max_k + 1):
@@ -191,32 +191,90 @@ class PlotGenerator:
         if "area_intensity" not in df:
             raise ValueError("Missing 'area_intensity' column.")
 
-        if title is None:
-            title = "Quantification Distribution per Run"
-        if ylabel is None:
-            ylabel = "Area Intensity (log scale)"
-        if xlabel is None:
-            xlabel = "Run ID"
+        title = title or "Quantification Distribution per Run"
+        ylabel = ylabel or "Area Intensity (log scale)"
+        xlabel = xlabel or "Run ID"
 
-        logger.debug(f"Generating quantification distribution plot for {id_key}")
+        # preserve data order like seaborn
+        run_order = pd.Index(pd.unique(df["run_id"]))
 
-        sns.violinplot(
-            data=df,
-            x="run_id",
-            y="area_intensity",
-            inner="box",
-            ax=ax,
-            log_scale=True,
-        )
-        ax.set(
-            title=title,
-            ylabel=ylabel,
-            xlabel=xlabel,
-        )
-        ax.tick_params(axis="x", rotation=60, labelsize=6)
+        # collect positive values per run
+        groups = [
+            df.loc[(df["run_id"] == r) & (df["area_intensity"] > 0), "area_intensity"]
+            .dropna()
+            .to_numpy()
+            for r in run_order
+        ]
+        if not any(len(g) for g in groups):
+            raise ValueError("No data to plot violinplot")
 
-        # Check how many runs there are, if there are more than 10 runs, then turn off the x-axis labels
-        if len(df["run_id"].unique()) > 10:
+        positions = np.arange(len(run_order))
+        non_empty_idx = [
+            i for i, g in enumerate(groups) if g.size > 1
+        ]  # need >=2 for KDE
+        empty_or_single = [i for i, g in enumerate(groups) if g.size <= 1]
+
+        # --- build KDEs in log10 space and remember the global max density for common scaling
+        cut = 2.0  # seaborn default
+        kdes, grids, dens_maxes = [], [], []
+        for i in non_empty_idx:
+            y = np.log10(groups[i])
+            kde = gaussian_kde(y)
+            # bandwidth in log-space
+            bw = kde.factor * np.std(y, ddof=1) if y.size > 1 else 0.0
+            lo = y.min() - cut * bw
+            hi = y.max() + cut * bw
+            grid = np.linspace(lo, hi, 256)
+            dens = kde(grid)
+            kdes.append((grid, dens))
+            grids.append(grid)
+            dens_maxes.append(dens.max())
+
+        global_max = max(dens_maxes) if dens_maxes else 1.0
+        max_half_width = 0.4  # visual width (like seaborn)
+
+        # --- draw each violin
+        for j, i in enumerate(non_empty_idx):
+            x = positions[i]
+            grid, dens = kdes[j]
+            # normalize so all violins have comparable max width
+            halfw = (dens / global_max) * max_half_width
+            y_vals = 10**grid  # back to original scale for the log axis
+
+            ax.fill_betweenx(
+                y_vals,
+                x - halfw,
+                x + halfw,
+                facecolor="#9ecae1",
+                edgecolor="black",
+                alpha=0.7,
+                linewidth=1,
+            )
+
+            # inner="box" like seaborn (quartiles on ORIGINAL scale)
+            q1, med, q3 = np.percentile(groups[i], [25, 50, 75])
+            w = 0.12  # half-box width -> thinner box
+            ax.add_patch(
+                Rectangle((x - w, q1), 2 * w, q3 - q1, ec="k", fc="white", lw=0.9)
+            )
+            ax.plot([x - w, x + w], [med, med], color="k", linewidth=0.9)
+
+        # handle runs with 0/1 point gracefully: draw a thin line/marker at the value
+        for i in empty_or_single:
+            x = positions[i]
+            vals = groups[i]
+            if len(vals) == 1:
+                v = vals[0]
+                ax.plot([x - 0.05, x + 0.05], [v, v], color="k", lw=1)
+            # (if 0 points, nothing to draw)
+
+        # axis cosmetics
+        ax.set_yscale("log")
+        ax.set_xticks(positions)
+        ax.set_xticklabels([str(r) for r in run_order], rotation=60, fontsize=6)
+        ax.set(title=title, ylabel=ylabel, xlabel=xlabel)
+
+        if len(run_order) > 10:
             ax.tick_params(axis="x", labelbottom=False)
             ax.set_xticklabels([])
 
@@ -227,45 +285,79 @@ class PlotGenerator:
         if "area_intensity" not in df:
             raise ValueError("Missing 'area_intensity' column.")
 
-        if title is None:
-            title = "Coefficient of Variation (CV) Distribution"
-        if ylabel is None:
-            ylabel = "Number of Identifications"
-        if xlabel is None:
-            xlabel = "CV"
+        title = title or "Coefficient of Variation (CV) Distribution"
+        ylabel = ylabel or "Number of Identifications"
+        xlabel = xlabel or "CV"
 
         logger.debug(f"Generating CV distribution plot for {id_key}")
 
         pivot = df.pivot_table(index=id_key, columns="run_id", values="area_intensity")
+        cv = (pivot.std(axis=1) / pivot.mean(axis=1)).dropna()
+        vals = cv.to_numpy()
 
-        cv = pivot.std(axis=1) / pivot.mean(axis=1)
-        logger.info(f"CV: min={cv.min()}, max={cv.max()}, mean={cv.mean()}")
-        sns.histplot(cv.dropna(), bins=50, kde=True, ax=ax)
-        ax.set(
-            title=title,
-            xlabel=xlabel,
-            ylabel=ylabel,
-        )
+        counts, bins, _ = ax.hist(vals, bins=50, density=False, alpha=0.6)
+
+        # Scale KDE to the same units (counts)
+        try:
+            kde = gaussian_kde(vals)
+            xs = np.linspace(vals.min(), vals.max(), 200)
+            bin_width = (
+                bins[1] - bins[0] if len(bins) > 1 else (xs.max() - xs.min()) / 50
+            )
+            scale = len(vals) * bin_width
+            ax.plot(xs, kde(xs) * scale, color="k", linewidth=1)
+        except Exception:
+            pass
+
+        ax.set(title=title, xlabel=xlabel, ylabel=ylabel)
         ax.grid(True)
 
     @handle_plot_errors
     def plot_jaccard_similarity(self, ax, df, id_key, title=None):
-        if title is None:
-            title = f"Jaccard Similarity of {id_key} IDs Across Runs"
+        title = title or f"Jaccard Similarity of {id_key} IDs Across Runs"
         if df.empty:
             raise ValueError("No data for Jaccard similarity plot.")
 
-        logger.debug(f"Generating idetnfication Jaccard similarity plot for {id_key}")
-
-        pivot = df.assign(present=1).pivot_table(
-            index=id_key, columns="run_id", values="present", fill_value=0
+        # presence/absence by run
+        pivot = (
+            df.assign(present=1)
+            .pivot_table(index=id_key, columns="run_id", values="present", fill_value=0)
+            .astype(bool)
         )
-        jaccard_matrix = self.compute_jaccard_matrix(pivot)
-        sns.heatmap(jaccard_matrix, cmap="viridis", ax=ax)
-        ax.set(title=title)
 
-        # Check how many runs there are, if there are more than 10 runs, then turn off the x-axis labels
-        if len(jaccard_matrix) > 10:
+        # jaccard across runs (columns)
+        jacc = self.compute_jaccard_matrix(pivot)
+        vals = jacc.values.astype(float)
+
+        # scale from off-diagonal range; keep diagonal visible (1.0)
+        n = vals.shape[0]
+        off = vals[~np.eye(n, dtype=bool)]
+        if off.size == 0 or np.all(np.isnan(off)):
+            raise ValueError("No valid off-diagonal Jaccard values to plot.")
+        vmin = float(np.nanmin(off))
+        vmax = 1.0
+        if np.isclose(vmin, vmax):
+            vmin = vmax - 1e-6  # avoid equal-bounds issues
+
+        # match seaborn look: full viridis, auto aspect
+        im = ax.imshow(vals, cmap="viridis", aspect="auto", vmin=vmin, vmax=vmax)
+
+        # colorbar like seaborn
+        cbar = ax.figure.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+        ticks = np.linspace(vmin, vmax, 6)
+        cbar.set_ticks(ticks)
+        cbar.set_ticklabels([f"{t:.4f}" for t in ticks])
+        cbar.ax.set_ylabel("Jaccard index", rotation=270, va="bottom")
+
+        # ticks/labels
+        runs = [str(c) for c in jacc.columns]
+        ax.set_xticks(np.arange(len(runs)))
+        ax.set_xticklabels(runs, rotation=60, fontsize=6)
+        ax.set_yticks(np.arange(len(runs)))
+        ax.set_yticklabels([str(r) for r in jacc.index], fontsize=6)
+        ax.set_title(title)
+
+        if len(runs) > 10:
             ax.tick_params(axis="x", labelbottom=False)
             ax.set_xticklabels([])
             ax.tick_params(axis="y", labelleft=False)
@@ -273,24 +365,55 @@ class PlotGenerator:
 
     @handle_plot_errors
     def plot_intensity_correlation(self, ax, df, id_key, title=None):
-        if title is None:
-            title = f"Run-to-Run Intensity Correlation (Spearman) for {id_key}"
+        title = title or f"Run-to-Run Intensity Correlation (Spearman) for {id_key}"
 
         if "area_intensity" not in df:
             raise ValueError("Missing 'area_intensity' column.")
-
-        logger.debug(f"Generating intensity correlation plot for {id_key}")
-
         if df.empty:
             raise ValueError("No data for intensity correlation plot.")
 
         pivot = df.pivot_table(index=id_key, columns="run_id", values="area_intensity")
-        corr = pivot.corr(method="spearman")
-        sns.heatmap(corr, cmap="coolwarm", center=1.0, ax=ax)
+        if pivot.shape[1] < 2:
+            raise ValueError("Need at least two runs for a correlation heatmap.")
+
+        corr_df = pivot.corr(method="spearman")
+        vals = corr_df.values.astype(float)
+
+        # Compute color scale from off-diagonal values only
+        off = vals.copy()
+        np.fill_diagonal(off, np.nan)
+        if np.all(np.isnan(off)):
+            raise ValueError("No valid pairwise correlations to plot.")
+
+        vmin = np.nanmin(off)
+        vmax = np.nanmax(off)
+
+        # Force 1.0 to be strictly inside the range (TwoSlopeNorm requires ascending order)
+        eps = 1e-6
+        vmin = min(vmin, 1.0 - eps)
+        vmax = max(vmax, 1.0 + eps)
+
+        norm = TwoSlopeNorm(vmin=vmin, vcenter=1.0, vmax=vmax)
+
+        im = ax.imshow(vals, cmap="coolwarm", norm=norm, aspect="auto")
+        ax.grid(which="minor", color="white", linestyle="-", linewidth=2)
+        cbar = ax.figure.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+        n_ticks = 9
+        ticks = np.linspace(vmin, 1.0, n_ticks)
+        cbar.set_ticks(ticks)
+        cbar.set_ticklabels([f"{t:.3f}" for t in ticks])
+        cbar.update_ticks()
+        cbar.ax.set_ylabel("Spearman ρ", rotation=270, va="bottom")
+        cbar.ax.set_ylim(vmin, 1.0)
+
+        runs = corr_df.columns.astype(str).tolist()
+        ax.set_xticks(np.arange(len(runs)))
+        ax.set_xticklabels(runs, rotation=60, fontsize=6)
+        ax.set_yticks(np.arange(len(runs)))
+        ax.set_yticklabels(runs, fontsize=6)
         ax.set(title=title)
 
-        # Check how many runs there are, if there are more than 10 runs, then turn off the x-axis labels
-        if len(corr) > 10:
+        if len(runs) > 10:
             ax.tick_params(axis="x", labelbottom=False)
             ax.set_xticklabels([])
             ax.tick_params(axis="y", labelleft=False)
@@ -810,8 +933,9 @@ def plot_score_distributions(pdf, plotter, df, score_mapping):
         ax = axes[i]
         try:
             # Filter valid scores (non-null and finite)
-            valid_scores = df[score_col].notna() & np.isfinite(df[score_col])
-            df_valid = df[valid_scores]
+            series = pd.to_numeric(df[score_col], errors="coerce")
+            valid_scores = series.notna() & np.isfinite(series)
+            df_valid = df[valid_scores].copy()
 
             if base_key in ("ms1", "ms2"):
                 top_targets = df_valid[
@@ -899,6 +1023,9 @@ def plot_score_distributions(pdf, plotter, df, score_mapping):
                 continue
 
             # Plot the distributions
+            top_targets = top_targets[np.isfinite(top_targets)]
+            top_decoys = top_decoys[np.isfinite(top_decoys)]
+
             plotter.plot_dscore_distributions(ax, top_targets, top_decoys)
             ax.set_title(f"{base_key} Scores")
 
@@ -1539,7 +1666,7 @@ def main_score_selection_report(
         label=["target", "decoy"],
         histtype="bar",
     )
-    plt.title(f"histogram of scores")
+    plt.title("histogram of scores")
     plt.xlabel("score")
     plt.ylabel("density histogram")
     plt.legend(loc=1)
