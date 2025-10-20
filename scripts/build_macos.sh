@@ -41,7 +41,7 @@ if [ -n "$DYLIB_PATH" ]; then
   ADD_BINARY_ARGS+=(--add-binary "$DYLIB_PATH:xgboost/lib")
 fi
 
-# Run PyInstaller with metadata collection
+# Run PyInstaller with metadata collection and explicit library collection
 python3 -m PyInstaller \
   --name pyprophet \
   --onedir \
@@ -55,9 +55,11 @@ python3 -m PyInstaller \
   --collect-all pandas \
   --collect-all scipy \
   --collect-all sklearn \
+  --collect-all pyopenms \
   --copy-metadata duckdb \
   --copy-metadata duckdb-extensions \
   --copy-metadata duckdb-extension-sqlite-scanner \
+  --copy-metadata pyopenms \
   "${ADD_BINARY_ARGS[@]}" \
   run_pyprophet.py
 
@@ -85,3 +87,10 @@ if command -v shasum &> /dev/null; then
     echo "Checksum: ${ARCHIVE_NAME}.sha256"
     cat "${ARCHIVE_NAME}.sha256"
 fi
+
+echo ""
+echo "To test locally:"
+echo "  cd dist/pyprophet && ./pyprophet --help"
+echo ""
+echo "To distribute:"
+echo "  Upload ${ARCHIVE_NAME} to GitHub releases"

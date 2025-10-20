@@ -61,6 +61,11 @@ $PYTHON -m PyInstaller \
   --collect-all pandas \
   --collect-all scipy \
   --collect-all sklearn \
+  --collect-all pyopenms \
+  --copy-metadata duckdb \
+  --copy-metadata duckdb-extensions \
+  --copy-metadata duckdb-extension-sqlite-scanner \
+  --copy-metadata pyopenms \
   "${ADD_BINARY_ARGS[@]}" \
   run_pyprophet.py
 

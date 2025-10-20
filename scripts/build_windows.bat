@@ -29,9 +29,11 @@ pyinstaller ^
     --collect-all pandas ^
     --collect-all scipy ^
     --collect-all sklearn ^
+    --collect-all pyopenms ^
     --copy-metadata duckdb ^
     --copy-metadata duckdb-extensions ^
     --copy-metadata duckdb-extension-sqlite-scanner ^
+    --copy-metadata pyopenms ^
     run_pyprophet.py
 
 echo ============================================
