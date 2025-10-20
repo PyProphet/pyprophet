@@ -55,7 +55,7 @@ $PYTHON -m PyInstaller \
   --clean \
   --noconfirm \
   --log-level INFO \
-  --additional-hooks-dir packaging/pyinstaller-hooks \
+  --additional-hooks-dir packaging/pyinstaller/hooks \
   --collect-submodules pyprophet \
   --collect-all numpy \
   --collect-all pandas \
@@ -67,7 +67,7 @@ $PYTHON -m PyInstaller \
   --copy-metadata duckdb-extension-sqlite-scanner \
   --copy-metadata pyopenms \
   "${ADD_BINARY_ARGS[@]}" \
-  run_pyprophet.py
+  packaging/pyinstaller/run_pyprophet.py
 
 # Copy to build-dist for local use
 cp -r dist/pyprophet build-dist/

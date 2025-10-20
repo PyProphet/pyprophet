@@ -27,17 +27,17 @@
 
 ### Linux
 ```bash
-bash scripts/build_linux.sh
+bash scripts/build/build_linux.sh
 ```
 
 ### Windows
 ```bat
-scripts\build_windows.bat
+scripts\build\build_windows.bat
 ```
 
 ### macOS
 ```bash
-bash scripts/build_macos.sh
+bash scripts/build/build_macos.sh
 ```
 
 ## Distribution

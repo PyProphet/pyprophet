@@ -49,7 +49,7 @@ python3 -m PyInstaller \
   --clean \
   --noconfirm \
   --log-level INFO \
-  --additional-hooks-dir packaging/pyinstaller-hooks \
+  --additional-hooks-dir packaging/pyinstaller/hooks \
   --collect-submodules pyprophet \
   --collect-all numpy \
   --collect-all pandas \
@@ -61,7 +61,7 @@ python3 -m PyInstaller \
   --copy-metadata duckdb-extension-sqlite-scanner \
   --copy-metadata pyopenms \
   "${ADD_BINARY_ARGS[@]}" \
-  run_pyprophet.py
+  packaging/pyinstaller/run_pyprophet.py
 
 echo "============================================"
 echo "Build complete! Executable at: dist/pyprophet/pyprophet"
