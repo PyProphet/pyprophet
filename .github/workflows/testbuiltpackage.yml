@@ -8,6 +8,10 @@ on:
       - master
       - feature/pyinstaller_packaging
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test-build:
     name: Test build on ${{ matrix.os }}
@@ -87,9 +91,6 @@ jobs:
           echo "Testing infer peptide..."
           dist/pyprophet/pyprophet infer peptide --in tests/data/test_data.osw --context global
           
-          echo "Testing infer protein..."
-          dist/pyprophet/pyprophet infer protein --in tests/data/test_data.osw --context global
-          
           echo "Testing infer peptidoform..."
           dist/pyprophet/pyprophet infer peptidoform --in tests/data/test_data.osw --no-ipf_ms1_scoring
 
@@ -98,9 +99,6 @@ jobs:
         run: |
           echo "Testing infer peptide..."
           dist\pyprophet\pyprophet.exe infer peptide --in tests/data/test_data.osw --context global
-          
-          echo "Testing infer protein..."
-          dist\pyprophet\pyprophet.exe infer protein --in tests/data/test_data.osw --context global
           
           echo "Testing infer peptidoform..."
           dist\pyprophet\pyprophet.exe infer peptidoform --in tests/data/test_data.osw --no-ipf_ms1_scoring

@@ -6,6 +6,10 @@ on:
       - 'v*'  # Trigger on version tags like v3.0.3
   workflow_dispatch:  # Allow manual trigger
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     name: Build on ${{ matrix.os }}
