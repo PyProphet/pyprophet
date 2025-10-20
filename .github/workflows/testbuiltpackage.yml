@@ -6,7 +6,6 @@ on:
   push:
     branches:
       - master
-      - feature/pyinstaller_packaging
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
