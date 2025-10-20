@@ -13,6 +13,9 @@ echo "============================================"
 $PYTHON -m pip install --upgrade pip setuptools wheel cython numpy
 $PYTHON -m pip install -r requirements.txt pyinstaller
 
+# Install the package in editable mode to ensure it's importable
+$PYTHON -m pip install -e .
+
 # Build C extensions in-place
 $PYTHON setup.py build_ext --inplace
 
@@ -40,7 +43,7 @@ if [ -n "$SO_PATH" ]; then
   echo "Including xgboost native lib: $SO_PATH"
   ADD_BINARY_ARGS+=(--add-binary "$SO_PATH:xgboost/lib")
 else
-  echo "Warning: xgboost native lib not found; hook should still work if packaging/pyinstaller-hooks/hook-xgboost.py is present."
+  echo "Warning: xgboost native lib not found; hook should still work if packaging/pyinstaller/hooks/hook-xgboost.py is present."
 fi
 
 # Clean previous builds
@@ -56,6 +59,8 @@ $PYTHON -m PyInstaller \
   --noconfirm \
   --log-level INFO \
   --additional-hooks-dir packaging/pyinstaller/hooks \
+  --hidden-import=pyprophet \
+  --hidden-import=pyprophet.main \
   --collect-submodules pyprophet \
   --collect-all numpy \
   --collect-all pandas \

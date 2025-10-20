@@ -13,6 +13,9 @@ rm -rf build dist
 # Install/upgrade build dependencies
 python3 -m pip install --upgrade pip setuptools wheel cython numpy pyinstaller
 
+# Install the package in editable mode to ensure it's importable
+python3 -m pip install -e .
+
 # Build Cython extensions in-place
 python3 setup.py build_ext --inplace
 
@@ -50,6 +53,8 @@ python3 -m PyInstaller \
   --noconfirm \
   --log-level INFO \
   --additional-hooks-dir packaging/pyinstaller/hooks \
+  --hidden-import=pyprophet \
+  --hidden-import=pyprophet.main \
   --collect-submodules pyprophet \
   --collect-all numpy \
   --collect-all pandas \
