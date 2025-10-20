@@ -1,12 +1,12 @@
 name: Test Build
 
 on:
+  workflow_dispatch:  # Manual trigger
   pull_request:
   push:
     branches:
-      - main
       - master
-      - develop
+      - feature/pyinstaller_packaging
 
 jobs:
   test-build:
