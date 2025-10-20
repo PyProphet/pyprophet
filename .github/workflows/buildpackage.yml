@@ -19,22 +19,22 @@ jobs:
         include:
           - os: ubuntu-22.04
             artifact_name: pyprophet-linux-x86_64
-            build_script: bash scripts/build_linux.sh
+            build_script: bash scripts/build/build_linux.sh
             archive_cmd: echo "Archive created by build script"
             
           - os: windows-latest
             artifact_name: pyprophet-windows-x86_64
-            build_script: scripts/build_windows.bat
+            build_script: scripts/build/build_windows.bat
             archive_cmd: cd dist && tar -czf ../pyprophet-windows-x86_64.tar.gz pyprophet/
             
           - os: macos-13  # Intel Mac
             artifact_name: pyprophet-macos-x86_64
-            build_script: bash scripts/build_macos.sh
+            build_script: bash scripts/build/build_macos.sh
             archive_cmd: echo "Archive created by build script"
             
           - os: macos-latest  # Apple Silicon (M1/M2)
             artifact_name: pyprophet-macos-arm64
-            build_script: bash scripts/build_macos.sh
+            build_script: bash scripts/build/build_macos.sh
             archive_cmd: echo "Archive created by build script"
 
     steps:

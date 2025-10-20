@@ -42,15 +42,15 @@ jobs:
 
       - name: Build executable (Linux)
         if: runner.os == 'Linux'
-        run: bash scripts/build_linux.sh
+        run: bash scripts/build/build_linux.sh
 
       - name: Build executable (Windows)
         if: runner.os == 'Windows'
-        run: scripts/build_windows.bat
+        run: scripts/build/build_windows.bat
 
       - name: Build executable (macOS)
         if: runner.os == 'macOS'
-        run: bash scripts/build_macos.sh
+        run: bash scripts/build/build_macos.sh
 
       - name: Test basic commands (Linux/macOS)
         if: runner.os != 'Windows'
