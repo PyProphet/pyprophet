@@ -163,8 +163,6 @@ pypdf==6.0.0
     # via
     #   pyprophet
     #   pyprophet (setup.py)
-pyprophet[docs,testing] @ file:///home/singjc/Documents/github/clean/pyprophet
-    # via file:///home/singjc/documents/github/clean/pyprophet
 pytest==8.4.0
     # via
     #   pyprophet
