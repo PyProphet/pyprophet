@@ -52,6 +52,20 @@ jobs:
         if: runner.os == 'macOS'
         run: bash scripts/build/build_macos.sh
 
+      # Create installers
+      - name: Create Linux packages (DEB/RPM)
+        if: runner.os == 'Linux'
+        run: bash scripts/build/create_linux_packages.sh
+
+      - name: Create Windows installer
+        if: runner.os == 'Windows'
+        run: pwsh scripts/build/create_windows_installer.ps1
+
+      - name: Create macOS DMG
+        if: runner.os == 'macOS'
+        run: bash scripts/build/create_macos_dmg.sh
+
+      # Test the built executable
       - name: Test basic commands (Linux/macOS)
         if: runner.os != 'Windows'
         run: |
@@ -135,6 +149,143 @@ jobs:
           Write-Output "Output file created successfully: test_data.tsv"
         shell: pwsh
 
+      # Test DEB package installation
+      - name: Test DEB package installation
+        if: runner.os == 'Linux'
+        run: |
+          echo "============================================"
+          echo "Testing DEB Package Installation"
+          echo "============================================"
+          
+          DEB_FILE=$(ls pyprophet_*.deb)
+          echo "Installing: $DEB_FILE"
+          
+          # Install the package
+          sudo dpkg -i "$DEB_FILE" || {
+            echo "Installation failed, attempting to fix dependencies..."
+            sudo apt-get install -f -y
+          }
+          
+          # Verify installation
+          if ! command -v pyprophet &> /dev/null; then
+            echo "ERROR: pyprophet command not found after DEB installation!"
+            exit 1
+          fi
+          
+          # Test installed package
+          echo "Testing installed pyprophet..."
+          pyprophet --version
+          pyprophet --help
+          
+          # Test with actual data
+          pyprophet score --in tests/data/test_data.osw --level ms1ms2 --pi0_lambda 0 0 0
+          
+          # Clean up
+          echo "Uninstalling package..."
+          sudo dpkg -r pyprophet
+          
+          echo "✅ DEB package test passed!"
+
+      # Test Windows installer
+      - name: Test Windows installer
+        if: runner.os == 'Windows'
+        run: |
+          Write-Host "============================================"
+          Write-Host "Testing Windows Installer"
+          Write-Host "============================================"
+          
+          $installerFile = Get-ChildItem pyprophet-setup-*.exe | Select-Object -First 1
+          
+          if (-not $installerFile) {
+            Write-Error "No installer file found!"
+            exit 1
+          }
+          
+          Write-Host "Installer: $($installerFile.Name)"
+          
+          # Install silently
+          Write-Host "Installing silently..."
+          Start-Process -FilePath $installerFile.FullName -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/DIR=$env:TEMP\PyProphet" -Wait
+          
+          # Verify installation
+          $installPath = "$env:TEMP\PyProphet\pyprophet.exe"
+          if (-not (Test-Path $installPath)) {
+            Write-Error "pyprophet.exe not found at expected location: $installPath"
+            exit 1
+          }
+          
+          # Test installed executable
+          Write-Host "Testing installed pyprophet..."
+          & $installPath --version
+          & $installPath --help
+          
+          # Test with actual data
+          & $installPath score --in tests/data/test_data.osw --level ms1ms2 --pi0_lambda 0 0 0
+          
+          # Clean up - uninstall silently
+          Write-Host "Uninstalling..."
+          $uninstallPath = "$env:TEMP\PyProphet\unins000.exe"
+          if (Test-Path $uninstallPath) {
+            Start-Process -FilePath $uninstallPath -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -Wait
+          }
+          
+          Write-Host "✅ Windows installer test passed!"
+        shell: pwsh
+
+      # Test macOS DMG
+      - name: Test macOS DMG
+        if: runner.os == 'macOS'
+        run: |
+          echo "============================================"
+          echo "Testing macOS DMG"
+          echo "============================================"
+          
+          DMG_FILE=$(ls pyprophet-*.dmg)
+          echo "DMG file: $DMG_FILE"
+          
+          # Mount the DMG
+          echo "Mounting DMG..."
+          hdiutil attach "$DMG_FILE" -mountpoint /Volumes/PyProphet
+          
+          # Verify app exists
+          if [ ! -d "/Volumes/PyProphet/PyProphet.app" ]; then
+            echo "ERROR: PyProphet.app not found in DMG!"
+            hdiutil detach /Volumes/PyProphet
+            exit 1
+          fi
+          
+          # Copy to temporary location (simulating installation)
+          echo "Copying app to temporary location..."
+          TEMP_APP="/tmp/PyProphet.app"
+          cp -r /Volumes/PyProphet/PyProphet.app "$TEMP_APP"
+          
+          # Unmount DMG
+          echo "Unmounting DMG..."
+          hdiutil detach /Volumes/PyProphet
+          
+          # Test the app
+          echo "Testing installed app..."
+          PYPROPHET_BIN="$TEMP_APP/Contents/MacOS/pyprophet"
+          
+          if [ ! -f "$PYPROPHET_BIN" ]; then
+            echo "ERROR: pyprophet executable not found at: $PYPROPHET_BIN"
+            exit 1
+          fi
+          
+          chmod +x "$PYPROPHET_BIN"
+          
+          "$PYPROPHET_BIN" --version
+          "$PYPROPHET_BIN" --help
+          
+          # Test with actual data
+          "$PYPROPHET_BIN" score --in tests/data/test_data.osw --level ms1ms2 --pi0_lambda 0 0 0
+          
+          # Clean up
+          echo "Cleaning up..."
+          rm -rf "$TEMP_APP"
+          
+          echo "✅ macOS DMG test passed!"
+
       - name: Upload test outputs as artifacts
         if: always()  # Upload even if tests fail
         uses: actions/upload-artifact@v4
@@ -150,3 +301,5 @@ jobs:
         if: success()
         run: |
           echo "✅ All tests passed on ${{ matrix.os }}!"
+          echo "  - Executable tests: PASSED"
+          echo "  - Installer tests: PASSED"

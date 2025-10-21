@@ -103,41 +103,75 @@ jobs:
           echo "Listing artifacts:"
           ls -lh pyprophet-*.tar.gz *.dmg *.sha256 || echo "Some files missing"
 
-      # Upload artifacts
-      - name: Upload build artifacts (Linux)
+      # Upload artifacts separately by type (Linux)
+      - name: Upload Linux tarball
         if: runner.os == 'Linux'
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact_name }}
+          name: pyprophet-linux-x86_64-tarball
           path: |
             pyprophet-linux-*.tar.gz
             pyprophet-linux-*.tar.gz.sha256
+          retention-days: 7
+
+      - name: Upload Linux DEB package
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: pyprophet-linux-x86_64-deb
+          path: |
             pyprophet_*.deb
             pyprophet_*.deb.sha256
+          retention-days: 7
+
+      - name: Upload Linux RPM package
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: pyprophet-linux-x86_64-rpm
+          path: |
             pyprophet-*.rpm
             pyprophet-*.rpm.sha256
           retention-days: 7
 
-      - name: Upload build artifacts (Windows)
+      # Upload artifacts separately by type (Windows)
+      - name: Upload Windows ZIP archive
         if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact_name }}
+          name: pyprophet-windows-x86_64-zip
           path: |
             pyprophet-windows-*.zip
             pyprophet-windows-*.zip.sha256
+          retention-days: 7
+
+      - name: Upload Windows installer
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: pyprophet-windows-x86_64-installer
+          path: |
             pyprophet-setup-*.exe
             pyprophet-setup-*.exe.sha256
           retention-days: 7
 
-      - name: Upload build artifacts (macOS)
+      # Upload artifacts separately by type (macOS)
+      - name: Upload macOS tarball
         if: runner.os == 'macOS'
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact_name }}
+          name: pyprophet-macos-${{ matrix.arch }}-tarball
           path: |
             pyprophet-macos-*.tar.gz
             pyprophet-macos-*.tar.gz.sha256
+          retention-days: 7
+
+      - name: Upload macOS DMG
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: pyprophet-macos-${{ matrix.arch }}-dmg
+          path: |
             pyprophet-*.dmg
             pyprophet-*.dmg.sha256
           retention-days: 7
