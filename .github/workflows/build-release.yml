@@ -12,12 +12,31 @@ concurrency:
 
 jobs:
   build:
-    name: Build on ${{ matrix.os }}
+    name: Build on ${{ matrix.os }} ${{ matrix.arch }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04, windows-latest, macos-latest]
+        include:
+          # Linux x86_64
+          - os: ubuntu-22.04
+            arch: x86_64
+            artifact_name: pyprophet-linux-x86_64
+            
+          # Windows x86_64
+          - os: windows-latest
+            arch: x86_64
+            artifact_name: pyprophet-windows-x86_64
+            
+          # macOS Intel (x86_64)
+          - os: macos-13  # Intel runner
+            arch: x86_64
+            artifact_name: pyprophet-macos-x86_64
+            
+          # macOS Apple Silicon (ARM64)
+          - os: macos-latest  # ARM64 runner (macos-14+)
+            arch: arm64
+            artifact_name: pyprophet-macos-arm64
 
     steps:
       - name: Checkout code
@@ -51,48 +70,76 @@ jobs:
         if: runner.os == 'macOS'
         run: bash scripts/build/build_macos.sh
 
-      - name: Verify artifacts (Linux/macOS)
-        if: runner.os != 'Windows'
+      # Create installers
+      - name: Create Linux packages (DEB/RPM)
+        if: runner.os == 'Linux'
+        run: bash scripts/build/create_linux_packages.sh
+
+      - name: Create Windows installer
+        if: runner.os == 'Windows'
+        run: pwsh scripts/build/create_windows_installer.ps1
+
+      - name: Create macOS DMG
+        if: runner.os == 'macOS'
+        run: bash scripts/build/create_macos_dmg.sh
+
+      # Verify artifacts
+      - name: Verify artifacts (Linux)
+        if: runner.os == 'Linux'
         run: |
-          echo "Listing artifacts in root directory:"
-          ls -lh pyprophet-*.tar.gz pyprophet-*.tar.gz.sha256 || echo "No .tar.gz files found"
+          echo "Listing artifacts:"
+          ls -lh pyprophet-*.tar.gz *.deb *.rpm *.sha256 || echo "Some files missing"
 
       - name: Verify artifacts (Windows)
         if: runner.os == 'Windows'
         run: |
-          echo "Listing artifacts in root directory:"
-          Get-ChildItem -Path . -Filter "pyprophet-*.zip" | Format-Table Name, Length
-          Get-ChildItem -Path . -Filter "pyprophet-*.zip.sha256" | Format-Table Name, Length
+          echo "Listing artifacts:"
+          Get-ChildItem -Path . -Filter "pyprophet-*" | Format-Table Name, Length
         shell: pwsh
 
+      - name: Verify artifacts (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          echo "Listing artifacts:"
+          ls -lh pyprophet-*.tar.gz *.dmg *.sha256 || echo "Some files missing"
+
+      # Upload artifacts
       - name: Upload build artifacts (Linux)
         if: runner.os == 'Linux'
         uses: actions/upload-artifact@v4
         with:
-          name: pyprophet-linux-x86_64
+          name: ${{ matrix.artifact_name }}
           path: |
             pyprophet-linux-*.tar.gz
             pyprophet-linux-*.tar.gz.sha256
+            pyprophet_*.deb
+            pyprophet_*.deb.sha256
+            pyprophet-*.rpm
+            pyprophet-*.rpm.sha256
           retention-days: 7
 
       - name: Upload build artifacts (Windows)
         if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
         with:
-          name: pyprophet-windows-x86_64
+          name: ${{ matrix.artifact_name }}
           path: |
             pyprophet-windows-*.zip
             pyprophet-windows-*.zip.sha256
+            pyprophet-setup-*.exe
+            pyprophet-setup-*.exe.sha256
           retention-days: 7
 
       - name: Upload build artifacts (macOS)
         if: runner.os == 'macOS'
         uses: actions/upload-artifact@v4
         with:
-          name: pyprophet-macos-${{ runner.arch }}
+          name: ${{ matrix.artifact_name }}
           path: |
             pyprophet-macos-*.tar.gz
             pyprophet-macos-*.tar.gz.sha256
+            pyprophet-*.dmg
+            pyprophet-*.dmg.sha256
           retention-days: 7
 
   release:
@@ -121,7 +168,7 @@ jobs:
       - name: Prepare release assets
         run: |
           mkdir -p release-assets
-          find artifacts -type f \( -name "*.tar.gz" -o -name "*.zip" -o -name "*.sha256" \) -exec cp {} release-assets/ \;
+          find artifacts -type f \( -name "*.tar.gz" -o -name "*.zip" -o -name "*.deb" -o -name "*.rpm" -o -name "*.dmg" -o -name "*.exe" -o -name "*.sha256" \) -exec cp {} release-assets/ \;
           echo "Release assets:"
           ls -lh release-assets/
 
