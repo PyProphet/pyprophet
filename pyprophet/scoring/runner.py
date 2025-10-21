@@ -393,6 +393,8 @@ class PyProphetWeightApplier(PyProphetRunner):
                                 f"Original training used this main score, applying it ensures feature alignment."
                             )
                             config.runner.ss_main_score = stored_ss_main_score
+                            # Update the dynamic flag to match the restored value
+                            config.runner.ss_use_dynamic_main_score = (stored_ss_main_score == "auto")
                         elif config.runner.ss_main_score != stored_ss_main_score:
                             logger.warning(
                                 f"Current ss_main_score='{config.runner.ss_main_score}' differs from stored ss_main_score='{stored_ss_main_score}'. "
@@ -472,6 +474,8 @@ class PyProphetWeightApplier(PyProphetRunner):
                                 f"Original training used this main score, applying it ensures feature alignment."
                             )
                             config.runner.ss_main_score = stored_ss_main_score
+                            # Update the dynamic flag to match the restored value
+                            config.runner.ss_use_dynamic_main_score = (stored_ss_main_score == "auto")
                         elif config.runner.ss_main_score != stored_ss_main_score:
                             logger.warning(
                                 f"Current ss_main_score='{config.runner.ss_main_score}' differs from stored ss_main_score='{stored_ss_main_score}'. "
