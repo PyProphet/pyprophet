@@ -35,7 +35,7 @@ Install the stable version of *pyprophet* from the PyPI:
 
 Download from [GitHub Releases](https://github.com/pyprophet/pyprophet/releases):
 - Linux: `pyprophet-linux-x86_64.tar.gz`
-- Windows: `pyprophet-windows-x86_64.tar.gz`  
+- Windows: `pyprophet-windows-x86_64.zip`  
 - macOS Intel: `pyprophet-macos-x86_64.tar.gz`
 - macOS Apple Silicon: `pyprophet-macos-arm64.tar.gz`
 

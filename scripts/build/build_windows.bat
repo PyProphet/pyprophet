@@ -50,14 +50,16 @@ echo ============================================
 echo Build complete! Executable at: dist\pyprophet\pyprophet.exe
 echo ============================================
 
-REM Create archive
-cd dist
-tar -czf ..\pyprophet-windows-x86_64.tar.gz pyprophet\
-cd ..
+REM Create ZIP archive (more native for Windows)
+powershell -Command "Compress-Archive -Path dist\pyprophet -DestinationPath pyprophet-windows-x86_64.zip -Force"
 
 if errorlevel 1 (
     echo Archive creation failed!
     exit /b 1
 )
 
-echo Archive created: pyprophet-windows-x86_64.tar.gz
+echo Archive created: pyprophet-windows-x86_64.zip
+
+REM Optional: Generate SHA256 checksum
+powershell -Command "(Get-FileHash pyprophet-windows-x86_64.zip -Algorithm SHA256).Hash | Out-File -FilePath pyprophet-windows-x86_64.zip.sha256 -Encoding ASCII"
+echo Checksum created: pyprophet-windows-x86_64.zip.sha256
