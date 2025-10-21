@@ -528,7 +528,11 @@ class BaseWriter(ABC):
 
     def _save_bin_weights(self, weights):
         """
-        Save the model weights to a binary file.
+        Save the model weights to a binary file with metadata.
+
+        For XGBoost/HistGradientBoosting classifiers, saves the model along with
+        metadata including ss_main_score and feature names to ensure proper
+        feature alignment when applying weights.
 
         Args:
             weights: Model weights or trained object.
@@ -537,8 +541,16 @@ class BaseWriter(ABC):
             f"trained_model_path_{self.level}"
         )
         if trained_weights_path is not None:
+            # For XGBoost/HistGradientBoosting, wrap model with metadata
+            # to ensure feature alignment when applying weights
+            model_data = {
+                "model": weights,
+                "ss_main_score": self.config.runner.ss_main_score,
+                "classifier": self.classifier,
+                "level": self.level,
+            }
             with open(trained_weights_path, "wb") as file:
-                self.persisted_weights = pickle.dump(weights, file)
+                pickle.dump(model_data, file)
             logger.success("%s written." % trained_weights_path)
         else:
             logger.error(f"Trained model path {trained_weights_path} not found. ")

@@ -364,7 +364,48 @@ class PyProphetWeightApplier(PyProphetRunner):
                     raise
             elif self.classifier in ("XGBoost", "HistGradientBoosting"):
                 with open(apply_weights, "rb") as file:
-                    self.persisted_weights = pickle.load(file)
+                    loaded_data = pickle.load(file)
+                    # Check if this is new format (dict with metadata) or old format (just model)
+                    if isinstance(loaded_data, dict) and "model" in loaded_data:
+                        # New format with metadata
+                        self.persisted_weights = loaded_data["model"]
+                        stored_ss_main_score = loaded_data.get("ss_main_score", "auto")
+                        stored_level = loaded_data.get("level", self.level)
+                        stored_classifier = loaded_data.get("classifier", self.classifier)
+                        
+                        # Validate level matches
+                        if stored_level != self.level:
+                            raise click.ClickException(
+                                f"Weights file was trained for level '{stored_level}' but you are applying to level '{self.level}'."
+                            )
+                        
+                        # Validate classifier matches
+                        if stored_classifier != self.classifier:
+                            logger.warning(
+                                f"Weights file was trained with classifier '{stored_classifier}' but you specified '{self.classifier}'. "
+                                f"Using stored classifier '{stored_classifier}'."
+                            )
+                        
+                        # Use stored ss_main_score if current config has default/auto
+                        if config.runner.ss_main_score == "auto" and stored_ss_main_score != "auto":
+                            logger.info(
+                                f"Using stored ss_main_score='{stored_ss_main_score}' from weights file. "
+                                f"Original training used this main score, applying it ensures feature alignment."
+                            )
+                            config.runner.ss_main_score = stored_ss_main_score
+                        elif config.runner.ss_main_score != stored_ss_main_score:
+                            logger.warning(
+                                f"Current ss_main_score='{config.runner.ss_main_score}' differs from stored ss_main_score='{stored_ss_main_score}'. "
+                                f"This may cause feature misalignment. Consider using --ss_main_score={stored_ss_main_score}"
+                            )
+                    else:
+                        # Old format (backward compatibility) - just the model
+                        self.persisted_weights = loaded_data
+                        logger.warning(
+                            "Loading weights from old format file (no metadata). "
+                            "Feature alignment cannot be automatically verified. "
+                            "Make sure to specify the same --ss_main_score as used during training."
+                        )
         elif self.config.file_type == "osw":
             if self.classifier in ("LDA", "SVM"):
                 try:
@@ -401,7 +442,49 @@ class PyProphetWeightApplier(PyProphetRunner):
                         "SELECT xgb FROM PYPROPHET_XGB WHERE LEVEL=='%s'" % self.level
                     ).fetchone()
                     con.close()
-                    self.persisted_weights = pickle.loads(data[0])
+                    loaded_data = pickle.loads(data[0])
+                    
+                    # Check if this is new format (dict with metadata) or old format (just model)
+                    if isinstance(loaded_data, dict) and "model" in loaded_data:
+                        # New format with metadata
+                        self.persisted_weights = loaded_data["model"]
+                        stored_ss_main_score = loaded_data.get("ss_main_score", "auto")
+                        stored_level = loaded_data.get("level", self.level)
+                        stored_classifier = loaded_data.get("classifier", self.classifier)
+                        
+                        # Validate level matches
+                        if stored_level != self.level:
+                            raise click.ClickException(
+                                f"Weights file was trained for level '{stored_level}' but you are applying to level '{self.level}'."
+                            )
+                        
+                        # Validate classifier matches
+                        if stored_classifier != self.classifier:
+                            logger.warning(
+                                f"Weights file was trained with classifier '{stored_classifier}' but you specified '{self.classifier}'. "
+                                f"Using stored classifier '{stored_classifier}'."
+                            )
+                        
+                        # Use stored ss_main_score if current config has default/auto
+                        if config.runner.ss_main_score == "auto" and stored_ss_main_score != "auto":
+                            logger.info(
+                                f"Using stored ss_main_score='{stored_ss_main_score}' from weights file. "
+                                f"Original training used this main score, applying it ensures feature alignment."
+                            )
+                            config.runner.ss_main_score = stored_ss_main_score
+                        elif config.runner.ss_main_score != stored_ss_main_score:
+                            logger.warning(
+                                f"Current ss_main_score='{config.runner.ss_main_score}' differs from stored ss_main_score='{stored_ss_main_score}'. "
+                                f"This may cause feature misalignment. Consider using --ss_main_score={stored_ss_main_score}"
+                            )
+                    else:
+                        # Old format (backward compatibility) - just the model
+                        self.persisted_weights = loaded_data
+                        logger.warning(
+                            "Loading weights from old format file (no metadata). "
+                            "Feature alignment cannot be automatically verified. "
+                            "Make sure to specify the same --ss_main_score as used during training."
+                        )
                 except Exception:
                     import traceback
 
