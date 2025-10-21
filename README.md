@@ -8,6 +8,7 @@
 <!-- [![Build Status](https://travis-ci.org/PyProphet/pyprophet.svg?branch=master)](https://travis-ci.org/PyProphet/pyprophet)  -->
 [![continuous-integration](https://github.com/PyProphet/pyprophet/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/PyProphet/pyprophet/actions/workflows/ci.yml)
 [![Test Package Build](https://github.com/PyProphet/pyprophet/actions/workflows/test-build.yml/badge.svg)](https://github.com/PyProphet/pyprophet/actions/workflows/test-build.yml)
+[![Build and Release](https://github.com/PyProphet/pyprophet/actions/workflows/build-release.yml/badge.svg)](https://github.com/PyProphet/pyprophet/actions/workflows/build-release.yml)
 [![Project Stats](https://www.openhub.net/p/PyProphet/widgets/project_thin_badge.gif)](https://www.openhub.net/p/PyProphet)
 ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/pyprophet)
 [![PyPI - Version](https://img.shields.io/pypi/v/pyprophet)](https://pypi.org/project/pyprophet/)
