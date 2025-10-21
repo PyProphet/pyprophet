@@ -74,8 +74,8 @@ fi
 
 # Make all executables and shared libraries have correct permissions
 echo "Setting permissions..."
-find package/usr/share/pyprophet -type f -name "*.so*" -exec chmod 755 {} \;
-find package/usr/share/pyprophet -type f -executable -exec chmod 755 {} \;
+find package/usr/share/pyprophet -type f -name "*.so*" -exec chmod 755 {} \; || true
+find package/usr/share/pyprophet -type f -executable -exec chmod 755 {} \; || true
 chmod +x package/usr/share/pyprophet/pyprophet
 
 # Create wrapper script in /usr/local/bin
@@ -106,10 +106,14 @@ pyprophet (${VERSION}) stable; urgency=medium
 EOF
 gzip -9 package/usr/share/doc/pyprophet/changelog
 
-# List what will be packaged
+# List what will be packaged (avoid broken pipe with head)
 echo "Package contents preview:"
-find package -type f | head -20
+find package -type f 2>/dev/null | head -20 || true
 echo "..."
+
+# Count total files
+TOTAL_FILES=$(find package -type f 2>/dev/null | wc -l)
+echo "Total files to package: ${TOTAL_FILES}"
 
 # Determine system dependencies
 # PyInstaller bundles most things, but we still need basic system libraries
@@ -158,10 +162,10 @@ RPM_FILE=$(ls pyprophet-*.rpm)
 # Verify DEB package
 echo "Verifying DEB package..."
 echo "Package info:"
-dpkg --info "${DEB_FILE}" | head -20
+dpkg --info "${DEB_FILE}" 2>/dev/null | head -20 || true
 echo ""
 echo "First few files:"
-dpkg --contents "${DEB_FILE}" | head -10
+dpkg --contents "${DEB_FILE}" 2>/dev/null | head -10 || true
 
 # Generate checksums
 echo "Generating checksums..."
