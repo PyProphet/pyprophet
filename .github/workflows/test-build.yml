@@ -247,42 +247,49 @@ jobs:
           echo "Mounting DMG..."
           hdiutil attach "$DMG_FILE" -mountpoint /Volumes/PyProphet
           
-          # Verify app exists
-          if [ ! -d "/Volumes/PyProphet/PyProphet.app" ]; then
-            echo "ERROR: PyProphet.app not found in DMG!"
-            hdiutil detach /Volumes/PyProphet
+          # Verify PyProphet directory exists
+          if [ ! -d "/Volumes/PyProphet/PyProphet" ]; then
+            echo "ERROR: PyProphet directory not found in DMG!"
+            hdiutil detach /Volumes/PyProphet || true
             exit 1
           fi
           
+          # Verify executable exists
+          if [ ! -f "/Volumes/PyProphet/PyProphet/pyprophet" ]; then
+            echo "ERROR: pyprophet executable not found!"
+            ls -la /Volumes/PyProphet/PyProphet/
+            hdiutil detach /Volumes/PyProphet || true
+            exit 1
+          fi
+          
+          # Test directly from mounted DMG
+          echo "Testing pyprophet from DMG..."
+          /Volumes/PyProphet/PyProphet/pyprophet --version
+          /Volumes/PyProphet/PyProphet/pyprophet --help
+          
+          # Test with actual data
+          echo "Running score test..."
+          /Volumes/PyProphet/PyProphet/pyprophet score --in tests/data/test_data.osw --level ms1ms2 --pi0_lambda 0 0 0
+          
           # Copy to temporary location (simulating installation)
-          echo "Copying app to temporary location..."
-          TEMP_APP="/tmp/PyProphet.app"
-          cp -r /Volumes/PyProphet/PyProphet.app "$TEMP_APP"
+          echo "Testing installation by copying to /tmp..."
+          TEMP_DIR="/tmp/PyProphet-test"
+          rm -rf "$TEMP_DIR"
+          cp -r /Volumes/PyProphet/PyProphet "$TEMP_DIR"
           
           # Unmount DMG
           echo "Unmounting DMG..."
           hdiutil detach /Volumes/PyProphet
           
-          # Test the app
-          echo "Testing installed app..."
-          PYPROPHET_BIN="$TEMP_APP/Contents/MacOS/pyprophet"
-          
-          if [ ! -f "$PYPROPHET_BIN" ]; then
-            echo "ERROR: pyprophet executable not found at: $PYPROPHET_BIN"
-            exit 1
-          fi
-          
-          chmod +x "$PYPROPHET_BIN"
-          
-          "$PYPROPHET_BIN" --version
-          "$PYPROPHET_BIN" --help
-          
-          # Test with actual data
-          "$PYPROPHET_BIN" score --in tests/data/test_data.osw --level ms1ms2 --pi0_lambda 0 0 0
+          # Test from copied location
+          echo "Testing from installed location..."
+          "$TEMP_DIR/pyprophet" --version
+          "$TEMP_DIR/pyprophet" --help
+          "$TEMP_DIR/pyprophet" score --in tests/data/test_data.osw --level ms1ms2 --pi0_lambda 0 0 0
           
           # Clean up
           echo "Cleaning up..."
-          rm -rf "$TEMP_APP"
+          rm -rf "$TEMP_DIR"
           
           echo "✅ macOS DMG test passed!"
 

@@ -25,85 +25,76 @@ if [ ! -f "dist/pyprophet/pyprophet" ]; then
     exit 1
 fi
 
-# Create app bundle structure
-echo "Creating app bundle..."
-APP_NAME="PyProphet.app"
-rm -rf "${APP_NAME}"
-mkdir -p "${APP_NAME}/Contents/MacOS"
-mkdir -p "${APP_NAME}/Contents/Resources"
+# Create a simple directory structure for DMG
+# Don't wrap in .app bundle - PyInstaller executables work better as-is
+echo "Preparing DMG contents..."
+DMG_TEMP="dmg-temp"
+rm -rf "${DMG_TEMP}"
+mkdir -p "${DMG_TEMP}/PyProphet"
 
-# Copy the entire pyprophet directory
-echo "Copying executable from dist/pyprophet..."
-cp -r dist/pyprophet/* "${APP_NAME}/Contents/MacOS/"
+# Copy the entire pyprophet directory (contains executable and all dependencies)
+echo "Copying PyProphet executable and dependencies..."
+cp -r dist/pyprophet/* "${DMG_TEMP}/PyProphet/"
 
 # Ensure main executable is present and executable
-if [ ! -f "${APP_NAME}/Contents/MacOS/pyprophet" ]; then
+if [ ! -f "${DMG_TEMP}/PyProphet/pyprophet" ]; then
     echo "ERROR: pyprophet executable not found in dist/pyprophet/"
     exit 1
 fi
 
-chmod +x "${APP_NAME}/Contents/MacOS/pyprophet"
+chmod +x "${DMG_TEMP}/PyProphet/pyprophet"
 
-# Create launcher script
-cat > "${APP_NAME}/Contents/MacOS/pyprophet-launcher" << 'EOF'
+# Create a wrapper script for easy command-line access
+cat > "${DMG_TEMP}/PyProphet/pyprophet.sh" << 'EOF'
 #!/bin/bash
+# PyProphet launcher script
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 exec "${DIR}/pyprophet" "$@"
 EOF
-chmod +x "${APP_NAME}/Contents/MacOS/pyprophet-launcher"
+chmod +x "${DMG_TEMP}/PyProphet/pyprophet.sh"
 
-# Create Info.plist
-cat > "${APP_NAME}/Contents/Info.plist" << EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>CFBundleExecutable</key>
-    <string>pyprophet-launcher</string>
-    <key>CFBundleIdentifier</key>
-    <string>org.pyprophet.pyprophet</string>
-    <key>CFBundleName</key>
-    <string>PyProphet</string>
-    <key>CFBundleDisplayName</key>
-    <string>PyProphet</string>
-    <key>CFBundleVersion</key>
-    <string>${VERSION}</string>
-    <key>CFBundleShortVersionString</key>
-    <string>${VERSION}</string>
-    <key>CFBundlePackageType</key>
-    <string>APPL</string>
-    <key>LSMinimumSystemVersion</key>
-    <string>11.0</string>
-    <key>NSHighResolutionCapable</key>
-    <true/>
-</dict>
-</plist>
+# Create a README for installation instructions
+cat > "${DMG_TEMP}/README.txt" << EOF
+PyProphet ${VERSION} for macOS (${ARCH})
+==========================================
+
+Installation:
+1. Copy the PyProphet folder to your Applications folder or any location
+2. Add to your PATH by adding this line to ~/.zshrc or ~/.bash_profile:
+   export PATH="/Applications/PyProphet:\$PATH"
+3. Restart your terminal or run: source ~/.zshrc
+
+Usage:
+- Run from Applications: /Applications/PyProphet/pyprophet --help
+- Or if added to PATH: pyprophet --help
+
+For more information:
+https://github.com/pyprophet/pyprophet
 EOF
+
+# Create symbolic link to Applications for easy drag-and-drop install
+ln -s /Applications "${DMG_TEMP}/Applications"
+
+# Copy documentation
+if [ -f "README.md" ]; then
+    cp README.md "${DMG_TEMP}/PyProphet/README.md"
+fi
+if [ -f "LICENSE" ]; then
+    cp LICENSE "${DMG_TEMP}/PyProphet/LICENSE"
+fi
 
 # Create DMG
 DMG_NAME="pyprophet-${VERSION}-macos-${ARCH}.dmg"
 echo "Creating DMG: ${DMG_NAME}"
 
-# Create temporary directory for DMG contents
-DMG_TEMP="dmg-temp"
-rm -rf "${DMG_TEMP}"
-mkdir -p "${DMG_TEMP}"
+# Remove any existing DMG
+rm -f "${DMG_NAME}"
 
-# Copy app to temp directory
-cp -r "${APP_NAME}" "${DMG_TEMP}/"
-
-# Create symbolic link to Applications
-ln -s /Applications "${DMG_TEMP}/Applications"
-
-# Copy README if exists
-if [ -f "README.md" ]; then
-    cp README.md "${DMG_TEMP}/README.txt"
-fi
-
-# Create DMG
+# Create DMG with proper settings
 hdiutil create -volname "PyProphet ${VERSION}" \
   -srcfolder "${DMG_TEMP}" \
   -ov -format UDZO \
+  -imagekey zlib-level=9 \
   "${DMG_NAME}"
 
 # Generate checksum
@@ -117,10 +108,10 @@ echo "============================================"
 ls -lh "${DMG_NAME}" "${DMG_NAME}.sha256"
 
 # Clean up
-rm -rf "${APP_NAME}" "${DMG_TEMP}"
+rm -rf "${DMG_TEMP}"
 
 echo ""
 echo "To test the DMG:"
 echo "1. Mount: hdiutil attach ${DMG_NAME}"
-echo "2. Copy app to /Applications"
-echo "3. Run: /Applications/PyProphet.app/Contents/MacOS/pyprophet --help"
+echo "2. Run: /Volumes/PyProphet*/PyProphet/pyprophet --help"
+echo "3. Unmount: hdiutil detach /Volumes/PyProphet*"
