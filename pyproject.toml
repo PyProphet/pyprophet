@@ -40,7 +40,7 @@ dependencies = [
     "polars >= 1.28.1",
     "cython",
     "scikit-learn >= 1.5",
-    "xgboost >= 2.1.4",
+    "xgboost-cpu >= 2.1.4", # regular xgboost includes nvidia libraries which bloat the package size on linux. For PyProphet, we likely would not need GPU support.
     "matplotlib",
     "pyarrow",
     "pypdf",
