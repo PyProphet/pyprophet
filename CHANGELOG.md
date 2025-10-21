@@ -12,6 +12,10 @@ All notable changes to this project will be documented in this file.
 - Add concurrency control to multiple GitHub Actions workflows for improved efficiency
 - Add PyInstaller hook for pyprophet package to ensure proper module collection
 
+### 🐛 Bug Fixes
+
+- *(build)* Fix archiving of windows build release to use zip instead of tar
+
 ### 💼 Other
 
 - Pyinstaller build scripts
@@ -57,6 +61,8 @@ All notable changes to this project will be documented in this file.
 - Update Python version support and refine package discovery settings
 - Add GitHub Actions workflow for automatic changelog generation
 - Remove concurrency settings from GitHub Actions workflow
+- Update CHANGELOG.md
+- Refactor GitHub Actions workflow for improved build and artifact handling
 
 ## [3.0.3] - 2025-10-18
 
