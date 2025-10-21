@@ -1,0 +1,106 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # Trigger on version tags like v3.0.3
+  workflow_dispatch:  # Allow manual trigger
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            artifact_name: pyprophet-linux-x86_64
+            build_script: bash scripts/build/build_linux.sh
+            archive_cmd: echo "Archive created by build script"
+            
+          - os: windows-latest
+            artifact_name: pyprophet-windows-x86_64
+            build_script: scripts/build/build_windows.bat
+            archive_cmd: cd dist && tar -czf ../pyprophet-windows-x86_64.tar.gz pyprophet/
+            
+          - os: macos-13  # Intel Mac
+            artifact_name: pyprophet-macos-x86_64
+            build_script: bash scripts/build/build_macos.sh
+            archive_cmd: echo "Archive created by build script"
+            
+          - os: macos-latest  # Apple Silicon (M1/M2)
+            artifact_name: pyprophet-macos-arm64
+            build_script: bash scripts/build/build_macos.sh
+            archive_cmd: echo "Archive created by build script"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+
+      - name: Build executable
+        run: ${{ matrix.build_script }}
+
+      - name: Create archive
+        run: ${{ matrix.archive_cmd }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: |
+            dist/*.tar.gz
+            dist/*.zip
+          retention-days: 7
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Display structure of downloaded files
+        run: ls -R artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            artifacts/**/*.tar.gz
+            artifacts/**/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

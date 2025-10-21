@@ -23,18 +23,57 @@ Please consult the [OpenSWATH website](http://openswath.org) for usage instructi
 Installation
 ============
 
-We strongly advice to install PyProphet in a Python [*virtualenv*](https://virtualenv.pypa.io/en/stable/). PyProphet is compatible with Python 3.
+### Option 1: Python Package Index (PyPI)
+
+Install the stable version of *pyprophet* from the PyPI:
+
+````
+    $ pip install pyprophet
+````
+
+### Option 2: Pre-built Executables (No Python Required)
+
+Download from [GitHub Releases](https://github.com/pyprophet/pyprophet/releases):
+- Linux: `pyprophet-linux-x86_64.tar.gz`
+- Windows: `pyprophet-windows-x86_64.tar.gz`  
+- macOS Intel: `pyprophet-macos-x86_64.tar.gz`
+- macOS Apple Silicon: `pyprophet-macos-arm64.tar.gz`
+
+```bash
+tar -xzf pyprophet-*.tar.gz
+cd pyprophet
+./pyprophet --help
+```
+### Option 3: From Source
+
+We strongly advise to install PyProphet in a Python [*virtualenv*](https://virtualenv.pypa.io/en/stable/). PyProphet is compatible with Python 3.
 
 Install the development version of *pyprophet* from GitHub:
 
 ````
+    $ git clone https://github.com/pyprophet/pyprophet.git
+    $ cd pyprophet  
+    $ pip install . 
+````
+
+or 
+
+```
     $ pip install git+https://github.com/PyProphet/pyprophet.git@master
-````
+```
 
-Install the stable version of *pyprophet* from the Python Package Index (PyPI):
+### Option 4: Docker 
+
+PyProphet is also available from Docker (automated builds):
+
+Pull the latest version of *pyprophet* from DockerHub or Github Container Registry (synced with releases):
 
 ````
-    $ pip install pyprophet
+    # Dockerhub
+    $ docker pull pyprophet/pyprophet:latest
+
+    # Github Container Registry
+    $ docker pull ghcr.io/pyprophet/pyprophet:latest
 ````
 
 Running pyprophet
@@ -50,21 +89,6 @@ or:
 
 ````
    $ pyprophet score --in=tests/test_data.txt
-````
-
-Docker
-=================
-
-PyProphet is also available from Docker (automated builds):
-
-Pull the latest version of *pyprophet* from DockerHub or Github Container Registry (synced with releases):
-
-````
-    # Dockerhub
-    $ docker pull pyprophet/pyprophet:latest
-
-    # Github Container Registry
-    $ docker pull ghcr.io/pyprophet/pyprophet:latest
 ````
 
 Documentation
@@ -91,10 +115,10 @@ References
 SRM experiments.* **Nat Methods.** 2011 May;8(5):430-5. [doi:
 10.1038/nmeth.1584.](http://dx.doi.org/10.1038/nmeth.1584) Epub 2011 Mar 20.
 
-2. Teleman J, Röst HL, Rosenberger G, Schmitt U, Malmström L, Malmström J, Levander F.
+1. Teleman J, Röst HL, Rosenberger G, Schmitt U, Malmström L, Malmström J, Levander F.
 *DIANA--algorithmic improvements for analysis of data-independent acquisition MS data.* **Bioinformatics.** 2015 Feb 15;31(4):555-62. [doi: 10.1093/bioinformatics/btu686.](http://dx.doi.org/10.1093/bioinformatics/btu686) Epub 2014 Oct 27.
 
-3. Rosenberger G, Liu Y, Röst HL, Ludwig C, Buil A, Bensimon A, Soste M, Spector TD, Dermitzakis ET, Collins BC, Malmström L, Aebersold R. *Inference and quantification of peptidoforms in large sample cohorts by SWATH-MS.* **Nat Biotechnol** 2017 Aug;35(8):781-788. [doi: 10.1038/nbt.3908.](http://dx.doi.org/10.1038/nbt.3908) Epub 2017 Jun 12.
+1. Rosenberger G, Liu Y, Röst HL, Ludwig C, Buil A, Bensimon A, Soste M, Spector TD, Dermitzakis ET, Collins BC, Malmström L, Aebersold R. *Inference and quantification of peptidoforms in large sample cohorts by SWATH-MS.* **Nat Biotechnol** 2017 Aug;35(8):781-788. [doi: 10.1038/nbt.3908.](http://dx.doi.org/10.1038/nbt.3908) Epub 2017 Jun 12.
 
-4. Rosenberger G, Bludau I, Schmitt U, Heusel M, Hunter CL, Liu Y, MacCoss MJ, MacLean BX, Nesvizhskii AI, Pedrioli PGA, Reiter L, Röst HL, Tate S, Ting YS, Collins BC, Aebersold R.
+2. Rosenberger G, Bludau I, Schmitt U, Heusel M, Hunter CL, Liu Y, MacCoss MJ, MacLean BX, Nesvizhskii AI, Pedrioli PGA, Reiter L, Röst HL, Tate S, Ting YS, Collins BC, Aebersold R.
 *Statistical control of peptide and protein error rates in large-scale targeted data-independent acquisition analyses.* **Nat Methods.** 2017 Sep;14(9):921-927. [doi: 10.1038/nmeth.4398.](http://dx.doi.org/10.1038/nmeth.4398) Epub 2017 Aug 21. 
