@@ -27,6 +27,13 @@ REM Clean previous builds
 if exist build rmdir /s /q build
 if exist dist rmdir /s /q dist
 if exist pyprophet.spec del /q pyprophet.spec
+if exist *.egg-info rmdir /s /q *.egg-info
+if exist .eggs rmdir /s /q .eggs
+
+REM Clean Python cache
+for /d /r %%d in (__pycache__) do @if exist "%%d" rmdir /s /q "%%d"
+del /s /q *.pyc 2>nul
+del /s /q *.pyo 2>nul
 
 REM Install/upgrade build dependencies
 python -m pip install --upgrade pip setuptools wheel cython numpy pyinstaller
@@ -35,38 +42,31 @@ REM Parse and install runtime dependencies from pyproject.toml
 echo Installing runtime dependencies...
 python -c "import tomllib, subprocess, sys; config = tomllib.load(open('pyproject.toml', 'rb')); deps = config['project']['dependencies']; [subprocess.check_call([sys.executable, '-m', 'pip', 'install', '--no-cache-dir', dep.strip()]) for dep in deps if dep.strip() and not dep.strip().startswith('#')]"
 
-REM Build and install pyprophet as a wheel (cleanest approach)
-echo Building and installing pyprophet package...
-python -m pip wheel --no-deps --wheel-dir %TEMP%\pyprophet_wheels .
-python -m pip install --force-reinstall --no-deps %TEMP%\pyprophet_wheels\pyprophet-*.whl
+REM Install the package in editable mode
+echo Installing pyprophet in editable mode...
+python -m pip install -e .
 
-REM Verify installation
-echo Verifying pyprophet installation...
-python -c "import pyprophet; print(f'PyProphet installed at: {pyprophet.__file__}')"
+REM Build C extensions in-place
+echo Building C extensions...
+python setup.py build_ext --inplace
 
-REM Run PyInstaller in onefile mode (single executable)
+REM Clean previous builds again
+if exist build rmdir /s /q build
+if exist dist rmdir /s /q dist
+if not exist dist mkdir dist
+
+REM Run PyInstaller in onefile mode (using --collect-all for problematic packages)
 echo Running PyInstaller (onefile mode)...
 python -m PyInstaller ^
     --clean ^
     --noconfirm ^
     --onefile ^
+    --console ^
     --name pyprophet ^
     --log-level INFO ^
     --additional-hooks-dir packaging/pyinstaller/hooks ^
-    --exclude-module sphinx ^
-    --exclude-module sphinx_rtd_theme ^
-    --exclude-module pydata_sphinx_theme ^
-    --exclude-module sphinx_copybutton ^
-    --exclude-module sphinx.ext ^
-    --exclude-module alabaster ^
-    --exclude-module babel ^
-    --exclude-module docutils ^
-    --exclude-module mypy ^
-    --exclude-module pytest ^
-    --exclude-module pytest-regtest ^
-    --exclude-module pytest-xdist ^
-    --exclude-module black ^
-    --exclude-module ruff ^
+    --hidden-import=pyprophet ^
+    --hidden-import=pyprophet.main ^
     --collect-submodules pyprophet ^
     --collect-all numpy ^
     --collect-all pandas ^
@@ -83,9 +83,6 @@ if errorlevel 1 (
     echo Build failed!
     exit /b 1
 )
-
-REM Clean up temporary wheel directory
-rmdir /s /q %TEMP%\pyprophet_wheels 2>nul
 
 REM Post-process: UPX compress the final binary
 where upx >nul 2>&1
