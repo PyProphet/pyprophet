@@ -44,12 +44,18 @@ find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 find . -type f -name "*.pyc" -delete 2>/dev/null || true
 find . -type f -name "*.pyo" -delete 2>/dev/null || true
 
-# Install/upgrade build dependencies
-$PYTHON -m pip install --upgrade pip setuptools wheel cython numpy pyinstaller
+# Create a clean virtual environment for building
+echo "Creating clean virtual environment for building..."
+VENV_DIR=$(mktemp -d)/pyprophet_build_venv
+$PYTHON -m venv "$VENV_DIR"
+source "$VENV_DIR/bin/activate"
+
+# Install build dependencies in venv
+pip install --upgrade pip setuptools wheel cython numpy pyinstaller
 
 # Parse and install runtime dependencies from pyproject.toml
 echo "Installing runtime dependencies..."
-$PYTHON << 'PYEOF'
+python << 'PYEOF'
 import tomllib
 import subprocess
 import sys
@@ -71,89 +77,26 @@ for dep in deps:
             continue
 PYEOF
 
-# Uninstall any existing pyprophet installation
-echo "Uninstalling any existing pyprophet..."
-$PYTHON -m pip uninstall -y pyprophet 2>/dev/null || true
+# Build and install pyprophet directly in the venv (no wheel intermediate step)
+echo "Building and installing pyprophet in venv..."
+pip install --no-deps -e .
 
-# Move pyprophet source directory OUT of the way completely
-echo "Temporarily hiding pyprophet source directory..."
-TEMP_BACKUP_DIR=$(mktemp -d)
-if [ -d "pyprophet" ]; then
-    mv pyprophet "${TEMP_BACKUP_DIR}/pyprophet_src"
-fi
-if [ -d "packaging" ]; then
-    mv packaging "${TEMP_BACKUP_DIR}/packaging_src"
-fi
-
-# Build pyprophet wheel in a completely isolated temp directory
-echo "Building pyprophet wheel in isolated directory..."
-WHEEL_BUILD_DIR=$(mktemp -d)
-
-# Copy ONLY the files needed for building (not the entire tree)
-cp "${ORIGINAL_DIR}/pyproject.toml" "${WHEEL_BUILD_DIR}/"
-cp "${ORIGINAL_DIR}/setup.py" "${WHEEL_BUILD_DIR}/"
-cp "${ORIGINAL_DIR}/README.md" "${WHEEL_BUILD_DIR}/" 2>/dev/null || true
-cp "${ORIGINAL_DIR}/LICENSE" "${WHEEL_BUILD_DIR}/" 2>/dev/null || true
-
-# Copy source files
-cp -r "${TEMP_BACKUP_DIR}/pyprophet_src" "${WHEEL_BUILD_DIR}/pyprophet"
-
-cd "${WHEEL_BUILD_DIR}"
-
-# Build wheel
-$PYTHON -m pip wheel --no-deps --wheel-dir /tmp/pyprophet_wheels .
-
-# Return to original directory
-cd "${ORIGINAL_DIR}"
-
-# Clean up wheel build directory
-rm -rf "${WHEEL_BUILD_DIR}"
-
-# Install pyprophet from wheel (now pyprophet source is hidden, so it MUST go to site-packages)
-echo "Installing pyprophet from wheel to site-packages..."
-$PYTHON -m pip install --no-deps --no-cache-dir /tmp/pyprophet_wheels/pyprophet-*.whl
-
-# Restore the source directories
-echo "Restoring source directories..."
-if [ -d "${TEMP_BACKUP_DIR}/pyprophet_src" ]; then
-    mv "${TEMP_BACKUP_DIR}/pyprophet_src" pyprophet
-fi
-if [ -d "${TEMP_BACKUP_DIR}/packaging_src" ]; then
-    mv "${TEMP_BACKUP_DIR}/packaging_src" packaging
-fi
-rm -rf "${TEMP_BACKUP_DIR}"
-
-# Verify installation is in site-packages, NOT source directory
+# Verify installation
 echo "Verifying pyprophet installation..."
-PYPROPHET_LOCATION=$($PYTHON -c "import pyprophet; print(pyprophet.__file__)")
+PYPROPHET_LOCATION=$(python -c "import pyprophet; print(pyprophet.__file__)")
 echo "PyProphet installed at: ${PYPROPHET_LOCATION}"
 
-# Ensure it's in site-packages
-if [[ "$PYPROPHET_LOCATION" == *"/site-packages/"* ]]; then
-    echo "✓ PyProphet correctly installed in site-packages"
-else
-    echo "✗ ERROR: PyProphet is NOT in site-packages!"
-    echo "  Location: ${PYPROPHET_LOCATION}"
-    exit 1
-fi
-
-# Get the site-packages location where pyprophet was installed
-SITE_PACKAGES=$($PYTHON -c "import pyprophet, os; print(os.path.dirname(pyprophet.__file__))")
+# Get the site-packages location
+SITE_PACKAGES=$(python -c "import pyprophet, os; print(os.path.dirname(pyprophet.__file__))")
 echo "PyProphet package location: ${SITE_PACKAGES}"
 
-# Verify numpy is installed correctly (not from source)
-echo "Verifying numpy installation..."
-NUMPY_LOCATION=$($PYTHON -c "import numpy; print(numpy.__file__)")
+# Verify numpy
+NUMPY_LOCATION=$(python -c "import numpy; print(numpy.__file__)")
 echo "NumPy installed at: ${NUMPY_LOCATION}"
-if [[ "$NUMPY_LOCATION" == *"/site-packages/"* ]]; then
-    echo "✓ NumPy correctly installed in site-packages"
-else
-    echo "✗ WARNING: NumPy may not be in site-packages!"
-fi
 
-$PYTHON -c "import pandas; print('✓ Pandas imports successfully')"
+python -c "import pandas; print('✓ Pandas imports successfully')"
 
-# Collect compiled extension binaries from the installed package
+# Collect compiled extension binaries
 ADD_BINARY_ARGS=()
 for so in "${SITE_PACKAGES}"/pyprophet/scoring/_optimized*.so; do
   if [ -f "$so" ]; then
@@ -170,20 +113,14 @@ BUILD_DIR=$(mktemp -d)
 echo "Using temporary build directory: ${BUILD_DIR}"
 cd "${BUILD_DIR}"
 
-# Copy only the necessary files (NOT the entire source tree)
+# Copy only the necessary files
 cp "${ORIGINAL_DIR}/packaging/pyinstaller/run_pyprophet.py" .
 mkdir -p hooks
 cp "${ORIGINAL_DIR}/packaging/pyinstaller/hooks"/*.py hooks/ 2>/dev/null || true
 
-# Verify we're in a clean directory with no source pollution
-echo "Build directory contents:"
-ls -la
-
-# Run PyInstaller in onefile mode
+# Run PyInstaller in onefile mode (still in venv)
 echo "Running PyInstaller (onefile mode)..."
-echo "Current directory: $(pwd)"
-
-$PYTHON -m PyInstaller \
+python -m PyInstaller \
   --clean \
   --noconfirm \
   --onefile \
@@ -224,10 +161,10 @@ mv dist/pyprophet "${ORIGINAL_DIR}/dist/pyprophet"
 # Return to original directory
 cd "${ORIGINAL_DIR}"
 
-# Clean up temporary directories
-rm -rf "${BUILD_DIR}" /tmp/pyprophet_wheels
-
-# NOTE: UPX compression is NOT applied on Linux because it breaks PyInstaller executables
+# Deactivate and clean up venv
+deactivate
+rm -rf "$(dirname "$VENV_DIR")"
+rm -rf "${BUILD_DIR}"
 
 echo "============================================"
 echo "Build complete! Single executable at: dist/pyprophet"
