@@ -36,10 +36,10 @@ Install the stable version of *pyprophet* from the PyPI:
 ### Option 2: Pre-built Executables (No Python Required)
 
 Download from [GitHub Releases](https://github.com/pyprophet/pyprophet/releases):
-- Linux: `pyprophet-linux-x86_64-deb.zip`
-- Windows: `pyprophet-windows-x86_64-installer.zip`  
-- macOS Intel: `pyprophet-macos-x86_64-dmg.zip`
-- macOS Apple Silicon: `pyprophet-macos-arm64-dmg.zip`
+- Linux: [![Ubuntu Installer](https://img.shields.io/badge/Install-Ubuntu-purple)](https://github.com/PyProphet/pyprophet/releases/download/v3.0.4/pyprophet-linux-x86_64-deb.zip)
+- Windows: [![Windows Installer](https://img.shields.io/badge/Install-Windows-blue)](https://github.com/PyProphet/pyprophet/releases/download/v3.0.4/pyprophet-windows-x86_64-installer.zip)  
+- macOS Intel: [![MacOS Intel Installer](https://img.shields.io/badge/Install-macOS_Intel-white)](https://github.com/PyProphet/pyprophet/releases/download/v3.0.4/pyprophet-macos-x86_64-dmg.zip)
+- macOS Apple Silicon: [![MacOS Apple Silicon Installer](https://img.shields.io/badge/Install-macOS_Apple_Silicon-white)](https://github.com/PyProphet/pyprophet/releases/download/v3.0.4/pyprophet-macos-arm64-dmg.zip)
 
 ### Option 3: From Source
 
