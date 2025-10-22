@@ -27,11 +27,11 @@ REM Clean previous builds
 if exist build rmdir /s /q build
 if exist dist rmdir /s /q dist
 if exist pyprophet.spec del /q pyprophet.spec
-if exist *.egg-info rmdir /s /q *.egg-info
-if exist .eggs rmdir /s /q .eggs
+if exist *.egg-info rmdir /s /q *.egg-info 2>nul
+if exist .eggs rmdir /s /q .eggs 2>nul
 
 REM Clean Python cache
-for /d /r %%d in (__pycache__) do @if exist "%%d" rmdir /s /q "%%d"
+for /d /r %%d in (__pycache__) do @if exist "%%d" rmdir /s /q "%%d" 2>nul
 del /s /q *.pyc 2>nul
 del /s /q *.pyo 2>nul
 
