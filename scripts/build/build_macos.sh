@@ -133,6 +133,7 @@ echo "Running PyInstaller..."
 python3 -m PyInstaller \
   --clean \
   --noconfirm \
+  --onefile \
   --log-level INFO \
   --collect-submodules pyprophet \
   --collect-all numpy \
