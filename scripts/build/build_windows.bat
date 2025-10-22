@@ -34,7 +34,6 @@ python -m PyInstaller ^
     --noconfirm ^
     --onefile ^
     --name pyprophet ^
-    --upx ^
     --log-level INFO ^
     --exclude-module sphinx ^
     --exclude-module sphinx_rtd_theme ^
@@ -66,6 +65,13 @@ python -m PyInstaller ^
 if errorlevel 1 (
     echo Build failed!
     exit /b 1
+)
+
+REM Post-process: UPX compress the final binary
+where upx >nul 2>&1
+if %errorlevel% equ 0 (
+    echo Post-processing: compressing with UPX...
+    upx --best --lzma dist\pyprophet.exe 2>nul || echo UPX compression skipped
 )
 
 echo ============================================

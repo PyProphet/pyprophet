@@ -83,7 +83,6 @@ $PYTHON -m PyInstaller \
   --onefile \
   --name pyprophet \
   --strip \
-  --upx \
   --log-level INFO \
   --exclude-module sphinx \
   --exclude-module sphinx_rtd_theme \
@@ -112,6 +111,12 @@ $PYTHON -m PyInstaller \
   --copy-metadata pyopenms \
   "${ADD_BINARY_ARGS[@]}" \
   packaging/pyinstaller/run_pyprophet.py
+
+# Post-process: UPX compress the final binary (PyInstaller's built-in UPX may not be aggressive enough)
+if command -v upx &> /dev/null; then
+    echo "Post-processing: compressing with UPX..."
+    upx --best --lzma dist/pyprophet 2>/dev/null || echo "UPX compression skipped (may have failed)"
+fi
 
 echo "============================================"
 echo "Build complete! Single executable at: dist/pyprophet"
