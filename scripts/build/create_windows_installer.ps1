@@ -16,11 +16,14 @@ if ($env:GITHUB_REF_NAME) {
 
 Write-Host "Installer version: $VERSION"
 
-# Verify dist directory exists
-if (-not (Test-Path "dist\pyprophet\pyprophet.exe")) {
-    Write-Error "ERROR: dist\pyprophet\pyprophet.exe not found. Build the executable first."
+# Verify single-file executable exists
+if (-not (Test-Path "dist\pyprophet.exe")) {
+    Write-Error "ERROR: dist\pyprophet.exe not found. Build the executable first."
     exit 1
 }
+
+Write-Host "Found single-file executable: dist\pyprophet.exe"
+Get-Item "dist\pyprophet.exe" | Format-Table Name, Length
 
 # Install Inno Setup if not available
 if (-not (Test-Path "C:\Program Files (x86)\Inno Setup 6\ISCC.exe")) {
@@ -59,7 +62,9 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Name: "addtopath"; Description: "Add to PATH environment variable"; GroupDescription: "System integration:"; Flags: unchecked
 
 [Files]
-Source: "dist\pyprophet\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "dist\pyprophet.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "README.md"; DestDir: "{app}"; Flags: ignoreversion; Check: FileExists('README.md')
+Source: "LICENSE"; DestDir: "{app}"; Flags: ignoreversion; Check: FileExists('LICENSE')
 
 [Icons]
 Name: "{group}\PyProphet"; Filename: "{app}\pyprophet.exe"
@@ -73,6 +78,11 @@ Filename: "{app}\pyprophet.exe"; Parameters: "--version"; Description: "Verify i
 Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Control\Session Manager\Environment"; ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{app}"; Tasks: addtopath; Check: NeedsAddPath('{app}')
 
 [Code]
+function FileExists(FileName: string): Boolean;
+begin
+  Result := FileOrDirExists(FileName);
+end;
+
 function NeedsAddPath(Param: string): boolean;
 var
   OrigPath: string;

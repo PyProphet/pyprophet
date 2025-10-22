@@ -46,11 +46,14 @@ if ! command -v fpm &> /dev/null; then
     sudo gem install --no-document fpm
 fi
 
-# Verify dist directory exists
-if [ ! -d "dist/pyprophet" ]; then
-    echo "ERROR: dist/pyprophet directory not found. Build the executable first."
+# Verify single-file executable exists
+if [ ! -f "dist/pyprophet" ]; then
+    echo "ERROR: dist/pyprophet executable not found. Build the executable first."
     exit 1
 fi
+
+echo "Found single-file executable: dist/pyprophet"
+ls -lh dist/pyprophet
 
 # Clean any previous package directory
 rm -rf package
@@ -58,33 +61,11 @@ rm -rf package
 # Create package structure
 echo "Creating package structure..."
 mkdir -p package/usr/local/bin
-mkdir -p package/usr/share/pyprophet
 mkdir -p package/usr/share/doc/pyprophet
 
-# Copy built executable and libraries
-echo "Copying executable from dist/pyprophet..."
-cp -r dist/pyprophet/* package/usr/share/pyprophet/
-
-# Ensure the main executable is present
-if [ ! -f "package/usr/share/pyprophet/pyprophet" ]; then
-    echo "ERROR: pyprophet executable not found in dist/pyprophet/"
-    ls -la dist/pyprophet/
-    exit 1
-fi
-
-# Make all executables and shared libraries have correct permissions
-echo "Setting permissions..."
-find package/usr/share/pyprophet -type f -name "*.so*" -exec chmod 755 {} \; || true
-find package/usr/share/pyprophet -type f -executable -exec chmod 755 {} \; || true
-chmod +x package/usr/share/pyprophet/pyprophet
-
-# Create wrapper script in /usr/local/bin
-echo "Creating wrapper script..."
-cat > package/usr/local/bin/pyprophet << 'EOF'
-#!/bin/bash
-# PyProphet wrapper script
-exec /usr/share/pyprophet/pyprophet "$@"
-EOF
+# Copy single-file executable
+echo "Copying pyprophet executable..."
+cp dist/pyprophet package/usr/local/bin/pyprophet
 chmod +x package/usr/local/bin/pyprophet
 
 # Copy documentation
@@ -106,20 +87,19 @@ pyprophet (${VERSION}) stable; urgency=medium
 EOF
 gzip -9 package/usr/share/doc/pyprophet/changelog
 
-# List what will be packaged (avoid broken pipe with head)
-echo "Package contents preview:"
-find package -type f 2>/dev/null | head -20 || true
-echo "..."
+# List what will be packaged
+echo "Package contents:"
+find package -type f
 
 # Count total files
 TOTAL_FILES=$(find package -type f 2>/dev/null | wc -l)
 echo "Total files to package: ${TOTAL_FILES}"
 
 # Determine system dependencies
-# PyInstaller bundles most things, but we still need basic system libraries
+# Single-file PyInstaller executable is mostly self-contained
 DEPS="libc6 (>= 2.34)"
 
-# Create DEB package with explicit dependencies
+# Create DEB package
 echo "Creating DEB package..."
 fpm -s dir -t deb \
   -n pyprophet \
@@ -141,7 +121,7 @@ fpm -s dir -t deb \
 
 DEB_FILE=$(ls pyprophet_*.deb)
 
-# Create RPM package with explicit dependencies
+# Create RPM package
 echo "Creating RPM package..."
 fpm -s dir -t rpm \
   -n pyprophet \
@@ -162,10 +142,10 @@ RPM_FILE=$(ls pyprophet-*.rpm)
 # Verify DEB package
 echo "Verifying DEB package..."
 echo "Package info:"
-dpkg --info "${DEB_FILE}" 2>/dev/null | head -20 || true
+dpkg --info "${DEB_FILE}"
 echo ""
-echo "First few files:"
-dpkg --contents "${DEB_FILE}" 2>/dev/null | head -10 || true
+echo "Package contents:"
+dpkg --contents "${DEB_FILE}"
 
 # Generate checksums
 echo "Generating checksums..."

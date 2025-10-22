@@ -19,32 +19,27 @@ ARCH=$(uname -m)
 echo "Version: ${VERSION}"
 echo "Architecture: ${ARCH}"
 
-# Verify dist directory exists
-if [ ! -f "dist/pyprophet/pyprophet" ]; then
-    echo "ERROR: dist/pyprophet/pyprophet not found. Build the executable first."
+# Verify single-file executable exists
+if [ ! -f "dist/pyprophet" ]; then
+    echo "ERROR: dist/pyprophet not found. Build the executable first."
     exit 1
 fi
 
+echo "Found single-file executable: dist/pyprophet"
+ls -lh dist/pyprophet
+
 # Create a simple directory structure for DMG
-# Don't wrap in .app bundle - PyInstaller executables work better as-is
 echo "Preparing DMG contents..."
 DMG_TEMP="dmg-temp"
 rm -rf "${DMG_TEMP}"
 mkdir -p "${DMG_TEMP}/PyProphet"
 
-# Copy the entire pyprophet directory (contains executable and all dependencies)
-echo "Copying PyProphet executable and dependencies..."
-cp -r dist/pyprophet/* "${DMG_TEMP}/PyProphet/"
-
-# Ensure main executable is present and executable
-if [ ! -f "${DMG_TEMP}/PyProphet/pyprophet" ]; then
-    echo "ERROR: pyprophet executable not found in dist/pyprophet/"
-    exit 1
-fi
-
+# Copy the single-file executable
+echo "Copying PyProphet executable..."
+cp dist/pyprophet "${DMG_TEMP}/PyProphet/pyprophet"
 chmod +x "${DMG_TEMP}/PyProphet/pyprophet"
 
-# Create a wrapper script for easy command-line access
+# Create a wrapper script for convenience
 cat > "${DMG_TEMP}/PyProphet/pyprophet.sh" << 'EOF'
 #!/bin/bash
 # PyProphet launcher script
@@ -67,6 +62,9 @@ Installation:
 Usage:
 - Run from Applications: /Applications/PyProphet/pyprophet --help
 - Or if added to PATH: pyprophet --help
+
+Note: On first run, macOS may show a security warning.
+Right-click the pyprophet file and select "Open" to allow it.
 
 For more information:
 https://github.com/pyprophet/pyprophet
