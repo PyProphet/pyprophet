@@ -101,7 +101,6 @@ python3 -m PyInstaller \
   --exclude-module pytest-xdist \
   --exclude-module black \
   --exclude-module ruff \
-  --exclude-module tomli \
   --collect-submodules pyprophet \
   --collect-all numpy \
   --collect-all pandas \
