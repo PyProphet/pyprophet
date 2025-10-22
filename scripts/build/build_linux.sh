@@ -83,13 +83,35 @@ $PYTHON -m pip wheel --no-deps --wheel-dir /tmp/pyprophet_wheels .
 cd "${ORIGINAL_DIR}"
 rm -rf "${WHEEL_BUILD_DIR}"
 
-# Install pyprophet from wheel
-echo "Installing pyprophet from wheel..."
+# CRITICAL: Remove pyprophet source directory to prevent pip from finding it
+# and installing in editable mode
+echo "Temporarily moving pyprophet source directory..."
+if [ -d "pyprophet" ]; then
+    mv pyprophet pyprophet.bak
+fi
+
+# Install pyprophet from wheel (this will now go to site-packages)
+echo "Installing pyprophet from wheel to site-packages..."
 $PYTHON -m pip install --force-reinstall --no-deps /tmp/pyprophet_wheels/pyprophet-*.whl
 
-# Verify installation
+# Restore the source directory (we'll need hooks and run_pyprophet.py later)
+if [ -d "pyprophet.bak" ]; then
+    mv pyprophet.bak pyprophet
+fi
+
+# Verify installation is in site-packages, NOT source directory
 echo "Verifying pyprophet installation..."
-$PYTHON -c "import pyprophet; print(f'PyProphet installed at: {pyprophet.__file__}')"
+PYPROPHET_LOCATION=$($PYTHON -c "import pyprophet; print(pyprophet.__file__)")
+echo "PyProphet installed at: ${PYPROPHET_LOCATION}"
+
+# Ensure it's in site-packages
+if [[ "$PYPROPHET_LOCATION" == *"/site-packages/"* ]]; then
+    echo "✓ PyProphet correctly installed in site-packages"
+else
+    echo "✗ ERROR: PyProphet is NOT in site-packages!"
+    echo "  Location: ${PYPROPHET_LOCATION}"
+    exit 1
+fi
 
 # Get the site-packages location where pyprophet was installed
 SITE_PACKAGES=$($PYTHON -c "import pyprophet, os; print(os.path.dirname(pyprophet.__file__))")
@@ -97,7 +119,15 @@ echo "PyProphet package location: ${SITE_PACKAGES}"
 
 # Verify numpy is installed correctly (not from source)
 echo "Verifying numpy installation..."
-$PYTHON -c "import numpy; print(f'NumPy installed at: {numpy.__file__}'); import pandas; print('Pandas imports successfully')"
+NUMPY_LOCATION=$($PYTHON -c "import numpy; print(numpy.__file__)")
+echo "NumPy installed at: ${NUMPY_LOCATION}"
+if [[ "$NUMPY_LOCATION" == *"/site-packages/"* ]]; then
+    echo "✓ NumPy correctly installed in site-packages"
+else
+    echo "✗ WARNING: NumPy may not be in site-packages!"
+fi
+
+$PYTHON -c "import pandas; print('Pandas imports successfully')"
 
 # Collect compiled extension binaries from the installed package
 ADD_BINARY_ARGS=()
@@ -128,8 +158,6 @@ ls -la
 # Run PyInstaller in onefile mode
 echo "Running PyInstaller (onefile mode)..."
 echo "Current directory: $(pwd)"
-echo "Python sys.path will be:"
-$PYTHON -c "import sys; import pprint; pprint.pprint(sys.path)"
 
 $PYTHON -m PyInstaller \
   --clean \
