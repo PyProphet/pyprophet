@@ -58,24 +58,29 @@ for dep in deps:
             continue
 PYEOF
 
-# Build C extensions in-place
-echo "Building C extensions..."
-$PYTHON setup.py build_ext --inplace
+# Build and install pyprophet as a wheel (cleanest approach)
+echo "Building and installing pyprophet package..."
+$PYTHON -m pip wheel --no-deps --wheel-dir /tmp/pyprophet_wheels .
+$PYTHON -m pip install --force-reinstall --no-deps /tmp/pyprophet_wheels/pyprophet-*.whl
 
-# Install pyprophet as a regular package (not editable) to avoid import conflicts
-echo "Installing pyprophet package..."
-$PYTHON -m pip install --no-deps .
+# Verify installation
+echo "Verifying pyprophet installation..."
+$PYTHON -c "import pyprophet; print(f'PyProphet installed at: {pyprophet.__file__}')"
 
-# Collect compiled extension binaries for pyprophet/scoring
+# Get the site-packages location where pyprophet was installed
+SITE_PACKAGES=$($PYTHON -c "import pyprophet, os; print(os.path.dirname(pyprophet.__file__))")
+echo "PyProphet package location: ${SITE_PACKAGES}"
+
+# Collect compiled extension binaries from the installed package
 ADD_BINARY_ARGS=()
-for so in pyprophet/scoring/_optimized*.so pyprophet/scoring/_optimized*.cpython-*.so; do
+for so in "${SITE_PACKAGES}"/pyprophet/scoring/_optimized*.so; do
   if [ -f "$so" ]; then
     ADD_BINARY_ARGS+=(--add-binary "$so:pyprophet/scoring")
     echo "Adding binary: $so"
   fi
 done
 
-# Clean previous builds
+# Clean previous PyInstaller builds
 rm -rf build dist pyprophet.spec
 
 # Run PyInstaller in onefile mode (single executable)
@@ -114,6 +119,9 @@ $PYTHON -m PyInstaller \
   --copy-metadata pyopenms \
   "${ADD_BINARY_ARGS[@]}" \
   packaging/pyinstaller/run_pyprophet.py
+
+# Clean up temporary wheel directory
+rm -rf /tmp/pyprophet_wheels
 
 # NOTE: UPX compression is NOT applied on Linux because it breaks PyInstaller executables
 

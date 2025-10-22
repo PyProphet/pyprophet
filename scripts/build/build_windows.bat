@@ -35,13 +35,14 @@ REM Parse and install runtime dependencies from pyproject.toml
 echo Installing runtime dependencies...
 python -c "import tomllib, subprocess, sys; config = tomllib.load(open('pyproject.toml', 'rb')); deps = config['project']['dependencies']; [subprocess.check_call([sys.executable, '-m', 'pip', 'install', '--no-cache-dir', dep.strip()]) for dep in deps if dep.strip() and not dep.strip().startswith('#')]"
 
-REM Build Cython extensions in-place
-echo Building C extensions...
-python setup.py build_ext --inplace
+REM Build and install pyprophet as a wheel (cleanest approach)
+echo Building and installing pyprophet package...
+python -m pip wheel --no-deps --wheel-dir %TEMP%\pyprophet_wheels .
+python -m pip install --force-reinstall --no-deps %TEMP%\pyprophet_wheels\pyprophet-*.whl
 
-REM Install pyprophet as a regular package (not editable) to avoid import conflicts
-echo Installing pyprophet package...
-python -m pip install --no-deps .
+REM Verify installation
+echo Verifying pyprophet installation...
+python -c "import pyprophet; print(f'PyProphet installed at: {pyprophet.__file__}')"
 
 REM Run PyInstaller in onefile mode (single executable)
 echo Running PyInstaller (onefile mode)...
@@ -82,6 +83,9 @@ if errorlevel 1 (
     echo Build failed!
     exit /b 1
 )
+
+REM Clean up temporary wheel directory
+rmdir /s /q %TEMP%\pyprophet_wheels 2>nul
 
 REM Post-process: UPX compress the final binary
 where upx >nul 2>&1
