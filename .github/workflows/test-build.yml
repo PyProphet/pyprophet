@@ -70,60 +70,60 @@ jobs:
         if: runner.os != 'Windows'
         run: |
           echo "Testing --help and --version..."
-          dist/pyprophet/pyprophet --help
-          dist/pyprophet/pyprophet --version
+          dist/pyprophet --help
+          dist/pyprophet --version
 
       - name: Test basic commands (Windows)
         if: runner.os == 'Windows'
         run: |
           echo "Testing --help and --version..."
-          dist\pyprophet\pyprophet.exe --help
-          dist\pyprophet\pyprophet.exe --version
+          dist\pyprophet.exe --help
+          dist\pyprophet.exe --version
 
       - name: Test score commands (Linux/macOS)
         if: runner.os != 'Windows'
         run: |
           echo "Testing score at ms1ms2 level..."
-          dist/pyprophet/pyprophet score --in tests/data/test_data.osw --level ms1ms2 --pi0_lambda 0 0 0
+          dist/pyprophet score --in tests/data/test_data.osw --level ms1ms2 --pi0_lambda 0 0 0
           
           echo "Testing score at transition level..."
-          dist/pyprophet/pyprophet score --in tests/data/test_data.osw --level transition --pi0_lambda 0 0 0
+          dist/pyprophet score --in tests/data/test_data.osw --level transition --pi0_lambda 0 0 0
 
       - name: Test score commands (Windows)
         if: runner.os == 'Windows'
         run: |
           echo "Testing score at ms1ms2 level..."
-          dist\pyprophet\pyprophet.exe score --in tests/data/test_data.osw --level ms1ms2 --pi0_lambda 0 0 0
+          dist\pyprophet.exe score --in tests/data/test_data.osw --level ms1ms2 --pi0_lambda 0 0 0
           
           echo "Testing score at transition level..."
-          dist\pyprophet\pyprophet.exe score --in tests/data/test_data.osw --level transition --pi0_lambda 0 0 0
+          dist\pyprophet.exe score --in tests/data/test_data.osw --level transition --pi0_lambda 0 0 0
 
       - name: Test infer commands (Linux/macOS)
         if: runner.os != 'Windows'
         run: |
           echo "Testing infer peptide..."
-          dist/pyprophet/pyprophet infer peptide --in tests/data/test_data.osw --context global
+          dist/pyprophet infer peptide --in tests/data/test_data.osw --context global
           
           echo "Testing infer peptidoform..."
-          dist/pyprophet/pyprophet infer peptidoform --in tests/data/test_data.osw --no-ipf_ms1_scoring
+          dist/pyprophet infer peptidoform --in tests/data/test_data.osw --no-ipf_ms1_scoring
 
       - name: Test infer commands (Windows)
         if: runner.os == 'Windows'
         run: |
           echo "Testing infer peptide..."
-          dist\pyprophet\pyprophet.exe infer peptide --in tests/data/test_data.osw --context global
+          dist\pyprophet.exe infer peptide --in tests/data/test_data.osw --context global
           
           echo "Testing infer peptidoform..."
-          dist\pyprophet\pyprophet.exe infer peptidoform --in tests/data/test_data.osw --no-ipf_ms1_scoring
+          dist\pyprophet.exe infer peptidoform --in tests/data/test_data.osw --no-ipf_ms1_scoring
 
       - name: Test export commands (Linux/macOS)
         if: runner.os != 'Windows'
         run: |
           echo "Testing export score-report..."
-          dist/pyprophet/pyprophet export score-report --in tests/data/test_data.osw
+          dist/pyprophet export score-report --in tests/data/test_data.osw
           
           echo "Testing export tsv..."
-          dist/pyprophet/pyprophet export tsv --in tests/data/test_data.osw --out test_data.tsv
+          dist/pyprophet export tsv --in tests/data/test_data.osw --out test_data.tsv
           
           # Verify output file was created
           if [ ! -f test_data.tsv ]; then
@@ -136,10 +136,10 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           echo "Testing export score-report..."
-          dist\pyprophet\pyprophet.exe export score-report --in tests/data/test_data.osw
+          dist\pyprophet.exe export score-report --in tests/data/test_data.osw
           
           echo "Testing export tsv..."
-          dist\pyprophet\pyprophet.exe export tsv --in tests/data/test_data.osw --out test_data.tsv
+          dist\pyprophet.exe export tsv --in tests/data/test_data.osw --out test_data.tsv
           
           # Verify output file was created
           if (-not (Test-Path test_data.tsv)) {
