@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# filepath: /workspaces/pyprophet/scripts/build/build_linux.sh
 # Build script for PyProphet Linux executable using PyInstaller
 
 set -euo pipefail
@@ -80,8 +81,14 @@ for so in "${SITE_PACKAGES}"/pyprophet/scoring/_optimized*.so; do
   fi
 done
 
-# Clean previous PyInstaller builds
+# Save the original directory
+ORIGINAL_DIR="$(pwd)"
+
+# Clean previous PyInstaller builds in original directory
 rm -rf build dist pyprophet.spec
+
+# Create dist directory in original location
+mkdir -p "${ORIGINAL_DIR}/dist"
 
 # Change to a temporary directory to avoid picking up source files
 # This ensures PyInstaller only sees installed packages
@@ -90,8 +97,8 @@ echo "Using temporary build directory: ${BUILD_DIR}"
 cd "${BUILD_DIR}"
 
 # Copy only the necessary files
-cp "${OLDPWD}/packaging/pyinstaller/run_pyprophet.py" .
-cp -r "${OLDPWD}/packaging/pyinstaller/hooks" .
+cp "${ORIGINAL_DIR}/packaging/pyinstaller/run_pyprophet.py" .
+cp -r "${ORIGINAL_DIR}/packaging/pyinstaller/hooks" .
 
 # Run PyInstaller in onefile mode (single executable)
 echo "Running PyInstaller (onefile mode)..."
@@ -131,10 +138,11 @@ $PYTHON -m PyInstaller \
   run_pyprophet.py
 
 # Move the built executable back to the original directory
-mv dist/pyprophet "${OLDPWD}/dist/"
+echo "Moving executable to ${ORIGINAL_DIR}/dist/"
+mv dist/pyprophet "${ORIGINAL_DIR}/dist/pyprophet"
 
 # Return to original directory
-cd "${OLDPWD}"
+cd "${ORIGINAL_DIR}"
 
 # Clean up temporary build directory and wheel directory
 rm -rf "${BUILD_DIR}" /tmp/pyprophet_wheels
