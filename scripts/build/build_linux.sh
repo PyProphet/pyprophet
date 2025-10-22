@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# filepath: /workspaces/pyprophet/scripts/build/build_linux.sh
 # Build script for PyProphet Linux executable using PyInstaller
 
 set -euo pipefail
@@ -17,17 +16,10 @@ echo "Using Python version: $PYTHON_VERSION"
 if [[ $(echo "$PYTHON_VERSION < 3.11" | bc -l) -eq 1 ]]; then
     echo "ERROR: Python 3.11+ is required for building."
     echo "Your Python version: $PYTHON_VERSION"
-    echo ""
-    echo "Please install Python 3.11 or later:"
-    echo "  sudo apt update"
-    echo "  sudo apt install python3.11 python3.11-venv python3.11-dev"
-    echo ""
-    echo "Then run the build with:"
-    echo "  PYTHON=python3.11 bash scripts/build/build_linux.sh"
     exit 1
 fi
 
-# Install system tools for stripping
+# Install system tools
 echo "Installing build tools..."
 sudo apt-get update -qq
 sudo apt-get install -y binutils
@@ -35,32 +27,19 @@ sudo apt-get install -y binutils
 # Save the original directory
 ORIGINAL_DIR="$(pwd)"
 
-# Clean ALL build artifacts
+# Clean build artifacts
 echo "Cleaning build artifacts..."
 rm -rf build dist pyprophet.spec *.egg-info .eggs
 find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 find . -type f -name "*.pyc" -delete 2>/dev/null || true
 find . -type f -name "*.pyo" -delete 2>/dev/null || true
 
-# Create a clean virtual environment
-echo "Creating clean virtual environment..."
-VENV_DIR=$(mktemp -d)/build_venv
-$PYTHON -m venv "$VENV_DIR"
-source "$VENV_DIR/bin/activate"
-
-# Upgrade pip and install build tools
-pip install --upgrade pip setuptools wheel build
-
-# Build wheel
-echo "Building pyprophet wheel..."
-python -m build --wheel --outdir /tmp/pyprophet_wheels
-
-# Install dependencies
-echo "Installing dependencies..."
-pip install cython numpy pyinstaller
+# Install/upgrade build dependencies
+$PYTHON -m pip install --upgrade pip setuptools wheel cython numpy pyinstaller
 
 # Parse and install runtime dependencies
-python << 'PYEOF'
+echo "Installing runtime dependencies..."
+$PYTHON << 'PYEOF'
 import tomllib
 import subprocess
 import sys
@@ -74,106 +53,96 @@ for dep in config['project']['dependencies']:
         try:
             print(f"Installing: {dep}")
             subprocess.check_call([sys.executable, '-m', 'pip', 'install', '--no-cache-dir', dep])
-        except subprocess.CalledProcessError:
-            pass
+        except subprocess.CalledProcessError as e:
+            print(f"Warning: Failed to install {dep}: {e}")
 PYEOF
 
-# Install pyprophet from wheel (NOT editable)
-echo "Installing pyprophet from wheel..."
-pip install --force-reinstall --no-deps /tmp/pyprophet_wheels/pyprophet-*.whl
+# Install the package in editable mode
+echo "Installing pyprophet in editable mode..."
+$PYTHON -m pip install -e .
 
-# Verify installation
-echo "Verifying installation..."
-python -c "import pyprophet; print(f'PyProphet: {pyprophet.__file__}')"
-python -c "import numpy; print(f'NumPy: {numpy.__file__}')"
-python -c "import pandas; print('✓ All imports successful')"
+# Build C extensions in-place
+echo "Building C extensions..."
+$PYTHON setup.py build_ext --inplace
 
-# Get site-packages
-SITE_PACKAGES=$(python -c "import pyprophet, os; print(os.path.dirname(pyprophet.__file__))")
-echo "Site-packages: ${SITE_PACKAGES}"
-
-# Collect binaries
+# Collect compiled extension binaries
 ADD_BINARY_ARGS=()
-for so in "${SITE_PACKAGES}"/pyprophet/scoring/_optimized*.so; do
+for so in pyprophet/scoring/_optimized*.so pyprophet/scoring/_optimized*.cpython-*.so; do
   if [ -f "$so" ]; then
     ADD_BINARY_ARGS+=(--add-binary "$so:pyprophet/scoring")
-    echo "Found binary: $so"
+    echo "Adding binary: $so"
   fi
 done
 
-# Create build directory
-mkdir -p "${ORIGINAL_DIR}/dist"
-BUILD_DIR=$(mktemp -d)
-cd "${BUILD_DIR}"
+# Locate xgboost native library
+SO_PATH=$($PYTHON - <<'PY'
+import importlib, os
+try:
+    m = importlib.import_module("xgboost")
+    p = os.path.join(os.path.dirname(m.__file__), "lib", "libxgboost.so")
+    print(p if os.path.exists(p) else "")
+except Exception:
+    print("")
+PY
+)
+if [ -n "$SO_PATH" ]; then
+  echo "Including xgboost native lib: $SO_PATH"
+  ADD_BINARY_ARGS+=(--add-binary "$SO_PATH:xgboost/lib")
+fi
 
-# Copy PyInstaller files
-cp "${ORIGINAL_DIR}/packaging/pyinstaller/run_pyprophet.py" .
-mkdir -p hooks
-cp "${ORIGINAL_DIR}/packaging/pyinstaller/hooks"/*.py hooks/ 2>/dev/null || true
+# Clean previous builds
+rm -rf build dist
+mkdir -p dist
 
-# Run PyInstaller
-echo "Running PyInstaller..."
-python -m PyInstaller \
+# Run PyInstaller with --onefile (using --collect-all for problematic packages)
+echo "Running PyInstaller (onefile mode)..."
+$PYTHON -m PyInstaller \
+  --name pyprophet \
+  --onefile \
+  --console \
   --clean \
   --noconfirm \
-  --onefile \
-  --name pyprophet \
-  --strip \
   --log-level INFO \
-  --additional-hooks-dir hooks \
-  --exclude-module sphinx \
-  --exclude-module sphinx_rtd_theme \
-  --exclude-module pydata_sphinx_theme \
-  --exclude-module sphinx_copybutton \
-  --exclude-module sphinx.ext \
-  --exclude-module alabaster \
-  --exclude-module babel \
-  --exclude-module docutils \
-  --exclude-module mypy \
-  --exclude-module pytest \
-  --exclude-module pytest-regtest \
-  --exclude-module pytest-xdist \
-  --exclude-module black \
-  --exclude-module ruff \
+  --additional-hooks-dir packaging/pyinstaller/hooks \
+  --hidden-import=pyprophet \
+  --hidden-import=pyprophet.main \
   --collect-submodules pyprophet \
-  --copy-metadata numpy \
-  --copy-metadata pandas \
-  --copy-metadata scipy \
-  --copy-metadata scikit-learn \
-  --copy-metadata pyopenms \
+  --collect-all numpy \
+  --collect-all pandas \
+  --collect-all scipy \
+  --collect-all sklearn \
+  --collect-all pyopenms \
   --copy-metadata duckdb \
   --copy-metadata duckdb-extensions \
   --copy-metadata duckdb-extension-sqlite-scanner \
+  --copy-metadata pyopenms \
   "${ADD_BINARY_ARGS[@]}" \
-  run_pyprophet.py
-
-# Move executable
-mv dist/pyprophet "${ORIGINAL_DIR}/dist/pyprophet"
-cd "${ORIGINAL_DIR}"
-
-# Cleanup
-deactivate
-rm -rf "$(dirname "$VENV_DIR")" "${BUILD_DIR}" /tmp/pyprophet_wheels
+  packaging/pyinstaller/run_pyprophet.py
 
 echo "============================================"
-echo "Build complete! Single executable at: dist/pyprophet"
+echo "Build complete! Executable at: dist/pyprophet"
 ls -lh dist/pyprophet
 echo "============================================"
 
-# Create archive
+# Create compressed archive for distribution
+echo "Creating distribution archive..."
 cd dist
 ARCH=$(uname -m)
 ARCHIVE_NAME="pyprophet-linux-${ARCH}.tar.gz"
 tar -czf "../${ARCHIVE_NAME}" pyprophet
 cd ..
 
+echo "============================================"
 echo "Archive created: ${ARCHIVE_NAME}"
+echo "============================================"
 
-# Generate checksum
+# Generate SHA256 checksum
 if command -v sha256sum &> /dev/null; then
     sha256sum "${ARCHIVE_NAME}" > "${ARCHIVE_NAME}.sha256"
+    echo "Checksum: ${ARCHIVE_NAME}.sha256"
     cat "${ARCHIVE_NAME}.sha256"
 fi
 
 echo ""
-echo "Test with: ./dist/pyprophet --help"
+echo "To test locally:"
+echo "  ./dist/pyprophet --help"
