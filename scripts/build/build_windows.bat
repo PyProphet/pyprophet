@@ -5,6 +5,20 @@ echo ============================================
 echo Building PyProphet for Windows
 echo ============================================
 
+REM Check Python version
+for /f "tokens=*" %%i in ('python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"') do set PYTHON_VERSION=%%i
+echo Using Python version: %PYTHON_VERSION%
+
+REM Check if version is 3.11 or higher
+python -c "import sys; exit(0 if sys.version_info >= (3, 11) else 1)"
+if errorlevel 1 (
+    echo ERROR: Python 3.11+ is required for building.
+    echo Your Python version: %PYTHON_VERSION%
+    echo.
+    echo Please install Python 3.11 or later from https://www.python.org/downloads/
+    exit /b 1
+)
+
 REM Install UPX for compression
 echo Installing UPX...
 choco install upx -y >nul 2>&1 || echo UPX install skipped (may already be installed)
@@ -35,6 +49,7 @@ python -m PyInstaller ^
     --onefile ^
     --name pyprophet ^
     --log-level INFO ^
+    --additional-hooks-dir packaging/pyinstaller/hooks ^
     --exclude-module sphinx ^
     --exclude-module sphinx_rtd_theme ^
     --exclude-module pydata_sphinx_theme ^

@@ -9,10 +9,27 @@ echo "============================================"
 echo "Building PyProphet for Linux"
 echo "============================================"
 
-# Install system tools for stripping and compression
-echo "Installing build tools (strip, upx)..."
+# Check Python version
+PYTHON_VERSION=$($PYTHON -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+echo "Using Python version: $PYTHON_VERSION"
+
+if [[ $(echo "$PYTHON_VERSION < 3.11" | bc -l) -eq 1 ]]; then
+    echo "ERROR: Python 3.11+ is required for building."
+    echo "Your Python version: $PYTHON_VERSION"
+    echo ""
+    echo "Please install Python 3.11 or later:"
+    echo "  sudo apt update"
+    echo "  sudo apt install python3.11 python3.11-venv python3.11-dev"
+    echo ""
+    echo "Then run the build with:"
+    echo "  PYTHON=python3.11 bash scripts/build/build_linux.sh"
+    exit 1
+fi
+
+# Install system tools for stripping (skip upx - it breaks PyInstaller on Linux)
+echo "Installing build tools..."
 sudo apt-get update -qq
-sudo apt-get install -y binutils upx
+sudo apt-get install -y binutils
 
 # Install/upgrade build dependencies
 $PYTHON -m pip install --upgrade pip setuptools wheel cython numpy pyinstaller
@@ -56,22 +73,6 @@ for so in pyprophet/scoring/_optimized*.so pyprophet/scoring/_optimized*.cpython
   fi
 done
 
-# Locate xgboost native library
-SO_PATH=$($PYTHON - <<'PY'
-import importlib, os
-try:
-    m = importlib.import_module("xgboost")
-    p = os.path.join(os.path.dirname(m.__file__), "lib", "libxgboost.so")
-    print(p if os.path.exists(p) else "")
-except Exception:
-    print("")
-PY
-)
-if [ -n "$SO_PATH" ]; then
-  echo "Including xgboost native lib: $SO_PATH"
-  ADD_BINARY_ARGS+=(--add-binary "$SO_PATH:xgboost/lib")
-fi
-
 # Clean previous builds
 rm -rf build dist pyprophet.spec
 
@@ -84,6 +85,7 @@ $PYTHON -m PyInstaller \
   --name pyprophet \
   --strip \
   --log-level INFO \
+  --additional-hooks-dir packaging/pyinstaller/hooks \
   --exclude-module sphinx \
   --exclude-module sphinx_rtd_theme \
   --exclude-module pydata_sphinx_theme \
@@ -111,11 +113,7 @@ $PYTHON -m PyInstaller \
   "${ADD_BINARY_ARGS[@]}" \
   packaging/pyinstaller/run_pyprophet.py
 
-# Post-process: UPX compress the final binary (PyInstaller's built-in UPX may not be aggressive enough)
-if command -v upx &> /dev/null; then
-    echo "Post-processing: compressing with UPX..."
-    upx --best --lzma dist/pyprophet 2>/dev/null || echo "UPX compression skipped (may have failed)"
-fi
+# NOTE: UPX compression is NOT applied on Linux because it breaks PyInstaller executables
 
 echo "============================================"
 echo "Build complete! Single executable at: dist/pyprophet"

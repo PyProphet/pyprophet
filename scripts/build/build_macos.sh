@@ -7,14 +7,18 @@ echo "============================================"
 echo "Building PyProphet for macOS"
 echo "============================================"
 
-# Install UPX for compression (strip is built-in on macOS)
-echo "Installing UPX..."
-if ! command -v upx &> /dev/null; then
-    if command -v brew &> /dev/null; then
-        brew install upx
-    else
-        echo "Warning: UPX not found and Homebrew not available. Skipping UPX compression."
-    fi
+# Check Python version
+PYTHON_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+echo "Using Python version: $PYTHON_VERSION"
+
+REQUIRED_VERSION="3.11"
+if [ "$(printf '%s\n' "$REQUIRED_VERSION" "$PYTHON_VERSION" | sort -V | head -n1)" != "$REQUIRED_VERSION" ]; then
+    echo "ERROR: Python 3.11+ is required for building."
+    echo "Your Python version: $PYTHON_VERSION"
+    echo ""
+    echo "Please install Python 3.11 or later using Homebrew:"
+    echo "  brew install python@3.11"
+    exit 1
 fi
 
 # Install/upgrade build dependencies
@@ -59,22 +63,6 @@ for so in pyprophet/scoring/_optimized*.so pyprophet/scoring/_optimized*.dylib; 
   fi
 done
 
-# Locate xgboost native library (macOS uses .dylib)
-DYLIB_PATH=$(python3 - <<'PY'
-import importlib, os
-try:
-    m = importlib.import_module("xgboost")
-    p = os.path.join(os.path.dirname(m.__file__), "lib", "libxgboost.dylib")
-    print(p if os.path.exists(p) else "")
-except Exception:
-    print("")
-PY
-)
-if [ -n "$DYLIB_PATH" ]; then
-  echo "Including xgboost native lib: $DYLIB_PATH"
-  ADD_BINARY_ARGS+=(--add-binary "$DYLIB_PATH:xgboost/lib")
-fi
-
 # Clean previous builds
 rm -rf build dist pyprophet.spec
 
@@ -87,6 +75,7 @@ python3 -m PyInstaller \
   --name pyprophet \
   --strip \
   --log-level INFO \
+  --additional-hooks-dir packaging/pyinstaller/hooks \
   --exclude-module sphinx \
   --exclude-module sphinx_rtd_theme \
   --exclude-module pydata_sphinx_theme \
@@ -113,12 +102,6 @@ python3 -m PyInstaller \
   --copy-metadata pyopenms \
   "${ADD_BINARY_ARGS[@]}" \
   packaging/pyinstaller/run_pyprophet.py
-
-# Post-process: UPX compress the final binary
-if command -v upx &> /dev/null; then
-    echo "Post-processing: compressing with UPX..."
-    upx --best --lzma dist/pyprophet 2>/dev/null || echo "UPX compression skipped (may have failed)"
-fi
 
 echo "============================================"
 echo "Build complete! Single executable at: dist/pyprophet"
