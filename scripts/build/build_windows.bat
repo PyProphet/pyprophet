@@ -20,7 +20,9 @@ python -m pip install --upgrade pip setuptools wheel cython numpy pyinstaller
 REM Install ONLY runtime dependencies (no dev/docs/testing extras)
 echo Installing runtime dependencies only...
 python -m pip install -e . --no-deps
-for /f "delims=" %%i in ('python -c "import tomllib; deps=tomllib.load(open('pyproject.toml','rb'))['project']['dependencies']; print(' '.join(deps))"') do python -m pip install --no-cache-dir %%i
+
+REM Parse and install runtime dependencies from pyproject.toml
+python -c "import tomllib, subprocess, sys; config = tomllib.load(open('pyproject.toml', 'rb')); deps = config['project']['dependencies']; [subprocess.check_call([sys.executable, '-m', 'pip', 'install', '--no-cache-dir', dep.strip()]) for dep in deps if dep.strip() and not dep.strip().startswith('#')]"
 
 REM Build Cython extensions in-place
 python setup.py build_ext --inplace

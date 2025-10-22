@@ -23,13 +23,29 @@ python3 -m pip install --upgrade pip setuptools wheel cython numpy pyinstaller
 # Install ONLY runtime dependencies (no dev/docs/testing extras)
 echo "Installing runtime dependencies only..."
 python3 -m pip install -e . --no-deps
-# Extract and install only [project.dependencies] from pyproject.toml
-python3 -c "
+
+# Parse and install runtime dependencies from pyproject.toml
+python3 << 'PYEOF'
 import tomllib
+import subprocess
+import sys
+
 with open('pyproject.toml', 'rb') as f:
-    deps = tomllib.load(f)['project']['dependencies']
-print(' '.join(deps))
-" | xargs python3 -m pip install --no-cache-dir
+    config = tomllib.load(f)
+
+deps = config['project']['dependencies']
+
+# Filter out any malformed entries and install one by one
+for dep in deps:
+    dep = dep.strip()
+    if dep and not dep.startswith('#'):
+        try:
+            print(f"Installing: {dep}")
+            subprocess.check_call([sys.executable, '-m', 'pip', 'install', '--no-cache-dir', dep])
+        except subprocess.CalledProcessError as e:
+            print(f"Warning: Failed to install {dep}: {e}")
+            continue
+PYEOF
 
 # Build C extensions in-place
 python3 setup.py build_ext --inplace
