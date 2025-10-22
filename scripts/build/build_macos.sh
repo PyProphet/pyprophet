@@ -52,6 +52,10 @@ PYEOF
 echo "Building C extensions..."
 python3 setup.py build_ext --inplace
 
+# Install pyprophet as a regular package (not editable) to avoid import conflicts
+echo "Installing pyprophet package..."
+python3 -m pip install --no-deps .
+
 # Collect compiled extension binaries for pyprophet/scoring
 ADD_BINARY_ARGS=()
 for so in pyprophet/scoring/_optimized*.so pyprophet/scoring/_optimized*.dylib; do
@@ -64,28 +68,6 @@ done
 # Clean previous builds
 rm -rf build dist pyprophet.spec
 
-# Create a minimal entry point script that imports from the package
-cat > build_entry.py << 'EOF'
-#!/usr/bin/env python3
-"""
-PyProphet build entry point for PyInstaller.
-This script imports pyprophet as an installed package to avoid path conflicts.
-"""
-import sys
-import os
-
-# Ensure we don't import from the source directory
-source_dir = os.path.dirname(os.path.abspath(__file__))
-if source_dir in sys.path:
-    sys.path.remove(source_dir)
-
-# Import and run pyprophet main
-from pyprophet.main import cli
-
-if __name__ == '__main__':
-    cli()
-EOF
-
 # Run PyInstaller in onefile mode (single executable)
 echo "Running PyInstaller (onefile mode)..."
 python3 -m PyInstaller \
@@ -96,7 +78,6 @@ python3 -m PyInstaller \
   --strip \
   --log-level INFO \
   --additional-hooks-dir packaging/pyinstaller/hooks \
-  --paths . \
   --exclude-module sphinx \
   --exclude-module sphinx_rtd_theme \
   --exclude-module pydata_sphinx_theme \
@@ -122,10 +103,7 @@ python3 -m PyInstaller \
   --copy-metadata duckdb-extension-sqlite-scanner \
   --copy-metadata pyopenms \
   "${ADD_BINARY_ARGS[@]}" \
-  build_entry.py
-
-# Clean up temporary entry script
-rm -f build_entry.py
+  packaging/pyinstaller/run_pyprophet.py
 
 echo "============================================"
 echo "Build complete! Single executable at: dist/pyprophet"

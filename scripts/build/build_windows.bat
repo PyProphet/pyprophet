@@ -27,7 +27,6 @@ REM Clean previous builds
 if exist build rmdir /s /q build
 if exist dist rmdir /s /q dist
 if exist pyprophet.spec del /q pyprophet.spec
-if exist build_entry.py del /q build_entry.py
 
 REM Install/upgrade build dependencies
 python -m pip install --upgrade pip setuptools wheel cython numpy pyinstaller
@@ -40,28 +39,9 @@ REM Build Cython extensions in-place
 echo Building C extensions...
 python setup.py build_ext --inplace
 
-REM Create a minimal entry point script
-echo Creating build entry point...
-(
-echo #!/usr/bin/env python3
-echo """
-echo PyProphet build entry point for PyInstaller.
-echo This script imports pyprophet as an installed package to avoid path conflicts.
-echo """
-echo import sys
-echo import os
-echo.
-echo # Ensure we don't import from the source directory
-echo source_dir = os.path.dirname^(os.path.abspath^(__file__^)^)
-echo if source_dir in sys.path:
-echo     sys.path.remove^(source_dir^)
-echo.
-echo # Import and run pyprophet main
-echo from pyprophet.main import cli
-echo.
-echo if __name__ == '__main__':
-echo     cli^(^)
-) > build_entry.py
+REM Install pyprophet as a regular package (not editable) to avoid import conflicts
+echo Installing pyprophet package...
+python -m pip install --no-deps .
 
 REM Run PyInstaller in onefile mode (single executable)
 echo Running PyInstaller (onefile mode)...
@@ -72,7 +52,6 @@ python -m PyInstaller ^
     --name pyprophet ^
     --log-level INFO ^
     --additional-hooks-dir packaging/pyinstaller/hooks ^
-    --paths . ^
     --exclude-module sphinx ^
     --exclude-module sphinx_rtd_theme ^
     --exclude-module pydata_sphinx_theme ^
@@ -97,16 +76,12 @@ python -m PyInstaller ^
     --copy-metadata duckdb-extensions ^
     --copy-metadata duckdb-extension-sqlite-scanner ^
     --copy-metadata pyopenms ^
-    build_entry.py
+    packaging/pyinstaller/run_pyprophet.py
 
 if errorlevel 1 (
     echo Build failed!
-    del /q build_entry.py 2>nul
     exit /b 1
 )
-
-REM Clean up temporary entry script
-del /q build_entry.py 2>nul
 
 REM Post-process: UPX compress the final binary
 where upx >nul 2>&1
