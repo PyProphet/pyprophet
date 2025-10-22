@@ -35,10 +35,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential
 
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e .
+      # REMOVED: pip install -e . (this was causing the numpy source directory issue)
+      # The build scripts will handle all dependency installation
 
       - name: Build executable (Linux)
         if: runner.os == 'Linux'
