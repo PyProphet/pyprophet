@@ -83,6 +83,16 @@ done
 # Clean previous PyInstaller builds
 rm -rf build dist pyprophet.spec
 
+# Change to a temporary directory to avoid picking up source files
+# This ensures PyInstaller only sees installed packages
+BUILD_DIR=$(mktemp -d)
+echo "Using temporary build directory: ${BUILD_DIR}"
+cd "${BUILD_DIR}"
+
+# Copy only the necessary files
+cp "${OLDPWD}/packaging/pyinstaller/run_pyprophet.py" .
+cp -r "${OLDPWD}/packaging/pyinstaller/hooks" .
+
 # Run PyInstaller in onefile mode (single executable)
 echo "Running PyInstaller (onefile mode)..."
 $PYTHON -m PyInstaller \
@@ -92,7 +102,7 @@ $PYTHON -m PyInstaller \
   --name pyprophet \
   --strip \
   --log-level INFO \
-  --additional-hooks-dir packaging/pyinstaller/hooks \
+  --additional-hooks-dir hooks \
   --exclude-module sphinx \
   --exclude-module sphinx_rtd_theme \
   --exclude-module pydata_sphinx_theme \
@@ -118,10 +128,16 @@ $PYTHON -m PyInstaller \
   --copy-metadata duckdb-extension-sqlite-scanner \
   --copy-metadata pyopenms \
   "${ADD_BINARY_ARGS[@]}" \
-  packaging/pyinstaller/run_pyprophet.py
+  run_pyprophet.py
 
-# Clean up temporary wheel directory
-rm -rf /tmp/pyprophet_wheels
+# Move the built executable back to the original directory
+mv dist/pyprophet "${OLDPWD}/dist/"
+
+# Return to original directory
+cd "${OLDPWD}"
+
+# Clean up temporary build directory and wheel directory
+rm -rf "${BUILD_DIR}" /tmp/pyprophet_wheels
 
 # NOTE: UPX compression is NOT applied on Linux because it breaks PyInstaller executables
 
