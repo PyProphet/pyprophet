@@ -71,33 +71,57 @@ for dep in deps:
             continue
 PYEOF
 
+# Uninstall any existing pyprophet installation
+echo "Uninstalling any existing pyprophet..."
+$PYTHON -m pip uninstall -y pyprophet 2>/dev/null || true
+
+# Move pyprophet source directory OUT of the way completely
+echo "Temporarily hiding pyprophet source directory..."
+TEMP_BACKUP_DIR=$(mktemp -d)
+if [ -d "pyprophet" ]; then
+    mv pyprophet "${TEMP_BACKUP_DIR}/pyprophet_src"
+fi
+if [ -d "packaging" ]; then
+    mv packaging "${TEMP_BACKUP_DIR}/packaging_src"
+fi
+
 # Build pyprophet wheel in a completely isolated temp directory
 echo "Building pyprophet wheel in isolated directory..."
 WHEEL_BUILD_DIR=$(mktemp -d)
-cp -r "${ORIGINAL_DIR}"/* "${WHEEL_BUILD_DIR}/" 2>/dev/null || true
+
+# Copy ONLY the files needed for building (not the entire tree)
+cp "${ORIGINAL_DIR}/pyproject.toml" "${WHEEL_BUILD_DIR}/"
+cp "${ORIGINAL_DIR}/setup.py" "${WHEEL_BUILD_DIR}/"
+cp "${ORIGINAL_DIR}/README.md" "${WHEEL_BUILD_DIR}/" 2>/dev/null || true
+cp "${ORIGINAL_DIR}/LICENSE" "${WHEEL_BUILD_DIR}/" 2>/dev/null || true
+
+# Copy source files
+cp -r "${TEMP_BACKUP_DIR}/pyprophet_src" "${WHEEL_BUILD_DIR}/pyprophet"
+
 cd "${WHEEL_BUILD_DIR}"
 
+# Build wheel
 $PYTHON -m pip wheel --no-deps --wheel-dir /tmp/pyprophet_wheels .
 
-# Return to original directory and clean up wheel build directory
+# Return to original directory
 cd "${ORIGINAL_DIR}"
+
+# Clean up wheel build directory
 rm -rf "${WHEEL_BUILD_DIR}"
 
-# CRITICAL: Remove pyprophet source directory to prevent pip from finding it
-# and installing in editable mode
-echo "Temporarily moving pyprophet source directory..."
-if [ -d "pyprophet" ]; then
-    mv pyprophet pyprophet.bak
-fi
-
-# Install pyprophet from wheel (this will now go to site-packages)
+# Install pyprophet from wheel (now pyprophet source is hidden, so it MUST go to site-packages)
 echo "Installing pyprophet from wheel to site-packages..."
-$PYTHON -m pip install --force-reinstall --no-deps /tmp/pyprophet_wheels/pyprophet-*.whl
+$PYTHON -m pip install --no-deps --no-cache-dir /tmp/pyprophet_wheels/pyprophet-*.whl
 
-# Restore the source directory (we'll need hooks and run_pyprophet.py later)
-if [ -d "pyprophet.bak" ]; then
-    mv pyprophet.bak pyprophet
+# Restore the source directories
+echo "Restoring source directories..."
+if [ -d "${TEMP_BACKUP_DIR}/pyprophet_src" ]; then
+    mv "${TEMP_BACKUP_DIR}/pyprophet_src" pyprophet
 fi
+if [ -d "${TEMP_BACKUP_DIR}/packaging_src" ]; then
+    mv "${TEMP_BACKUP_DIR}/packaging_src" packaging
+fi
+rm -rf "${TEMP_BACKUP_DIR}"
 
 # Verify installation is in site-packages, NOT source directory
 echo "Verifying pyprophet installation..."
@@ -127,7 +151,7 @@ else
     echo "✗ WARNING: NumPy may not be in site-packages!"
 fi
 
-$PYTHON -c "import pandas; print('Pandas imports successfully')"
+$PYTHON -c "import pandas; print('✓ Pandas imports successfully')"
 
 # Collect compiled extension binaries from the installed package
 ADD_BINARY_ARGS=()
