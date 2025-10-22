@@ -157,7 +157,6 @@ $PYTHON -m PyInstaller \
   --copy-metadata numpy \
   --copy-metadata pandas \
   --copy-metadata scipy \
-  --copy-metadata sklearn \
   --copy-metadata scikit-learn \
   --copy-metadata pyopenms \
   --copy-metadata duckdb \
