@@ -19,10 +19,6 @@ if errorlevel 1 (
     exit /b 1
 )
 
-REM Install UPX for compression
-echo Installing UPX...
-choco install upx -y >nul 2>&1 || echo UPX install skipped (may already be installed)
-
 REM Clean previous builds
 if exist build rmdir /s /q build
 if exist dist rmdir /s /q dist
@@ -55,8 +51,8 @@ if exist build rmdir /s /q build
 if exist dist rmdir /s /q dist
 if not exist dist mkdir dist
 
-REM Run PyInstaller in onefile mode (using --collect-all for problematic packages)
-echo Running PyInstaller (onefile mode)...
+REM Try onefile with collect-submodules instead of collect-all (less aggressive)
+echo Running PyInstaller (onefile mode with optimized collection)...
 python -m PyInstaller ^
     --clean ^
     --noconfirm ^
@@ -68,37 +64,94 @@ python -m PyInstaller ^
     --hidden-import=pyprophet ^
     --hidden-import=pyprophet.main ^
     --collect-submodules pyprophet ^
-    --collect-all numpy ^
-    --collect-all pandas ^
-    --collect-all scipy ^
-    --collect-all sklearn ^
-    --collect-all pyopenms ^
+    --collect-submodules numpy ^
+    --collect-submodules pandas ^
+    --collect-submodules scipy ^
+    --collect-submodules sklearn ^
+    --collect-submodules pyopenms ^
+    --copy-metadata numpy ^
+    --copy-metadata pandas ^
+    --copy-metadata scipy ^
+    --copy-metadata scikit-learn ^
+    --copy-metadata pyopenms ^
     --copy-metadata duckdb ^
     --copy-metadata duckdb-extensions ^
     --copy-metadata duckdb-extension-sqlite-scanner ^
-    --copy-metadata pyopenms ^
     packaging/pyinstaller/run_pyprophet.py
 
 if errorlevel 1 (
-    echo Build failed!
-    exit /b 1
-)
-
-REM Post-process: UPX compress the final binary
-where upx >nul 2>&1
-if %errorlevel% equ 0 (
-    echo Post-processing: compressing with UPX...
-    upx --best --lzma dist\pyprophet.exe 2>nul || echo UPX compression skipped
+    echo Onefile build failed, trying alternative approach...
+    
+    REM If onefile fails, fall back to onedir but wrap it in a self-extracting archive
+    echo.
+    echo Falling back to onedir with SFX wrapper...
+    
+    python -m PyInstaller ^
+        --clean ^
+        --noconfirm ^
+        --onedir ^
+        --console ^
+        --name pyprophet ^
+        --log-level INFO ^
+        --additional-hooks-dir packaging/pyinstaller/hooks ^
+        --hidden-import=pyprophet ^
+        --hidden-import=pyprophet.main ^
+        --collect-submodules pyprophet ^
+        --collect-all numpy ^
+        --collect-all pandas ^
+        --collect-all scipy ^
+        --collect-all sklearn ^
+        --collect-all pyopenms ^
+        --copy-metadata duckdb ^
+        --copy-metadata duckdb-extensions ^
+        --copy-metadata duckdb-extension-sqlite-scanner ^
+        --copy-metadata pyopenms ^
+        packaging/pyinstaller/run_pyprophet.py
+    
+    if errorlevel 1 (
+        echo Both builds failed!
+        exit /b 1
+    )
+    
+    REM Create a self-extracting archive using 7-Zip if available
+    where 7z >nul 2>&1
+    if %errorlevel% equ 0 (
+        echo Creating self-extracting archive with 7-Zip...
+        7z a -sfx7z.sfx dist\pyprophet-sfx.exe dist\pyprophet\*
+        if errorlevel 1 (
+            echo SFX creation failed, keeping directory build
+        ) else (
+            move /y dist\pyprophet-sfx.exe dist\pyprophet.exe
+            echo Created self-extracting executable: dist\pyprophet.exe
+        )
+    ) else (
+        echo 7-Zip not found, keeping onedir build
+        echo Note: Install 7-Zip for single-file executable support
+    )
+    
+    set BUILD_TYPE=onedir
+) else (
+    set BUILD_TYPE=onefile
+    echo Onefile build succeeded!
 )
 
 echo ============================================
-echo Build complete! Single executable at: dist\pyprophet.exe
-dir dist\pyprophet.exe
+if "%BUILD_TYPE%"=="onefile" (
+    echo Build complete! Single executable at: dist\pyprophet.exe
+    dir dist\pyprophet.exe
+) else (
+    echo Build complete! Executable at: dist\pyprophet\pyprophet.exe
+    dir dist\pyprophet\pyprophet.exe
+)
 echo ============================================
 
 REM Create ZIP archive
 echo Creating ZIP archive...
-powershell -Command "Compress-Archive -Path dist\pyprophet.exe -DestinationPath pyprophet-windows-x86_64.zip -Force"
+if "%BUILD_TYPE%"=="onefile" (
+    powershell -Command "Compress-Archive -Path dist\pyprophet.exe -DestinationPath pyprophet-windows-x86_64.zip -Force"
+) else (
+    powershell -Command "Compress-Archive -Path dist\pyprophet -DestinationPath pyprophet-windows-x86_64.zip -Force"
+)
 
 if errorlevel 1 (
     echo Archive creation failed!
@@ -113,4 +166,8 @@ echo Checksum created: pyprophet-windows-x86_64.zip.sha256
 
 echo.
 echo To test locally:
-echo   dist\pyprophet.exe --help
+if "%BUILD_TYPE%"=="onefile" (
+    echo   dist\pyprophet.exe --help
+) else (
+    echo   dist\pyprophet\pyprophet.exe --help
+)
