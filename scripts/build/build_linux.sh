@@ -27,7 +27,7 @@ if [[ $(echo "$PYTHON_VERSION < 3.11" | bc -l) -eq 1 ]]; then
     exit 1
 fi
 
-# Install system tools for stripping (skip upx - it breaks PyInstaller on Linux)
+# Install system tools for stripping
 echo "Installing build tools..."
 sudo apt-get update -qq
 sudo apt-get install -y binutils
@@ -35,26 +35,31 @@ sudo apt-get install -y binutils
 # Save the original directory
 ORIGINAL_DIR="$(pwd)"
 
-# Clean ALL build artifacts that might confuse PyInstaller
+# Clean ALL build artifacts
 echo "Cleaning build artifacts..."
-rm -rf build dist pyprophet.spec *.egg-info
-rm -rf .eggs
-# Clean any Python cache that might have source references
+rm -rf build dist pyprophet.spec *.egg-info .eggs
 find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 find . -type f -name "*.pyc" -delete 2>/dev/null || true
 find . -type f -name "*.pyo" -delete 2>/dev/null || true
 
-# Create a clean virtual environment for building
-echo "Creating clean virtual environment for building..."
-VENV_DIR=$(mktemp -d)/pyprophet_build_venv
+# Create a clean virtual environment
+echo "Creating clean virtual environment..."
+VENV_DIR=$(mktemp -d)/build_venv
 $PYTHON -m venv "$VENV_DIR"
 source "$VENV_DIR/bin/activate"
 
-# Install build dependencies in venv
-pip install --upgrade pip setuptools wheel cython numpy pyinstaller
+# Upgrade pip and install build tools
+pip install --upgrade pip setuptools wheel build
 
-# Parse and install runtime dependencies from pyproject.toml
-echo "Installing runtime dependencies..."
+# Build wheel
+echo "Building pyprophet wheel..."
+python -m build --wheel --outdir /tmp/pyprophet_wheels
+
+# Install dependencies
+echo "Installing dependencies..."
+pip install cython numpy pyinstaller
+
+# Parse and install runtime dependencies
 python << 'PYEOF'
 import tomllib
 import subprocess
@@ -63,63 +68,51 @@ import sys
 with open('pyproject.toml', 'rb') as f:
     config = tomllib.load(f)
 
-deps = config['project']['dependencies']
-
-# Filter out any malformed entries and install one by one
-for dep in deps:
+for dep in config['project']['dependencies']:
     dep = dep.strip()
     if dep and not dep.startswith('#'):
         try:
             print(f"Installing: {dep}")
             subprocess.check_call([sys.executable, '-m', 'pip', 'install', '--no-cache-dir', dep])
-        except subprocess.CalledProcessError as e:
-            print(f"Warning: Failed to install {dep}: {e}")
-            continue
+        except subprocess.CalledProcessError:
+            pass
 PYEOF
 
-# Build and install pyprophet directly in the venv (no wheel intermediate step)
-echo "Building and installing pyprophet in venv..."
-pip install --no-deps -e .
+# Install pyprophet from wheel (NOT editable)
+echo "Installing pyprophet from wheel..."
+pip install --force-reinstall --no-deps /tmp/pyprophet_wheels/pyprophet-*.whl
 
 # Verify installation
-echo "Verifying pyprophet installation..."
-PYPROPHET_LOCATION=$(python -c "import pyprophet; print(pyprophet.__file__)")
-echo "PyProphet installed at: ${PYPROPHET_LOCATION}"
+echo "Verifying installation..."
+python -c "import pyprophet; print(f'PyProphet: {pyprophet.__file__}')"
+python -c "import numpy; print(f'NumPy: {numpy.__file__}')"
+python -c "import pandas; print('✓ All imports successful')"
 
-# Get the site-packages location
+# Get site-packages
 SITE_PACKAGES=$(python -c "import pyprophet, os; print(os.path.dirname(pyprophet.__file__))")
-echo "PyProphet package location: ${SITE_PACKAGES}"
+echo "Site-packages: ${SITE_PACKAGES}"
 
-# Verify numpy
-NUMPY_LOCATION=$(python -c "import numpy; print(numpy.__file__)")
-echo "NumPy installed at: ${NUMPY_LOCATION}"
-
-python -c "import pandas; print('✓ Pandas imports successfully')"
-
-# Collect compiled extension binaries
+# Collect binaries
 ADD_BINARY_ARGS=()
 for so in "${SITE_PACKAGES}"/pyprophet/scoring/_optimized*.so; do
   if [ -f "$so" ]; then
     ADD_BINARY_ARGS+=(--add-binary "$so:pyprophet/scoring")
-    echo "Adding binary: $so"
+    echo "Found binary: $so"
   fi
 done
 
-# Create dist directory in original location
+# Create build directory
 mkdir -p "${ORIGINAL_DIR}/dist"
-
-# Change to a temporary directory to avoid picking up ANY source files
 BUILD_DIR=$(mktemp -d)
-echo "Using temporary build directory: ${BUILD_DIR}"
 cd "${BUILD_DIR}"
 
-# Copy only the necessary files
+# Copy PyInstaller files
 cp "${ORIGINAL_DIR}/packaging/pyinstaller/run_pyprophet.py" .
 mkdir -p hooks
 cp "${ORIGINAL_DIR}/packaging/pyinstaller/hooks"/*.py hooks/ 2>/dev/null || true
 
-# Run PyInstaller in onefile mode (still in venv)
-echo "Running PyInstaller (onefile mode)..."
+# Run PyInstaller
+echo "Running PyInstaller..."
 python -m PyInstaller \
   --clean \
   --noconfirm \
@@ -154,42 +147,33 @@ python -m PyInstaller \
   "${ADD_BINARY_ARGS[@]}" \
   run_pyprophet.py
 
-# Move the built executable back to the original directory
-echo "Moving executable to ${ORIGINAL_DIR}/dist/"
+# Move executable
 mv dist/pyprophet "${ORIGINAL_DIR}/dist/pyprophet"
-
-# Return to original directory
 cd "${ORIGINAL_DIR}"
 
-# Deactivate and clean up venv
+# Cleanup
 deactivate
-rm -rf "$(dirname "$VENV_DIR")"
-rm -rf "${BUILD_DIR}"
+rm -rf "$(dirname "$VENV_DIR")" "${BUILD_DIR}" /tmp/pyprophet_wheels
 
 echo "============================================"
 echo "Build complete! Single executable at: dist/pyprophet"
 ls -lh dist/pyprophet
 echo "============================================"
 
-# Create compressed archive for distribution
-echo "Creating distribution archive..."
+# Create archive
 cd dist
 ARCH=$(uname -m)
 ARCHIVE_NAME="pyprophet-linux-${ARCH}.tar.gz"
 tar -czf "../${ARCHIVE_NAME}" pyprophet
 cd ..
 
-echo "============================================"
 echo "Archive created: ${ARCHIVE_NAME}"
-echo "============================================"
 
-# Generate SHA256 checksum
+# Generate checksum
 if command -v sha256sum &> /dev/null; then
     sha256sum "${ARCHIVE_NAME}" > "${ARCHIVE_NAME}.sha256"
-    echo "Checksum: ${ARCHIVE_NAME}.sha256"
     cat "${ARCHIVE_NAME}.sha256"
 fi
 
 echo ""
-echo "To test locally:"
-echo "  ./dist/pyprophet --help"
+echo "Test with: ./dist/pyprophet --help"
