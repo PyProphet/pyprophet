@@ -27,80 +27,30 @@ python -c "import tomllib, subprocess, sys; config = tomllib.load(open('pyprojec
 REM Build Cython extensions in-place
 python setup.py build_ext --inplace
 
-REM Create PyInstaller spec with dev package excludes
-echo Creating PyInstaller spec...
-(
-echo # -*- mode: python ; coding: utf-8 -*-
-echo block_cipher = None
-echo.
-echo a = Analysis^(
-echo     ['packaging/pyinstaller/run_pyprophet.py'],
-echo     pathex=[],
-echo     binaries=[],
-echo     datas=[],
-echo     hiddenimports=['pyprophet', 'pyprophet.main'],
-echo     hookspath=['packaging/pyinstaller/hooks'],
-echo     hooksconfig={},
-echo     runtime_hooks=[],
-echo     excludes=[
-echo         # Exclude dev/docs/testing packages
-echo         'sphinx', 'sphinx_rtd_theme', 'pydata_sphinx_theme', 'sphinx_copybutton',
-echo         'sphinx.ext', 'alabaster', 'babel', 'docutils',
-echo         'mypy', 'pytest', 'pytest-regtest', 'pytest-xdist',
-echo         'black', 'ruff',
-echo         'tomli',  # build-time only
-echo     ],
-echo     win_no_prefer_redirects=False,
-echo     win_private_assemblies=False,
-echo     cipher=block_cipher,
-echo     noarchive=False,
-echo ^)
-echo.
-echo # Remove pyopenms data files ^(not needed at runtime^)
-echo a.datas = [
-echo     d for d in a.datas
-echo     if not any^(x in d[0] for x in ['pyopenms/share/OpenMS/CHEMISTRY/', 'pyopenms/share/OpenMS/CV/']^)
-echo ]
-echo.
-echo pyz = PYZ^(a.pure, a.zipped_data, cipher=block_cipher^)
-echo.
-echo exe = EXE^(
-echo     pyz,
-echo     a.scripts,
-echo     [],
-echo     exclude_binaries=True,
-echo     name='pyprophet',
-echo     debug=False,
-echo     bootloader_ignore_signals=False,
-echo     strip=False,
-echo     upx=True,    # compress exe with UPX
-echo     console=True,
-echo     disable_windowed_traceback=False,
-echo     argv_emulation=False,
-echo     target_arch=None,
-echo     codesign_identity=None,
-echo     entitlements_file=None,
-echo ^)
-echo.
-echo coll = COLLECT^(
-echo     exe,
-echo     a.binaries,
-echo     a.zipfiles,
-echo     a.datas,
-echo     strip=False,
-echo     upx=True,    # compress all binaries with UPX
-echo     upx_exclude=[],
-echo     name='pyprophet',
-echo ^)
-) > pyprophet.spec
-
-REM Run PyInstaller with the spec
-echo Running PyInstaller...
+REM Run PyInstaller in onefile mode (single executable)
+echo Running PyInstaller (onefile mode)...
 python -m PyInstaller ^
     --clean ^
     --noconfirm ^
     --onefile ^
+    --name pyprophet ^
+    --upx ^
     --log-level INFO ^
+    --exclude-module sphinx ^
+    --exclude-module sphinx_rtd_theme ^
+    --exclude-module pydata_sphinx_theme ^
+    --exclude-module sphinx_copybutton ^
+    --exclude-module sphinx.ext ^
+    --exclude-module alabaster ^
+    --exclude-module babel ^
+    --exclude-module docutils ^
+    --exclude-module mypy ^
+    --exclude-module pytest ^
+    --exclude-module pytest-regtest ^
+    --exclude-module pytest-xdist ^
+    --exclude-module black ^
+    --exclude-module ruff ^
+    --exclude-module tomli ^
     --collect-submodules pyprophet ^
     --collect-all numpy ^
     --collect-all pandas ^
@@ -111,27 +61,21 @@ python -m PyInstaller ^
     --copy-metadata duckdb-extensions ^
     --copy-metadata duckdb-extension-sqlite-scanner ^
     --copy-metadata pyopenms ^
-    pyprophet.spec
+    packaging/pyinstaller/run_pyprophet.py
 
 if errorlevel 1 (
     echo Build failed!
     exit /b 1
 )
 
-REM Post-build: remove dev packages if any slipped through
-echo Removing any dev/doc packages...
-for %%d in (sphinx babel alabaster docutils mypy pytest black ruff tomli) do (
-    if exist dist\pyprophet\_internal\%%d rmdir /s /q dist\pyprophet\_internal\%%d 2>nul
-)
-
 echo ============================================
-echo Build complete! Executable at: dist\pyprophet\pyprophet.exe
-dir dist\pyprophet\_internal | find "bytes"
+echo Build complete! Single executable at: dist\pyprophet.exe
+dir dist\pyprophet.exe
 echo ============================================
 
 REM Create ZIP archive
 echo Creating ZIP archive...
-powershell -Command "Compress-Archive -Path dist\pyprophet -DestinationPath pyprophet-windows-x86_64.zip -Force"
+powershell -Command "Compress-Archive -Path dist\pyprophet.exe -DestinationPath pyprophet-windows-x86_64.zip -Force"
 
 if errorlevel 1 (
     echo Archive creation failed!
@@ -146,4 +90,4 @@ echo Checksum created: pyprophet-windows-x86_64.zip.sha256
 
 echo.
 echo To test locally:
-echo   dist\pyprophet\pyprophet.exe --help
+echo   dist\pyprophet.exe --help

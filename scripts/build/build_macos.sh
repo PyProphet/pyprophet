@@ -78,79 +78,31 @@ fi
 # Clean previous builds
 rm -rf build dist pyprophet.spec
 
-# Create PyInstaller spec with dev package excludes
-cat > pyprophet.spec << 'SPEC_EOF'
-# -*- mode: python ; coding: utf-8 -*-
-block_cipher = None
-
-a = Analysis(
-    ['packaging/pyinstaller/run_pyprophet.py'],
-    pathex=[],
-    binaries=[],
-    datas=[],
-    hiddenimports=['pyprophet', 'pyprophet.main'],
-    hookspath=['packaging/pyinstaller/hooks'],
-    hooksconfig={},
-    runtime_hooks=[],
-    excludes=[
-        # Exclude dev/docs/testing packages
-        'sphinx', 'sphinx_rtd_theme', 'pydata_sphinx_theme', 'sphinx_copybutton',
-        'sphinx.ext', 'alabaster', 'babel', 'docutils',
-        'mypy', 'pytest', 'pytest-regtest', 'pytest-xdist',
-        'black', 'ruff',
-        'tomli',  # build-time only
-    ],
-    win_no_prefer_redirects=False,
-    win_private_assemblies=False,
-    cipher=block_cipher,
-    noarchive=False,
-)
-
-# Remove pyopenms data files (not needed at runtime)
-a.datas = [
-    d for d in a.datas
-    if not any(x in d[0] for x in ['pyopenms/share/OpenMS/CHEMISTRY/', 'pyopenms/share/OpenMS/CV/'])
-]
-
-pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
-
-exe = EXE(
-    pyz,
-    a.scripts,
-    [],
-    exclude_binaries=True,
-    name='pyprophet',
-    debug=False,
-    bootloader_ignore_signals=False,
-    strip=True,  # strip symbols from exe
-    upx=True,    # compress exe with UPX
-    console=True,
-    disable_windowed_traceback=False,
-    argv_emulation=False,
-    target_arch=None,
-    codesign_identity=None,
-    entitlements_file=None,
-)
-
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-    strip=True,  # strip symbols from all binaries
-    upx=True,    # compress all binaries with UPX
-    upx_exclude=[],
-    name='pyprophet',
-)
-SPEC_EOF
-
-# Run PyInstaller with the spec
-echo "Running PyInstaller..."
+# Run PyInstaller in onefile mode (single executable)
+echo "Running PyInstaller (onefile mode)..."
 python3 -m PyInstaller \
   --clean \
   --noconfirm \
   --onefile \
+  --name pyprophet \
+  --strip \
+  --upx \
   --log-level INFO \
+  --exclude-module sphinx \
+  --exclude-module sphinx_rtd_theme \
+  --exclude-module pydata_sphinx_theme \
+  --exclude-module sphinx_copybutton \
+  --exclude-module sphinx.ext \
+  --exclude-module alabaster \
+  --exclude-module babel \
+  --exclude-module docutils \
+  --exclude-module mypy \
+  --exclude-module pytest \
+  --exclude-module pytest-regtest \
+  --exclude-module pytest-xdist \
+  --exclude-module black \
+  --exclude-module ruff \
+  --exclude-module tomli \
   --collect-submodules pyprophet \
   --collect-all numpy \
   --collect-all pandas \
@@ -162,35 +114,21 @@ python3 -m PyInstaller \
   --copy-metadata duckdb-extension-sqlite-scanner \
   --copy-metadata pyopenms \
   "${ADD_BINARY_ARGS[@]}" \
-  pyprophet.spec
-
-# Post-build: aggressive strip + UPX on all .dylib/.so files
-echo "Post-processing: stripping and compressing native libraries..."
-find dist/pyprophet/_internal -type f \( -name '*.dylib' -o -name '*.so' \) -print0 | \
-  xargs -0 -n1 -P$(sysctl -n hw.ncpu) strip -x 2>/dev/null || true
-
-if command -v upx &> /dev/null; then
-    find dist/pyprophet/_internal -type f \( -name '*.dylib' -o -name '*.so' \) -print0 | \
-      xargs -0 -n1 -P$(sysctl -n hw.ncpu) upx --best --lzma 2>/dev/null || true
-fi
-
-# Remove collected dev packages if any slipped through
-echo "Removing any dev/doc packages..."
-rm -rf dist/pyprophet/_internal/{sphinx,babel,alabaster,docutils,mypy,pytest,black,ruff,tomli} 2>/dev/null || true
+  packaging/pyinstaller/run_pyprophet.py
 
 echo "============================================"
-echo "Build complete! Executable at: dist/pyprophet/pyprophet"
-du -sh dist/pyprophet/_internal
+echo "Build complete! Single executable at: dist/pyprophet"
+ls -lh dist/pyprophet
 echo "============================================"
 
 # Make executable
-chmod +x dist/pyprophet/pyprophet
+chmod +x dist/pyprophet
 
 # Create tarball for distribution
 cd dist
 ARCH=$(uname -m)
 ARCHIVE_NAME="pyprophet-macos-${ARCH}.tar.gz"
-tar -czf "../${ARCHIVE_NAME}" pyprophet/
+tar -czf "../${ARCHIVE_NAME}" pyprophet
 cd ..
 
 echo "============================================"
@@ -206,4 +144,4 @@ fi
 
 echo ""
 echo "To test locally:"
-echo "  cd dist/pyprophet && ./pyprophet --help"
+echo "  ./dist/pyprophet --help"
