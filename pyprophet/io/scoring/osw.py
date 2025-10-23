@@ -723,8 +723,16 @@ class OSWWriter(BaseOSWWriter):
 
             weights.to_sql("PYPROPHET_WEIGHTS", con, index=False, if_exists="append")
 
-        elif self.classifier == "XGBoost":
+        elif self.classifier == "XGBoost" or self.classifier == "HistGradientBoosting":
             con = sqlite3.connect(self.outfile)
+
+            # Wrap model with metadata for feature alignment
+            model_data = {
+                "model": weights,
+                "ss_main_score": self.config.runner.ss_main_score,
+                "classifier": self.classifier,
+                "level": self.level,
+            }
 
             c = con.cursor()
             if self.glyco and self.level in ["ms2", "ms1ms2"]:
@@ -743,7 +751,7 @@ class OSWWriter(BaseOSWWriter):
 
                 c.execute(
                     "INSERT INTO GLYCOPEPTIDEPROPHET_XGB VALUES(?, ?)",
-                    [self.level, pickle.dumps(weights)],
+                    [self.level, pickle.dumps(model_data)],
                 )
             else:
                 c.execute(
@@ -758,7 +766,7 @@ class OSWWriter(BaseOSWWriter):
 
                 c.execute(
                     "INSERT INTO PYPROPHET_XGB VALUES(?, ?)",
-                    [self.level, pickle.dumps(weights)],
+                    [self.level, pickle.dumps(model_data)],
                 )
             con.commit()
             c.close()
