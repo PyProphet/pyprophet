@@ -42,7 +42,6 @@ dependencies = [
     "scikit-learn >= 1.5",
     "xgboost-cpu >= 2.1.4", # regular xgboost includes nvidia libraries which bloat the package size on linux. For PyProphet, we likely would not need GPU support.
     "matplotlib",
-    "pyarrow",
     "pypdf",
     "psutil",
     "pyopenms",
@@ -55,6 +54,7 @@ dependencies = [
 testing = ["pytest", "pytest-regtest", "pytest-xdist"]
 docs = ["sphinx", "sphinx-copybutton", "sphinx_rtd_theme", "pydata_sphinx_theme", "sphinx-click"]
 dev = ["pyprophet[testing]", "pyprophet[docs]", "black", "ruff", "mypy"]
+parquet = ["pyarrow"]
 
 # Define console entry points
 [project.scripts]
