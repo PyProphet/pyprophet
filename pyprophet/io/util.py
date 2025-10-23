@@ -44,13 +44,32 @@ Usage:
 import os
 from collections import defaultdict
 import sqlite3
+import importlib
+from typing import Type
 import duckdb
 import click
 import pandas as pd
-import pyarrow.parquet as pq
 import pyopenms as poms
 from loguru import logger
-from pyarrow.lib import ArrowInvalid, ArrowIOError
+
+from .._config import ExportIOConfig, IPFIOConfig, LevelContextIOConfig, RunnerIOConfig
+
+
+def _ensure_pyarrow():
+    """
+    Avoid importing pyarrow at module import time; import lazily in functions that need it.
+    """
+    try:
+        import pyarrow.parquet as pq  # type: ignore
+        from pyarrow.lib import ArrowInvalid, ArrowIOError  # type: ignore
+
+        return pq, ArrowInvalid, ArrowIOError
+    except ImportError as exc:
+        import click
+
+        raise click.ClickException(
+            "Parquet support requires 'pyarrow'. Install with 'pip install pyarrow' or 'pip install pyprophet[parquet]'."
+        ) from exc
 
 
 def is_tsv_file(file_path):
@@ -248,6 +267,56 @@ def create_index_if_not_exists(con, index_name, table_name, column_name):
         con.execute(f"CREATE INDEX {index_name} ON {table_name} ({column_name})")
 
 
+def _lazy_parquet_class(module_path: str, class_name: str) -> Type:
+    """
+    Import the given module (relative to this package) and return the class.
+    Raises a ClickException with a friendly message if the import fails (e.g. missing pyarrow).
+    """
+    try:
+        mod = importlib.import_module(module_path, package=__package__)
+        return getattr(mod, class_name)
+    except ModuleNotFoundError as exc:
+        # Likely pyarrow or the module itself is missing; user should install the parquet extra.
+        raise click.ClickException(
+            "Parquet support requires the 'pyarrow' package. "
+            "Install it with 'pip install pyarrow' or 'pip install pyprophet[parquet]'."
+        ) from exc
+    except Exception:
+        # Propagate other exceptions (syntax errors, attribute errors) to surface the real problem.
+        raise
+
+
+def _area_from_config(config) -> str:
+    """
+    Map a config instance to its package area name used in the io package.
+    """
+    if isinstance(config, RunnerIOConfig):
+        return "scoring"
+    if isinstance(config, IPFIOConfig):
+        return "ipf"
+    if isinstance(config, LevelContextIOConfig):
+        return "levels_context"
+    if isinstance(config, ExportIOConfig):
+        return "export"
+    raise ValueError(f"Unsupported config context: {type(config).__name__}")
+
+
+def _get_parquet_reader_class_for_config(config, split: bool = False) -> Type:
+    area = _area_from_config(config)
+    module = f".{area}.split_parquet" if split else f".{area}.parquet"
+    return _lazy_parquet_class(
+        module, "SplitParquetReader" if split else "ParquetReader"
+    )
+
+
+def _get_parquet_writer_class_for_config(config, split: bool = False) -> Type:
+    area = _area_from_config(config)
+    module = f".{area}.split_parquet" if split else f".{area}.parquet"
+    return _lazy_parquet_class(
+        module, "SplitParquetWriter" if split else "ParquetWriter"
+    )
+
+
 def is_parquet_file(file_path):
     """
     Check if the file is a valid Parquet file.
@@ -259,6 +328,7 @@ def is_parquet_file(file_path):
 
     # Then verify it's actually a parquet file
     try:
+        pq, ArrowInvalid, ArrowIOError = _ensure_pyarrow()
         pq.read_schema(file_path)
         return True
     except (ArrowInvalid, ArrowIOError, OSError):
@@ -327,6 +397,7 @@ def get_parquet_column_names(file_path):
     Retrieves column names from a Parquet file without reading the entire file.
     """
     try:
+        pq, _, _ = _ensure_pyarrow()
         table_schema = pq.read_schema(file_path)
         return table_schema.names
     except Exception as e:
