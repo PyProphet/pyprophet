@@ -2,13 +2,16 @@ import os
 from typing import Literal
 from shutil import copyfile
 import pandas as pd
-import pyarrow as pa
 import duckdb
 import click
 from loguru import logger
-from ..util import get_parquet_column_names
+
+
+from ..util import get_parquet_column_names, _ensure_pyarrow
 from .._base import BaseParquetReader, BaseParquetWriter
 from ..._config import IPFIOConfig
+
+pa = _ensure_pyarrow()
 
 
 class ParquetReader(BaseParquetReader):

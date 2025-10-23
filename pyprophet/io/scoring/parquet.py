@@ -1,14 +1,17 @@
 import sys
 from shutil import copyfile
+
+import click
+import duckdb
 import pandas as pd
 import polars as pl
-import pyarrow as pa
-import duckdb
-import click
 from loguru import logger
-from ..util import get_parquet_column_names
-from .._base import BaseParquetReader, BaseParquetWriter, RowCountMismatchError
+
 from ..._config import RunnerIOConfig
+from .._base import BaseParquetReader, BaseParquetWriter, RowCountMismatchError
+from ..util import _ensure_pyarrow, get_parquet_column_names
+
+pa, _, _ = _ensure_pyarrow()
 
 
 class ParquetReader(BaseParquetReader):
