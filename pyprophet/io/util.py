@@ -52,8 +52,6 @@ import pandas as pd
 import pyopenms as poms
 from loguru import logger
 
-from .._config import ExportIOConfig, IPFIOConfig, LevelContextIOConfig, RunnerIOConfig
-
 
 def _ensure_pyarrow():
     """
@@ -290,13 +288,15 @@ def _area_from_config(config) -> str:
     """
     Map a config instance to its package area name used in the io package.
     """
-    if isinstance(config, RunnerIOConfig):
+    # Avoid importing config classes here to prevent circular imports.
+    cname = type(config).__name__
+    if cname == "RunnerIOConfig":
         return "scoring"
-    if isinstance(config, IPFIOConfig):
+    if cname == "IPFIOConfig":
         return "ipf"
-    if isinstance(config, LevelContextIOConfig):
+    if cname == "LevelContextIOConfig":
         return "levels_context"
-    if isinstance(config, ExportIOConfig):
+    if cname == "ExportIOConfig":
         return "export"
     raise ValueError(f"Unsupported config context: {type(config).__name__}")
 
