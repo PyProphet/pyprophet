@@ -58,13 +58,23 @@ def _ensure_pyarrow():
     Avoid importing pyarrow at module import time; import lazily in functions that need it.
     """
     try:
-        import pyarrow as pa  # type: ignore
-        from pyarrow.lib import ArrowInvalid, ArrowIOError  # type: ignore
+        import pyarrow as pa  # pylint: disable=C0415
+
+        # Ensure the parquet submodule is loaded and available as pa.parquet
+        try:
+            import pyarrow.parquet as pq  # pylint: disable=C0415
+        except Exception:
+            pq = None
+        from pyarrow.lib import ArrowInvalid, ArrowIOError  # pylint: disable=C0415
+
+        # Some pyarrow installs don't automatically expose the parquet submodule
+        # as an attribute on the top-level module until it's imported. Attach it
+        # so callers can use pa.parquet.*
+        if pq is not None and not hasattr(pa, "parquet"):
+            setattr(pa, "parquet", pq)
 
         return pa, ArrowInvalid, ArrowIOError
     except ImportError as exc:
-        import click
-
         raise click.ClickException(
             "Parquet support requires 'pyarrow'. Install with 'pip install pyarrow' or 'pip install pyprophet[parquet]'."
         ) from exc
@@ -330,7 +340,7 @@ def is_parquet_file(file_path):
 
     # Then verify it's actually a parquet file
     try:
-        pa, ArrowInvalid, ArrowIOError = _ensure_pyarrow()
+        pa, ArrowInvalid, ArrowIOError = _ensure_pyarrow()  # pylint: disable=C0103
         pa.parquet.read_schema(file_path)
         return True
     except (ArrowInvalid, ArrowIOError, OSError):
