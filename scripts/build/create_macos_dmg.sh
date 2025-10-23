@@ -8,15 +8,38 @@ echo "============================================"
 echo "Creating macOS DMG Installer"
 echo "============================================"
 
-# Get version and architecture
+# Get version (prefer GITHUB_REF_NAME, then pyproject.toml, then git tag, then default)
 if [ -n "${GITHUB_REF_NAME:-}" ]; then
     VERSION="${GITHUB_REF_NAME#v}"
 else
-    VERSION=$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || echo "3.0.4")
+    VERSION=$(
+        python3 - <<'PY'
+import sys, subprocess
+try:
+    import tomllib
+    with open("pyproject.toml","rb") as f:
+        cfg = tomllib.load(f)
+        v = cfg.get("project",{}).get("version")
+        if v:
+            print(v); sys.exit(0)
+except Exception:
+    pass
+try:
+    tag = subprocess.check_output(["git","describe","--tags","--abbrev=0"], stderr=subprocess.DEVNULL).decode().strip()
+    print(tag.lstrip("v")); sys.exit(0)
+except Exception:
+    print("3.0.4")
+PY
+    )
 fi
 
+# sanitize VERSION for filenames
+VERSION_SAFE="${VERSION//\//-}"
+VERSION_SAFE="${VERSION_SAFE// /-}"
+VERSION_SAFE="$(echo "$VERSION_SAFE" | tr -cd 'A-Za-z0-9._-')"
+
 ARCH=$(uname -m)
-echo "Version: ${VERSION}"
+echo "Version: ${VERSION} (safe: ${VERSION_SAFE})"
 echo "Architecture: ${ARCH}"
 
 # Verify single-file executable exists
@@ -82,7 +105,7 @@ if [ -f "LICENSE" ]; then
 fi
 
 # Create DMG
-DMG_NAME="pyprophet-${VERSION}-macos-${ARCH}.dmg"
+DMG_NAME="pyprophet-${VERSION_SAFE}-macos-${ARCH}.dmg"
 echo "Creating DMG: ${DMG_NAME}"
 
 # Remove any existing DMG

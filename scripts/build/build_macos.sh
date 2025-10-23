@@ -21,6 +21,40 @@ if [ "$(printf '%s\n' "$REQUIRED_VERSION" "$PYTHON_VERSION" | sort -V | head -n1
     exit 1
 fi
 
+# Get version: prefer GITHUB_REF_NAME (CI), then pyproject.toml, then git tag, then default
+if [ -n "${GITHUB_REF_NAME:-}" ]; then
+    VERSION="${GITHUB_REF_NAME#v}"
+else
+    # Use tomllib (Python 3.11) to read pyproject.toml
+    VERSION=$(
+        python3 - <<'PY'
+import tomllib, sys, subprocess
+try:
+    with open("pyproject.toml", "rb") as f:
+        cfg = tomllib.load(f)
+        v = cfg.get("project", {}).get("version")
+        if v:
+            print(v)
+            sys.exit(0)
+except Exception:
+    pass
+# fallback to git tag
+try:
+    tag = subprocess.check_output(["git", "describe", "--tags", "--abbrev=0"], stderr=subprocess.DEVNULL).decode().strip()
+    print(tag.lstrip("v"))
+    sys.exit(0)
+except Exception:
+    print("0.0.0")
+PY
+    )
+fi
+
+# sanitize for filenames
+VERSION_SAFE="${VERSION//\//-}"
+VERSION_SAFE="${VERSION_SAFE// /-}"
+VERSION_SAFE="$(echo "$VERSION_SAFE" | tr -cd 'A-Za-z0-9._-')"
+
+
 # Install/upgrade build dependencies
 python3 -m pip install --upgrade pip setuptools wheel cython numpy pyinstaller
 
@@ -78,6 +112,7 @@ python3 -m PyInstaller \
   --strip \
   --log-level INFO \
   --additional-hooks-dir packaging/pyinstaller/hooks \
+  --exclude-module pyarrow \
   --exclude-module sphinx \
   --exclude-module sphinx_rtd_theme \
   --exclude-module pydata_sphinx_theme \
