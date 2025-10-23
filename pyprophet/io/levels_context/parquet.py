@@ -1,16 +1,15 @@
-import os
-from typing import Literal
 from shutil import copyfile
-import pandas as pd
-import duckdb
+
 import click
+import duckdb
+import pandas as pd
 from loguru import logger
 
-from ..util import get_parquet_column_names, _ensure_pyarrow
-from .._base import BaseParquetReader, BaseParquetWriter
 from ..._config import LevelContextIOConfig
+from .._base import BaseParquetReader, BaseParquetWriter
+from ..util import _ensure_pyarrow, get_parquet_column_names
 
-pa = _ensure_pyarrow()
+pa, _, _ = _ensure_pyarrow()
 
 
 class ParquetReader(BaseParquetReader):
