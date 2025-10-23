@@ -104,6 +104,21 @@ $PYTHON -m PyInstaller \
   --noconfirm \
   --log-level INFO \
   --additional-hooks-dir packaging/pyinstaller/hooks \
+  --exclude-module pyarrow \
+  --exclude-module sphinx \
+  --exclude-module sphinx_rtd_theme \
+  --exclude-module pydata_sphinx_theme \
+  --exclude-module sphinx_copybutton \
+  --exclude-module sphinx.ext \
+  --exclude-module alabaster \
+  --exclude-module babel \
+  --exclude-module docutils \
+  --exclude-module mypy \
+  --exclude-module pytest \
+  --exclude-module pytest-regtest \
+  --exclude-module pytest-xdist \
+  --exclude-module black \
+  --exclude-module ruff \
   --hidden-import=pyprophet \
   --hidden-import=pyprophet.main \
   --collect-submodules pyprophet \

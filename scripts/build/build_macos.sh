@@ -78,6 +78,7 @@ python3 -m PyInstaller \
   --strip \
   --log-level INFO \
   --additional-hooks-dir packaging/pyinstaller/hooks \
+  --exclude-module pyarrow \
   --exclude-module sphinx \
   --exclude-module sphinx_rtd_theme \
   --exclude-module pydata_sphinx_theme \
