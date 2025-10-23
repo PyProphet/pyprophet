@@ -60,10 +60,10 @@ def _ensure_pyarrow():
     Avoid importing pyarrow at module import time; import lazily in functions that need it.
     """
     try:
-        import pyarrow.parquet as pq  # type: ignore
+        import pyarrow as pa  # type: ignore
         from pyarrow.lib import ArrowInvalid, ArrowIOError  # type: ignore
 
-        return pq, ArrowInvalid, ArrowIOError
+        return pa, ArrowInvalid, ArrowIOError
     except ImportError as exc:
         import click
 
@@ -302,6 +302,7 @@ def _area_from_config(config) -> str:
 
 
 def _get_parquet_reader_class_for_config(config, split: bool = False) -> Type:
+    _, _, _ = _ensure_pyarrow()
     area = _area_from_config(config)
     module = f".{area}.split_parquet" if split else f".{area}.parquet"
     return _lazy_parquet_class(
@@ -310,6 +311,7 @@ def _get_parquet_reader_class_for_config(config, split: bool = False) -> Type:
 
 
 def _get_parquet_writer_class_for_config(config, split: bool = False) -> Type:
+    _, _, _ = _ensure_pyarrow()
     area = _area_from_config(config)
     module = f".{area}.split_parquet" if split else f".{area}.parquet"
     return _lazy_parquet_class(
@@ -328,8 +330,8 @@ def is_parquet_file(file_path):
 
     # Then verify it's actually a parquet file
     try:
-        pq, ArrowInvalid, ArrowIOError = _ensure_pyarrow()
-        pq.read_schema(file_path)
+        pa, ArrowInvalid, ArrowIOError = _ensure_pyarrow()
+        pa.parquet.read_schema(file_path)
         return True
     except (ArrowInvalid, ArrowIOError, OSError):
         return False
@@ -397,8 +399,8 @@ def get_parquet_column_names(file_path):
     Retrieves column names from a Parquet file without reading the entire file.
     """
     try:
-        pq, _, _ = _ensure_pyarrow()
-        table_schema = pq.read_schema(file_path)
+        pa, _, _ = _ensure_pyarrow()
+        table_schema = pa.parquet.read_schema(file_path)
         return table_schema.names
     except Exception as e:
         print(f"An error occurred while reading schema from '{file_path}': {e}")
