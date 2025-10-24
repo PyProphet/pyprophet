@@ -316,7 +316,8 @@ class OSWReader(BaseOSWReader):
         return pd.merge(data, ipf_data, how="left", on="id")
 
     def _read_standard_data(self, con, cfg):
-        """Read standard OpenSWATH data without IPF."""
+        """Read standard OpenSWATH data without IPF, optionally including aligned features."""
+        # First, get features that pass MS2 QVALUE threshold
         query = f"""
             SELECT RUN.ID AS id_run,
                   PEPTIDE.ID AS id_peptide,
@@ -342,7 +343,8 @@ class OSWReader(BaseOSWReader):
                   FEATURE.RIGHT_WIDTH AS rightWidth,
                   SCORE_MS2.RANK AS peak_group_rank,
                   SCORE_MS2.SCORE AS d_score,
-                  SCORE_MS2.QVALUE AS m_score
+                  SCORE_MS2.QVALUE AS m_score,
+                  0 AS from_alignment
             FROM PRECURSOR
             INNER JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
             INNER JOIN PEPTIDE ON PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
@@ -354,7 +356,75 @@ class OSWReader(BaseOSWReader):
             WHERE SCORE_MS2.QVALUE < {cfg.max_rs_peakgroup_qvalue}
             ORDER BY transition_group_id, peak_group_rank;
         """
-        return pd.read_sql_query(query, con)
+        data = pd.read_sql_query(query, con)
+        
+        # If alignment is enabled, fetch and merge aligned features
+        if cfg.use_alignment:
+            aligned_features = self._fetch_alignment_features(con, cfg)
+            
+            if not aligned_features.empty:
+                # Get full feature data for aligned features that are NOT already in base results
+                # We only want to add features that didn't pass MS2 threshold but have good alignment
+                aligned_ids = aligned_features['id'].unique()
+                existing_ids = data['id'].unique()
+                new_aligned_ids = [aid for aid in aligned_ids if aid not in existing_ids]
+                
+                if new_aligned_ids:
+                    # Fetch full data for these new aligned features
+                    aligned_ids_str = ','.join(map(str, new_aligned_ids))
+                    aligned_query = f"""
+                        SELECT RUN.ID AS id_run,
+                              PEPTIDE.ID AS id_peptide,
+                              PRECURSOR.ID AS transition_group_id,
+                              PRECURSOR.DECOY AS decoy,
+                              RUN.ID AS run_id,
+                              RUN.FILENAME AS filename,
+                              FEATURE.EXP_RT AS RT,
+                              FEATURE.EXP_RT - FEATURE.DELTA_RT AS assay_rt,
+                              FEATURE.DELTA_RT AS delta_rt,
+                              FEATURE.NORM_RT AS iRT,
+                              PRECURSOR.LIBRARY_RT AS assay_iRT,
+                              FEATURE.NORM_RT - PRECURSOR.LIBRARY_RT AS delta_iRT,
+                              FEATURE.ID AS id,
+                              PEPTIDE.UNMODIFIED_SEQUENCE AS Sequence,
+                              PEPTIDE.MODIFIED_SEQUENCE AS FullPeptideName,
+                              PRECURSOR.CHARGE AS Charge,
+                              PRECURSOR.PRECURSOR_MZ AS mz,
+                              FEATURE_MS2.AREA_INTENSITY AS Intensity,
+                              FEATURE_MS1.AREA_INTENSITY AS aggr_prec_Peak_Area,
+                              FEATURE_MS1.APEX_INTENSITY AS aggr_prec_Peak_Apex,
+                              FEATURE.LEFT_WIDTH AS leftWidth,
+                              FEATURE.RIGHT_WIDTH AS rightWidth,
+                              SCORE_MS2.RANK AS peak_group_rank,
+                              SCORE_MS2.SCORE AS d_score,
+                              SCORE_MS2.QVALUE AS m_score,
+                              1 AS from_alignment
+                        FROM PRECURSOR
+                        INNER JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
+                        INNER JOIN PEPTIDE ON PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
+                        INNER JOIN FEATURE ON FEATURE.PRECURSOR_ID = PRECURSOR.ID
+                        INNER JOIN RUN ON RUN.ID = FEATURE.RUN_ID
+                        LEFT JOIN FEATURE_MS1 ON FEATURE_MS1.FEATURE_ID = FEATURE.ID
+                        LEFT JOIN FEATURE_MS2 ON FEATURE_MS2.FEATURE_ID = FEATURE.ID
+                        LEFT JOIN SCORE_MS2 ON SCORE_MS2.FEATURE_ID = FEATURE.ID
+                        WHERE FEATURE.ID IN ({aligned_ids_str})
+                    """
+                    aligned_data = pd.read_sql_query(aligned_query, con)
+                    
+                    # Merge alignment scores into the aligned data
+                    aligned_data = pd.merge(
+                        aligned_data,
+                        aligned_features[['id', 'alignment_pep', 'alignment_qvalue']],
+                        on='id',
+                        how='left'
+                    )
+                    
+                    logger.info(f"Adding {len(aligned_data)} features recovered through alignment")
+                    
+                    # Combine with base data
+                    data = pd.concat([data, aligned_data], ignore_index=True)
+        
+        return data
 
     def _augment_data(self, data, con, cfg):
         """Apply common data augmentations to the base dataset."""
@@ -632,6 +702,53 @@ class OSWReader(BaseOSWReader):
             )
 
         return data
+
+    def _fetch_alignment_features(self, con, cfg):
+        """
+        Fetch aligned features with good alignment scores.
+        
+        This method retrieves features that have been aligned across runs
+        and pass the alignment quality threshold. These features can be used
+        to recover peaks in runs where the MS2 signal might be weak but the
+        alignment score is good.
+        
+        Args:
+            con: Database connection
+            cfg: Configuration object with max_alignment_pep threshold
+            
+        Returns:
+            DataFrame with aligned feature IDs that pass quality threshold
+        """
+        # Check if alignment tables exist
+        if not check_sqlite_table(con, "FEATURE_MS2_ALIGNMENT") or not check_sqlite_table(con, "SCORE_ALIGNMENT"):
+            logger.debug("Alignment tables not found, skipping alignment integration")
+            return pd.DataFrame()
+        
+        max_alignment_pep = cfg.max_alignment_pep
+        
+        query = f"""
+            SELECT  
+                ALIGNED_FEATURE_ID AS id,
+                PRECURSOR_ID AS transition_group_id,
+                RUN_ID AS run_id,
+                SCORE_ALIGNMENT.PEP AS alignment_pep,
+                SCORE_ALIGNMENT.QVALUE AS alignment_qvalue
+            FROM (
+                SELECT DISTINCT * FROM FEATURE_MS2_ALIGNMENT
+            ) AS FEATURE_MS2_ALIGNMENT
+            INNER JOIN (
+                SELECT DISTINCT *, MIN(QVALUE) 
+                FROM SCORE_ALIGNMENT 
+                GROUP BY FEATURE_ID
+            ) AS SCORE_ALIGNMENT 
+            ON SCORE_ALIGNMENT.FEATURE_ID = FEATURE_MS2_ALIGNMENT.ALIGNED_FEATURE_ID
+            WHERE LABEL = 1
+            AND SCORE_ALIGNMENT.PEP < {max_alignment_pep}
+        """
+        
+        df = pd.read_sql_query(query, con)
+        logger.info(f"Found {len(df)} aligned features passing alignment PEP < {max_alignment_pep}")
+        return df
 
     ##################################
     # Export-specific readers below

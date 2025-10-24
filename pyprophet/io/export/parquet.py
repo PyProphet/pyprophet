@@ -236,8 +236,9 @@ class ParquetReader(BaseParquetReader):
 
     def _read_standard_data(self, con) -> pd.DataFrame:
         """
-        Read standard OpenSWATH data without IPF.
+        Read standard OpenSWATH data without IPF, optionally including aligned features.
         """
+        # First, get features that pass MS2 QVALUE threshold
         query = f"""
             SELECT
                 RUN_ID AS id_run,
@@ -264,13 +265,81 @@ class ParquetReader(BaseParquetReader):
                 RIGHT_WIDTH AS rightWidth,
                 SCORE_MS2_PEAK_GROUP_RANK AS peak_group_rank,
                 SCORE_MS2_SCORE AS d_score,
-                SCORE_MS2_Q_VALUE AS m_score
+                SCORE_MS2_Q_VALUE AS m_score,
+                0 AS from_alignment
             FROM data
             WHERE PROTEIN_ID IS NOT NULL
             AND SCORE_MS2_Q_VALUE < {self.config.max_rs_peakgroup_qvalue}
             ORDER BY transition_group_id, peak_group_rank
         """
-        return con.execute(query).fetchdf()
+        data = con.execute(query).fetchdf()
+        
+        # If alignment is enabled, fetch and merge aligned features
+        if self.config.use_alignment:
+            aligned_features = self._fetch_alignment_features(con)
+            
+            if not aligned_features.empty:
+                # Get full feature data for aligned features that are NOT already in base results
+                # We only want to add features that didn't pass MS2 threshold but have good alignment
+                aligned_ids = aligned_features['id'].unique()
+                existing_ids = data['id'].unique()
+                new_aligned_ids = [aid for aid in aligned_ids if aid not in existing_ids]
+                
+                if new_aligned_ids:
+                    # Fetch full data for these new aligned features from the main data view
+                    # Register aligned IDs as a temp table for the query
+                    aligned_ids_df = pd.DataFrame({'id': new_aligned_ids})
+                    con.register('aligned_ids_temp', aligned_ids_df)
+                    
+                    aligned_query = f"""
+                        SELECT
+                            RUN_ID AS id_run,
+                            PEPTIDE_ID AS id_peptide,
+                            PRECURSOR_ID AS transition_group_id,
+                            PRECURSOR_DECOY AS decoy,
+                            RUN_ID AS run_id,
+                            FILENAME AS filename,
+                            EXP_RT AS RT,
+                            EXP_RT - DELTA_RT AS assay_rt,
+                            DELTA_RT AS delta_rt,
+                            NORM_RT AS iRT,
+                            PRECURSOR_LIBRARY_RT AS assay_iRT,
+                            NORM_RT - PRECURSOR_LIBRARY_RT AS delta_iRT,
+                            FEATURE_ID AS id,
+                            UNMODIFIED_SEQUENCE AS Sequence,
+                            MODIFIED_SEQUENCE AS FullPeptideName,
+                            PRECURSOR_CHARGE AS Charge,
+                            PRECURSOR_MZ AS mz,
+                            FEATURE_MS2_AREA_INTENSITY AS Intensity,
+                            FEATURE_MS1_AREA_INTENSITY AS aggr_prec_Peak_Area,
+                            FEATURE_MS1_APEX_INTENSITY AS aggr_prec_Peak_Apex,
+                            LEFT_WIDTH AS leftWidth,
+                            RIGHT_WIDTH AS rightWidth,
+                            SCORE_MS2_PEAK_GROUP_RANK AS peak_group_rank,
+                            SCORE_MS2_SCORE AS d_score,
+                            SCORE_MS2_Q_VALUE AS m_score,
+                            1 AS from_alignment
+                        FROM data
+                        WHERE PROTEIN_ID IS NOT NULL
+                        AND FEATURE_ID IN (SELECT id FROM aligned_ids_temp)
+                    """
+                    aligned_data = con.execute(aligned_query).fetchdf()
+                    
+                    # Merge alignment scores into the aligned data
+                    if 'alignment_pep' in aligned_features.columns:
+                        aligned_data = pd.merge(
+                            aligned_data,
+                            aligned_features[['id', 'alignment_pep', 'alignment_qvalue']],
+                            on='id',
+                            how='left'
+                        )
+                    
+                    logger.info(f"Adding {len(aligned_data)} features recovered through alignment")
+                    
+                    # Combine with base data
+                    data = pd.concat([data, aligned_data], ignore_index=True)
+        
+        return data
 
     def _augment_data(self, data, con) -> pd.DataFrame:
         """
@@ -558,6 +627,65 @@ class ParquetReader(BaseParquetReader):
                 feature_vars.append(f"{col} AS var_ms2_{var_name}")
 
         return ", " + ", ".join(feature_vars) if feature_vars else ""
+
+    def _fetch_alignment_features(self, con) -> pd.DataFrame:
+        """
+        Fetch aligned features with good alignment scores from alignment parquet file.
+        
+        This method checks for an alignment parquet file and retrieves features
+        that have been aligned across runs and pass the alignment quality threshold.
+        
+        Args:
+            con: DuckDB connection
+            
+        Returns:
+            DataFrame with aligned feature IDs that pass quality threshold
+        """
+        import os
+        
+        # Check for alignment file - it should be named with _feature_alignment.parquet suffix
+        alignment_file = None
+        if self.infile.endswith('.parquet'):
+            base_name = self.infile[:-8]  # Remove .parquet
+            alignment_file = f"{base_name}_feature_alignment.parquet"
+        
+        if not alignment_file or not os.path.exists(alignment_file):
+            logger.debug("Alignment parquet file not found, skipping alignment integration")
+            return pd.DataFrame()
+        
+        logger.debug(f"Loading alignment data from {alignment_file}")
+        max_alignment_pep = self.config.max_alignment_pep
+        
+        try:
+            # Load alignment data
+            alignment_df = pd.read_parquet(alignment_file)
+            
+            # Filter to target (non-decoy) features with good alignment scores
+            if 'DECOY' in alignment_df.columns and 'VAR_XCORR_SHAPE' in alignment_df.columns:
+                # This looks like the feature_alignment table structure
+                filtered_df = alignment_df[
+                    (alignment_df['DECOY'] == 1) &  # LABEL=1 means target
+                    (alignment_df.get('alignment_pep', alignment_df.get('PEP', 1.0)) < max_alignment_pep)
+                ].copy()
+                
+                # Rename columns to match expected format
+                if 'FEATURE_ID' in filtered_df.columns:
+                    result = filtered_df[['FEATURE_ID', 'PRECURSOR_ID', 'RUN_ID']].rename(
+                        columns={'FEATURE_ID': 'id'}
+                    )
+                    
+                    # Add alignment scores if available
+                    if 'PEP' in filtered_df.columns:
+                        result['alignment_pep'] = filtered_df['PEP']
+                    if 'QVALUE' in filtered_df.columns:
+                        result['alignment_qvalue'] = filtered_df['QVALUE']
+                    
+                    logger.info(f"Found {len(result)} aligned features passing alignment PEP < {max_alignment_pep}")
+                    return result
+        except Exception as e:
+            logger.warning(f"Could not load alignment data: {e}")
+        
+        return pd.DataFrame()
 
     ##################################
     # Export-specific readers below

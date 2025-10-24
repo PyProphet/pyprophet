@@ -649,6 +649,8 @@ class ExportIOConfig(BaseIOConfig):
         max_global_peptide_qvalue (float): Filter results to maximum global peptide-level q-value.
         protein (bool): Append protein-level error-rate estimates if available.
         max_global_protein_qvalue (float): Filter results to maximum global protein-level q-value.
+        use_alignment (bool): Use alignment results to recover peaks with good alignment scores.
+        max_alignment_pep (float): Maximum PEP to consider for good alignments when use_alignment is True.
 
         # Quantification matrix options
         top_n (int): Number of top intense features to use for summarization
@@ -688,6 +690,10 @@ class ExportIOConfig(BaseIOConfig):
     protein: bool = True
     max_global_protein_qvalue: float = 0.01
     test: bool = False
+    
+    # Alignment options
+    use_alignment: bool = False
+    max_alignment_pep: float = 0.7
 
     # Quantification matrix options
     top_n: int = 3
