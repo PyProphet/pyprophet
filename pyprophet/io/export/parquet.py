@@ -661,12 +661,36 @@ class ParquetReader(BaseParquetReader):
             alignment_df = pd.read_parquet(alignment_file)
             
             # Filter to target (non-decoy) features with good alignment scores
+            # Note: DECOY column in parquet alignment file comes from LABEL in SQLite
+            # where LABEL=1 (DECOY=1 in parquet) means target, not decoy
             if 'DECOY' in alignment_df.columns and 'VAR_XCORR_SHAPE' in alignment_df.columns:
                 # This looks like the feature_alignment table structure
-                filtered_df = alignment_df[
-                    (alignment_df['DECOY'] == 1) &  # LABEL=1 means target
-                    (alignment_df.get('alignment_pep', alignment_df.get('PEP', 1.0)) < max_alignment_pep)
-                ].copy()
+                
+                # Check if we have alignment scores (PEP/QVALUE) in the file
+                # If not, we'll need to rely on the base MS2 scores and just use alignment to identify features
+                has_alignment_scores = 'PEP' in alignment_df.columns or 'QVALUE' in alignment_df.columns
+                
+                if has_alignment_scores:
+                    # Filter by alignment PEP threshold
+                    pep_col = 'PEP' if 'PEP' in alignment_df.columns else None
+                    qvalue_col = 'QVALUE' if 'QVALUE' in alignment_df.columns else None
+                    
+                    if pep_col:
+                        filtered_df = alignment_df[
+                            (alignment_df['DECOY'] == 1) &  # DECOY=1 means target (from LABEL=1 in SQLite)
+                            (alignment_df[pep_col] < max_alignment_pep)
+                        ].copy()
+                    else:
+                        # Use QVALUE if PEP not available (less ideal but workable)
+                        filtered_df = alignment_df[
+                            (alignment_df['DECOY'] == 1) &
+                            (alignment_df[qvalue_col] < max_alignment_pep)
+                        ].copy()
+                else:
+                    # No alignment scores in file - just filter by target status
+                    # In this case, we can't apply alignment quality threshold
+                    logger.warning("Alignment file found but no PEP/QVALUE scores present. Cannot filter by alignment quality.")
+                    filtered_df = alignment_df[alignment_df['DECOY'] == 1].copy()
                 
                 # Rename columns to match expected format
                 if 'FEATURE_ID' in filtered_df.columns:
@@ -676,11 +700,12 @@ class ParquetReader(BaseParquetReader):
                     
                     # Add alignment scores if available
                     if 'PEP' in filtered_df.columns:
-                        result['alignment_pep'] = filtered_df['PEP']
+                        result['alignment_pep'] = filtered_df['PEP'].values
                     if 'QVALUE' in filtered_df.columns:
-                        result['alignment_qvalue'] = filtered_df['QVALUE']
+                        result['alignment_qvalue'] = filtered_df['QVALUE'].values
                     
-                    logger.info(f"Found {len(result)} aligned features passing alignment PEP < {max_alignment_pep}")
+                    logger.info(f"Found {len(result)} aligned features" + 
+                               (f" passing alignment PEP < {max_alignment_pep}" if has_alignment_scores else ""))
                     return result
         except Exception as e:
             logger.warning(f"Could not load alignment data: {e}")

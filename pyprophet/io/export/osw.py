@@ -1683,30 +1683,67 @@ class OSWWriter(BaseOSWWriter):
         conn.execute(create_temp_table_query)
 
     def _export_alignment_data(self, conn, path: str = None) -> None:
-        """Export feature alignment data"""
+        """Export feature alignment data with scores if available"""
         if path is None:
             path = os.path.join(self.config.outfile, "feature_alignment.parquet")
 
-        query = f"""
-        SELECT
-            ALIGNMENT_ID,
-            RUN_ID,
-            PRECURSOR_ID,
-            ALIGNED_FEATURE_ID AS FEATURE_ID,
-            REFERENCE_FEATURE_ID,
-            ALIGNED_RT,
-            REFERENCE_RT,
-            XCORR_COELUTION_TO_REFERENCE AS VAR_XCORR_COELUTION_TO_REFERENCE,
-            XCORR_SHAPE_TO_REFERENCE AS VAR_XCORR_SHAPE_TO_REFERENCE, 
-            MI_TO_REFERENCE AS VAR_MI_TO_REFERENCE, 
-            XCORR_COELUTION_TO_ALL AS VAR_XCORR_COELUTION_TO_ALL,  
-            XCORR_SHAPE_TO_ALL AS VAR_XCORR_SHAPE, 
-            MI_TO_ALL AS VAR_MI_TO_ALL, 
-            RETENTION_TIME_DEVIATION AS VAR_RETENTION_TIME_DEVIATION, 
-            PEAK_INTENSITY_RATIO AS VAR_PEAK_INTENSITY_RATIO,
-            LABEL AS DECOY
-        FROM sqlite_scan('{self.config.infile}', 'FEATURE_MS2_ALIGNMENT')
-        """
+        # Check if SCORE_ALIGNMENT table exists
+        with sqlite3.connect(self.config.infile) as sql_conn:
+            has_score_alignment = check_sqlite_table(sql_conn, "SCORE_ALIGNMENT")
+        
+        if has_score_alignment:
+            # Export with alignment scores
+            query = f"""
+            SELECT
+                FEATURE_MS2_ALIGNMENT.ALIGNMENT_ID,
+                FEATURE_MS2_ALIGNMENT.RUN_ID,
+                FEATURE_MS2_ALIGNMENT.PRECURSOR_ID,
+                FEATURE_MS2_ALIGNMENT.ALIGNED_FEATURE_ID AS FEATURE_ID,
+                FEATURE_MS2_ALIGNMENT.REFERENCE_FEATURE_ID,
+                FEATURE_MS2_ALIGNMENT.ALIGNED_RT,
+                FEATURE_MS2_ALIGNMENT.REFERENCE_RT,
+                FEATURE_MS2_ALIGNMENT.XCORR_COELUTION_TO_REFERENCE AS VAR_XCORR_COELUTION_TO_REFERENCE,
+                FEATURE_MS2_ALIGNMENT.XCORR_SHAPE_TO_REFERENCE AS VAR_XCORR_SHAPE_TO_REFERENCE, 
+                FEATURE_MS2_ALIGNMENT.MI_TO_REFERENCE AS VAR_MI_TO_REFERENCE, 
+                FEATURE_MS2_ALIGNMENT.XCORR_COELUTION_TO_ALL AS VAR_XCORR_COELUTION_TO_ALL,  
+                FEATURE_MS2_ALIGNMENT.XCORR_SHAPE_TO_ALL AS VAR_XCORR_SHAPE, 
+                FEATURE_MS2_ALIGNMENT.MI_TO_ALL AS VAR_MI_TO_ALL, 
+                FEATURE_MS2_ALIGNMENT.RETENTION_TIME_DEVIATION AS VAR_RETENTION_TIME_DEVIATION, 
+                FEATURE_MS2_ALIGNMENT.PEAK_INTENSITY_RATIO AS VAR_PEAK_INTENSITY_RATIO,
+                FEATURE_MS2_ALIGNMENT.LABEL AS DECOY,
+                SCORE_ALIGNMENT.SCORE AS SCORE,
+                SCORE_ALIGNMENT.PEP AS PEP,
+                SCORE_ALIGNMENT.QVALUE AS QVALUE
+            FROM sqlite_scan('{self.config.infile}', 'FEATURE_MS2_ALIGNMENT') AS FEATURE_MS2_ALIGNMENT
+            LEFT JOIN (
+                SELECT FEATURE_ID, SCORE, PEP, QVALUE, MIN(QVALUE) as MIN_QVALUE
+                FROM sqlite_scan('{self.config.infile}', 'SCORE_ALIGNMENT')
+                GROUP BY FEATURE_ID
+            ) AS SCORE_ALIGNMENT
+            ON FEATURE_MS2_ALIGNMENT.ALIGNED_FEATURE_ID = SCORE_ALIGNMENT.FEATURE_ID
+            """
+        else:
+            # Export without scores (original behavior)
+            query = f"""
+            SELECT
+                ALIGNMENT_ID,
+                RUN_ID,
+                PRECURSOR_ID,
+                ALIGNED_FEATURE_ID AS FEATURE_ID,
+                REFERENCE_FEATURE_ID,
+                ALIGNED_RT,
+                REFERENCE_RT,
+                XCORR_COELUTION_TO_REFERENCE AS VAR_XCORR_COELUTION_TO_REFERENCE,
+                XCORR_SHAPE_TO_REFERENCE AS VAR_XCORR_SHAPE_TO_REFERENCE, 
+                MI_TO_REFERENCE AS VAR_MI_TO_REFERENCE, 
+                XCORR_COELUTION_TO_ALL AS VAR_XCORR_COELUTION_TO_ALL,  
+                XCORR_SHAPE_TO_ALL AS VAR_XCORR_SHAPE, 
+                MI_TO_ALL AS VAR_MI_TO_ALL, 
+                RETENTION_TIME_DEVIATION AS VAR_RETENTION_TIME_DEVIATION, 
+                PEAK_INTENSITY_RATIO AS VAR_PEAK_INTENSITY_RATIO,
+                LABEL AS DECOY
+            FROM sqlite_scan('{self.config.infile}', 'FEATURE_MS2_ALIGNMENT')
+            """
 
         self._execute_copy_query(conn, query, path)
 
