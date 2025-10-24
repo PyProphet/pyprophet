@@ -143,9 +143,9 @@ def create_export_group():
 )
 @click.option(
     "--use_alignment/--no-use_alignment",
-    default=False,
+    default=True,
     show_default=True,
-    help="Use alignment results to recover peaks with good alignment scores (requires FEATURE_MS2_ALIGNMENT and SCORE_ALIGNMENT tables).",
+    help="Use alignment results to recover peaks with good alignment scores if alignment data is present in the input file.",
 )
 @click.option(
     "--max_alignment_pep",
@@ -292,9 +292,9 @@ def export_tsv(
 )
 @click.option(
     "--use_alignment/--no-use_alignment",
-    default=False,
+    default=True,
     show_default=True,
-    help="Use alignment results to recover peaks with good alignment scores (requires FEATURE_MS2_ALIGNMENT and SCORE_ALIGNMENT tables).",
+    help="Use alignment results to recover peaks with good alignment scores if alignment data is present in the input file.",
 )
 @click.option(
     "--max_alignment_pep",

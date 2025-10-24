@@ -27,6 +27,9 @@ class ParquetReader(BaseParquetReader):
         self._has_transition_scores = any(
             col.startswith("SCORE_TRANSITION_") for col in self._columns
         )
+        
+        # Check for alignment file
+        self._has_alignment = self._check_alignment_file_exists()
 
     def read(self) -> pd.DataFrame:
         """
@@ -68,6 +71,22 @@ class ParquetReader(BaseParquetReader):
         """
         all_cols = get_parquet_column_names(self.infile)
         return all(not col.startswith("SCORE_") for col in all_cols)
+
+    def _check_alignment_file_exists(self) -> bool:
+        """
+        Check if alignment parquet file exists.
+        """
+        import os
+        
+        alignment_file = None
+        if self.infile.endswith('.parquet'):
+            base_name = self.infile[:-8]  # Remove .parquet
+            alignment_file = f"{base_name}_feature_alignment.parquet"
+        
+        if alignment_file and os.path.exists(alignment_file):
+            logger.debug(f"Alignment file found: {alignment_file}")
+            return True
+        return False
 
     def _read_unscored_data(self, con) -> pd.DataFrame:
         """
@@ -274,8 +293,8 @@ class ParquetReader(BaseParquetReader):
         """
         data = con.execute(query).fetchdf()
         
-        # If alignment is enabled, fetch and merge aligned features
-        if self.config.use_alignment:
+        # If alignment is enabled and alignment data is present, fetch and merge aligned features
+        if self.config.use_alignment and self._has_alignment:
             aligned_features = self._fetch_alignment_features(con)
             
             if not aligned_features.empty:

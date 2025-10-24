@@ -161,6 +161,13 @@ class OSWReader(BaseOSWReader):
         """Check if IPF data is present and should be used."""
         return cfg.ipf != "disable" and check_sqlite_table(con, "SCORE_IPF")
 
+    def _check_alignment_presence(self, con):
+        """Check if alignment data is present."""
+        return (
+            check_sqlite_table(con, "FEATURE_MS2_ALIGNMENT") 
+            and check_sqlite_table(con, "SCORE_ALIGNMENT")
+        )
+
     def _read_unscored_data(self, con):
         """Read data from unscored files."""
         score_sql = self._build_score_sql(con)
@@ -358,8 +365,8 @@ class OSWReader(BaseOSWReader):
         """
         data = pd.read_sql_query(query, con)
         
-        # If alignment is enabled, fetch and merge aligned features
-        if cfg.use_alignment:
+        # If alignment is enabled and alignment data is present, fetch and merge aligned features
+        if cfg.use_alignment and self._check_alignment_presence(con):
             aligned_features = self._fetch_alignment_features(con, cfg)
             
             if not aligned_features.empty:
@@ -719,11 +726,6 @@ class OSWReader(BaseOSWReader):
         Returns:
             DataFrame with aligned feature IDs that pass quality threshold
         """
-        # Check if alignment tables exist
-        if not check_sqlite_table(con, "FEATURE_MS2_ALIGNMENT") or not check_sqlite_table(con, "SCORE_ALIGNMENT"):
-            logger.debug("Alignment tables not found, skipping alignment integration")
-            return pd.DataFrame()
-        
         max_alignment_pep = cfg.max_alignment_pep
         
         query = f"""
