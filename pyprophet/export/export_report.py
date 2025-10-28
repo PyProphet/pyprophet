@@ -469,6 +469,12 @@ def _plot_feature_scores(df: pd.DataFrame, outfile: str, level: str, append: boo
     if rename_dict:
         plot_df.rename(columns=rename_dict, inplace=True)
     
+    # plot_scores requires a "SCORE" column - use the first VAR_ column as SCORE
+    var_cols = [col for col in plot_df.columns if col.startswith("VAR_")]
+    if var_cols and "SCORE" not in plot_df.columns:
+        # Add SCORE column as a copy of the first VAR_ column
+        plot_df["SCORE"] = plot_df[var_cols[0]]
+    
     # Call plot_scores with the formatted dataframe
     plot_scores(plot_df, temp_outfile)
     
