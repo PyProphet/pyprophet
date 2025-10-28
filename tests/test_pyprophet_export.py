@@ -9,6 +9,8 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+from pyprophet.export.export_report import export_feature_scores
+
 pd.options.display.expand_frame_repr = False
 pd.options.display.precision = 4
 pd.options.display.max_columns = None
@@ -275,9 +277,6 @@ def test_export_feature_scores_osw(test_data_osw, temp_folder):
     """Test export feature scores from OSW file"""
     outfile = temp_folder / "test_data_feature_scores.pdf"
     
-    # Import the function
-    from pyprophet.export.export_report import export_feature_scores
-    
     # Try to export feature scores
     try:
         export_feature_scores(str(test_data_osw), str(outfile))
@@ -285,10 +284,13 @@ def test_export_feature_scores_osw(test_data_osw, temp_folder):
         # Check that output file was created
         assert outfile.exists(), "Feature scores PDF was not created"
         assert outfile.stat().st_size > 0, "Feature scores PDF is empty"
-    except Exception as e:
-        # If matplotlib is not available or data doesn't have feature scores, skip test
-        if "matplotlib" in str(e).lower() or "no feature score" in str(e).lower():
-            pytest.skip(f"Test skipped due to: {str(e)}")
+    except (ImportError, ModuleNotFoundError) as e:
+        # Skip if matplotlib or other required packages are not available
+        pytest.skip(f"Test skipped due to missing dependency: {str(e)}")
+    except ValueError as e:
+        # Skip if data doesn't have feature scores
+        if "no feature score" in str(e).lower():
+            pytest.skip(f"Test skipped: {str(e)}")
         else:
             raise
 
@@ -297,9 +299,6 @@ def test_export_feature_scores_parquet(test_data_parquet, temp_folder):
     """Test export feature scores from Parquet file"""
     outfile = temp_folder / "test_data_feature_scores.pdf"
     
-    # Import the function
-    from pyprophet.export.export_report import export_feature_scores
-    
     # Try to export feature scores
     try:
         export_feature_scores(str(test_data_parquet), str(outfile))
@@ -307,10 +306,13 @@ def test_export_feature_scores_parquet(test_data_parquet, temp_folder):
         # Check that output file was created (if data has feature scores)
         if outfile.exists():
             assert outfile.stat().st_size > 0, "Feature scores PDF is empty"
-    except Exception as e:
-        # If matplotlib is not available or data doesn't have feature scores, skip test
-        if "matplotlib" in str(e).lower() or "no feature score" in str(e).lower():
-            pytest.skip(f"Test skipped due to: {str(e)}")
+    except (ImportError, ModuleNotFoundError) as e:
+        # Skip if matplotlib or other required packages are not available
+        pytest.skip(f"Test skipped due to missing dependency: {str(e)}")
+    except ValueError as e:
+        # Skip if data doesn't have feature scores
+        if "no feature score" in str(e).lower():
+            pytest.skip(f"Test skipped: {str(e)}")
         else:
             raise
 
@@ -319,9 +321,6 @@ def test_export_feature_scores_split_parquet(test_data_split_parquet, temp_folde
     """Test export feature scores from Split Parquet directory"""
     outfile = temp_folder / "test_data_feature_scores.pdf"
     
-    # Import the function
-    from pyprophet.export.export_report import export_feature_scores
-    
     # Try to export feature scores
     try:
         export_feature_scores(str(test_data_split_parquet), str(outfile))
@@ -329,10 +328,13 @@ def test_export_feature_scores_split_parquet(test_data_split_parquet, temp_folde
         # Check that output file was created (if data has feature scores)
         if outfile.exists():
             assert outfile.stat().st_size > 0, "Feature scores PDF is empty"
-    except Exception as e:
-        # If matplotlib is not available or data doesn't have feature scores, skip test
-        if "matplotlib" in str(e).lower() or "no feature score" in str(e).lower():
-            pytest.skip(f"Test skipped due to: {str(e)}")
+    except (ImportError, ModuleNotFoundError) as e:
+        # Skip if matplotlib or other required packages are not available
+        pytest.skip(f"Test skipped due to missing dependency: {str(e)}")
+    except ValueError as e:
+        # Skip if data doesn't have feature scores
+        if "no feature score" in str(e).lower():
+            pytest.skip(f"Test skipped: {str(e)}")
         else:
             raise
 
