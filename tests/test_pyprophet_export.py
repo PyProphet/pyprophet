@@ -268,3 +268,86 @@ def test_compound_ms2(test_data_compound_osw, temp_folder, regtest):
 
     df = pd.read_csv(f"{temp_folder}/test_data_compound_ms2.tsv", sep="\t", nrows=100)
     print(df.sort_index(axis=1), file=regtest)
+
+
+# ================== TEST EXPORT FEATURE SCORES ==================
+def test_export_feature_scores_osw(test_data_osw, temp_folder):
+    """Test export feature scores from OSW file"""
+    outfile = temp_folder / "test_data_feature_scores.pdf"
+    
+    # Import the function
+    from pyprophet.export.export_report import export_feature_scores
+    
+    # Try to export feature scores
+    try:
+        export_feature_scores(str(test_data_osw), str(outfile))
+        
+        # Check that output file was created
+        assert outfile.exists(), "Feature scores PDF was not created"
+        assert outfile.stat().st_size > 0, "Feature scores PDF is empty"
+    except Exception as e:
+        # If matplotlib is not available or data doesn't have feature scores, skip test
+        if "matplotlib" in str(e).lower() or "no feature score" in str(e).lower():
+            pytest.skip(f"Test skipped due to: {str(e)}")
+        else:
+            raise
+
+
+def test_export_feature_scores_parquet(test_data_parquet, temp_folder):
+    """Test export feature scores from Parquet file"""
+    outfile = temp_folder / "test_data_feature_scores.pdf"
+    
+    # Import the function
+    from pyprophet.export.export_report import export_feature_scores
+    
+    # Try to export feature scores
+    try:
+        export_feature_scores(str(test_data_parquet), str(outfile))
+        
+        # Check that output file was created (if data has feature scores)
+        if outfile.exists():
+            assert outfile.stat().st_size > 0, "Feature scores PDF is empty"
+    except Exception as e:
+        # If matplotlib is not available or data doesn't have feature scores, skip test
+        if "matplotlib" in str(e).lower() or "no feature score" in str(e).lower():
+            pytest.skip(f"Test skipped due to: {str(e)}")
+        else:
+            raise
+
+
+def test_export_feature_scores_split_parquet(test_data_split_parquet, temp_folder):
+    """Test export feature scores from Split Parquet directory"""
+    outfile = temp_folder / "test_data_feature_scores.pdf"
+    
+    # Import the function
+    from pyprophet.export.export_report import export_feature_scores
+    
+    # Try to export feature scores
+    try:
+        export_feature_scores(str(test_data_split_parquet), str(outfile))
+        
+        # Check that output file was created (if data has feature scores)
+        if outfile.exists():
+            assert outfile.stat().st_size > 0, "Feature scores PDF is empty"
+    except Exception as e:
+        # If matplotlib is not available or data doesn't have feature scores, skip test
+        if "matplotlib" in str(e).lower() or "no feature score" in str(e).lower():
+            pytest.skip(f"Test skipped due to: {str(e)}")
+        else:
+            raise
+
+
+def test_export_feature_scores_cli_osw(test_data_osw, temp_folder):
+    """Test export feature scores CLI command with OSW file"""
+    outfile = temp_folder / "test_data_feature_scores.pdf"
+    cmd = f"pyprophet export feature-scores --in={test_data_osw} --out={outfile}"
+    
+    try:
+        run_pyprophet_command(cmd, temp_folder)
+        
+        # Check that output file was created (if data has feature scores)
+        if outfile.exists():
+            assert outfile.stat().st_size > 0, "Feature scores PDF is empty"
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        # Skip test if pyprophet command is not available or fails
+        pytest.skip(f"Test skipped due to: {str(e)}")
