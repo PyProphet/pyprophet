@@ -437,26 +437,68 @@ def _plot_feature_scores(df: pd.DataFrame, outfile: str, level: str, append: boo
     
     logger.info(f"Found {len(score_cols)} feature score columns for {level} level: {score_cols}")
     
-    # Prepare data for plotting - ensure DECOY column exists and rename score columns
+    # Prepare data for plotting - ensure DECOY column exists
     if "DECOY" not in df.columns:
         logger.warning(f"No DECOY column found for {level} level, skipping")
         return
     
-    # Create a copy with standardized column names for plot_scores
-    plot_df = df[score_cols + ["DECOY"]].copy()
+    # Drop rows with null DECOY values
+    plot_df = df[score_cols + ["DECOY"]].dropna(subset=["DECOY"]).copy()
     
-    # Add required columns for plot_scores function
-    # The plot_scores function expects specific column names
-    plot_df.rename(columns={
-        score_cols[0]: "SCORE"  # Use first score column as main score
-    }, inplace=True)
+    # Ensure DECOY is 0 or 1
+    if plot_df["DECOY"].dtype == bool:
+        plot_df["DECOY"] = plot_df["DECOY"].astype(int)
     
-    # Rename other columns to match expected format
-    for col in score_cols[1:]:
-        # Keep VAR_ prefix for additional scores
-        if not col.startswith("VAR_"):
-            new_col = "VAR_" + col.split("VAR_")[-1] if "VAR_" in col else "VAR_" + col
-            plot_df.rename(columns={col: new_col}, inplace=True)
+    # Generate a temporary output file for this level
+    temp_outfile = outfile.replace(".pdf", f"_{level}_temp.pdf")
+    
+    # Rename columns to match plot_scores expectations
+    # plot_scores expects columns named "SCORE", "MAIN_VAR_*", or "VAR_*"
+    rename_dict = {}
+    for i, col in enumerate(score_cols):
+        # Ensure column names start with VAR_
+        if not col.upper().startswith("VAR_"):
+            # Extract the var part from column names like FEATURE_MS1_VAR_XXX
+            parts = col.split("VAR_")
+            if len(parts) > 1:
+                new_name = "VAR_" + parts[-1]
+            else:
+                new_name = "VAR_" + col
+            rename_dict[col] = new_name
+    
+    if rename_dict:
+        plot_df.rename(columns=rename_dict, inplace=True)
     
     # Call plot_scores with the formatted dataframe
-    plot_scores(plot_df, outfile)
+    plot_scores(plot_df, temp_outfile)
+    
+    # If appending, merge PDFs, otherwise just rename
+    if append and os.path.exists(outfile):
+        from pypdf import PdfReader, PdfWriter
+        
+        # Merge the PDFs
+        writer = PdfWriter()
+        
+        # Add pages from existing PDF
+        with open(outfile, "rb") as f:
+            existing_pdf = PdfReader(f)
+            for page in existing_pdf.pages:
+                writer.add_page(page)
+        
+        # Add pages from new PDF
+        with open(temp_outfile, "rb") as f:
+            new_pdf = PdfReader(f)
+            for page in new_pdf.pages:
+                writer.add_page(page)
+        
+        # Write merged PDF
+        with open(outfile, "wb") as f:
+            writer.write(f)
+        
+        # Remove temporary file
+        os.remove(temp_outfile)
+    else:
+        # Just rename temporary file to output file
+        if os.path.exists(outfile):
+            os.remove(outfile)
+        os.rename(temp_outfile, outfile)
