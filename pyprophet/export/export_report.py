@@ -224,77 +224,105 @@ def _export_feature_scores_osw(infile: str, outfile: str):
         # Process MS1 level if available
         if check_sqlite_table(con, "FEATURE_MS1"):
             logger.info("Processing MS1 level feature scores")
-            ms1_query = """
-                SELECT 
-                    FEATURE_MS1.*,
-                    PRECURSOR.DECOY,
-                    RUN.ID AS RUN_ID,
-                    FEATURE.PRECURSOR_ID,
-                    FEATURE.EXP_RT
-                FROM FEATURE_MS1
-                INNER JOIN FEATURE ON FEATURE_MS1.FEATURE_ID = FEATURE.ID
-                INNER JOIN PRECURSOR ON FEATURE.PRECURSOR_ID = PRECURSOR.ID
-                INNER JOIN RUN ON FEATURE.RUN_ID = RUN.ID
-            """
-            df_ms1 = pd.read_sql_query(ms1_query, con)
-            if not df_ms1.empty:
-                _plot_feature_scores(df_ms1, outfile, "ms1", append=False)
+            # Get only VAR_ columns to reduce memory usage
+            cursor = con.cursor()
+            cursor.execute("PRAGMA table_info(FEATURE_MS1)")
+            all_cols = [row[1] for row in cursor.fetchall()]
+            var_cols = [col for col in all_cols if "VAR_" in col.upper()]
+            
+            if var_cols:
+                var_cols_sql = ", ".join([f"FEATURE_MS1.{col}" for col in var_cols])
+                ms1_query = f"""
+                    SELECT 
+                        {var_cols_sql},
+                        PRECURSOR.DECOY
+                    FROM FEATURE_MS1
+                    INNER JOIN FEATURE ON FEATURE_MS1.FEATURE_ID = FEATURE.ID
+                    INNER JOIN PRECURSOR ON FEATURE.PRECURSOR_ID = PRECURSOR.ID
+                """
+                df_ms1 = pd.read_sql_query(ms1_query, con)
+                if not df_ms1.empty:
+                    _plot_feature_scores(df_ms1, outfile, "ms1", append=False)
+            else:
+                logger.warning("No VAR_ columns found in FEATURE_MS1 table")
         
         # Process MS2 level if available
         if check_sqlite_table(con, "FEATURE_MS2"):
             logger.info("Processing MS2 level feature scores")
-            ms2_query = """
-                SELECT 
-                    FEATURE_MS2.*,
-                    PRECURSOR.DECOY,
-                    RUN.ID AS RUN_ID,
-                    FEATURE.PRECURSOR_ID,
-                    FEATURE.EXP_RT
-                FROM FEATURE_MS2
-                INNER JOIN FEATURE ON FEATURE_MS2.FEATURE_ID = FEATURE.ID
-                INNER JOIN PRECURSOR ON FEATURE.PRECURSOR_ID = PRECURSOR.ID
-                INNER JOIN RUN ON FEATURE.RUN_ID = RUN.ID
-            """
-            df_ms2 = pd.read_sql_query(ms2_query, con)
-            if not df_ms2.empty:
-                append = check_sqlite_table(con, "FEATURE_MS1")
-                _plot_feature_scores(df_ms2, outfile, "ms2", append=append)
+            # Get only VAR_ columns to reduce memory usage
+            cursor = con.cursor()
+            cursor.execute("PRAGMA table_info(FEATURE_MS2)")
+            all_cols = [row[1] for row in cursor.fetchall()]
+            var_cols = [col for col in all_cols if "VAR_" in col.upper()]
+            
+            if var_cols:
+                var_cols_sql = ", ".join([f"FEATURE_MS2.{col}" for col in var_cols])
+                ms2_query = f"""
+                    SELECT 
+                        {var_cols_sql},
+                        PRECURSOR.DECOY
+                    FROM FEATURE_MS2
+                    INNER JOIN FEATURE ON FEATURE_MS2.FEATURE_ID = FEATURE.ID
+                    INNER JOIN PRECURSOR ON FEATURE.PRECURSOR_ID = PRECURSOR.ID
+                """
+                df_ms2 = pd.read_sql_query(ms2_query, con)
+                if not df_ms2.empty:
+                    append = check_sqlite_table(con, "FEATURE_MS1")
+                    _plot_feature_scores(df_ms2, outfile, "ms2", append=append)
+            else:
+                logger.warning("No VAR_ columns found in FEATURE_MS2 table")
         
         # Process transition level if available
         if check_sqlite_table(con, "FEATURE_TRANSITION"):
             logger.info("Processing transition level feature scores")
-            transition_query = """
-                SELECT 
-                    FEATURE_TRANSITION.*,
-                    TRANSITION.DECOY,
-                    RUN.ID AS RUN_ID,
-                    FEATURE.PRECURSOR_ID,
-                    FEATURE.EXP_RT
-                FROM FEATURE_TRANSITION
-                INNER JOIN FEATURE ON FEATURE_TRANSITION.FEATURE_ID = FEATURE.ID
-                INNER JOIN TRANSITION ON FEATURE_TRANSITION.TRANSITION_ID = TRANSITION.ID
-                INNER JOIN RUN ON FEATURE.RUN_ID = RUN.ID
-            """
-            df_transition = pd.read_sql_query(transition_query, con)
-            if not df_transition.empty:
-                append = check_sqlite_table(con, "FEATURE_MS1") or check_sqlite_table(con, "FEATURE_MS2")
-                _plot_feature_scores(df_transition, outfile, "transition", append=append)
+            # Get only VAR_ columns to reduce memory usage
+            cursor = con.cursor()
+            cursor.execute("PRAGMA table_info(FEATURE_TRANSITION)")
+            all_cols = [row[1] for row in cursor.fetchall()]
+            var_cols = [col for col in all_cols if "VAR_" in col.upper()]
+            
+            if var_cols:
+                var_cols_sql = ", ".join([f"FEATURE_TRANSITION.{col}" for col in var_cols])
+                transition_query = f"""
+                    SELECT 
+                        {var_cols_sql},
+                        TRANSITION.DECOY
+                    FROM FEATURE_TRANSITION
+                    INNER JOIN FEATURE ON FEATURE_TRANSITION.FEATURE_ID = FEATURE.ID
+                    INNER JOIN TRANSITION ON FEATURE_TRANSITION.TRANSITION_ID = TRANSITION.ID
+                """
+                df_transition = pd.read_sql_query(transition_query, con)
+                if not df_transition.empty:
+                    append = check_sqlite_table(con, "FEATURE_MS1") or check_sqlite_table(con, "FEATURE_MS2")
+                    _plot_feature_scores(df_transition, outfile, "transition", append=append)
+            else:
+                logger.warning("No VAR_ columns found in FEATURE_TRANSITION table")
         
         # Process alignment level if available
         if check_sqlite_table(con, "FEATURE_MS2_ALIGNMENT"):
             logger.info("Processing alignment level feature scores")
-            alignment_query = """
-                SELECT 
-                    *,
-                    LABEL AS DECOY
-                FROM FEATURE_MS2_ALIGNMENT
-            """
-            df_alignment = pd.read_sql_query(alignment_query, con)
-            if not df_alignment.empty:
-                append = (check_sqlite_table(con, "FEATURE_MS1") or 
-                         check_sqlite_table(con, "FEATURE_MS2") or 
-                         check_sqlite_table(con, "FEATURE_TRANSITION"))
-                _plot_feature_scores(df_alignment, outfile, "alignment", append=append)
+            # Get only VAR_ columns to reduce memory usage
+            cursor = con.cursor()
+            cursor.execute("PRAGMA table_info(FEATURE_MS2_ALIGNMENT)")
+            all_cols = [row[1] for row in cursor.fetchall()]
+            var_cols = [col for col in all_cols if "VAR_" in col.upper()]
+            
+            if var_cols:
+                var_cols_sql = ", ".join(var_cols)
+                alignment_query = f"""
+                    SELECT 
+                        {var_cols_sql},
+                        LABEL AS DECOY
+                    FROM FEATURE_MS2_ALIGNMENT
+                """
+                df_alignment = pd.read_sql_query(alignment_query, con)
+                if not df_alignment.empty:
+                    append = (check_sqlite_table(con, "FEATURE_MS1") or 
+                             check_sqlite_table(con, "FEATURE_MS2") or 
+                             check_sqlite_table(con, "FEATURE_TRANSITION"))
+                    _plot_feature_scores(df_alignment, outfile, "alignment", append=append)
+            else:
+                logger.warning("No VAR_ columns found in FEATURE_MS2_ALIGNMENT table")
     
     finally:
         con.close()
@@ -312,36 +340,61 @@ def _export_feature_scores_parquet(infile: str, outfile: str):
         Path to the output PDF file.
     """
     logger.info(f"Reading parquet file: {infile}")
-    df = pd.read_parquet(infile)
+    # First, read only column names to identify what to load
+    import pyarrow.parquet as pq
+    parquet_file = pq.ParquetFile(infile)
+    all_columns = parquet_file.schema.names
     
-    # Get all column names
-    columns = df.columns.tolist()
+    # Identify columns to read for each level
+    ms1_cols = [col for col in all_columns if col.startswith("FEATURE_MS1_VAR_")]
+    ms2_cols = [col for col in all_columns if col.startswith("FEATURE_MS2_VAR_")]
+    transition_cols = [col for col in all_columns if col.startswith("FEATURE_TRANSITION_VAR_")]
+    
+    # Determine which columns to read (only what we need)
+    cols_to_read = set()
+    if ms1_cols and "PRECURSOR_DECOY" in all_columns:
+        cols_to_read.update(ms1_cols)
+        cols_to_read.add("PRECURSOR_DECOY")
+    if ms2_cols and "PRECURSOR_DECOY" in all_columns:
+        cols_to_read.update(ms2_cols)
+        cols_to_read.add("PRECURSOR_DECOY")
+    if transition_cols and "TRANSITION_DECOY" in all_columns:
+        cols_to_read.update(transition_cols)
+        cols_to_read.add("TRANSITION_DECOY")
+    
+    if not cols_to_read:
+        logger.warning("No VAR_ columns found in parquet file")
+        return
+    
+    # Read only the columns we need
+    logger.info(f"Reading {len(cols_to_read)} columns from parquet file")
+    df = pd.read_parquet(infile, columns=list(cols_to_read))
     
     # Process MS1 level
-    ms1_cols = [col for col in columns if col.startswith("FEATURE_MS1_VAR_")]
-    if ms1_cols and "PRECURSOR_DECOY" in columns:
+    if ms1_cols and "PRECURSOR_DECOY" in df.columns:
         logger.info("Processing MS1 level feature scores")
         ms1_df = df[ms1_cols + ["PRECURSOR_DECOY"]].copy()
         ms1_df.rename(columns={"PRECURSOR_DECOY": "DECOY"}, inplace=True)
         _plot_feature_scores(ms1_df, outfile, "ms1", append=False)
+        del ms1_df  # Free memory
     
     # Process MS2 level
-    ms2_cols = [col for col in columns if col.startswith("FEATURE_MS2_VAR_")]
-    if ms2_cols and "PRECURSOR_DECOY" in columns:
+    if ms2_cols and "PRECURSOR_DECOY" in df.columns:
         logger.info("Processing MS2 level feature scores")
         ms2_df = df[ms2_cols + ["PRECURSOR_DECOY"]].copy()
         ms2_df.rename(columns={"PRECURSOR_DECOY": "DECOY"}, inplace=True)
         append = bool(ms1_cols)
         _plot_feature_scores(ms2_df, outfile, "ms2", append=append)
+        del ms2_df  # Free memory
     
     # Process transition level
-    transition_cols = [col for col in columns if col.startswith("FEATURE_TRANSITION_VAR_")]
-    if transition_cols and "TRANSITION_DECOY" in columns:
+    if transition_cols and "TRANSITION_DECOY" in df.columns:
         logger.info("Processing transition level feature scores")
         transition_df = df[transition_cols + ["TRANSITION_DECOY"]].copy()
         transition_df.rename(columns={"TRANSITION_DECOY": "DECOY"}, inplace=True)
         append = bool(ms1_cols or ms2_cols)
         _plot_feature_scores(transition_df, outfile, "transition", append=append)
+        del transition_df  # Free memory
 
 
 def _export_feature_scores_split_parquet(infile: str, outfile: str):
@@ -355,65 +408,97 @@ def _export_feature_scores_split_parquet(infile: str, outfile: str):
     outfile : str
         Path to the output PDF file.
     """
-    # Read precursor features
+    # Read precursor features - only necessary columns
     precursor_file = os.path.join(infile, "precursors_features.parquet")
     logger.info(f"Reading precursor features from: {precursor_file}")
-    df_precursor = pd.read_parquet(precursor_file)
     
-    # Get all column names
-    columns = df_precursor.columns.tolist()
+    # First check what columns are available
+    import pyarrow.parquet as pq
+    precursor_parquet = pq.ParquetFile(precursor_file)
+    all_columns = precursor_parquet.schema.names
     
-    # Process MS1 level
-    ms1_cols = [col for col in columns if col.startswith("FEATURE_MS1_VAR_")]
-    if ms1_cols and "PRECURSOR_DECOY" in columns:
-        logger.info("Processing MS1 level feature scores")
-        ms1_df = df_precursor[ms1_cols + ["PRECURSOR_DECOY"]].copy()
-        ms1_df.rename(columns={"PRECURSOR_DECOY": "DECOY"}, inplace=True)
-        _plot_feature_scores(ms1_df, outfile, "ms1", append=False)
+    # Identify columns to read
+    ms1_cols = [col for col in all_columns if col.startswith("FEATURE_MS1_VAR_")]
+    ms2_cols = [col for col in all_columns if col.startswith("FEATURE_MS2_VAR_")]
     
-    # Process MS2 level
-    ms2_cols = [col for col in columns if col.startswith("FEATURE_MS2_VAR_")]
-    if ms2_cols and "PRECURSOR_DECOY" in columns:
-        logger.info("Processing MS2 level feature scores")
-        ms2_df = df_precursor[ms2_cols + ["PRECURSOR_DECOY"]].copy()
-        ms2_df.rename(columns={"PRECURSOR_DECOY": "DECOY"}, inplace=True)
-        append = bool(ms1_cols)
-        _plot_feature_scores(ms2_df, outfile, "ms2", append=append)
+    cols_to_read = set()
+    if ms1_cols and "PRECURSOR_DECOY" in all_columns:
+        cols_to_read.update(ms1_cols)
+        cols_to_read.add("PRECURSOR_DECOY")
+    if ms2_cols and "PRECURSOR_DECOY" in all_columns:
+        cols_to_read.update(ms2_cols)
+        cols_to_read.add("PRECURSOR_DECOY")
+    
+    if cols_to_read:
+        logger.info(f"Reading {len(cols_to_read)} columns from precursor features")
+        df_precursor = pd.read_parquet(precursor_file, columns=list(cols_to_read))
+        
+        # Process MS1 level
+        if ms1_cols and "PRECURSOR_DECOY" in df_precursor.columns:
+            logger.info("Processing MS1 level feature scores")
+            ms1_df = df_precursor[ms1_cols + ["PRECURSOR_DECOY"]].copy()
+            ms1_df.rename(columns={"PRECURSOR_DECOY": "DECOY"}, inplace=True)
+            _plot_feature_scores(ms1_df, outfile, "ms1", append=False)
+            del ms1_df  # Free memory
+        
+        # Process MS2 level
+        if ms2_cols and "PRECURSOR_DECOY" in df_precursor.columns:
+            logger.info("Processing MS2 level feature scores")
+            ms2_df = df_precursor[ms2_cols + ["PRECURSOR_DECOY"]].copy()
+            ms2_df.rename(columns={"PRECURSOR_DECOY": "DECOY"}, inplace=True)
+            append = bool(ms1_cols)
+            _plot_feature_scores(ms2_df, outfile, "ms2", append=append)
+            del ms2_df  # Free memory
+        
+        del df_precursor  # Free memory
     
     # Read transition features if available
     transition_file = os.path.join(infile, "transition_features.parquet")
     if os.path.exists(transition_file):
         logger.info(f"Reading transition features from: {transition_file}")
-        df_transition = pd.read_parquet(transition_file)
-        transition_columns = df_transition.columns.tolist()
         
-        # Process transition level
-        transition_cols = [col for col in transition_columns if col.startswith("FEATURE_TRANSITION_VAR_")]
-        if transition_cols and "TRANSITION_DECOY" in transition_columns:
+        # Check what columns are available
+        transition_parquet = pq.ParquetFile(transition_file)
+        transition_all_columns = transition_parquet.schema.names
+        transition_cols = [col for col in transition_all_columns if col.startswith("FEATURE_TRANSITION_VAR_")]
+        
+        if transition_cols and "TRANSITION_DECOY" in transition_all_columns:
+            # Read only necessary columns
+            cols_to_read = transition_cols + ["TRANSITION_DECOY"]
+            logger.info(f"Reading {len(cols_to_read)} columns from transition features")
+            df_transition = pd.read_parquet(transition_file, columns=cols_to_read)
+            
             logger.info("Processing transition level feature scores")
             transition_df = df_transition[transition_cols + ["TRANSITION_DECOY"]].copy()
             transition_df.rename(columns={"TRANSITION_DECOY": "DECOY"}, inplace=True)
             append = bool(ms1_cols or ms2_cols)
             _plot_feature_scores(transition_df, outfile, "transition", append=append)
+            del transition_df, df_transition  # Free memory
     
     # Read alignment features if available
     alignment_file = os.path.join(infile, "feature_alignment.parquet")
     if os.path.exists(alignment_file):
         logger.info(f"Reading alignment features from: {alignment_file}")
-        df_alignment = pd.read_parquet(alignment_file)
         
-        # Get var columns
-        alignment_columns = df_alignment.columns.tolist()
-        var_cols = [col for col in alignment_columns if col.startswith("VAR_")]
+        # Check what columns are available
+        alignment_parquet = pq.ParquetFile(alignment_file)
+        alignment_all_columns = alignment_parquet.schema.names
+        var_cols = [col for col in alignment_all_columns if col.startswith("VAR_")]
         
-        if var_cols and "DECOY" in alignment_columns:
+        if var_cols and "DECOY" in alignment_all_columns:
+            # Read only necessary columns
+            cols_to_read = var_cols + ["DECOY"]
+            logger.info(f"Reading {len(cols_to_read)} columns from alignment features")
+            df_alignment = pd.read_parquet(alignment_file, columns=cols_to_read)
+            
             logger.info("Processing alignment level feature scores")
             alignment_df = df_alignment[var_cols + ["DECOY"]].copy()
             append = bool(ms1_cols or ms2_cols or (os.path.exists(transition_file) and transition_cols))
             _plot_feature_scores(alignment_df, outfile, "alignment", append=append)
+            del alignment_df, df_alignment  # Free memory
 
 
-def _plot_feature_scores(df: pd.DataFrame, outfile: str, level: str, append: bool = False):
+def _plot_feature_scores(df: pd.DataFrame, outfile: str, level: str, append: bool = False, sample_size: int = 100000):
     """
     Create plots for feature scores at a specific level.
     
@@ -427,6 +512,9 @@ def _plot_feature_scores(df: pd.DataFrame, outfile: str, level: str, append: boo
         Level name (ms1, ms2, transition, or alignment).
     append : bool
         If True, append to existing PDF. If False, create new PDF.
+    sample_size : int
+        Maximum number of rows to use for plotting. If df has more rows,
+        a stratified sample (by DECOY) will be taken to reduce memory usage.
     """
     # Get all columns that contain feature scores (VAR_ columns or columns with _VAR_ in name)
     score_cols = [col for col in df.columns if "VAR_" in col.upper() and col != "DECOY"]
@@ -442,8 +530,38 @@ def _plot_feature_scores(df: pd.DataFrame, outfile: str, level: str, append: boo
         logger.warning(f"No DECOY column found for {level} level, skipping")
         return
     
-    # Drop rows with null DECOY values
+    # Only select the columns we need for plotting
     plot_df = df[score_cols + ["DECOY"]].dropna(subset=["DECOY"]).copy()
+    
+    # Memory optimization: Sample data if it's too large
+    if len(plot_df) > sample_size:
+        logger.info(f"Dataset has {len(plot_df)} rows, sampling {sample_size} rows (stratified by DECOY) to reduce memory usage")
+        # Stratified sampling to maintain target/decoy ratio
+        target_df = plot_df[plot_df["DECOY"] == 0]
+        decoy_df = plot_df[plot_df["DECOY"] == 1]
+        
+        # Calculate sample sizes proportional to original distribution
+        n_targets = len(target_df)
+        n_decoys = len(decoy_df)
+        total = n_targets + n_decoys
+        
+        target_sample_size = int(sample_size * n_targets / total)
+        decoy_sample_size = int(sample_size * n_decoys / total)
+        
+        # Sample from each group
+        if n_targets > target_sample_size:
+            target_sample = target_df.sample(n=target_sample_size, random_state=42)
+        else:
+            target_sample = target_df
+            
+        if n_decoys > decoy_sample_size:
+            decoy_sample = decoy_df.sample(n=decoy_sample_size, random_state=42)
+        else:
+            decoy_sample = decoy_df
+        
+        # Combine samples
+        plot_df = pd.concat([target_sample, decoy_sample], ignore_index=True)
+        logger.info(f"Sampled {len(plot_df)} rows ({len(target_sample)} targets, {len(decoy_sample)} decoys)")
     
     # Ensure DECOY is 0 or 1
     if plot_df["DECOY"].dtype == bool:
