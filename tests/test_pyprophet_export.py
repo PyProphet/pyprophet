@@ -390,3 +390,45 @@ def test_parquet_export_split_format(test_data_osw, temp_folder, regtest):
     print(f"Precursor score columns: {sorted(precursor_score_columns)}", file=regtest)
     print("Precursor data sample:", file=regtest)
     print(precursor_df.head(5).sort_index(axis=1), file=regtest)
+
+
+def test_parquet_export_with_ipf(test_data_osw, temp_folder, regtest):
+    """Test exporting parquet with IPF (Inference of Peptidoforms) scoring"""
+    # Score at MS1 level
+    cmd = f"pyprophet score --in={test_data_osw} --level=ms1 --test --pi0_lambda=0.1 0 0 --ss_iteration_fdr=0.02 && "
+    
+    # Score at MS2 level
+    cmd += f"pyprophet score --in={test_data_osw} --level=ms2 --test --pi0_lambda=0.001 0 0 --ss_iteration_fdr=0.02 && "
+    
+    # Score at transition level
+    cmd += f"pyprophet score --in={test_data_osw} --level=transition --test --pi0_lambda=0.1 0 0 --ss_iteration_fdr=0.02 && "
+    
+    # Run IPF (Inference of Peptidoforms)
+    cmd += f"pyprophet infer peptidoform --in={test_data_osw} && "
+    
+    # Export to parquet (should include SCORE_IPF columns)
+    cmd += f"pyprophet export parquet --in={test_data_osw} --out={temp_folder}/test_data_ipf.parquet"
+    
+    run_pyprophet_command(cmd, temp_folder)
+    
+    # Verify the parquet file exists and has data
+    import pyarrow.parquet as pq
+    table = pq.read_table(f"{temp_folder}/test_data_ipf.parquet")
+    df = table.to_pandas()
+    
+    # Check that we have data
+    assert len(df) > 0, "Exported parquet file should not be empty"
+    
+    # Check that SCORE_IPF columns are present
+    ipf_columns = [col for col in df.columns if col.startswith('SCORE_IPF')]
+    assert len(ipf_columns) > 0, "Exported parquet should contain SCORE_IPF columns"
+    
+    # Check for specific SCORE_IPF columns
+    expected_ipf_columns = ['SCORE_IPF_PRECURSOR_PEAKGROUP_PEP', 'SCORE_IPF_PEP', 'SCORE_IPF_QVALUE']
+    for col in expected_ipf_columns:
+        assert col in df.columns, f"Expected column {col} not found in exported parquet"
+    
+    print(f"Exported {len(df)} rows with {len(df.columns)} columns", file=regtest)
+    print(f"SCORE_IPF columns found: {sorted(ipf_columns)}", file=regtest)
+    print("Sample data with IPF scores:", file=regtest)
+    print(df[['FEATURE_ID'] + ipf_columns].head(10).sort_index(axis=1), file=regtest)
