@@ -322,6 +322,11 @@ def _plot_feature_scores(df: pd.DataFrame, outfile: str, level: str, append: boo
     # Call plot_scores with the formatted dataframe
     plot_scores(plot_df, temp_outfile)
     
+    # Check if the temporary file was created
+    if not os.path.exists(temp_outfile):
+        logger.warning(f"plot_scores did not create output file for {level} level, skipping")
+        return
+    
     # If appending, merge PDFs, otherwise just rename
     if append and os.path.exists(outfile):
         from pypdf import PdfReader, PdfWriter
