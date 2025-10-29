@@ -14,6 +14,9 @@ from ..export.export_report import (
 from ..export.export_report import (
     export_scored_report as _export_scored_report,
 )
+from ..export.export_report import (
+    export_feature_scores as _export_feature_scores,
+)
 from ..export.calibration_report import generate_report as generate_calibration_report
 from ..glyco.export import (
     export_score_plots as export_glyco_score_plots,
@@ -45,6 +48,7 @@ def create_export_group():
     export.add_command(export_glyco, name="glyco")
     export.add_command(export_score_plots, name="score-plots")
     export.add_command(export_scored_report, name="score-report")
+    export.add_command(export_feature_scores, name="feature-scores")
     export.add_command(export_calibration_report, name="calibration-report")
 
     return export
@@ -878,6 +882,33 @@ def export_scored_report(infile):
     outfile = Path(infile).stem + "_score_plots.pdf"
     logger.info(f"Exporting score plots to {outfile}")
     _export_scored_report(infile, outfile)
+
+
+# Export feature scores
+@click.command(name="feature-scores", cls=AdvancedHelpCommand)
+@click.option(
+    "--in",
+    "infile",
+    required=True,
+    type=click.Path(exists=True),
+    help="PyProphet input file (OSW, Parquet, or Split Parquet directory).",
+)
+@click.option(
+    "--out",
+    "outfile",
+    type=click.Path(exists=False),
+    help="Output PDF file. If not provided, will be auto-generated based on input filename.",
+)
+@measure_memory_usage_and_time
+def export_feature_scores(infile, outfile):
+    """
+    Export feature score plots from a PyProphet input file.
+    
+    Creates plots showing the distribution of feature scores (var_* columns)
+    at different levels (ms1, ms2, transition, alignment) colored by target/decoy status.
+    Works with OSW, Parquet, and Split Parquet files (scored or unscored).
+    """
+    _export_feature_scores(infile, outfile)
 
 
 # Export OpenSwath Calibration debug plots
