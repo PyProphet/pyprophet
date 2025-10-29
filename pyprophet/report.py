@@ -853,11 +853,12 @@ def plot_scores(df, out, color_palette="normal"):
             "Error: The matplotlib package is required to create a report."
         )
 
-    score_columns = (
-        ["SCORE"]
-        + [c for c in df.columns if c.startswith("MAIN_VAR_")]
-        + [c for c in df.columns if c.startswith("VAR_")]
-    )
+    # Build score_columns list, only including SCORE if it exists
+    score_columns = []
+    if "SCORE" in df.columns:
+        score_columns.append("SCORE")
+    score_columns += [c for c in df.columns if c.startswith("MAIN_VAR_")]
+    score_columns += [c for c in df.columns if c.startswith("VAR_")]
 
     t_col, d_col = color_blind_friendly(color_palette)
 
