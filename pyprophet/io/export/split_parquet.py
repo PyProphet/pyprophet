@@ -666,6 +666,107 @@ class SplitParquetReader(BaseSplitParquetReader):
 
         return ", " + ", ".join(feature_vars) if feature_vars else ""
 
+    def export_feature_scores(self, outfile: str, plot_callback):
+        """
+        Export feature scores from split Parquet directory for plotting.
+        
+        Parameters
+        ----------
+        outfile : str
+            Path to the output PDF file.
+        plot_callback : callable
+            Function to call for plotting each level's data.
+            Signature: plot_callback(df, outfile, level, append)
+        """
+        # Read precursor features - only necessary columns
+        precursor_file = os.path.join(self.infile, "precursors_features.parquet")
+        logger.info(f"Reading precursor features from: {precursor_file}")
+        
+        # First check what columns are available
+        import pyarrow.parquet as pq
+        precursor_parquet = pq.ParquetFile(precursor_file)
+        all_columns = precursor_parquet.schema.names
+        
+        # Identify columns to read
+        ms1_cols = [col for col in all_columns if col.startswith("FEATURE_MS1_VAR_")]
+        ms2_cols = [col for col in all_columns if col.startswith("FEATURE_MS2_VAR_")]
+        
+        cols_to_read = set()
+        if ms1_cols and "PRECURSOR_DECOY" in all_columns:
+            cols_to_read.update(ms1_cols)
+            cols_to_read.add("PRECURSOR_DECOY")
+        if ms2_cols and "PRECURSOR_DECOY" in all_columns:
+            cols_to_read.update(ms2_cols)
+            cols_to_read.add("PRECURSOR_DECOY")
+        
+        if cols_to_read:
+            logger.info(f"Reading {len(cols_to_read)} columns from precursor features")
+            df_precursor = pd.read_parquet(precursor_file, columns=list(cols_to_read))
+            
+            # Process MS1 level
+            if ms1_cols and "PRECURSOR_DECOY" in df_precursor.columns:
+                logger.info("Processing MS1 level feature scores")
+                ms1_df = df_precursor[ms1_cols + ["PRECURSOR_DECOY"]].copy()
+                ms1_df.rename(columns={"PRECURSOR_DECOY": "DECOY"}, inplace=True)
+                plot_callback(ms1_df, outfile, "ms1", append=False)
+                del ms1_df  # Free memory
+            
+            # Process MS2 level
+            if ms2_cols and "PRECURSOR_DECOY" in df_precursor.columns:
+                logger.info("Processing MS2 level feature scores")
+                ms2_df = df_precursor[ms2_cols + ["PRECURSOR_DECOY"]].copy()
+                ms2_df.rename(columns={"PRECURSOR_DECOY": "DECOY"}, inplace=True)
+                append = bool(ms1_cols)
+                plot_callback(ms2_df, outfile, "ms2", append=append)
+                del ms2_df  # Free memory
+            
+            del df_precursor  # Free memory
+        
+        # Read transition features if available
+        transition_file = os.path.join(self.infile, "transition_features.parquet")
+        if os.path.exists(transition_file):
+            logger.info(f"Reading transition features from: {transition_file}")
+            
+            # Check what columns are available
+            transition_parquet = pq.ParquetFile(transition_file)
+            transition_all_columns = transition_parquet.schema.names
+            transition_cols = [col for col in transition_all_columns if col.startswith("FEATURE_TRANSITION_VAR_")]
+            
+            if transition_cols and "TRANSITION_DECOY" in transition_all_columns:
+                # Read only necessary columns
+                cols_to_read = transition_cols + ["TRANSITION_DECOY"]
+                logger.info(f"Reading {len(cols_to_read)} columns from transition features")
+                df_transition = pd.read_parquet(transition_file, columns=cols_to_read)
+                
+                logger.info("Processing transition level feature scores")
+                transition_df = df_transition[transition_cols + ["TRANSITION_DECOY"]].copy()
+                transition_df.rename(columns={"TRANSITION_DECOY": "DECOY"}, inplace=True)
+                append = bool(ms1_cols or ms2_cols)
+                plot_callback(transition_df, outfile, "transition", append=append)
+                del transition_df, df_transition  # Free memory
+        
+        # Read alignment features if available
+        alignment_file = os.path.join(self.infile, "feature_alignment.parquet")
+        if os.path.exists(alignment_file):
+            logger.info(f"Reading alignment features from: {alignment_file}")
+            
+            # Check what columns are available
+            alignment_parquet = pq.ParquetFile(alignment_file)
+            alignment_all_columns = alignment_parquet.schema.names
+            var_cols = [col for col in alignment_all_columns if col.startswith("VAR_")]
+            
+            if var_cols and "DECOY" in alignment_all_columns:
+                # Read only necessary columns
+                cols_to_read = var_cols + ["DECOY"]
+                logger.info(f"Reading {len(cols_to_read)} columns from alignment features")
+                df_alignment = pd.read_parquet(alignment_file, columns=cols_to_read)
+                
+                logger.info("Processing alignment level feature scores")
+                alignment_df = df_alignment[var_cols + ["DECOY"]].copy()
+                append = bool(ms1_cols or ms2_cols or (os.path.exists(transition_file) and transition_cols))
+                plot_callback(alignment_df, outfile, "alignment", append=append)
+                del alignment_df, df_alignment  # Free memory
+
 
 class SplitParquetWriter(BaseSplitParquetWriter):
     """

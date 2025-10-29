@@ -601,6 +601,75 @@ class ParquetReader(BaseParquetReader):
 
         return df
 
+    def export_feature_scores(self, outfile: str, plot_callback):
+        """
+        Export feature scores from Parquet file for plotting.
+        
+        Parameters
+        ----------
+        outfile : str
+            Path to the output PDF file.
+        plot_callback : callable
+            Function to call for plotting each level's data.
+            Signature: plot_callback(df, outfile, level, append)
+        """
+        logger.info(f"Reading parquet file: {self.infile}")
+        # First, read only column names to identify what to load
+        import pyarrow.parquet as pq
+        parquet_file = pq.ParquetFile(self.infile)
+        all_columns = parquet_file.schema.names
+        
+        # Identify columns to read for each level
+        ms1_cols = [col for col in all_columns if col.startswith("FEATURE_MS1_VAR_")]
+        ms2_cols = [col for col in all_columns if col.startswith("FEATURE_MS2_VAR_")]
+        transition_cols = [col for col in all_columns if col.startswith("FEATURE_TRANSITION_VAR_")]
+        
+        # Determine which columns to read (only what we need)
+        cols_to_read = set()
+        if ms1_cols and "PRECURSOR_DECOY" in all_columns:
+            cols_to_read.update(ms1_cols)
+            cols_to_read.add("PRECURSOR_DECOY")
+        if ms2_cols and "PRECURSOR_DECOY" in all_columns:
+            cols_to_read.update(ms2_cols)
+            cols_to_read.add("PRECURSOR_DECOY")
+        if transition_cols and "TRANSITION_DECOY" in all_columns:
+            cols_to_read.update(transition_cols)
+            cols_to_read.add("TRANSITION_DECOY")
+        
+        if not cols_to_read:
+            logger.warning("No VAR_ columns found in parquet file")
+            return
+        
+        # Read only the columns we need
+        logger.info(f"Reading {len(cols_to_read)} columns from parquet file")
+        df = pd.read_parquet(self.infile, columns=list(cols_to_read))
+        
+        # Process MS1 level
+        if ms1_cols and "PRECURSOR_DECOY" in df.columns:
+            logger.info("Processing MS1 level feature scores")
+            ms1_df = df[ms1_cols + ["PRECURSOR_DECOY"]].copy()
+            ms1_df.rename(columns={"PRECURSOR_DECOY": "DECOY"}, inplace=True)
+            plot_callback(ms1_df, outfile, "ms1", append=False)
+            del ms1_df  # Free memory
+        
+        # Process MS2 level
+        if ms2_cols and "PRECURSOR_DECOY" in df.columns:
+            logger.info("Processing MS2 level feature scores")
+            ms2_df = df[ms2_cols + ["PRECURSOR_DECOY"]].copy()
+            ms2_df.rename(columns={"PRECURSOR_DECOY": "DECOY"}, inplace=True)
+            append = bool(ms1_cols)
+            plot_callback(ms2_df, outfile, "ms2", append=append)
+            del ms2_df  # Free memory
+        
+        # Process transition level
+        if transition_cols and "TRANSITION_DECOY" in df.columns:
+            logger.info("Processing transition level feature scores")
+            transition_df = df[transition_cols + ["TRANSITION_DECOY"]].copy()
+            transition_df.rename(columns={"TRANSITION_DECOY": "DECOY"}, inplace=True)
+            append = bool(ms1_cols or ms2_cols)
+            plot_callback(transition_df, outfile, "transition", append=append)
+            del transition_df  # Free memory
+
 
 class ParquetWriter(BaseParquetWriter):
     """
