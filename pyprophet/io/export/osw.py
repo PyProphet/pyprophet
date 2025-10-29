@@ -1849,7 +1849,7 @@ class OSWWriter(BaseOSWWriter):
             )
             # Add JOIN for peptide score view
             score_tables_to_join.append(
-                "INNER JOIN score_peptide_view ON PEPTIDE.ID = score_peptide_view.PEPTIDE_ID AND FEATURE.RUN_ID = score_peptide_view.RUN_ID"
+                "LEFT JOIN score_peptide_view ON PEPTIDE.ID = score_peptide_view.PEPTIDE_ID AND FEATURE.RUN_ID = score_peptide_view.RUN_ID"
             )
         if column_info["score_protein_exists"]:
             logger.debug("SCORE_PROTEIN table exists, adding score table view to query")
@@ -1860,7 +1860,7 @@ class OSWWriter(BaseOSWWriter):
             )
             # Add JOIN for protein score view
             score_tables_to_join.append(
-                "INNER JOIN score_protein_view ON PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID = score_protein_view.PROTEIN_ID AND FEATURE.RUN_ID = score_protein_view.RUN_ID"
+                "LEFT JOIN score_protein_view ON PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID = score_protein_view.PROTEIN_ID AND FEATURE.RUN_ID = score_protein_view.RUN_ID"
             )
 
         # Add score columns for peptide and protein contexts
