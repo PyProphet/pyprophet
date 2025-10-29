@@ -1,0 +1,14 @@
+Exported 97965 rows with 103 columns
+SCORE_IPF columns found: ['SCORE_IPF_PEP', 'SCORE_IPF_PRECURSOR_PEAKGROUP_PEP', 'SCORE_IPF_QVALUE']
+Sample data with IPF scores:
+   FEATURE_ID  SCORE_IPF_PEP  SCORE_IPF_PRECURSOR_PEAKGROUP_PEP  SCORE_IPF_QVALUE
+0  4.8397e+17     0.0000e+00                         2.1927e-07        0.0000e+00
+1  1.0824e+18     0.0000e+00                         9.9998e-08        0.0000e+00
+2 -1.1854e+18     0.0000e+00                         4.5323e-08        0.0000e+00
+3  6.8070e+18     0.0000e+00                         1.5978e-09        0.0000e+00
+4  7.1486e+18     0.0000e+00                         1.1662e-08        0.0000e+00
+5  9.0780e+17     2.5734e-10                         1.6434e-04        9.0990e-13
+6  2.4200e+18     0.0000e+00                         1.7179e-08        0.0000e+00
+7 -1.4753e+18     0.0000e+00                         1.5978e-09        0.0000e+00
+8  5.4169e+18     0.0000e+00                         4.0794e-08        0.0000e+00
+9 -3.0355e+17     0.0000e+00                         2.0475e-08        0.0000e+00
