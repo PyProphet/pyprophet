@@ -1775,6 +1775,7 @@ class OSWWriter(BaseOSWWriter):
         if global_exists:
             glob_query = f"""
             SELECT {id_col}, 
+                RUN_ID,
                 SCORE as {score_table}_GLOBAL_SCORE, 
                 PVALUE as {score_table}_GLOBAL_PVALUE, 
                 QVALUE as {score_table}_GLOBAL_QVALUE, 
@@ -1793,7 +1794,7 @@ class OSWWriter(BaseOSWWriter):
                 g.{score_table}_GLOBAL_QVALUE, 
                 g.{score_table}_GLOBAL_PEP
             FROM ({non_global_query}) ng
-            LEFT JOIN ({glob_query}) g ON ng.{id_col} = g.{id_col}
+            LEFT JOIN ({glob_query}) g ON ng.{id_col} = g.{id_col} AND ng.RUN_ID = g.RUN_ID
             """
         elif pivot_cols_str and not global_exists:
             # Only non-global contexts exist
