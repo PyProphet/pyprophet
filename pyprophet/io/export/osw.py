@@ -1243,7 +1243,7 @@ class OSWWriter(BaseOSWWriter):
             {score_table_joins}
             """
 
-    def _build_transition_score_columns_and_join(self, column_info: dict) -> tuple[str, str]:
+    def _build_transition_score_columns_and_join(self, column_info: dict) -> Tuple[str, str]:
         """Build score columns and join clause for transition scores"""
         score_transition_cols = ""
         score_transition_join = ""
