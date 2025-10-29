@@ -1626,7 +1626,7 @@ class OSWWriter(BaseOSWWriter):
                 "SCORE_TRANSITION_PEP DOUBLE"
             ])
 
-        # Prepend comma to score columns if there are any
+        # Prepend comma and space to score columns if there are any
         score_cols_types_sql = (", " + ", ".join(score_cols_types)) if score_cols_types else ""
 
         create_temp_table_query = f"""
