@@ -860,6 +860,238 @@ class OSWReader(BaseOSWReader):
 
         return f"{view_name} AS ({merged})"
 
+    def export_feature_scores(self, outfile: str, plot_callback):
+        """
+        Export feature scores from OSW file for plotting.
+        
+        Detects if SCORE tables exist and adjusts behavior:
+        - If SCORE tables exist: applies RANK==1 filtering and plots SCORE + VAR_ columns
+        - If SCORE tables don't exist: plots only VAR_ columns
+        
+        Parameters
+        ----------
+        outfile : str
+            Path to the output PDF file.
+        plot_callback : callable
+            Function to call for plotting each level's data.
+            Signature: plot_callback(df, outfile, level, append)
+        """
+        con = sqlite3.connect(self.infile)
+        
+        try:
+            # Check for SCORE tables
+            has_score_ms1 = check_sqlite_table(con, "SCORE_MS1")
+            has_score_ms2 = check_sqlite_table(con, "SCORE_MS2")
+            has_score_transition = check_sqlite_table(con, "SCORE_TRANSITION")
+            
+            if has_score_ms1 or has_score_ms2 or has_score_transition:
+                logger.info("SCORE tables detected - applying RANK==1 filter and plotting SCORE + VAR_ columns")
+            else:
+                logger.info("No SCORE tables detected - plotting only VAR_ columns")
+            
+            # Process MS1 level if available
+            if check_sqlite_table(con, "FEATURE_MS1"):
+                logger.info("Processing MS1 level feature scores")
+                
+                if has_score_ms1:
+                    # Scored mode: Include SCORE columns and apply RANK==1 filter
+                    ms1_query = """
+                        SELECT *,
+                               RUN_ID || '_' || PRECURSOR_ID AS GROUP_ID
+                        FROM FEATURE_MS1
+                        INNER JOIN
+                          (SELECT RUN_ID,
+                                  ID,
+                                  PRECURSOR_ID,
+                                  EXP_RT
+                           FROM FEATURE) AS FEATURE ON FEATURE_MS1.FEATURE_ID = FEATURE.ID
+                        INNER JOIN
+                          (SELECT ID,
+                                  CHARGE AS VAR_PRECURSOR_CHARGE,
+                                  DECOY
+                           FROM PRECURSOR) AS PRECURSOR ON FEATURE.PRECURSOR_ID = PRECURSOR.ID
+                        INNER JOIN SCORE_MS1 ON FEATURE.ID = SCORE_MS1.FEATURE_ID
+                        WHERE RANK == 1
+                        ORDER BY RUN_ID,
+                                 PRECURSOR.ID ASC,
+                                 FEATURE.EXP_RT ASC
+                    """
+                else:
+                    # Unscored mode: Only VAR_ columns
+                    cursor = con.cursor()
+                    cursor.execute("PRAGMA table_info(FEATURE_MS1)")
+                    all_cols = [row[1] for row in cursor.fetchall()]
+                    var_cols = [col for col in all_cols if "VAR_" in col.upper()]
+                    
+                    if var_cols:
+                        var_cols_sql = ", ".join([f"FEATURE_MS1.{col}" for col in var_cols])
+                        ms1_query = f"""
+                            SELECT 
+                                {var_cols_sql},
+                                PRECURSOR.DECOY
+                            FROM FEATURE_MS1
+                            INNER JOIN FEATURE ON FEATURE_MS1.FEATURE_ID = FEATURE.ID
+                            INNER JOIN PRECURSOR ON FEATURE.PRECURSOR_ID = PRECURSOR.ID
+                        """
+                    else:
+                        logger.warning("No VAR_ columns found in FEATURE_MS1 table")
+                        ms1_query = None
+                
+                if ms1_query:
+                    df_ms1 = pd.read_sql_query(ms1_query, con)
+                    if not df_ms1.empty:
+                        plot_callback(df_ms1, outfile, "ms1", append=False)
+            
+            # Process MS2 level if available
+            if check_sqlite_table(con, "FEATURE_MS2"):
+                logger.info("Processing MS2 level feature scores")
+                
+                if has_score_ms2:
+                    # Scored mode: Include SCORE columns and apply RANK==1 filter
+                    ms2_query = """
+                        SELECT *,
+                               RUN_ID || '_' || PRECURSOR_ID AS GROUP_ID
+                        FROM FEATURE_MS2
+                        INNER JOIN
+                          (SELECT RUN_ID,
+                                  ID,
+                                  PRECURSOR_ID,
+                                  EXP_RT
+                           FROM FEATURE) AS FEATURE ON FEATURE_MS2.FEATURE_ID = FEATURE.ID
+                        INNER JOIN
+                          (SELECT ID,
+                                  CHARGE AS VAR_PRECURSOR_CHARGE,
+                                  DECOY
+                           FROM PRECURSOR) AS PRECURSOR ON FEATURE.PRECURSOR_ID = PRECURSOR.ID
+                        INNER JOIN
+                          (SELECT PRECURSOR_ID AS ID,
+                                  COUNT(*) AS VAR_TRANSITION_NUM_SCORE
+                           FROM TRANSITION_PRECURSOR_MAPPING
+                           INNER JOIN TRANSITION ON TRANSITION_PRECURSOR_MAPPING.TRANSITION_ID = TRANSITION.ID
+                           WHERE DETECTING==1
+                           GROUP BY PRECURSOR_ID) AS VAR_TRANSITION_SCORE ON FEATURE.PRECURSOR_ID = VAR_TRANSITION_SCORE.ID
+                        INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
+                        WHERE RANK == 1
+                        ORDER BY RUN_ID,
+                                 PRECURSOR.ID ASC,
+                                 FEATURE.EXP_RT ASC
+                    """
+                else:
+                    # Unscored mode: Only VAR_ columns
+                    cursor = con.cursor()
+                    cursor.execute("PRAGMA table_info(FEATURE_MS2)")
+                    all_cols = [row[1] for row in cursor.fetchall()]
+                    var_cols = [col for col in all_cols if "VAR_" in col.upper()]
+                    
+                    if var_cols:
+                        var_cols_sql = ", ".join([f"FEATURE_MS2.{col}" for col in var_cols])
+                        ms2_query = f"""
+                            SELECT 
+                                {var_cols_sql},
+                                PRECURSOR.DECOY
+                            FROM FEATURE_MS2
+                            INNER JOIN FEATURE ON FEATURE_MS2.FEATURE_ID = FEATURE.ID
+                            INNER JOIN PRECURSOR ON FEATURE.PRECURSOR_ID = PRECURSOR.ID
+                        """
+                    else:
+                        logger.warning("No VAR_ columns found in FEATURE_MS2 table")
+                        ms2_query = None
+                
+                if ms2_query:
+                    df_ms2 = pd.read_sql_query(ms2_query, con)
+                    if not df_ms2.empty:
+                        append = check_sqlite_table(con, "FEATURE_MS1")
+                        plot_callback(df_ms2, outfile, "ms2", append=append)
+            
+            # Process transition level if available
+            if check_sqlite_table(con, "FEATURE_TRANSITION"):
+                logger.info("Processing transition level feature scores")
+                
+                if has_score_transition:
+                    # Scored mode: Include SCORE columns and apply RANK==1 filter
+                    transition_query = """
+                        SELECT TRANSITION.DECOY AS DECOY,
+                               FEATURE_TRANSITION.*,
+                               PRECURSOR.CHARGE AS VAR_PRECURSOR_CHARGE,
+                               TRANSITION.VAR_PRODUCT_CHARGE AS VAR_PRODUCT_CHARGE,
+                               SCORE_TRANSITION.*,
+                               RUN_ID || '_' || FEATURE_TRANSITION.FEATURE_ID || '_' || PRECURSOR_ID || '_' || FEATURE_TRANSITION.TRANSITION_ID AS GROUP_ID
+                        FROM FEATURE_TRANSITION
+                        INNER JOIN
+                          (SELECT RUN_ID,
+                                  ID,
+                                  PRECURSOR_ID,
+                                  EXP_RT
+                           FROM FEATURE) AS FEATURE ON FEATURE_TRANSITION.FEATURE_ID = FEATURE.ID
+                        INNER JOIN PRECURSOR ON FEATURE.PRECURSOR_ID = PRECURSOR.ID
+                        INNER JOIN SCORE_TRANSITION ON FEATURE_TRANSITION.FEATURE_ID = SCORE_TRANSITION.FEATURE_ID
+                        AND FEATURE_TRANSITION.TRANSITION_ID = SCORE_TRANSITION.TRANSITION_ID
+                        INNER JOIN
+                          (SELECT ID,
+                                  CHARGE AS VAR_PRODUCT_CHARGE,
+                                  DECOY
+                           FROM TRANSITION) AS TRANSITION ON FEATURE_TRANSITION.TRANSITION_ID = TRANSITION.ID
+                        ORDER BY RUN_ID,
+                                 PRECURSOR.ID,
+                                 FEATURE.EXP_RT,
+                                 TRANSITION.ID
+                    """
+                else:
+                    # Unscored mode: Only VAR_ columns
+                    cursor = con.cursor()
+                    cursor.execute("PRAGMA table_info(FEATURE_TRANSITION)")
+                    all_cols = [row[1] for row in cursor.fetchall()]
+                    var_cols = [col for col in all_cols if "VAR_" in col.upper()]
+                    
+                    if var_cols:
+                        var_cols_sql = ", ".join([f"FEATURE_TRANSITION.{col}" for col in var_cols])
+                        transition_query = f"""
+                            SELECT 
+                                {var_cols_sql},
+                                TRANSITION.DECOY
+                            FROM FEATURE_TRANSITION
+                            INNER JOIN FEATURE ON FEATURE_TRANSITION.FEATURE_ID = FEATURE.ID
+                            INNER JOIN TRANSITION ON FEATURE_TRANSITION.TRANSITION_ID = TRANSITION.ID
+                        """
+                    else:
+                        logger.warning("No VAR_ columns found in FEATURE_TRANSITION table")
+                        transition_query = None
+                
+                if transition_query:
+                    df_transition = pd.read_sql_query(transition_query, con)
+                    if not df_transition.empty:
+                        append = check_sqlite_table(con, "FEATURE_MS1") or check_sqlite_table(con, "FEATURE_MS2")
+                        plot_callback(df_transition, outfile, "transition", append=append)
+            
+            # Process alignment level if available (no SCORE tables for alignment)
+            if check_sqlite_table(con, "FEATURE_MS2_ALIGNMENT"):
+                logger.info("Processing alignment level feature scores")
+                # Get only VAR_ columns to reduce memory usage
+                cursor = con.cursor()
+                cursor.execute("PRAGMA table_info(FEATURE_MS2_ALIGNMENT)")
+                all_cols = [row[1] for row in cursor.fetchall()]
+                var_cols = [col for col in all_cols if "VAR_" in col.upper()]
+                
+                if var_cols:
+                    var_cols_sql = ", ".join(var_cols)
+                    alignment_query = f"""
+                        SELECT 
+                            {var_cols_sql},
+                            LABEL AS DECOY
+                        FROM FEATURE_MS2_ALIGNMENT
+                    """
+                    df_alignment = pd.read_sql_query(alignment_query, con)
+                    if not df_alignment.empty:
+                        append = (check_sqlite_table(con, "FEATURE_MS1") or 
+                                 check_sqlite_table(con, "FEATURE_MS2") or 
+                                 check_sqlite_table(con, "FEATURE_TRANSITION"))
+                        plot_callback(df_alignment, outfile, "alignment", append=append)
+                else:
+                    logger.warning("No VAR_ columns found in FEATURE_MS2_ALIGNMENT table")
+        
+        finally:
+            con.close()
+
 
 class OSWWriter(BaseOSWWriter):
     """

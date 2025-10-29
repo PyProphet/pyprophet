@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### 🚀 Features
+
+- Add unified `pyprophet export feature-scores` command that works with all file formats (OSW, Parquet, Split Parquet)
+  - Auto-detects SCORE tables and adjusts behavior intelligently
+  - Applies RANK==1 filtering when SCORE tables exist
+  - Plots only VAR_ columns for unscored files
+  - Supports MS1, MS2, and transition level features
+
+### 🔧 Deprecated
+
+- Deprecate `pyprophet export score-plots` command in favor of `pyprophet export feature-scores`
+  - Old command still works with deprecation warning for backward compatibility
+
 ## [3.0.4] - 2025-10-21
 
 ### 🚀 Features
