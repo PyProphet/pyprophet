@@ -605,6 +605,10 @@ class ParquetReader(BaseParquetReader):
         """
         Export feature scores from Parquet file for plotting.
         
+        Detects if SCORE columns exist and adjusts behavior:
+        - If SCORE columns exist: applies RANK==1 filtering and plots SCORE + VAR_ columns
+        - If SCORE columns don't exist: plots only VAR_ columns
+        
         Parameters
         ----------
         outfile : str
@@ -621,6 +625,15 @@ class ParquetReader(BaseParquetReader):
         parquet_file = pa.parquet.ParquetFile(self.infile)
         all_columns = parquet_file.schema.names
         
+        # Check for SCORE columns
+        score_cols = [col for col in all_columns if col.startswith("SCORE_")]
+        has_scores = len(score_cols) > 0
+        
+        if has_scores:
+            logger.info("SCORE columns detected - applying RANK==1 filter and plotting SCORE + VAR_ columns")
+        else:
+            logger.info("No SCORE columns detected - plotting only VAR_ columns")
+        
         # Identify columns to read for each level
         ms1_cols = [col for col in all_columns if col.startswith("FEATURE_MS1_VAR_")]
         ms2_cols = [col for col in all_columns if col.startswith("FEATURE_MS2_VAR_")]
@@ -628,6 +641,19 @@ class ParquetReader(BaseParquetReader):
         
         # Determine which columns to read (only what we need)
         cols_to_read = set()
+        
+        # Add SCORE columns if they exist
+        if has_scores:
+            cols_to_read.update(score_cols)
+            # Add RANK column for filtering
+            if "SCORE_MS2_PEAK_GROUP_RANK" in all_columns:
+                cols_to_read.add("SCORE_MS2_PEAK_GROUP_RANK")
+            # Add ID columns for grouping
+            if "RUN_ID" in all_columns:
+                cols_to_read.add("RUN_ID")
+            if "PRECURSOR_ID" in all_columns:
+                cols_to_read.add("PRECURSOR_ID")
+        
         if ms1_cols and "PRECURSOR_DECOY" in all_columns:
             cols_to_read.update(ms1_cols)
             cols_to_read.add("PRECURSOR_DECOY")
@@ -646,10 +672,28 @@ class ParquetReader(BaseParquetReader):
         logger.info(f"Reading {len(cols_to_read)} columns from parquet file")
         df = pd.read_parquet(self.infile, columns=list(cols_to_read))
         
+        # Apply RANK==1 filter if SCORE columns exist
+        if has_scores and 'SCORE_MS2_PEAK_GROUP_RANK' in df.columns:
+            logger.info(f"Filtering to RANK==1: {len(df)} -> ", end="")
+            df = df[df['SCORE_MS2_PEAK_GROUP_RANK'] == 1].copy()
+            logger.info(f"{len(df)} rows")
+        
+        # Generate GROUP_ID if needed
+        if has_scores and 'GROUP_ID' not in df.columns:
+            if 'RUN_ID' in df.columns and 'PRECURSOR_ID' in df.columns:
+                df['GROUP_ID'] = df['RUN_ID'].astype(str) + '_' + df['PRECURSOR_ID'].astype(str)
+        
         # Process MS1 level
         if ms1_cols and "PRECURSOR_DECOY" in df.columns:
             logger.info("Processing MS1 level feature scores")
-            ms1_df = df[ms1_cols + ["PRECURSOR_DECOY"]].copy()
+            select_cols = ms1_cols + ["PRECURSOR_DECOY"]
+            # Add SCORE columns if present
+            if has_scores:
+                score_ms1_cols = [col for col in score_cols if 'MS1' in col.upper()]
+                select_cols.extend(score_ms1_cols)
+                if 'GROUP_ID' in df.columns:
+                    select_cols.append('GROUP_ID')
+            ms1_df = df[select_cols].copy()
             ms1_df.rename(columns={"PRECURSOR_DECOY": "DECOY"}, inplace=True)
             plot_callback(ms1_df, outfile, "ms1", append=False)
             del ms1_df  # Free memory
@@ -657,7 +701,14 @@ class ParquetReader(BaseParquetReader):
         # Process MS2 level
         if ms2_cols and "PRECURSOR_DECOY" in df.columns:
             logger.info("Processing MS2 level feature scores")
-            ms2_df = df[ms2_cols + ["PRECURSOR_DECOY"]].copy()
+            select_cols = ms2_cols + ["PRECURSOR_DECOY"]
+            # Add SCORE columns if present
+            if has_scores:
+                score_ms2_cols = [col for col in score_cols if 'MS2' in col.upper() or 'MS1' not in col.upper()]
+                select_cols.extend(score_ms2_cols)
+                if 'GROUP_ID' in df.columns:
+                    select_cols.append('GROUP_ID')
+            ms2_df = df[select_cols].copy()
             ms2_df.rename(columns={"PRECURSOR_DECOY": "DECOY"}, inplace=True)
             append = bool(ms1_cols)
             plot_callback(ms2_df, outfile, "ms2", append=append)
@@ -666,7 +717,14 @@ class ParquetReader(BaseParquetReader):
         # Process transition level
         if transition_cols and "TRANSITION_DECOY" in df.columns:
             logger.info("Processing transition level feature scores")
-            transition_df = df[transition_cols + ["TRANSITION_DECOY"]].copy()
+            select_cols = transition_cols + ["TRANSITION_DECOY"]
+            # Add SCORE columns if present
+            if has_scores:
+                score_transition_cols = [col for col in score_cols if 'TRANSITION' in col.upper()]
+                select_cols.extend(score_transition_cols)
+                if 'GROUP_ID' in df.columns:
+                    select_cols.append('GROUP_ID')
+            transition_df = df[select_cols].copy()
             transition_df.rename(columns={"TRANSITION_DECOY": "DECOY"}, inplace=True)
             append = bool(ms1_cols or ms2_cols)
             plot_callback(transition_df, outfile, "transition", append=append)
