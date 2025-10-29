@@ -670,6 +670,10 @@ class SplitParquetReader(BaseSplitParquetReader):
         """
         Export feature scores from split Parquet directory for plotting.
         
+        Detects if SCORE columns exist and adjusts behavior:
+        - If SCORE columns exist: applies RANK==1 filtering and plots SCORE + VAR_ columns
+        - If SCORE columns don't exist: plots only VAR_ columns
+        
         Parameters
         ----------
         outfile : str
@@ -689,11 +693,33 @@ class SplitParquetReader(BaseSplitParquetReader):
         precursor_parquet = pa.parquet.ParquetFile(precursor_file)
         all_columns = precursor_parquet.schema.names
         
+        # Check for SCORE columns
+        score_cols = [col for col in all_columns if col.startswith("SCORE_")]
+        has_scores = len(score_cols) > 0
+        
+        if has_scores:
+            logger.info("SCORE columns detected - applying RANK==1 filter and plotting SCORE + VAR_ columns")
+        else:
+            logger.info("No SCORE columns detected - plotting only VAR_ columns")
+        
         # Identify columns to read
         ms1_cols = [col for col in all_columns if col.startswith("FEATURE_MS1_VAR_")]
         ms2_cols = [col for col in all_columns if col.startswith("FEATURE_MS2_VAR_")]
         
         cols_to_read = set()
+        
+        # Add SCORE columns if they exist
+        if has_scores:
+            cols_to_read.update(score_cols)
+            # Add RANK column for filtering
+            if "SCORE_MS2_PEAK_GROUP_RANK" in all_columns:
+                cols_to_read.add("SCORE_MS2_PEAK_GROUP_RANK")
+            # Add ID columns for grouping
+            if "RUN_ID" in all_columns:
+                cols_to_read.add("RUN_ID")
+            if "PRECURSOR_ID" in all_columns:
+                cols_to_read.add("PRECURSOR_ID")
+        
         if ms1_cols and "PRECURSOR_DECOY" in all_columns:
             cols_to_read.update(ms1_cols)
             cols_to_read.add("PRECURSOR_DECOY")
@@ -705,10 +731,28 @@ class SplitParquetReader(BaseSplitParquetReader):
             logger.info(f"Reading {len(cols_to_read)} columns from precursor features")
             df_precursor = pd.read_parquet(precursor_file, columns=list(cols_to_read))
             
+            # Apply RANK==1 filter if SCORE columns exist
+            if has_scores and 'SCORE_MS2_PEAK_GROUP_RANK' in df_precursor.columns:
+                logger.info(f"Filtering to RANK==1: {len(df_precursor)} -> ", end="")
+                df_precursor = df_precursor[df_precursor['SCORE_MS2_PEAK_GROUP_RANK'] == 1].copy()
+                logger.info(f"{len(df_precursor)} rows")
+            
+            # Generate GROUP_ID if needed
+            if has_scores and 'GROUP_ID' not in df_precursor.columns:
+                if 'RUN_ID' in df_precursor.columns and 'PRECURSOR_ID' in df_precursor.columns:
+                    df_precursor['GROUP_ID'] = df_precursor['RUN_ID'].astype(str) + '_' + df_precursor['PRECURSOR_ID'].astype(str)
+            
             # Process MS1 level
             if ms1_cols and "PRECURSOR_DECOY" in df_precursor.columns:
                 logger.info("Processing MS1 level feature scores")
-                ms1_df = df_precursor[ms1_cols + ["PRECURSOR_DECOY"]].copy()
+                select_cols = ms1_cols + ["PRECURSOR_DECOY"]
+                # Add SCORE columns if present
+                if has_scores:
+                    score_ms1_cols = [col for col in score_cols if 'MS1' in col.upper()]
+                    select_cols.extend(score_ms1_cols)
+                    if 'GROUP_ID' in df_precursor.columns:
+                        select_cols.append('GROUP_ID')
+                ms1_df = df_precursor[select_cols].copy()
                 ms1_df.rename(columns={"PRECURSOR_DECOY": "DECOY"}, inplace=True)
                 plot_callback(ms1_df, outfile, "ms1", append=False)
                 del ms1_df  # Free memory
@@ -716,7 +760,14 @@ class SplitParquetReader(BaseSplitParquetReader):
             # Process MS2 level
             if ms2_cols and "PRECURSOR_DECOY" in df_precursor.columns:
                 logger.info("Processing MS2 level feature scores")
-                ms2_df = df_precursor[ms2_cols + ["PRECURSOR_DECOY"]].copy()
+                select_cols = ms2_cols + ["PRECURSOR_DECOY"]
+                # Add SCORE columns if present
+                if has_scores:
+                    score_ms2_cols = [col for col in score_cols if 'MS2' in col.upper() or 'MS1' not in col.upper()]
+                    select_cols.extend(score_ms2_cols)
+                    if 'GROUP_ID' in df_precursor.columns:
+                        select_cols.append('GROUP_ID')
+                ms2_df = df_precursor[select_cols].copy()
                 ms2_df.rename(columns={"PRECURSOR_DECOY": "DECOY"}, inplace=True)
                 append = bool(ms1_cols)
                 plot_callback(ms2_df, outfile, "ms2", append=append)
@@ -734,14 +785,23 @@ class SplitParquetReader(BaseSplitParquetReader):
             transition_all_columns = transition_parquet.schema.names
             transition_cols = [col for col in transition_all_columns if col.startswith("FEATURE_TRANSITION_VAR_")]
             
+            # Check for SCORE columns in transition file
+            transition_score_cols = [col for col in transition_all_columns if col.startswith("SCORE_") and 'TRANSITION' in col.upper()]
+            has_transition_scores = len(transition_score_cols) > 0
+            
             if transition_cols and "TRANSITION_DECOY" in transition_all_columns:
                 # Read only necessary columns
                 cols_to_read = transition_cols + ["TRANSITION_DECOY"]
+                if has_transition_scores:
+                    cols_to_read.extend(transition_score_cols)
+                    if 'GROUP_ID' in transition_all_columns:
+                        cols_to_read.append('GROUP_ID')
+                
                 logger.info(f"Reading {len(cols_to_read)} columns from transition features")
                 df_transition = pd.read_parquet(transition_file, columns=cols_to_read)
                 
                 logger.info("Processing transition level feature scores")
-                transition_df = df_transition[transition_cols + ["TRANSITION_DECOY"]].copy()
+                transition_df = df_transition.copy()
                 transition_df.rename(columns={"TRANSITION_DECOY": "DECOY"}, inplace=True)
                 append = bool(ms1_cols or ms2_cols)
                 plot_callback(transition_df, outfile, "transition", append=append)

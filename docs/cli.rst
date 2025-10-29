@@ -144,10 +144,27 @@ To convert OpenSwath's *.osw* / *.sqMass* format to a parquet format, you can us
    :prog: pyprophet export parquet
    :nested: none
 
-Export Score Plots
-^^^^^^^^^^^^^^^^^^
+Export Feature Score Plots
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-It may be useful to export the distribution of scores for the different input features. This can help you investigate the distribution and quality of scores for target-decoy separation.
+To export the distribution of feature scores (VAR_ columns) and, if available, scorer scores (SCORE columns), you can use the :program:`export feature-scores` subcommand. This command works with all file formats (OSW, Parquet, and Split Parquet):
+
+- **For unscored files**: Plots only VAR_ columns (feature variables)
+- **For scored files**: Applies RANK==1 filtering and plots both SCORE and VAR_ columns
+
+This is useful for investigating the distribution and quality of scores for target-decoy separation.
+
+.. click:: pyprophet.cli.export:export_feature_scores
+   :prog: pyprophet export feature-scores
+   :nested: none
+
+Export Score Plots (Deprecated)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. deprecated:: 3.1
+   Use :program:`pyprophet export feature-scores` instead.
+
+The :program:`export score-plots` command is deprecated and will be removed in a future version. It has been replaced by the more flexible :program:`export feature-scores` command which works with all file formats.
 
 .. click:: pyprophet.cli.export:export_score_plots
    :prog: pyprophet export score-plots

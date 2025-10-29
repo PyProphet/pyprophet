@@ -453,3 +453,104 @@ def test_parquet_export_with_ipf(test_data_osw, temp_folder, regtest):
     print(f"SCORE_IPF columns found: {sorted(ipf_columns)}", file=regtest)
     print("Sample data with IPF scores:", file=regtest)
     print(df[['FEATURE_ID'] + ipf_columns].head(10).sort_index(axis=1), file=regtest)
+
+
+# ================== FEATURE SCORES EXPORT TESTS ==================
+def test_feature_scores_unscored_osw(test_data_osw, temp_folder, regtest):
+    """Test exporting feature scores from unscored OSW file"""
+    cmd = f"pyprophet export feature-scores --in={test_data_osw} --out={temp_folder}/feature_scores.pdf"
+    
+    run_pyprophet_command(cmd, temp_folder)
+    
+    # Check that output PDF files were created
+    output_files = list(temp_folder.glob("*.pdf"))
+    assert len(output_files) > 0, "Expected at least one PDF file to be created"
+    
+    print(f"Created {len(output_files)} PDF file(s):", file=regtest)
+    for f in sorted(output_files):
+        print(f"  - {f.name}", file=regtest)
+
+
+def test_feature_scores_scored_osw(test_data_osw, temp_folder, regtest):
+    """Test exporting feature scores from scored OSW file with SCORE tables"""
+    # Score at MS2 level first
+    cmd = f"pyprophet score --in={test_data_osw} --level=ms2 --test --pi0_lambda=0.001 0 0 --ss_iteration_fdr=0.02 && "
+    
+    # Export feature scores (should detect SCORE_MS2 table)
+    cmd += f"pyprophet export feature-scores --in={test_data_osw} --out={temp_folder}/feature_scores.pdf"
+    
+    run_pyprophet_command(cmd, temp_folder)
+    
+    # Check that output PDF files were created
+    output_files = list(temp_folder.glob("*.pdf"))
+    assert len(output_files) > 0, "Expected at least one PDF file to be created"
+    
+    print(f"Created {len(output_files)} PDF file(s) from scored OSW:", file=regtest)
+    for f in sorted(output_files):
+        print(f"  - {f.name}", file=regtest)
+
+
+def test_feature_scores_parquet_with_scores(test_data_osw, temp_folder, regtest):
+    """Test exporting feature scores from Parquet file with SCORE columns"""
+    # Score and export to parquet
+    cmd = f"pyprophet score --in={test_data_osw} --level=ms2 --test --pi0_lambda=0.001 0 0 --ss_iteration_fdr=0.02 && "
+    cmd += f"pyprophet export parquet --in={test_data_osw} --out={temp_folder}/test_data_scored.parquet && "
+    
+    # Export feature scores from parquet
+    cmd += f"pyprophet export feature-scores --in={temp_folder}/test_data_scored.parquet --out={temp_folder}/feature_scores.pdf"
+    
+    run_pyprophet_command(cmd, temp_folder)
+    
+    # Check that output PDF was created
+    pdf_file = temp_folder / "feature_scores.pdf"
+    assert pdf_file.exists(), "Expected feature_scores.pdf to be created"
+    
+    print(f"Successfully created feature scores from Parquet with SCORE columns", file=regtest)
+
+
+def test_feature_scores_split_parquet_with_scores(test_data_osw, temp_folder, regtest):
+    """Test exporting feature scores from split Parquet directory with SCORE columns"""
+    # Score and export to split parquet
+    cmd = f"pyprophet score --in={test_data_osw} --level=ms2 --test --pi0_lambda=0.001 0 0 --ss_iteration_fdr=0.02 && "
+    cmd += f"pyprophet export parquet --in={test_data_osw} --out={temp_folder}/test_data_split --split_transition_data && "
+    
+    # Export feature scores from split parquet
+    cmd += f"pyprophet export feature-scores --in={temp_folder}/test_data_split --out={temp_folder}/feature_scores.pdf"
+    
+    run_pyprophet_command(cmd, temp_folder)
+    
+    # Check that output PDF was created
+    pdf_file = temp_folder / "feature_scores.pdf"
+    assert pdf_file.exists(), "Expected feature_scores.pdf to be created"
+    
+    print(f"Successfully created feature scores from split Parquet with SCORE columns", file=regtest)
+
+
+def test_feature_scores_ms1_ms2_transition(test_data_osw, temp_folder, regtest):
+    """Test exporting feature scores with MS1, MS2, and transition level scoring"""
+    # Score at all levels
+    cmd = f"pyprophet score --in={test_data_osw} --level=ms1 --test --pi0_lambda=0.1 0 0 --ss_iteration_fdr=0.02 && "
+    cmd += f"pyprophet score --in={test_data_osw} --level=ms2 --test --pi0_lambda=0.001 0 0 --ss_iteration_fdr=0.02 && "
+    cmd += f"pyprophet score --in={test_data_osw} --level=transition --test --pi0_lambda=0.1 0 0 --ss_iteration_fdr=0.02 && "
+    
+    # Export feature scores (should create ms1, ms2, and transition PDFs)
+    cmd += f"pyprophet export feature-scores --in={test_data_osw} --out={temp_folder}/feature_scores.pdf"
+    
+    run_pyprophet_command(cmd, temp_folder)
+    
+    # Check that output PDF files were created for all levels
+    output_files = list(temp_folder.glob("*.pdf"))
+    assert len(output_files) >= 3, "Expected at least 3 PDF files (ms1, ms2, transition)"
+    
+    # Check for specific files
+    ms1_files = [f for f in output_files if 'ms1' in f.name.lower()]
+    ms2_files = [f for f in output_files if 'ms2' in f.name.lower()]
+    transition_files = [f for f in output_files if 'transition' in f.name.lower()]
+    
+    print(f"Created {len(output_files)} PDF file(s) from multi-level scoring:", file=regtest)
+    print(f"  MS1 files: {len(ms1_files)}", file=regtest)
+    print(f"  MS2 files: {len(ms2_files)}", file=regtest)
+    print(f"  Transition files: {len(transition_files)}", file=regtest)
+    
+    for f in sorted(output_files):
+        print(f"  - {f.name}", file=regtest)
