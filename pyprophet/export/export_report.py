@@ -336,29 +336,43 @@ def _plot_feature_scores(df: pd.DataFrame, outfile: str, level: str, append: boo
     if append and os.path.exists(outfile):
         from pypdf import PdfReader, PdfWriter
         
-        # Merge the PDFs
-        writer = PdfWriter()
-        
-        # Add pages from existing PDF
-        with open(outfile, "rb") as f:
-            existing_pdf = PdfReader(f)
-            for page in existing_pdf.pages:
-                writer.add_page(page)
-        
-        # Add pages from new PDF
-        with open(temp_outfile, "rb") as f:
-            new_pdf = PdfReader(f)
-            for page in new_pdf.pages:
-                writer.add_page(page)
-        
-        # Write merged PDF
-        with open(outfile, "wb") as f:
-            writer.write(f)
-        
-        # Remove temporary file
-        os.remove(temp_outfile)
+        try:
+            # Merge the PDFs
+            writer = PdfWriter()
+            
+            # Add pages from existing PDF
+            with open(outfile, "rb") as f:
+                existing_pdf = PdfReader(f)
+                for page in existing_pdf.pages:
+                    writer.add_page(page)
+            
+            # Add pages from new PDF
+            with open(temp_outfile, "rb") as f:
+                new_pdf = PdfReader(f)
+                for page in new_pdf.pages:
+                    writer.add_page(page)
+            
+            # Write merged PDF
+            with open(outfile, "wb") as f:
+                writer.write(f)
+            
+            # Remove temporary file
+            os.remove(temp_outfile)
+        except Exception as e:
+            logger.warning(f"Failed to merge PDF for {level} level: {e}. Skipping this level.")
+            # Clean up temporary file if it exists
+            if os.path.exists(temp_outfile):
+                os.remove(temp_outfile)
+            return
     else:
         # Just rename temporary file to output file
-        if os.path.exists(outfile):
-            os.remove(outfile)
-        os.rename(temp_outfile, outfile)
+        try:
+            if os.path.exists(outfile):
+                os.remove(outfile)
+            os.rename(temp_outfile, outfile)
+        except Exception as e:
+            logger.warning(f"Failed to save PDF for {level} level: {e}. Skipping this level.")
+            # Clean up temporary file if it exists
+            if os.path.exists(temp_outfile):
+                os.remove(temp_outfile)
+            return
