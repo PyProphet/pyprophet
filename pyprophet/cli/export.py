@@ -43,7 +43,8 @@ def create_export_group():
     export.add_command(export_parquet, name="parquet")
     export.add_command(export_compound, name="compound")
     export.add_command(export_glyco, name="glyco")
-    export.add_command(export_score_plots, name="score-plots")
+    export.add_command(export_feature_scores, name="feature-scores")
+    export.add_command(export_score_plots, name="score-plots")  # Deprecated
     export.add_command(export_scored_report, name="score-report")
     export.add_command(export_calibration_report, name="calibration-report")
 
@@ -829,7 +830,35 @@ def export_glyco(
     )
 
 
-# Export score plots
+# Export feature scores (unified command)
+@click.command(name="feature-scores", cls=AdvancedHelpCommand)
+@click.option(
+    "--in",
+    "infile",
+    required=True,
+    type=click.Path(exists=True),
+    help="PyProphet input file (OSW, Parquet, or Split Parquet directory).",
+)
+@click.option(
+    "--out",
+    "outfile",
+    type=click.Path(exists=False),
+    help="Output PDF file path. If not specified, will be derived from input filename.",
+)
+@measure_memory_usage_and_time
+def export_feature_scores(infile, outfile):
+    """
+    Export feature score plots
+    
+    Works with OSW, Parquet, and Split Parquet formats.
+    - If SCORE tables exist: applies RANK==1 filtering and plots SCORE + VAR_ columns
+    - If SCORE tables don't exist: plots only VAR_ columns
+    """
+    from ..export.export_report import export_feature_scores as _export_feature_scores
+    _export_feature_scores(infile, outfile)
+
+
+# Export score plots (deprecated - use feature-scores instead)
 @click.command(name="score-plots", cls=AdvancedHelpCommand)
 @click.option(
     "--in",
@@ -849,8 +878,11 @@ def export_glyco(
 @measure_memory_usage_and_time
 def export_score_plots(infile, glycoform):
     """
-    Export score plots
+    Export score plots (DEPRECATED - use 'feature-scores' instead)
+    
+    This command is deprecated. Please use 'pyprophet export feature-scores' instead.
     """
+    logger.warning("DEPRECATED: 'pyprophet export score-plots' is deprecated. Use 'pyprophet export feature-scores' instead.")
     if infile.endswith(".osw"):
         if not glycoform:
             _export_score_plots(infile)
