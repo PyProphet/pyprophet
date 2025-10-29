@@ -950,21 +950,21 @@ class OSWWriter(BaseOSWWriter):
                     for col in get_table_columns_with_types(
                         self.config.infile, "FEATURE_MS1"
                     )
-                    if col[0] != "FEATURE_ID"
+                    if col[0] != "FEATURE_ID" and col[1]  # Ensure column has a type
                 ],
                 "feature_ms2_cols": [
                     col
                     for col in get_table_columns_with_types(
                         self.config.infile, "FEATURE_MS2"
                     )
-                    if col[0] != "FEATURE_ID"
+                    if col[0] != "FEATURE_ID" and col[1]  # Ensure column has a type
                 ],
                 "feature_transition_cols": [
                     col
                     for col in get_table_columns_with_types(
                         self.config.infile, "FEATURE_TRANSITION"
                     )
-                    if col[0] not in ["FEATURE_ID", "TRANSITION_ID"]
+                    if col[0] not in ["FEATURE_ID", "TRANSITION_ID"] and col[1]  # Ensure column has a type
                 ],
                 "score_ms1_exists": {"SCORE_MS1"}.issubset(table_names),
                 "score_ms2_exists": {"SCORE_MS2"}.issubset(table_names),
