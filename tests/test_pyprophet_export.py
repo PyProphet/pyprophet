@@ -268,3 +268,124 @@ def test_compound_ms2(test_data_compound_osw, temp_folder, regtest):
 
     df = pd.read_csv(f"{temp_folder}/test_data_compound_ms2.tsv", sep="\t", nrows=100)
     print(df.sort_index(axis=1), file=regtest)
+
+
+# ================== PARQUET EXPORT TESTS ==================
+def test_parquet_export_scored_osw(test_data_osw, temp_folder, regtest):
+    """Test exporting scored OSW with SCORE_ tables to parquet format"""
+    # Score at MS2 level
+    cmd = f"pyprophet score --in={test_data_osw} --level=ms2 --test --pi0_lambda=0.001 0 0 --ss_iteration_fdr=0.02 && "
+    
+    # Infer peptide level with global context
+    cmd += f"pyprophet infer peptide --pi0_lambda=0.001 0 0 --in={test_data_osw} --context=global && "
+    
+    # Infer protein level with global context
+    cmd += f"pyprophet infer protein --pi0_lambda=0 0 0 --in={test_data_osw} --context=global && "
+    
+    # Export to parquet (should include SCORE_ tables)
+    cmd += f"pyprophet export parquet --in={test_data_osw} --out={temp_folder}/test_data_scored.parquet"
+    
+    run_pyprophet_command(cmd, temp_folder)
+    
+    # Verify the parquet file exists and has data
+    import pyarrow.parquet as pq
+    table = pq.read_table(f"{temp_folder}/test_data_scored.parquet")
+    df = table.to_pandas()
+    
+    # Check that we have data
+    assert len(df) > 0, "Exported parquet file should not be empty"
+    
+    # Check that score columns are present
+    score_columns = [col for col in df.columns if col.startswith('SCORE_')]
+    assert len(score_columns) > 0, "Exported parquet should contain SCORE_ columns"
+    
+    print(f"Exported {len(df)} rows with {len(df.columns)} columns", file=regtest)
+    print(f"Score columns found: {sorted(score_columns)}", file=regtest)
+    print(df.head(10).sort_index(axis=1), file=regtest)
+
+
+def test_parquet_export_no_transition_data(test_data_osw, temp_folder, regtest):
+    """Test exporting parquet without transition data using --no-include_transition_data flag"""
+    # Score at MS2 level
+    cmd = f"pyprophet score --in={test_data_osw} --level=ms2 --test --pi0_lambda=0.001 0 0 --ss_iteration_fdr=0.02 && "
+    
+    # Infer peptide level with global context
+    cmd += f"pyprophet infer peptide --pi0_lambda=0.001 0 0 --in={test_data_osw} --context=global && "
+    
+    # Infer protein level with global context
+    cmd += f"pyprophet infer protein --pi0_lambda=0 0 0 --in={test_data_osw} --context=global && "
+    
+    # Export to parquet without transition data
+    cmd += f"pyprophet export parquet --in={test_data_osw} --out={temp_folder}/test_data_no_transition.parquet --no-include_transition_data"
+    
+    run_pyprophet_command(cmd, temp_folder)
+    
+    # Verify the parquet file exists and has data
+    import pyarrow.parquet as pq
+    table = pq.read_table(f"{temp_folder}/test_data_no_transition.parquet")
+    df = table.to_pandas()
+    
+    # Check that we have data
+    assert len(df) > 0, "Exported parquet file should not be empty"
+    
+    # Check that transition-specific columns are NOT present
+    transition_columns = [col for col in df.columns if 'TRANSITION' in col.upper()]
+    assert len(transition_columns) == 0, "Exported parquet should not contain TRANSITION columns when --no-include_transition_data is used"
+    
+    # Check that score columns are present
+    score_columns = [col for col in df.columns if col.startswith('SCORE_')]
+    assert len(score_columns) > 0, "Exported parquet should contain SCORE_ columns"
+    
+    print(f"Exported {len(df)} rows with {len(df.columns)} columns (no transition data)", file=regtest)
+    print(f"Score columns found: {sorted(score_columns)}", file=regtest)
+    print(df.head(10).sort_index(axis=1), file=regtest)
+
+
+def test_parquet_export_split_format(test_data_osw, temp_folder, regtest):
+    """Test exporting to split parquet format with score data"""
+    # Score at MS2 level
+    cmd = f"pyprophet score --in={test_data_osw} --level=ms2 --test --pi0_lambda=0.001 0 0 --ss_iteration_fdr=0.02 && "
+    
+    # Infer peptide level with global context
+    cmd += f"pyprophet infer peptide --pi0_lambda=0.001 0 0 --in={test_data_osw} --context=global && "
+    
+    # Infer protein level with global context
+    cmd += f"pyprophet infer protein --pi0_lambda=0 0 0 --in={test_data_osw} --context=global && "
+    
+    # Export to split parquet format
+    cmd += f"pyprophet export parquet --in={test_data_osw} --out={temp_folder}/test_data_split --split_transition_data"
+    
+    run_pyprophet_command(cmd, temp_folder)
+    
+    # Verify the directory exists and contains parquet files
+    import pyarrow.parquet as pq
+    split_dir = Path(temp_folder) / "test_data_split"
+    assert split_dir.exists(), "Split parquet directory should exist"
+    
+    precursor_file = split_dir / "precursor_features.parquet"
+    transition_file = split_dir / "transition_features.parquet"
+    
+    assert precursor_file.exists(), "precursor_features.parquet should exist"
+    assert transition_file.exists(), "transition_features.parquet should exist"
+    
+    # Read precursor data
+    precursor_table = pq.read_table(str(precursor_file))
+    precursor_df = precursor_table.to_pandas()
+    
+    # Read transition data
+    transition_table = pq.read_table(str(transition_file))
+    transition_df = transition_table.to_pandas()
+    
+    # Check that we have data in both files
+    assert len(precursor_df) > 0, "Precursor parquet file should not be empty"
+    assert len(transition_df) > 0, "Transition parquet file should not be empty"
+    
+    # Check that score columns are present in precursor file
+    precursor_score_columns = [col for col in precursor_df.columns if col.startswith('SCORE_')]
+    assert len(precursor_score_columns) > 0, "Precursor parquet should contain SCORE_ columns"
+    
+    print(f"Precursor data: {len(precursor_df)} rows with {len(precursor_df.columns)} columns", file=regtest)
+    print(f"Transition data: {len(transition_df)} rows with {len(transition_df.columns)} columns", file=regtest)
+    print(f"Precursor score columns: {sorted(precursor_score_columns)}", file=regtest)
+    print("Precursor data sample:", file=regtest)
+    print(precursor_df.head(5).sort_index(axis=1), file=regtest)
