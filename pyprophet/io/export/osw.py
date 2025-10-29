@@ -1243,6 +1243,27 @@ class OSWWriter(BaseOSWWriter):
             {score_table_joins}
             """
 
+    def _build_transition_score_columns_and_join(self, column_info: dict) -> tuple[str, str]:
+        """Build score columns and join clause for transition scores"""
+        score_transition_cols = ""
+        score_transition_join = ""
+        if column_info.get("score_transition_exists", False):
+            logger.debug("SCORE_TRANSITION table exists, adding score columns to transition query")
+            score_cols = [
+                "SCORE_TRANSITION.SCORE AS SCORE_TRANSITION_SCORE",
+                "SCORE_TRANSITION.RANK AS SCORE_TRANSITION_RANK",
+                "SCORE_TRANSITION.PVALUE AS SCORE_TRANSITION_P_VALUE",
+                "SCORE_TRANSITION.QVALUE AS SCORE_TRANSITION_Q_VALUE",
+                "SCORE_TRANSITION.PEP AS SCORE_TRANSITION_PEP",
+            ]
+            score_transition_cols = ", " + ", ".join(score_cols)
+            score_transition_join = (
+                f"LEFT JOIN sqlite_scan('{self.config.infile}', 'SCORE_TRANSITION') AS SCORE_TRANSITION "
+                f"ON FEATURE_TRANSITION.TRANSITION_ID = SCORE_TRANSITION.TRANSITION_ID "
+                f"AND FEATURE_TRANSITION.FEATURE_ID = SCORE_TRANSITION.FEATURE_ID"
+            )
+        return score_transition_cols, score_transition_join
+
     def _build_transition_query(self, column_info: dict) -> str:
         """Build SQL query for transition data"""
         feature_transition_cols_sql = ", ".join(
@@ -1257,12 +1278,7 @@ class OSWWriter(BaseOSWWriter):
         )
 
         # Add transition score columns if they exist
-        score_transition_cols = ""
-        score_transition_join = ""
-        if column_info["score_transition_exists"]:
-            logger.debug("SCORE_TRANSITION table exists, adding score columns to transition query")
-            score_transition_cols = ", SCORE_TRANSITION.SCORE AS SCORE_TRANSITION_SCORE, SCORE_TRANSITION.RANK AS SCORE_TRANSITION_RANK, SCORE_TRANSITION.PVALUE AS SCORE_TRANSITION_P_VALUE, SCORE_TRANSITION.QVALUE AS SCORE_TRANSITION_Q_VALUE, SCORE_TRANSITION.PEP AS SCORE_TRANSITION_PEP"
-            score_transition_join = f"LEFT JOIN sqlite_scan('{self.config.infile}', 'SCORE_TRANSITION') AS SCORE_TRANSITION ON FEATURE_TRANSITION.TRANSITION_ID = SCORE_TRANSITION.TRANSITION_ID AND FEATURE_TRANSITION.FEATURE_ID = SCORE_TRANSITION.FEATURE_ID"
+        score_transition_cols, score_transition_join = self._build_transition_score_columns_and_join(column_info)
 
         return f"""
             SELECT 
@@ -1482,12 +1498,7 @@ class OSWWriter(BaseOSWWriter):
         )
 
         # Add transition score columns if they exist
-        score_transition_cols = ""
-        score_transition_join = ""
-        if column_info["score_transition_exists"]:
-            logger.debug("SCORE_TRANSITION table exists, adding score columns to combined transition query")
-            score_transition_cols = ", SCORE_TRANSITION.SCORE AS SCORE_TRANSITION_SCORE, SCORE_TRANSITION.RANK AS SCORE_TRANSITION_RANK, SCORE_TRANSITION.PVALUE AS SCORE_TRANSITION_P_VALUE, SCORE_TRANSITION.QVALUE AS SCORE_TRANSITION_Q_VALUE, SCORE_TRANSITION.PEP AS SCORE_TRANSITION_PEP"
-            score_transition_join = f"LEFT JOIN sqlite_scan('{self.config.infile}', 'SCORE_TRANSITION') AS SCORE_TRANSITION ON FEATURE_TRANSITION.TRANSITION_ID = SCORE_TRANSITION.TRANSITION_ID AND FEATURE_TRANSITION.FEATURE_ID = SCORE_TRANSITION.FEATURE_ID"
+        score_transition_cols, score_transition_join = self._build_transition_score_columns_and_join(column_info)
 
         # Also need to add NULL columns for score columns that appear in precursor query
         as_null_score_cols = ""
@@ -1615,8 +1626,8 @@ class OSWWriter(BaseOSWWriter):
                 "SCORE_TRANSITION_PEP DOUBLE"
             ])
 
-        score_cols_types_sql = ", ".join(score_cols_types) if score_cols_types else ""
-        score_cols_separator = ", " if score_cols_types_sql else ""
+        # Prepend comma to score columns if there are any
+        score_cols_types_sql = (", " + ", ".join(score_cols_types)) if score_cols_types else ""
 
         create_temp_table_query = f"""
         CREATE TABLE temp_table (
@@ -1662,7 +1673,7 @@ class OSWWriter(BaseOSWWriter):
             TRANSITION_LIBRARY_INTENSITY DOUBLE,
             TRANSITION_DECOY BOOLEAN,
             {feature_transition_cols_types}
-            {score_cols_separator}{score_cols_types_sql}
+            {score_cols_types_sql}
         );
         """
 
