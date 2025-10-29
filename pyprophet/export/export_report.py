@@ -51,21 +51,18 @@ def export_feature_scores(infile, outfile=None):
     outfile : str, optional
         Base path for output PDF files. If None, derives from infile.
     """
-    # Determine file type
+    # Determine file type and route to appropriate handler
     inpath = Path(infile)
     
     # Check if it's a directory (split parquet) or file
     if inpath.is_dir():
-        file_type = "split_parquet"
-        # For split parquet, we'll need to handle differently
+        # Split parquet directory
         logger.info(f"Detected split parquet directory: {infile}")
         _export_feature_scores_from_split_parquet(infile, outfile)
     elif infile.endswith('.parquet'):
-        file_type = "parquet"
         logger.info(f"Detected parquet file: {infile}")
         _export_feature_scores_from_parquet(infile, outfile)
     elif infile.endswith('.osw'):
-        file_type = "osw"
         logger.info(f"Detected OSW file: {infile}")
         _export_feature_scores_from_osw(infile, outfile)
     else:
