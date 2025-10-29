@@ -2,10 +2,9 @@ import os
 import glob
 import pandas as pd
 import duckdb
-import pyarrow.parquet as pq
 from loguru import logger
 
-from ..util import get_parquet_column_names
+from ..util import get_parquet_column_names, _ensure_pyarrow
 from .._base import BaseSplitParquetReader, BaseSplitParquetWriter
 from ..._config import ExportIOConfig
 
@@ -679,12 +678,15 @@ class SplitParquetReader(BaseSplitParquetReader):
             Function to call for plotting each level's data.
             Signature: plot_callback(df, outfile, level, append)
         """
+        # Ensure pyarrow is available
+        pa, _, _ = _ensure_pyarrow()
+        
         # Read precursor features - only necessary columns
         precursor_file = os.path.join(self.infile, "precursors_features.parquet")
         logger.info(f"Reading precursor features from: {precursor_file}")
         
         # First check what columns are available
-        precursor_parquet = pq.ParquetFile(precursor_file)
+        precursor_parquet = pa.parquet.ParquetFile(precursor_file)
         all_columns = precursor_parquet.schema.names
         
         # Identify columns to read
@@ -728,7 +730,7 @@ class SplitParquetReader(BaseSplitParquetReader):
             logger.info(f"Reading transition features from: {transition_file}")
             
             # Check what columns are available
-            transition_parquet = pq.ParquetFile(transition_file)
+            transition_parquet = pa.parquet.ParquetFile(transition_file)
             transition_all_columns = transition_parquet.schema.names
             transition_cols = [col for col in transition_all_columns if col.startswith("FEATURE_TRANSITION_VAR_")]
             
@@ -751,7 +753,7 @@ class SplitParquetReader(BaseSplitParquetReader):
             logger.info(f"Reading alignment features from: {alignment_file}")
             
             # Check what columns are available
-            alignment_parquet = pq.ParquetFile(alignment_file)
+            alignment_parquet = pa.parquet.ParquetFile(alignment_file)
             alignment_all_columns = alignment_parquet.schema.names
             var_cols = [col for col in alignment_all_columns if col.startswith("VAR_")]
             

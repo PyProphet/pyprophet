@@ -1,11 +1,10 @@
 import duckdb
 import pandas as pd
-import pyarrow.parquet as pq
 from loguru import logger
 
 from ..._config import ExportIOConfig
 from .._base import BaseParquetReader, BaseParquetWriter
-from ..util import get_parquet_column_names
+from ..util import get_parquet_column_names, _ensure_pyarrow
 
 
 class ParquetReader(BaseParquetReader):
@@ -615,8 +614,11 @@ class ParquetReader(BaseParquetReader):
             Signature: plot_callback(df, outfile, level, append)
         """
         logger.info(f"Reading parquet file: {self.infile}")
+        # Ensure pyarrow is available
+        pa, _, _ = _ensure_pyarrow()
+        
         # First, read only column names to identify what to load
-        parquet_file = pq.ParquetFile(self.infile)
+        parquet_file = pa.parquet.ParquetFile(self.infile)
         all_columns = parquet_file.schema.names
         
         # Identify columns to read for each level
