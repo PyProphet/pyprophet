@@ -553,6 +553,13 @@ def export_library(
     type=int,
     help="Compression level to use for parquet file.",
 )
+@click.option(
+    "--include_transition_data/--no-include_transition_data",
+    "include_transition_data",
+    default=True,
+    show_default=True,
+    help="Include transition data in the exported parquet file(s). When disabled, only precursor-level data is exported.",
+)
 @measure_memory_usage_and_time
 def export_parquet(
     infile,
@@ -565,6 +572,7 @@ def export_parquet(
     split_runs,
     compression,
     compression_level,
+    include_transition_data,
 ):
     """
     Export OSW or sqMass to parquet format
@@ -600,6 +608,7 @@ def export_parquet(
             split_runs=split_runs,
             compression_method=compression,
             compression_level=compression_level,
+            include_transition_data=include_transition_data,
         )
 
         writer = WriterDispatcher.get_writer(config)

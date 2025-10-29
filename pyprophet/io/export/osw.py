@@ -1019,21 +1019,24 @@ class OSWWriter(BaseOSWWriter):
             logger.info(f"Exporting precursor data to {precursor_path}")
             self._execute_copy_query(conn, precursor_query, precursor_path)
 
-            # Export transition data
-            transition_path = os.path.join(run_dir, "transition_features.parquet")
-            transition_query_run = (
-                self._build_transition_query(column_info)
-                + f"\nWHERE FEATURE.RUN_ID = {run_id}"
-            )
-            transition_query_null = (
-                self._build_transition_query(column_info)
-                + "\nWHERE FEATURE.RUN_ID IS NULL"
-            )
-            combined_transition_query = (
-                f"{transition_query_run}\nUNION ALL\n{transition_query_null}"
-            )
-            logger.info(f"Exporting transition data to {transition_path}")
-            self._execute_copy_query(conn, combined_transition_query, transition_path)
+            # Export transition data if requested
+            if self.config.include_transition_data:
+                transition_path = os.path.join(run_dir, "transition_features.parquet")
+                transition_query_run = (
+                    self._build_transition_query(column_info)
+                    + f"\nWHERE FEATURE.RUN_ID = {run_id}"
+                )
+                transition_query_null = (
+                    self._build_transition_query(column_info)
+                    + "\nWHERE FEATURE.RUN_ID IS NULL"
+                )
+                combined_transition_query = (
+                    f"{transition_query_run}\nUNION ALL\n{transition_query_null}"
+                )
+                logger.info(f"Exporting transition data to {transition_path}")
+                self._execute_copy_query(conn, combined_transition_query, transition_path)
+            else:
+                logger.info("Skipping transition data export (include_transition_data=False)")
 
         # Export alignment data if exists
         if column_info["feature_ms2_alignment_exists"]:
@@ -1052,13 +1055,16 @@ class OSWWriter(BaseOSWWriter):
         precursor_query = self._build_precursor_query(conn, column_info)
         self._execute_copy_query(conn, precursor_query, precursor_path)
 
-        # Export transition data
-        transition_path = os.path.join(
-            self.config.outfile, "transition_features.parquet"
-        )
-        logger.info(f"Exporting transition data to {transition_path}")
-        transition_query = self._build_transition_query(column_info)
-        self._execute_copy_query(conn, transition_query, transition_path)
+        # Export transition data if requested
+        if self.config.include_transition_data:
+            transition_path = os.path.join(
+                self.config.outfile, "transition_features.parquet"
+            )
+            logger.info(f"Exporting transition data to {transition_path}")
+            transition_query = self._build_transition_query(column_info)
+            self._execute_copy_query(conn, transition_query, transition_path)
+        else:
+            logger.info("Skipping transition data export (include_transition_data=False)")
 
         # Export alignment data if exists
         if column_info["feature_ms2_alignment_exists"]:
@@ -1076,10 +1082,13 @@ class OSWWriter(BaseOSWWriter):
         precursor_query = self._build_combined_precursor_query(conn, column_info)
         conn.execute(f"INSERT INTO temp_table {precursor_query}")
 
-        # Insert transition data
-        logger.debug("Inserting transition data into temp table")
-        transition_query = self._build_combined_transition_query(column_info)
-        conn.execute(f"INSERT INTO temp_table {transition_query}")
+        # Insert transition data if requested
+        if self.config.include_transition_data:
+            logger.debug("Inserting transition data into temp table")
+            transition_query = self._build_combined_transition_query(column_info)
+            conn.execute(f"INSERT INTO temp_table {transition_query}")
+        else:
+            logger.info("Skipping transition data export (include_transition_data=False)")
 
         # Export to parquet
         logger.info(f"Exporting combined data to {self.config.outfile}")
@@ -1247,6 +1256,14 @@ class OSWWriter(BaseOSWWriter):
             else "TRANSITION.TYPE || CAST(TRANSITION.ORDINAL AS VARCHAR) || '^' || CAST(TRANSITION.CHARGE AS VARCHAR)"
         )
 
+        # Add transition score columns if they exist
+        score_transition_cols = ""
+        score_transition_join = ""
+        if column_info["score_transition_exists"]:
+            logger.debug("SCORE_TRANSITION table exists, adding score columns to transition query")
+            score_transition_cols = ", SCORE_TRANSITION.SCORE AS SCORE_TRANSITION_SCORE, SCORE_TRANSITION.RANK AS SCORE_TRANSITION_RANK, SCORE_TRANSITION.PVALUE AS SCORE_TRANSITION_P_VALUE, SCORE_TRANSITION.QVALUE AS SCORE_TRANSITION_Q_VALUE, SCORE_TRANSITION.PEP AS SCORE_TRANSITION_PEP"
+            score_transition_join = f"LEFT JOIN sqlite_scan('{self.config.infile}', 'SCORE_TRANSITION') AS SCORE_TRANSITION ON FEATURE_TRANSITION.TRANSITION_ID = SCORE_TRANSITION.TRANSITION_ID AND FEATURE_TRANSITION.FEATURE_ID = SCORE_TRANSITION.FEATURE_ID"
+
         return f"""
             SELECT 
                 FEATURE.RUN_ID AS RUN_ID,
@@ -1264,6 +1281,7 @@ class OSWWriter(BaseOSWWriter):
                 TRANSITION.DECOY AS TRANSITION_DECOY,
                 FEATURE.ID AS FEATURE_ID,
                 {feature_transition_cols_sql}
+                {score_transition_cols}
             FROM sqlite_scan('{self.config.infile}', 'TRANSITION') AS TRANSITION
             FULL JOIN sqlite_scan('{self.config.infile}', 'TRANSITION_PRECURSOR_MAPPING') AS TRANSITION_PRECURSOR_MAPPING 
                 ON TRANSITION.ID = TRANSITION_PRECURSOR_MAPPING.TRANSITION_ID
@@ -1276,6 +1294,7 @@ class OSWWriter(BaseOSWWriter):
                 FROM sqlite_scan('{self.config.infile}', 'FEATURE')
             ) AS FEATURE
                 ON FEATURE_TRANSITION.FEATURE_ID = FEATURE.ID
+            {score_transition_join}
             """
 
     def _build_combined_precursor_query(self, conn, column_info: dict) -> str:
@@ -1294,6 +1313,16 @@ class OSWWriter(BaseOSWWriter):
             f"NULL AS FEATURE_TRANSITION_{col[0]}"
             for col in column_info["feature_transition_cols"]
         )
+
+        # Get score columns for precursor level
+        score_cols_select, score_table_joins, score_column_views = (
+            self._build_score_column_selection_and_joins(column_info)
+        )
+
+        # Add NULL columns for transition score columns
+        as_null_transition_score_cols = ""
+        if column_info.get("score_transition_exists", False):
+            as_null_transition_score_cols = ", NULL AS SCORE_TRANSITION_SCORE, NULL AS SCORE_TRANSITION_RANK, NULL AS SCORE_TRANSITION_P_VALUE, NULL AS SCORE_TRANSITION_Q_VALUE, NULL AS SCORE_TRANSITION_PEP"
 
         # First get the peptide table and process it with pyopenms
         logger.info("Generating peptide unimod to codename mapping")
@@ -1362,6 +1391,7 @@ class OSWWriter(BaseOSWWriter):
             --    JOIN ipf_groups g USING (NORMALIZED_SEQUENCE)
             --) 
             
+            {score_column_views}
             SELECT 
                 PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID AS PROTEIN_ID,
                 PEPTIDE.ID AS PEPTIDE_ID,
@@ -1404,7 +1434,9 @@ class OSWWriter(BaseOSWWriter):
                 NULL AS TRANSITION_DETECTING,
                 NULL AS TRANSITION_LIBRARY_INTENSITY,
                 NULL AS TRANSITION_DECOY,
-                {as_null_feature_transition_cols_sql}
+                {as_null_feature_transition_cols_sql},
+                {score_cols_select}
+                {as_null_transition_score_cols}
             FROM sqlite_scan('{self.config.infile}', 'PRECURSOR') AS PRECURSOR
             INNER JOIN sqlite_scan('{self.config.infile}', 'PRECURSOR_PEPTIDE_MAPPING') AS PRECURSOR_PEPTIDE_MAPPING 
                 ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
@@ -1425,6 +1457,7 @@ class OSWWriter(BaseOSWWriter):
                 ON FEATURE.ID = FEATURE_MS2.FEATURE_ID
             INNER JOIN sqlite_scan('{self.config.infile}', 'RUN') AS RUN 
                 ON FEATURE.RUN_ID = RUN.ID
+            {score_table_joins}
             """
 
     def _build_combined_transition_query(self, column_info: dict) -> str:
@@ -1447,6 +1480,28 @@ class OSWWriter(BaseOSWWriter):
             if column_info["has_annotation"]
             else "TRANSITION.TYPE || CAST(TRANSITION.ORDINAL AS VARCHAR) || '^' || CAST(TRANSITION.CHARGE AS VARCHAR)"
         )
+
+        # Add transition score columns if they exist
+        score_transition_cols = ""
+        score_transition_join = ""
+        if column_info["score_transition_exists"]:
+            logger.debug("SCORE_TRANSITION table exists, adding score columns to combined transition query")
+            score_transition_cols = ", SCORE_TRANSITION.SCORE AS SCORE_TRANSITION_SCORE, SCORE_TRANSITION.RANK AS SCORE_TRANSITION_RANK, SCORE_TRANSITION.PVALUE AS SCORE_TRANSITION_P_VALUE, SCORE_TRANSITION.QVALUE AS SCORE_TRANSITION_Q_VALUE, SCORE_TRANSITION.PEP AS SCORE_TRANSITION_PEP"
+            score_transition_join = f"LEFT JOIN sqlite_scan('{self.config.infile}', 'SCORE_TRANSITION') AS SCORE_TRANSITION ON FEATURE_TRANSITION.TRANSITION_ID = SCORE_TRANSITION.TRANSITION_ID AND FEATURE_TRANSITION.FEATURE_ID = SCORE_TRANSITION.FEATURE_ID"
+
+        # Also need to add NULL columns for score columns that appear in precursor query
+        as_null_score_cols = ""
+        if column_info.get("score_ms1_exists", False):
+            as_null_score_cols += ", NULL AS SCORE_MS1_SCORE, NULL AS SCORE_MS1_RANK, NULL AS SCORE_MS1_P_VALUE, NULL AS SCORE_MS1_Q_VALUE, NULL AS SCORE_MS1_PEP"
+        if column_info.get("score_ms2_exists", False):
+            as_null_score_cols += ", NULL AS SCORE_MS2_SCORE, NULL AS SCORE_MS2_PEAK_GROUP_RANK, NULL AS SCORE_MS2_P_VALUE, NULL AS SCORE_MS2_Q_VALUE, NULL AS SCORE_MS2_PEP"
+        
+        # Add NULL columns for peptide and protein score contexts
+        for table in ["peptide", "protein"]:
+            if column_info.get(f"score_{table}_exists", False):
+                for context in column_info.get(f"score_{table}_contexts", []):
+                    safe_context = context.upper().replace("-", "_")
+                    as_null_score_cols += f", NULL AS SCORE_{table.upper()}_{safe_context}_SCORE, NULL AS SCORE_{table.upper()}_{safe_context}_P_VALUE, NULL AS SCORE_{table.upper()}_{safe_context}_Q_VALUE, NULL AS SCORE_{table.upper()}_{safe_context}_PEP"
 
         return f"""
             SELECT
@@ -1492,6 +1547,8 @@ class OSWWriter(BaseOSWWriter):
                 TRANSITION.LIBRARY_INTENSITY AS TRANSITION_LIBRARY_INTENSITY,
                 TRANSITION.DECOY AS TRANSITION_DECOY,
                 {feature_transition_cols_sql}
+                {as_null_score_cols}
+                {score_transition_cols}
             FROM sqlite_scan('{self.config.infile}', 'TRANSITION_PRECURSOR_MAPPING') AS TRANSITION_PRECURSOR_MAPPING 
             INNER JOIN sqlite_scan('{self.config.infile}', 'TRANSITION') AS TRANSITION
                 ON TRANSITION_PRECURSOR_MAPPING.TRANSITION_ID = TRANSITION.ID
@@ -1499,6 +1556,7 @@ class OSWWriter(BaseOSWWriter):
                 ON TRANSITION.ID = TRANSITION_PEPTIDE_MAPPING.TRANSITION_ID
             FULL JOIN sqlite_scan('{self.config.infile}', 'FEATURE_TRANSITION') AS FEATURE_TRANSITION 
                 ON TRANSITION.ID = FEATURE_TRANSITION.TRANSITION_ID
+            {score_transition_join}
             """
 
     def _create_temp_table(self, conn, column_info: dict) -> None:
@@ -1515,6 +1573,50 @@ class OSWWriter(BaseOSWWriter):
             f"FEATURE_TRANSITION_{col[0]} {col[1]}"
             for col in column_info["feature_transition_cols"]
         )
+
+        # Build score column types
+        score_cols_types = []
+        if column_info.get("score_ms1_exists", False):
+            score_cols_types.extend([
+                "SCORE_MS1_SCORE DOUBLE",
+                "SCORE_MS1_RANK INTEGER",
+                "SCORE_MS1_P_VALUE DOUBLE",
+                "SCORE_MS1_Q_VALUE DOUBLE",
+                "SCORE_MS1_PEP DOUBLE"
+            ])
+        if column_info.get("score_ms2_exists", False):
+            score_cols_types.extend([
+                "SCORE_MS2_SCORE DOUBLE",
+                "SCORE_MS2_PEAK_GROUP_RANK INTEGER",
+                "SCORE_MS2_P_VALUE DOUBLE",
+                "SCORE_MS2_Q_VALUE DOUBLE",
+                "SCORE_MS2_PEP DOUBLE"
+            ])
+        
+        # Add peptide and protein score columns for each context
+        for table in ["peptide", "protein"]:
+            if column_info.get(f"score_{table}_exists", False):
+                for context in column_info.get(f"score_{table}_contexts", []):
+                    safe_context = context.upper().replace("-", "_")
+                    score_cols_types.extend([
+                        f"SCORE_{table.upper()}_{safe_context}_SCORE DOUBLE",
+                        f"SCORE_{table.upper()}_{safe_context}_P_VALUE DOUBLE",
+                        f"SCORE_{table.upper()}_{safe_context}_Q_VALUE DOUBLE",
+                        f"SCORE_{table.upper()}_{safe_context}_PEP DOUBLE"
+                    ])
+        
+        # Add transition score columns
+        if column_info.get("score_transition_exists", False):
+            score_cols_types.extend([
+                "SCORE_TRANSITION_SCORE DOUBLE",
+                "SCORE_TRANSITION_RANK INTEGER",
+                "SCORE_TRANSITION_P_VALUE DOUBLE",
+                "SCORE_TRANSITION_Q_VALUE DOUBLE",
+                "SCORE_TRANSITION_PEP DOUBLE"
+            ])
+
+        score_cols_types_sql = ", ".join(score_cols_types) if score_cols_types else ""
+        score_cols_separator = ", " if score_cols_types_sql else ""
 
         create_temp_table_query = f"""
         CREATE TABLE temp_table (
@@ -1560,6 +1662,7 @@ class OSWWriter(BaseOSWWriter):
             TRANSITION_LIBRARY_INTENSITY DOUBLE,
             TRANSITION_DECOY BOOLEAN,
             {feature_transition_cols_types}
+            {score_cols_separator}{score_cols_types_sql}
         );
         """
 
