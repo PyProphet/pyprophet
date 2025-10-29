@@ -12,6 +12,30 @@ from ..report import plot_scores
 from loguru import logger
 
 
+def _check_pyarrow_available():
+    """
+    Helper function to check if pyarrow is available and provide helpful error message.
+    
+    Returns
+    -------
+    module
+        The pyarrow.parquet module if available
+        
+    Raises
+    ------
+    ImportError
+        If pyarrow is not installed
+    """
+    try:
+        import pyarrow.parquet as pq
+        return pq
+    except ImportError:
+        raise ImportError(
+            "pyarrow is required for parquet file operations. "
+            "Install it with: pip install pyarrow or pip install pyprophet[parquet]"
+        )
+
+
 def export_feature_scores(infile, outfile=None):
     """
     Export feature score plots from a PyProphet input file.
@@ -255,12 +279,7 @@ def _export_feature_scores_from_parquet(infile, outfile=None):
     """
     Export feature scores from single Parquet file.
     """
-    try:
-        import pyarrow.parquet as pq
-    except ImportError:
-        raise ImportError(
-            "pyarrow is required for parquet export. Install it with: pip install pyarrow"
-        )
+    pq = _check_pyarrow_available()
     
     # Read parquet file
     table = pq.read_table(infile)
@@ -306,14 +325,7 @@ def _export_feature_scores_from_split_parquet(infile, outfile=None):
     """
     Export feature scores from split Parquet directory.
     """
-    try:
-        import pyarrow.parquet as pq
-    except ImportError:
-        raise ImportError(
-            "pyarrow is required for parquet export. Install it with: pip install pyarrow"
-        )
-    
-    from pathlib import Path
+    pq = _check_pyarrow_available()
     
     inpath = Path(infile)
     
