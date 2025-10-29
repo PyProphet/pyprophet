@@ -1,6 +1,8 @@
 import sqlite3
 import pandas as pd
+import os
 from pathlib import Path
+from loguru import logger
 
 
 from .._config import ExportIOConfig
@@ -9,7 +11,6 @@ from ..io.dispatcher import ReaderDispatcher
 from ..io.util import get_parquet_column_names
 from ..io.util import check_sqlite_table
 from ..report import plot_scores
-from loguru import logger
 
 
 def _check_pyarrow_available():
