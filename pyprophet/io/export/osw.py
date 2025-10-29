@@ -1506,6 +1506,8 @@ class OSWWriter(BaseOSWWriter):
             as_null_score_cols += ", NULL AS SCORE_MS1_SCORE, NULL AS SCORE_MS1_RANK, NULL AS SCORE_MS1_P_VALUE, NULL AS SCORE_MS1_Q_VALUE, NULL AS SCORE_MS1_PEP"
         if column_info.get("score_ms2_exists", False):
             as_null_score_cols += ", NULL AS SCORE_MS2_SCORE, NULL AS SCORE_MS2_PEAK_GROUP_RANK, NULL AS SCORE_MS2_P_VALUE, NULL AS SCORE_MS2_Q_VALUE, NULL AS SCORE_MS2_PEP"
+        if column_info.get("score_ipf_exists", False):
+            as_null_score_cols += ", NULL AS SCORE_IPF_PRECURSOR_PEAKGROUP_PEP, NULL AS SCORE_IPF_PEP, NULL AS SCORE_IPF_QVALUE"
         
         # Add NULL columns for peptide and protein score contexts
         for table in ["peptide", "protein"]:
@@ -1602,6 +1604,12 @@ class OSWWriter(BaseOSWWriter):
                 "SCORE_MS2_P_VALUE DOUBLE",
                 "SCORE_MS2_Q_VALUE DOUBLE",
                 "SCORE_MS2_PEP DOUBLE"
+            ])
+        if column_info.get("score_ipf_exists", False):
+            score_cols_types.extend([
+                "SCORE_IPF_PRECURSOR_PEAKGROUP_PEP DOUBLE",
+                "SCORE_IPF_PEP DOUBLE",
+                "SCORE_IPF_QVALUE DOUBLE"
             ])
         
         # Add peptide and protein score columns for each context
@@ -1837,6 +1845,15 @@ class OSWWriter(BaseOSWWriter):
             )
             score_tables_to_join.append(
                 f"INNER JOIN sqlite_scan('{self.config.infile}', 'SCORE_MS2') AS SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID"
+            )
+
+        if column_info["score_ipf_exists"]:
+            logger.debug("SCORE_IPF table exists, adding score columns to selection")
+            score_columns_to_select.append(
+                "SCORE_IPF.PRECURSOR_PEAKGROUP_PEP AS SCORE_IPF_PRECURSOR_PEAKGROUP_PEP, SCORE_IPF.PEP AS SCORE_IPF_PEP, SCORE_IPF.QVALUE AS SCORE_IPF_QVALUE"
+            )
+            score_tables_to_join.append(
+                f"LEFT JOIN sqlite_scan('{self.config.infile}', 'SCORE_IPF') AS SCORE_IPF ON FEATURE.ID = SCORE_IPF.FEATURE_ID"
             )
 
         # Create views for peptide and protein score tables if they exist
