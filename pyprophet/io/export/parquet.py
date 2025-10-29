@@ -1,5 +1,6 @@
 import duckdb
 import pandas as pd
+import pyarrow.parquet as pq
 from loguru import logger
 
 from ..._config import ExportIOConfig
@@ -615,7 +616,6 @@ class ParquetReader(BaseParquetReader):
         """
         logger.info(f"Reading parquet file: {self.infile}")
         # First, read only column names to identify what to load
-        import pyarrow.parquet as pq
         parquet_file = pq.ParquetFile(self.infile)
         all_columns = parquet_file.schema.names
         

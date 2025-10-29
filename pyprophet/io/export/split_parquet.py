@@ -2,6 +2,7 @@ import os
 import glob
 import pandas as pd
 import duckdb
+import pyarrow.parquet as pq
 from loguru import logger
 
 from ..util import get_parquet_column_names
@@ -683,7 +684,6 @@ class SplitParquetReader(BaseSplitParquetReader):
         logger.info(f"Reading precursor features from: {precursor_file}")
         
         # First check what columns are available
-        import pyarrow.parquet as pq
         precursor_parquet = pq.ParquetFile(precursor_file)
         all_columns = precursor_parquet.schema.names
         
