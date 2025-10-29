@@ -255,7 +255,12 @@ def _export_feature_scores_from_parquet(infile, outfile=None):
     """
     Export feature scores from single Parquet file.
     """
-    import pyarrow.parquet as pq
+    try:
+        import pyarrow.parquet as pq
+    except ImportError:
+        raise ImportError(
+            "pyarrow is required for parquet export. Install it with: pip install pyarrow"
+        )
     
     # Read parquet file
     table = pq.read_table(infile)
@@ -301,7 +306,13 @@ def _export_feature_scores_from_split_parquet(infile, outfile=None):
     """
     Export feature scores from split Parquet directory.
     """
-    import pyarrow.parquet as pq
+    try:
+        import pyarrow.parquet as pq
+    except ImportError:
+        raise ImportError(
+            "pyarrow is required for parquet export. Install it with: pip install pyarrow"
+        )
+    
     from pathlib import Path
     
     inpath = Path(infile)
