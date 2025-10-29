@@ -10,31 +10,8 @@ from ..report import post_scoring_report
 from ..io.dispatcher import ReaderDispatcher
 from ..io.util import get_parquet_column_names
 from ..io.util import check_sqlite_table
+from ..io.util import _ensure_pyarrow
 from ..report import plot_scores
-
-
-def _check_pyarrow_available():
-    """
-    Helper function to check if pyarrow is available and provide helpful error message.
-    
-    Returns
-    -------
-    module
-        The pyarrow.parquet module if available
-        
-    Raises
-    ------
-    ImportError
-        If pyarrow is not installed
-    """
-    try:
-        import pyarrow.parquet as pq
-        return pq
-    except ImportError:
-        raise ImportError(
-            "pyarrow is required for parquet file operations. "
-            "Install it with: pip install pyarrow or pip install pyprophet[parquet]"
-        )
 
 
 def export_feature_scores(infile, outfile=None):
@@ -277,10 +254,10 @@ def _export_feature_scores_from_parquet(infile, outfile=None):
     """
     Export feature scores from single Parquet file.
     """
-    pq = _check_pyarrow_available()
+    pa, _, _ = _ensure_pyarrow()
     
     # Read parquet file
-    table = pq.read_table(infile)
+    table = pa.parquet.read_table(infile)
     df = table.to_pandas()
     
     # Check for SCORE columns
@@ -323,14 +300,14 @@ def _export_feature_scores_from_split_parquet(infile, outfile=None):
     """
     Export feature scores from split Parquet directory.
     """
-    pq = _check_pyarrow_available()
+    pa, _, _ = _ensure_pyarrow()
     
     inpath = Path(infile)
     
     # Read precursor features
     precursor_file = inpath / "precursors_features.parquet"
     if precursor_file.exists():
-        table = pq.read_table(str(precursor_file))
+        table = pa.parquet.read_table(str(precursor_file))
         df = table.to_pandas()
         
         # Check for SCORE columns
