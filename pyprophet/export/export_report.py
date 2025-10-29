@@ -250,6 +250,11 @@ def _plot_feature_scores(df: pd.DataFrame, outfile: str, level: str, append: boo
     # Only select the columns we need for plotting
     plot_df = df[score_cols + ["DECOY"]].dropna(subset=["DECOY"]).copy()
     
+    # Check if we have any data left after dropping NAs
+    if len(plot_df) == 0:
+        logger.warning(f"No valid data rows found for {level} level after removing rows with null DECOY values")
+        return
+    
     # Memory optimization: Sample data if it's too large
     if len(plot_df) > sample_size:
         logger.info(f"Dataset has {len(plot_df)} rows, sampling {sample_size} rows (stratified by DECOY) to reduce memory usage")
@@ -262,23 +267,33 @@ def _plot_feature_scores(df: pd.DataFrame, outfile: str, level: str, append: boo
         n_decoys = len(decoy_df)
         total = n_targets + n_decoys
         
-        target_sample_size = int(sample_size * n_targets / total)
-        decoy_sample_size = int(sample_size * n_decoys / total)
+        # Handle edge cases where one group might be empty
+        if total == 0:
+            logger.warning(f"No data with valid DECOY values for {level} level")
+            return
+        
+        target_sample_size = int(sample_size * n_targets / total) if n_targets > 0 else 0
+        decoy_sample_size = int(sample_size * n_decoys / total) if n_decoys > 0 else 0
         
         # Sample from each group
-        if n_targets > target_sample_size:
-            target_sample = target_df.sample(n=target_sample_size, random_state=42)
-        else:
-            target_sample = target_df
+        samples = []
+        if n_targets > 0:
+            if n_targets > target_sample_size and target_sample_size > 0:
+                target_sample = target_df.sample(n=target_sample_size, random_state=42)
+            else:
+                target_sample = target_df
+            samples.append(target_sample)
             
-        if n_decoys > decoy_sample_size:
-            decoy_sample = decoy_df.sample(n=decoy_sample_size, random_state=42)
-        else:
-            decoy_sample = decoy_df
+        if n_decoys > 0:
+            if n_decoys > decoy_sample_size and decoy_sample_size > 0:
+                decoy_sample = decoy_df.sample(n=decoy_sample_size, random_state=42)
+            else:
+                decoy_sample = decoy_df
+            samples.append(decoy_sample)
         
         # Combine samples
-        plot_df = pd.concat([target_sample, decoy_sample], ignore_index=True)
-        logger.info(f"Sampled {len(plot_df)} rows ({len(target_sample)} targets, {len(decoy_sample)} decoys)")
+        plot_df = pd.concat(samples, ignore_index=True)
+        logger.info(f"Sampled {len(plot_df)} rows ({len(samples[0]) if len(samples) > 0 and n_targets > 0 else 0} targets, {len(samples[-1]) if len(samples) > 0 and n_decoys > 0 else 0} decoys)")
     
     # Ensure DECOY is 0 or 1
     if plot_df["DECOY"].dtype == bool:
