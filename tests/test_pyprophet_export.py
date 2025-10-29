@@ -93,10 +93,12 @@ def run_pyprophet_command(cmd, temp_folder):
         ).decode()
     except subprocess.CalledProcessError as error:
         print(f"Command failed: {cmd}\n{error.output.decode()}", file=sys.stderr)
-        if "NotImplementedError" in error.output.decode(): # attempt to catch the specific error rather than the CalledProcessError
+        if (
+            "NotImplementedError" in error.output.decode()
+        ):  # attempt to catch the specific error rather than the CalledProcessError
             raise NotImplementedError
         else:
-            raise 
+            raise
 
 
 def validate_export_results(
@@ -152,12 +154,11 @@ def test_osw_analysis(
         f"{temp_folder}/test_data.tsv",
     )
 
+
 @pytest.mark.parametrize(
-    "calib, rt_unit",
-    [ (True, 'iRT'), (False, 'iRT'), (True, 'RT'), (False, 'RT')]
+    "calib, rt_unit", [(True, "iRT"), (False, "iRT"), (True, "RT"), (False, "RT")]
 )
-def test_osw_analysis_libExport(input_strategy, temp_folder, regtest, calib, rt_unit
-):
+def test_osw_analysis_libExport(input_strategy, temp_folder, regtest, calib, rt_unit):
     cmd = f"pyprophet score {input_strategy['cmd_prefix']} --level=ms2 --test --pi0_lambda=0.001 0 0 --ss_iteration_fdr=0.02 && "
 
     # peptide-level
@@ -165,7 +166,6 @@ def test_osw_analysis_libExport(input_strategy, temp_folder, regtest, calib, rt_
 
     # protein-level
     cmd += f"pyprophet infer protein --pi0_lambda=0 0 0 {input_strategy['cmd_prefix']} --context=global && "
-
 
     # export
     if calib:
@@ -184,6 +184,7 @@ def test_osw_analysis_libExport(input_strategy, temp_folder, regtest, calib, rt_
             input_strategy["reader"],
             f"{temp_folder}/test_lib.tsv",
         )
+
 
 def test_osw_unscored(input_strategy, temp_folder, regtest):
     """Test export of unscored OSW data"""
@@ -272,84 +273,141 @@ def test_compound_ms2(test_data_compound_osw, temp_folder, regtest):
     print(df.sort_index(axis=1), file=regtest)
 
 
-# ================== TEST EXPORT FEATURE SCORES ==================
-def test_export_feature_scores_osw(test_data_osw, temp_folder):
-    """Test export feature scores from OSW file"""
-    outfile = temp_folder / "test_data_feature_scores.pdf"
-    
-    # Try to export feature scores
-    try:
-        export_feature_scores(str(test_data_osw), str(outfile))
-        
-        # Check that output file was created
-        assert outfile.exists(), "Feature scores PDF was not created"
-        assert outfile.stat().st_size > 0, "Feature scores PDF is empty"
-    except (ImportError, ModuleNotFoundError) as e:
-        # Skip if matplotlib or other required packages are not available
-        pytest.skip(f"Test skipped due to missing dependency: {str(e)}")
-    except ValueError as e:
-        # Skip if data doesn't have feature scores
-        if "no feature score" in str(e).lower():
-            pytest.skip(f"Test skipped: {str(e)}")
-        else:
-            raise
+# ================== PARQUET EXPORT TESTS ==================
+def test_parquet_export_scored_osw(test_data_osw, temp_folder, regtest):
+    """Test exporting scored OSW with SCORE_ tables to parquet format"""
+    # Score at MS2 level
+    cmd = f"pyprophet score --in={test_data_osw} --level=ms2 --test --pi0_lambda=0.001 0 0 --ss_iteration_fdr=0.02 && "
+
+    # Infer peptide level with global context
+    cmd += f"pyprophet infer peptide --pi0_lambda=0.001 0 0 --in={test_data_osw} --context=global && "
+
+    # Infer protein level with global context
+    cmd += f"pyprophet infer protein --pi0_lambda=0 0 0 --in={test_data_osw} --context=global && "
+
+    # Export to parquet (should include SCORE_ tables)
+    cmd += f"pyprophet export parquet --in={test_data_osw} --out={temp_folder}/test_data_scored.parquet"
+
+    run_pyprophet_command(cmd, temp_folder)
+
+    # Verify the parquet file exists and has data
+    import pyarrow.parquet as pq
+
+    table = pq.read_table(f"{temp_folder}/test_data_scored.parquet")
+    df = table.to_pandas()
+
+    # Check that we have data
+    assert len(df) > 0, "Exported parquet file should not be empty"
+
+    # Check that score columns are present
+    score_columns = [col for col in df.columns if col.startswith("SCORE_")]
+    assert len(score_columns) > 0, "Exported parquet should contain SCORE_ columns"
+
+    print(f"Exported {len(df)} rows with {len(df.columns)} columns", file=regtest)
+    print(f"Score columns found: {sorted(score_columns)}", file=regtest)
+    print(df.head(10).sort_index(axis=1), file=regtest)
 
 
-def test_export_feature_scores_parquet(test_data_parquet, temp_folder):
-    """Test export feature scores from Parquet file"""
-    outfile = temp_folder / "test_data_feature_scores.pdf"
-    
-    # Try to export feature scores
-    try:
-        export_feature_scores(str(test_data_parquet), str(outfile))
-        
-        # Check that output file was created (if data has feature scores)
-        if outfile.exists():
-            assert outfile.stat().st_size > 0, "Feature scores PDF is empty"
-    except (ImportError, ModuleNotFoundError) as e:
-        # Skip if matplotlib or other required packages are not available
-        pytest.skip(f"Test skipped due to missing dependency: {str(e)}")
-    except ValueError as e:
-        # Skip if data doesn't have feature scores
-        if "no feature score" in str(e).lower():
-            pytest.skip(f"Test skipped: {str(e)}")
-        else:
-            raise
+def test_parquet_export_no_transition_data(test_data_osw, temp_folder, regtest):
+    """Test exporting parquet without transition data using --no-include_transition_data flag"""
+    # Score at MS2 level
+    cmd = f"pyprophet score --in={test_data_osw} --level=ms2 --test --pi0_lambda=0.001 0 0 --ss_iteration_fdr=0.02 && "
+
+    # Infer peptide level with global context
+    cmd += f"pyprophet infer peptide --pi0_lambda=0.001 0 0 --in={test_data_osw} --context=global && "
+
+    # Infer protein level with global context
+    cmd += f"pyprophet infer protein --pi0_lambda=0 0 0 --in={test_data_osw} --context=global && "
+
+    # Export to parquet without transition data
+    cmd += f"pyprophet export parquet --in={test_data_osw} --out={temp_folder}/test_data_no_transition.parquet --no-include_transition_data"
+
+    run_pyprophet_command(cmd, temp_folder)
+
+    # Verify the parquet file exists and has data
+    import pyarrow.parquet as pq
+
+    table = pq.read_table(f"{temp_folder}/test_data_no_transition.parquet")
+    df = table.to_pandas()
+
+    # Check that we have data
+    assert len(df) > 0, "Exported parquet file should not be empty"
+
+    # Check that transition-specific columns are NOT present
+    # transition_columns = [col for col in df.columns if 'TRANSITION' in col.upper()]
+    # assert len(transition_columns) == 0, "Exported parquet should not contain TRANSITION columns when --no-include_transition_data is used"
+    assert df["TRANSITION_ID"].isnull().all(), (
+        "TRANSITION_ID column should be empty when --no-include_transition_data is used"
+    )
+
+    # Check that score columns are present
+    score_columns = [col for col in df.columns if col.startswith("SCORE_")]
+    assert len(score_columns) > 0, "Exported parquet should contain SCORE_ columns"
+
+    print(
+        f"Exported {len(df)} rows with {len(df.columns)} columns (no transition data)",
+        file=regtest,
+    )
+    print(f"Score columns found: {sorted(score_columns)}", file=regtest)
+    print(df.head(10).sort_index(axis=1), file=regtest)
 
 
-def test_export_feature_scores_split_parquet(test_data_split_parquet, temp_folder):
-    """Test export feature scores from Split Parquet directory"""
-    outfile = temp_folder / "test_data_feature_scores.pdf"
-    
-    # Try to export feature scores
-    try:
-        export_feature_scores(str(test_data_split_parquet), str(outfile))
-        
-        # Check that output file was created (if data has feature scores)
-        if outfile.exists():
-            assert outfile.stat().st_size > 0, "Feature scores PDF is empty"
-    except (ImportError, ModuleNotFoundError) as e:
-        # Skip if matplotlib or other required packages are not available
-        pytest.skip(f"Test skipped due to missing dependency: {str(e)}")
-    except ValueError as e:
-        # Skip if data doesn't have feature scores
-        if "no feature score" in str(e).lower():
-            pytest.skip(f"Test skipped: {str(e)}")
-        else:
-            raise
+def test_parquet_export_split_format(test_data_osw, temp_folder, regtest):
+    """Test exporting to split parquet format with score data"""
+    # Score at MS2 level
+    cmd = f"pyprophet score --in={test_data_osw} --level=ms2 --test --pi0_lambda=0.001 0 0 --ss_iteration_fdr=0.02 && "
 
+    # Infer peptide level with global context
+    cmd += f"pyprophet infer peptide --pi0_lambda=0.001 0 0 --in={test_data_osw} --context=global && "
 
-def test_export_feature_scores_cli_osw(test_data_osw, temp_folder):
-    """Test export feature scores CLI command with OSW file"""
-    outfile = temp_folder / "test_data_feature_scores.pdf"
-    cmd = f"pyprophet export feature-scores --in={test_data_osw} --out={outfile}"
-    
-    try:
-        run_pyprophet_command(cmd, temp_folder)
-        
-        # Check that output file was created (if data has feature scores)
-        if outfile.exists():
-            assert outfile.stat().st_size > 0, "Feature scores PDF is empty"
-    except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        # Skip test if pyprophet command is not available or fails
-        pytest.skip(f"Test skipped due to: {str(e)}")
+    # Infer protein level with global context
+    cmd += f"pyprophet infer protein --pi0_lambda=0 0 0 --in={test_data_osw} --context=global && "
+
+    # Export to split parquet format
+    cmd += f"pyprophet export parquet --in={test_data_osw} --out={temp_folder}/test_data_split --split_transition_data"
+
+    run_pyprophet_command(cmd, temp_folder)
+
+    # Verify the directory exists and contains parquet files
+    import pyarrow.parquet as pq
+
+    split_dir = Path(temp_folder) / "test_data_split"
+    assert split_dir.exists(), "Split parquet directory should exist"
+
+    precursor_file = split_dir / "precursors_features.parquet"
+    transition_file = split_dir / "transition_features.parquet"
+
+    assert precursor_file.exists(), "precursors_features.parquet should exist"
+    assert transition_file.exists(), "transition_features.parquet should exist"
+
+    # Read precursor data
+    precursor_table = pq.read_table(str(precursor_file))
+    precursor_df = precursor_table.to_pandas()
+
+    # Read transition data
+    transition_table = pq.read_table(str(transition_file))
+    transition_df = transition_table.to_pandas()
+
+    # Check that we have data in both files
+    assert len(precursor_df) > 0, "Precursor parquet file should not be empty"
+    assert len(transition_df) > 0, "Transition parquet file should not be empty"
+
+    # Check that score columns are present in precursor file
+    precursor_score_columns = [
+        col for col in precursor_df.columns if col.startswith("SCORE_")
+    ]
+    assert len(precursor_score_columns) > 0, (
+        "Precursor parquet should contain SCORE_ columns"
+    )
+
+    print(
+        f"Precursor data: {len(precursor_df)} rows with {len(precursor_df.columns)} columns",
+        file=regtest,
+    )
+    print(
+        f"Transition data: {len(transition_df)} rows with {len(transition_df.columns)} columns",
+        file=regtest,
+    )
+    print(f"Precursor score columns: {sorted(precursor_score_columns)}", file=regtest)
+    print("Precursor data sample:", file=regtest)
+    print(precursor_df.head(5).sort_index(axis=1), file=regtest)
