@@ -705,6 +705,7 @@ class ExportIOConfig(BaseIOConfig):
     compression_level: int = 11
     split_transition_data: bool = True
     split_runs: bool = False
+    include_transition_data: bool = True  # Whether to include transition data in parquet export
 
     # SqMass: Export to parquet
     pqp_file: Optional[str] = None  # Path to PQP file for precursor/transition mapping
