@@ -364,7 +364,12 @@ class SplitParquetReader(BaseSplitParquetReader):
         """
         Read standard OpenSWATH data without IPF from split files, optionally including aligned features.
         """
+        # Check if we should attempt alignment integration
+        use_alignment = self.config.use_alignment and self._has_alignment
+        
         # First, get features that pass MS2 QVALUE threshold
+        # Only add from_alignment column if we're using alignment
+        from_alignment_col = ", 0 AS from_alignment" if use_alignment else ""
         query = f"""
             SELECT
                 p.RUN_ID AS id_run,
@@ -391,8 +396,7 @@ class SplitParquetReader(BaseSplitParquetReader):
                 p.RIGHT_WIDTH AS rightWidth,
                 p.SCORE_MS2_PEAK_GROUP_RANK AS peak_group_rank,
                 p.SCORE_MS2_SCORE AS d_score,
-                p.SCORE_MS2_Q_VALUE AS m_score,
-                0 AS from_alignment
+                p.SCORE_MS2_Q_VALUE AS m_score{from_alignment_col}
             FROM precursors p
             WHERE p.PROTEIN_ID IS NOT NULL
             AND p.SCORE_MS2_Q_VALUE < {self.config.max_rs_peakgroup_qvalue}
@@ -401,7 +405,7 @@ class SplitParquetReader(BaseSplitParquetReader):
         data = con.execute(query).fetchdf()
         
         # If alignment is enabled and alignment data is present, fetch and merge aligned features
-        if self.config.use_alignment and self._has_alignment:
+        if use_alignment:
             aligned_features = self._fetch_alignment_features(con)
             
             if not aligned_features.empty:

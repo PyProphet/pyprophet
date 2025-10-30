@@ -324,7 +324,12 @@ class OSWReader(BaseOSWReader):
 
     def _read_standard_data(self, con, cfg):
         """Read standard OpenSWATH data without IPF, optionally including aligned features."""
+        # Check if we should attempt alignment integration
+        use_alignment = cfg.use_alignment and self._check_alignment_presence(con)
+        
         # First, get features that pass MS2 QVALUE threshold
+        # Only add from_alignment column if we're using alignment
+        from_alignment_col = ", 0 AS from_alignment" if use_alignment else ""
         query = f"""
             SELECT RUN.ID AS id_run,
                   PEPTIDE.ID AS id_peptide,
@@ -350,8 +355,7 @@ class OSWReader(BaseOSWReader):
                   FEATURE.RIGHT_WIDTH AS rightWidth,
                   SCORE_MS2.RANK AS peak_group_rank,
                   SCORE_MS2.SCORE AS d_score,
-                  SCORE_MS2.QVALUE AS m_score,
-                  0 AS from_alignment
+                  SCORE_MS2.QVALUE AS m_score{from_alignment_col}
             FROM PRECURSOR
             INNER JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
             INNER JOIN PEPTIDE ON PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
@@ -366,7 +370,7 @@ class OSWReader(BaseOSWReader):
         data = pd.read_sql_query(query, con)
         
         # If alignment is enabled and alignment data is present, fetch and merge aligned features
-        if cfg.use_alignment and self._check_alignment_presence(con):
+        if use_alignment:
             aligned_features = self._fetch_alignment_features(con, cfg)
             
             if not aligned_features.empty:
