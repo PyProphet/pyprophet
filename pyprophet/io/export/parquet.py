@@ -764,7 +764,7 @@ class ParquetReader(BaseParquetReader):
                     
                     # Add reference feature ID and RT if available
                     if 'REFERENCE_FEATURE_ID' in filtered_df.columns:
-                        result['alignment_reference_feature_id'] = filtered_df['REFERENCE_FEATURE_ID'].values
+                        result['alignment_reference_feature_id'] = filtered_df['REFERENCE_FEATURE_ID'].astype('Int64').values
                     if 'REFERENCE_RT' in filtered_df.columns:
                         result['alignment_reference_rt'] = filtered_df['REFERENCE_RT'].values
                     
@@ -773,6 +773,10 @@ class ParquetReader(BaseParquetReader):
                         result['alignment_pep'] = filtered_df['PEP'].values
                     if 'QVALUE' in filtered_df.columns:
                         result['alignment_qvalue'] = filtered_df['QVALUE'].values
+                    
+                    # Convert alignment_group_id to int64
+                    if 'alignment_group_id' in result.columns:
+                        result['alignment_group_id'] = result['alignment_group_id'].astype('Int64')
                     
                     logger.info(f"Found {len(result)} aligned features passing alignment PEP < {max_alignment_pep} " +
                                f"with reference features passing MS2 QVALUE < {max_rs_peakgroup_qvalue}")

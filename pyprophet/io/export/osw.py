@@ -431,6 +431,12 @@ class OSWReader(BaseOSWReader):
                         how='left'
                     )
                     
+                    # Convert alignment_reference_feature_id to int64 to avoid scientific notation
+                    if 'alignment_reference_feature_id' in aligned_data.columns:
+                        aligned_data['alignment_reference_feature_id'] = aligned_data['alignment_reference_feature_id'].astype('Int64')
+                    if 'alignment_group_id' in aligned_data.columns:
+                        aligned_data['alignment_group_id'] = aligned_data['alignment_group_id'].astype('Int64')
+                    
                     logger.info(f"Adding {len(aligned_data)} features recovered through alignment")
                     
                     # Combine with base data
