@@ -837,6 +837,7 @@ class OSWReader(BaseOSWReader):
             AND SCORE_ALIGNMENT.PEP < {max_alignment_pep}
             AND REF_SCORE_MS2.QVALUE < {max_rs_peakgroup_qvalue}
         """
+        # Note: SQLite INTEGER is 8 bytes (equivalent to BIGINT) and can store values up to 2^63-1
 
         df = pd.read_sql_query(query, con)
         logger.info(
