@@ -736,12 +736,12 @@ class OSWReader(BaseOSWReader):
         
         query = f"""
             SELECT  
-                DENSE_RANK() OVER (ORDER BY PRECURSOR_ID, ALIGNMENT_ID) AS alignment_group_id,
-                ALIGNED_FEATURE_ID AS id,
-                PRECURSOR_ID AS transition_group_id,
-                RUN_ID AS run_id,
-                REFERENCE_FEATURE_ID AS alignment_reference_feature_id,
-                REFERENCE_RT AS alignment_reference_rt,
+                DENSE_RANK() OVER (ORDER BY FEATURE_MS2_ALIGNMENT.PRECURSOR_ID, FEATURE_MS2_ALIGNMENT.ALIGNMENT_ID) AS alignment_group_id,
+                FEATURE_MS2_ALIGNMENT.ALIGNED_FEATURE_ID AS id,
+                FEATURE_MS2_ALIGNMENT.PRECURSOR_ID AS transition_group_id,
+                FEATURE_MS2_ALIGNMENT.RUN_ID AS run_id,
+                FEATURE_MS2_ALIGNMENT.REFERENCE_FEATURE_ID AS alignment_reference_feature_id,
+                FEATURE_MS2_ALIGNMENT.REFERENCE_RT AS alignment_reference_rt,
                 SCORE_ALIGNMENT.PEP AS alignment_pep,
                 SCORE_ALIGNMENT.QVALUE AS alignment_qvalue
             FROM (
@@ -758,7 +758,7 @@ class OSWReader(BaseOSWReader):
                 FROM SCORE_MS2
             ) AS REF_SCORE_MS2
             ON REF_SCORE_MS2.FEATURE_ID = FEATURE_MS2_ALIGNMENT.REFERENCE_FEATURE_ID
-            WHERE LABEL = 1
+            WHERE FEATURE_MS2_ALIGNMENT.LABEL = 1
             AND SCORE_ALIGNMENT.PEP < {max_alignment_pep}
             AND REF_SCORE_MS2.QVALUE < {max_rs_peakgroup_qvalue}
         """
