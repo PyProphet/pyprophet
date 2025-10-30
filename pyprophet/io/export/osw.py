@@ -422,10 +422,11 @@ class OSWReader(BaseOSWReader):
                     """
                     aligned_data = pd.read_sql_query(aligned_query, con)
                     
-                    # Merge alignment scores into the aligned data
+                    # Merge alignment scores and reference info into the aligned data
                     aligned_data = pd.merge(
                         aligned_data,
-                        aligned_features[['id', 'alignment_pep', 'alignment_qvalue']],
+                        aligned_features[['id', 'alignment_reference_feature_id', 'alignment_reference_rt', 
+                                         'alignment_pep', 'alignment_qvalue']],
                         on='id',
                         how='left'
                     )
@@ -737,6 +738,8 @@ class OSWReader(BaseOSWReader):
                 ALIGNED_FEATURE_ID AS id,
                 PRECURSOR_ID AS transition_group_id,
                 RUN_ID AS run_id,
+                REFERENCE_FEATURE_ID AS alignment_reference_feature_id,
+                REFERENCE_RT AS alignment_reference_rt,
                 SCORE_ALIGNMENT.PEP AS alignment_pep,
                 SCORE_ALIGNMENT.QVALUE AS alignment_qvalue
             FROM (

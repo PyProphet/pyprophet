@@ -455,11 +455,18 @@ class SplitParquetReader(BaseSplitParquetReader):
                     """
                     aligned_data = con.execute(aligned_query).fetchdf()
                     
-                    # Merge alignment scores into the aligned data
+                    # Merge alignment scores and reference info into the aligned data
                     if 'alignment_pep' in aligned_features.columns:
+                        # Build list of columns to merge
+                        merge_cols = ['id', 'alignment_pep', 'alignment_qvalue']
+                        if 'alignment_reference_feature_id' in aligned_features.columns:
+                            merge_cols.append('alignment_reference_feature_id')
+                        if 'alignment_reference_rt' in aligned_features.columns:
+                            merge_cols.append('alignment_reference_rt')
+                        
                         aligned_data = pd.merge(
                             aligned_data,
-                            aligned_features[['id', 'alignment_pep', 'alignment_qvalue']],
+                            aligned_features[merge_cols],
                             on='id',
                             how='left'
                         )
@@ -802,9 +809,17 @@ class SplitParquetReader(BaseSplitParquetReader):
                 
                 # Rename columns to match expected format
                 if 'FEATURE_ID' in filtered_df.columns:
-                    result = filtered_df[['FEATURE_ID', 'PRECURSOR_ID', 'RUN_ID']].rename(
+                    # Start with base columns
+                    base_cols = ['FEATURE_ID', 'PRECURSOR_ID', 'RUN_ID']
+                    result = filtered_df[base_cols].rename(
                         columns={'FEATURE_ID': 'id'}
                     )
+                    
+                    # Add reference feature ID and RT if available
+                    if 'REFERENCE_FEATURE_ID' in filtered_df.columns:
+                        result['alignment_reference_feature_id'] = filtered_df['REFERENCE_FEATURE_ID'].values
+                    if 'REFERENCE_RT' in filtered_df.columns:
+                        result['alignment_reference_rt'] = filtered_df['REFERENCE_RT'].values
                     
                     # Add alignment scores if available
                     if 'PEP' in filtered_df.columns:
