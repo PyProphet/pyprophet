@@ -510,6 +510,37 @@ class SplitParquetReader(BaseSplitParquetReader):
                         "Int64"
                     )
 
+                # Assign alignment_group_id to reference features
+                # Create a mapping from reference feature IDs to their alignment_group_ids
+                if "alignment_reference_feature_id" in data.columns and "alignment_group_id" in data.columns:
+                    # Get all reference feature IDs and their corresponding alignment_group_ids
+                    ref_mapping = data[
+                        data["alignment_reference_feature_id"].notna()
+                    ][["alignment_reference_feature_id", "alignment_group_id"]].drop_duplicates()
+                    
+                    # For each reference feature ID, we need to assign the alignment_group_id
+                    # to the feature row where id == alignment_reference_feature_id
+                    if not ref_mapping.empty:
+                        # Merge the alignment_group_id for reference features
+                        # First create a DataFrame mapping id -> alignment_group_id for references
+                        ref_group_mapping = ref_mapping.rename(
+                            columns={"alignment_reference_feature_id": "id", "alignment_group_id": "ref_alignment_group_id"}
+                        )
+                        
+                        # Merge this mapping to assign alignment_group_id to reference features
+                        data = pd.merge(data, ref_group_mapping, on="id", how="left")
+                        
+                        # Fill in alignment_group_id for reference features (where it's currently null but ref_alignment_group_id is not)
+                        mask = data["alignment_group_id"].isna() & data["ref_alignment_group_id"].notna()
+                        data.loc[mask, "alignment_group_id"] = data.loc[mask, "ref_alignment_group_id"]
+                        
+                        # Drop the temporary column
+                        data = data.drop(columns=["ref_alignment_group_id"])
+                        
+                        logger.debug(
+                            f"Assigned alignment_group_id to {mask.sum()} reference features"
+                        )
+
         return data
 
     def _augment_data(self, data, con) -> pd.DataFrame:
@@ -862,18 +893,19 @@ class SplitParquetReader(BaseSplitParquetReader):
 
                     # Query to get aligned features where reference passes MS2 QVALUE threshold
                     # Also compute alignment_group_id using DENSE_RANK
+                    # Cast REFERENCE_FEATURE_ID to BIGINT to preserve precision and avoid float conversion
                     ref_check_query = f"""
                         SELECT 
                             DENSE_RANK() OVER (ORDER BY fa.PRECURSOR_ID, fa.ALIGNMENT_ID) AS ALIGNMENT_GROUP_ID,
                             fa.FEATURE_ID,
                             fa.PRECURSOR_ID,
                             fa.RUN_ID,
-                            fa.REFERENCE_FEATURE_ID,
+                            CAST(fa.REFERENCE_FEATURE_ID AS BIGINT) AS REFERENCE_FEATURE_ID,
                             fa.REFERENCE_RT,
                             fa.PEP,
                             fa.QVALUE
                         FROM filtered_alignment fa
-                        INNER JOIN precursors p ON p.FEATURE_ID = fa.REFERENCE_FEATURE_ID
+                        INNER JOIN precursors p ON CAST(p.FEATURE_ID AS BIGINT) = CAST(fa.REFERENCE_FEATURE_ID AS BIGINT)
                         WHERE p.SCORE_MS2_Q_VALUE < {max_rs_peakgroup_qvalue}
                     """
                     filtered_df = con.execute(ref_check_query).fetchdf()
