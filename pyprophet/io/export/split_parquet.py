@@ -459,6 +459,8 @@ class SplitParquetReader(BaseSplitParquetReader):
                     if 'alignment_pep' in aligned_features.columns:
                         # Build list of columns to merge
                         merge_cols = ['id', 'alignment_pep', 'alignment_qvalue']
+                        if 'alignment_group_id' in aligned_features.columns:
+                            merge_cols.append('alignment_group_id')
                         if 'alignment_reference_feature_id' in aligned_features.columns:
                             merge_cols.append('alignment_reference_feature_id')
                         if 'alignment_reference_rt' in aligned_features.columns:
@@ -816,8 +818,10 @@ class SplitParquetReader(BaseSplitParquetReader):
                     con.register('filtered_alignment', filtered_df)
                     
                     # Query to get aligned features where reference passes MS2 QVALUE threshold
+                    # Also compute alignment_group_id using DENSE_RANK
                     ref_check_query = f"""
                         SELECT 
+                            DENSE_RANK() OVER (ORDER BY fa.PRECURSOR_ID, fa.ALIGNMENT_ID) AS ALIGNMENT_GROUP_ID,
                             fa.FEATURE_ID,
                             fa.PRECURSOR_ID,
                             fa.RUN_ID,
@@ -838,6 +842,10 @@ class SplitParquetReader(BaseSplitParquetReader):
                     result = filtered_df[base_cols].rename(
                         columns={'FEATURE_ID': 'id'}
                     )
+                    
+                    # Add alignment group ID if available
+                    if 'ALIGNMENT_GROUP_ID' in filtered_df.columns:
+                        result['alignment_group_id'] = filtered_df['ALIGNMENT_GROUP_ID'].values
                     
                     # Add reference feature ID and RT if available
                     if 'REFERENCE_FEATURE_ID' in filtered_df.columns:

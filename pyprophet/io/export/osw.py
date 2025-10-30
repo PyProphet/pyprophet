@@ -425,8 +425,8 @@ class OSWReader(BaseOSWReader):
                     # Merge alignment scores and reference info into the aligned data
                     aligned_data = pd.merge(
                         aligned_data,
-                        aligned_features[['id', 'alignment_reference_feature_id', 'alignment_reference_rt', 
-                                         'alignment_pep', 'alignment_qvalue']],
+                        aligned_features[['id', 'alignment_group_id', 'alignment_reference_feature_id', 
+                                         'alignment_reference_rt', 'alignment_pep', 'alignment_qvalue']],
                         on='id',
                         how='left'
                     )
@@ -736,6 +736,7 @@ class OSWReader(BaseOSWReader):
         
         query = f"""
             SELECT  
+                DENSE_RANK() OVER (ORDER BY PRECURSOR_ID, ALIGNMENT_ID) AS alignment_group_id,
                 ALIGNED_FEATURE_ID AS id,
                 PRECURSOR_ID AS transition_group_id,
                 RUN_ID AS run_id,
