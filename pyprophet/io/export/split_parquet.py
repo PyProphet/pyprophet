@@ -42,7 +42,7 @@ class SplitParquetReader(BaseSplitParquetReader):
         self._has_transition_scores = any(
             col.startswith("SCORE_TRANSITION_") for col in self._columns
         )
-        
+
         # Check for alignment file
         self._has_alignment = self._check_alignment_file_exists()
 
@@ -73,14 +73,16 @@ class SplitParquetReader(BaseSplitParquetReader):
 
             if self.config.export_format == "library":
                 if self._is_unscored_file():
-                    descr= "Files must be scored for library generation."
+                    descr = "Files must be scored for library generation."
                     logger.exception(descr)
                     raise ValueError(descr)
                 if not self._has_peptide_protein_global_scores():
-                    descr= "Files must have peptide and protein level global scores for library generation."
+                    descr = "Files must have peptide and protein level global scores for library generation."
                     logger.exception(descr)
                     raise ValueError(descr)
-                logger.info("Reading standard OpenSWATH data for library from split Parquet files.")
+                logger.info(
+                    "Reading standard OpenSWATH data for library from split Parquet files."
+                )
                 return self._read_library_data(con)
 
             if self._is_unscored_file():
@@ -100,13 +102,17 @@ class SplitParquetReader(BaseSplitParquetReader):
                 return self._augment_data(data, con)
         finally:
             con.close()
-    
+
     def _has_peptide_protein_global_scores(self) -> bool:
         """
         Check if files contain peptide and protein global scores
         """
-        has_peptide = any(col.startswith("SCORE_PEPTIDE_GLOBAL") for col in self._columns)
-        has_protein = any(col.startswith("SCORE_PROTEIN_GLOBAL") for col in self._columns)
+        has_peptide = any(
+            col.startswith("SCORE_PEPTIDE_GLOBAL") for col in self._columns
+        )
+        has_protein = any(
+            col.startswith("SCORE_PROTEIN_GLOBAL") for col in self._columns
+        )
         return has_peptide and has_protein
 
     def _is_unscored_file(self) -> bool:
@@ -118,18 +124,18 @@ class SplitParquetReader(BaseSplitParquetReader):
     def _check_alignment_file_exists(self) -> bool:
         """
         Check if alignment parquet file exists for split parquet format.
-        
+
         For split parquet, alignment file is at the parent directory level:
         - infile is a directory containing *.oswpq subdirectories
         - alignment file is at infile/feature_alignment.parquet
         """
         import os
-        
+
         alignment_file = None
         if os.path.isdir(self.infile):
             # Split parquet format: alignment file is in the parent directory
             alignment_file = os.path.join(self.infile, "feature_alignment.parquet")
-        
+
         if alignment_file and os.path.exists(alignment_file):
             logger.debug(f"Alignment file found: {alignment_file}")
             return True
@@ -315,14 +321,16 @@ class SplitParquetReader(BaseSplitParquetReader):
             im_col = "p.PRECURSOR_LIBRARY_DRIFT_TIME"
 
         if self.config.intensity_calibration:
-            intensity_col = 't.FEATURE_TRANSITION_AREA_INTENSITY'
+            intensity_col = "t.FEATURE_TRANSITION_AREA_INTENSITY"
         else:
-            intensity_col = 't.TRANSITION_LIBRARY_INTENSITY'
-        
+            intensity_col = "t.TRANSITION_LIBRARY_INTENSITY"
+
         if self.config.keep_decoys:
             decoy_query = ""
         else:
-            decoy_query ="p.PRECURSOR_DECOY is false and t.TRANSITION_DECOY is false and" 
+            decoy_query = (
+                "p.PRECURSOR_DECOY is false and t.TRANSITION_DECOY is false and"
+            )
 
         query = f"""
             SELECT
@@ -359,14 +367,14 @@ class SplitParquetReader(BaseSplitParquetReader):
                      t.TRANSITION_CHARGE, t.TRANSITION_TYPE, t.TRANSITION_ORDINAL, t.TRANSITION_ID, p.PRECURSOR_DECOY, p.RUN_ID, p.FEATURE_MS2_AREA_INTENSITY
         """
         return con.execute(query).fetchdf()
-    
+
     def _read_standard_data(self, con) -> pd.DataFrame:
         """
         Read standard OpenSWATH data without IPF from split files, optionally including aligned features.
         """
         # Check if we should attempt alignment integration
         use_alignment = self.config.use_alignment and self._has_alignment
-        
+
         # First, get features that pass MS2 QVALUE threshold
         query = f"""
             SELECT
@@ -395,52 +403,51 @@ class SplitParquetReader(BaseSplitParquetReader):
                 p.SCORE_MS2_PEAK_GROUP_RANK AS peak_group_rank,
                 p.SCORE_MS2_SCORE AS d_score,
                 p.SCORE_MS2_Q_VALUE AS m_score,
-                p.SCORE_MS2_PEP AS MS2_PEAKGROUP_PEP
+                p.SCORE_MS2_PEP AS pep
             FROM precursors p
             WHERE p.PROTEIN_ID IS NOT NULL
             AND p.SCORE_MS2_Q_VALUE < {self.config.max_rs_peakgroup_qvalue}
             ORDER BY transition_group_id, peak_group_rank
         """
         data = con.execute(query).fetchdf()
-        
+
         # If alignment is enabled and alignment data is present, fetch and merge aligned features
         if use_alignment:
             aligned_features = self._fetch_alignment_features(con)
-            
+
             if not aligned_features.empty:
                 # Get full feature data for aligned features that are NOT already in base results
                 # We only want to add features that didn't pass MS2 threshold but have good alignment
-                aligned_ids = aligned_features['id'].unique()
-                existing_ids = data['id'].unique()
-                new_aligned_ids = [aid for aid in aligned_ids if aid not in existing_ids]
-                
+                aligned_ids = aligned_features["id"].unique()
+                existing_ids = data["id"].unique()
+                new_aligned_ids = [
+                    aid for aid in aligned_ids if aid not in existing_ids
+                ]
+
                 # First, merge alignment info into existing features (those that passed MS2)
                 # Mark them with from_alignment=0
-                if 'alignment_pep' in aligned_features.columns:
+                if "alignment_pep" in aligned_features.columns:
                     # Build list of columns to merge
-                    merge_cols = ['id', 'alignment_pep', 'alignment_qvalue']
-                    if 'alignment_group_id' in aligned_features.columns:
-                        merge_cols.append('alignment_group_id')
-                    if 'alignment_reference_feature_id' in aligned_features.columns:
-                        merge_cols.append('alignment_reference_feature_id')
-                    if 'alignment_reference_rt' in aligned_features.columns:
-                        merge_cols.append('alignment_reference_rt')
-                    
+                    merge_cols = ["id", "alignment_pep", "alignment_qvalue"]
+                    if "alignment_group_id" in aligned_features.columns:
+                        merge_cols.append("alignment_group_id")
+                    if "alignment_reference_feature_id" in aligned_features.columns:
+                        merge_cols.append("alignment_reference_feature_id")
+                    if "alignment_reference_rt" in aligned_features.columns:
+                        merge_cols.append("alignment_reference_rt")
+
                     data = pd.merge(
-                        data,
-                        aligned_features[merge_cols],
-                        on='id',
-                        how='left'
+                        data, aligned_features[merge_cols], on="id", how="left"
                     )
-                data['from_alignment'] = 0
-                
+                data["from_alignment"] = 0
+
                 # Now add features that didn't pass MS2 but have good alignment (recovered features)
                 if new_aligned_ids:
                     # Fetch full data for these new aligned features from the main data view
                     # Register aligned IDs as a temp table for the query
-                    aligned_ids_df = pd.DataFrame({'id': new_aligned_ids})
-                    con.register('aligned_ids_temp', aligned_ids_df)
-                    
+                    aligned_ids_df = pd.DataFrame({"id": new_aligned_ids})
+                    con.register("aligned_ids_temp", aligned_ids_df)
+
                     aligned_query = f"""
                         SELECT
                             p.RUN_ID AS id_run,
@@ -473,30 +480,36 @@ class SplitParquetReader(BaseSplitParquetReader):
                         AND p.FEATURE_ID IN (SELECT id FROM aligned_ids_temp)
                     """
                     aligned_data = con.execute(aligned_query).fetchdf()
-                    
+
                     # Merge alignment scores and reference info into the aligned data
-                    if 'alignment_pep' in aligned_features.columns:
+                    if "alignment_pep" in aligned_features.columns:
                         aligned_data = pd.merge(
                             aligned_data,
                             aligned_features[merge_cols],
-                            on='id',
-                            how='left'
+                            on="id",
+                            how="left",
                         )
-                    
+
                     # Mark as recovered through alignment
-                    aligned_data['from_alignment'] = 1
-                    
-                    logger.info(f"Adding {len(aligned_data)} features recovered through alignment")
-                    
+                    aligned_data["from_alignment"] = 1
+
+                    logger.info(
+                        f"Adding {len(aligned_data)} features recovered through alignment"
+                    )
+
                     # Combine with base data
                     data = pd.concat([data, aligned_data], ignore_index=True)
-                
+
                 # Convert alignment_reference_feature_id to int64 to avoid scientific notation
-                if 'alignment_reference_feature_id' in data.columns:
-                    data['alignment_reference_feature_id'] = data['alignment_reference_feature_id'].astype('Int64')
-                if 'alignment_group_id' in data.columns:
-                    data['alignment_group_id'] = data['alignment_group_id'].astype('Int64')
-        
+                if "alignment_reference_feature_id" in data.columns:
+                    data["alignment_reference_feature_id"] = data[
+                        "alignment_reference_feature_id"
+                    ].astype("Int64")
+                if "alignment_group_id" in data.columns:
+                    data["alignment_group_id"] = data["alignment_group_id"].astype(
+                        "Int64"
+                    )
+
         return data
 
     def _augment_data(self, data, con) -> pd.DataFrame:
@@ -770,72 +783,83 @@ class SplitParquetReader(BaseSplitParquetReader):
     def _fetch_alignment_features(self, con) -> pd.DataFrame:
         """
         Fetch aligned features with good alignment scores from alignment parquet file.
-        
+
         This method checks for an alignment parquet file and retrieves features
         that have been aligned across runs and pass the alignment quality threshold.
         Only features whose reference feature passes the MS2 QVALUE threshold are included.
-        
+
         Args:
             con: DuckDB connection
-            
+
         Returns:
             DataFrame with aligned feature IDs that pass quality threshold
         """
         import os
-        
+
         # For split parquet, alignment file is at parent directory level
         alignment_file = os.path.join(self.infile, "feature_alignment.parquet")
-        
+
         if not os.path.exists(alignment_file):
-            logger.debug("Alignment parquet file not found, skipping alignment integration")
+            logger.debug(
+                "Alignment parquet file not found, skipping alignment integration"
+            )
             return pd.DataFrame()
-        
+
         logger.debug(f"Loading alignment data from {alignment_file}")
         max_alignment_pep = self.config.max_alignment_pep
         max_rs_peakgroup_qvalue = self.config.max_rs_peakgroup_qvalue
-        
+
         try:
             # Load alignment data
             alignment_df = pd.read_parquet(alignment_file)
-            
+
             # Filter to target (non-decoy) features with good alignment scores
             # Note: DECOY column in parquet alignment file comes from LABEL in SQLite
             # where LABEL=1 (DECOY=1 in parquet) means target, not decoy
-            if 'DECOY' in alignment_df.columns and 'VAR_XCORR_SHAPE' in alignment_df.columns:
+            if (
+                "DECOY" in alignment_df.columns
+                and "VAR_XCORR_SHAPE" in alignment_df.columns
+            ):
                 # This looks like the feature_alignment table structure
-                
+
                 # Check if we have alignment scores (PEP/QVALUE) in the file
                 # If not, we'll need to rely on the base MS2 scores and just use alignment to identify features
-                has_alignment_scores = 'PEP' in alignment_df.columns or 'QVALUE' in alignment_df.columns
-                
+                has_alignment_scores = (
+                    "PEP" in alignment_df.columns or "QVALUE" in alignment_df.columns
+                )
+
                 if has_alignment_scores:
                     # Filter by alignment PEP threshold
-                    pep_col = 'PEP' if 'PEP' in alignment_df.columns else None
-                    qvalue_col = 'QVALUE' if 'QVALUE' in alignment_df.columns else None
-                    
+                    pep_col = "PEP" if "PEP" in alignment_df.columns else None
+                    qvalue_col = "QVALUE" if "QVALUE" in alignment_df.columns else None
+
                     if pep_col:
                         filtered_df = alignment_df[
-                            (alignment_df['DECOY'] == 1) &  # DECOY=1 means target (from LABEL=1 in SQLite)
-                            (alignment_df[pep_col] < max_alignment_pep)
+                            (
+                                alignment_df["DECOY"] == 1
+                            )  # DECOY=1 means target (from LABEL=1 in SQLite)
+                            & (alignment_df[pep_col] < max_alignment_pep)
                         ].copy()
                     else:
                         # Use QVALUE if PEP not available (less ideal but workable)
                         filtered_df = alignment_df[
-                            (alignment_df['DECOY'] == 1) &
-                            (alignment_df[qvalue_col] < max_alignment_pep)
+                            (alignment_df["DECOY"] == 1)
+                            & (alignment_df[qvalue_col] < max_alignment_pep)
                         ].copy()
                 else:
                     # No alignment scores in file - just filter by target status
                     # In this case, we can't apply alignment quality threshold
-                    logger.warning("Alignment file found but no PEP/QVALUE scores present. Cannot filter by alignment quality.")
-                    filtered_df = alignment_df[alignment_df['DECOY'] == 1].copy()
-                
+                    logger.warning(
+                        "Alignment file found but no PEP/QVALUE scores present. Cannot filter by alignment quality."
+                    )
+                    filtered_df = alignment_df[alignment_df["DECOY"] == 1].copy()
+
                 # Now filter by reference feature MS2 QVALUE
                 # Need to join with precursors data to check reference feature QVALUE
-                if 'REFERENCE_FEATURE_ID' in filtered_df.columns:
+                if "REFERENCE_FEATURE_ID" in filtered_df.columns:
                     # Register filtered alignment data for SQL query
-                    con.register('filtered_alignment', filtered_df)
-                    
+                    con.register("filtered_alignment", filtered_df)
+
                     # Query to get aligned features where reference passes MS2 QVALUE threshold
                     # Also compute alignment_group_id using DENSE_RANK
                     ref_check_query = f"""
@@ -853,41 +877,49 @@ class SplitParquetReader(BaseSplitParquetReader):
                         WHERE p.SCORE_MS2_Q_VALUE < {max_rs_peakgroup_qvalue}
                     """
                     filtered_df = con.execute(ref_check_query).fetchdf()
-                    
+
                 # Rename columns to match expected format
-                if 'FEATURE_ID' in filtered_df.columns:
+                if "FEATURE_ID" in filtered_df.columns:
                     # Start with base columns
-                    base_cols = ['FEATURE_ID', 'PRECURSOR_ID', 'RUN_ID']
-                    result = filtered_df[base_cols].rename(
-                        columns={'FEATURE_ID': 'id'}
-                    )
-                    
+                    base_cols = ["FEATURE_ID", "PRECURSOR_ID", "RUN_ID"]
+                    result = filtered_df[base_cols].rename(columns={"FEATURE_ID": "id"})
+
                     # Add alignment group ID if available
-                    if 'ALIGNMENT_GROUP_ID' in filtered_df.columns:
-                        result['alignment_group_id'] = filtered_df['ALIGNMENT_GROUP_ID'].values
-                    
+                    if "ALIGNMENT_GROUP_ID" in filtered_df.columns:
+                        result["alignment_group_id"] = filtered_df[
+                            "ALIGNMENT_GROUP_ID"
+                        ].values
+
                     # Add reference feature ID and RT if available
-                    if 'REFERENCE_FEATURE_ID' in filtered_df.columns:
-                        result['alignment_reference_feature_id'] = filtered_df['REFERENCE_FEATURE_ID'].astype('Int64').values
-                    if 'REFERENCE_RT' in filtered_df.columns:
-                        result['alignment_reference_rt'] = filtered_df['REFERENCE_RT'].values
-                    
+                    if "REFERENCE_FEATURE_ID" in filtered_df.columns:
+                        result["alignment_reference_feature_id"] = (
+                            filtered_df["REFERENCE_FEATURE_ID"].astype("Int64").values
+                        )
+                    if "REFERENCE_RT" in filtered_df.columns:
+                        result["alignment_reference_rt"] = filtered_df[
+                            "REFERENCE_RT"
+                        ].values
+
                     # Add alignment scores if available
-                    if 'PEP' in filtered_df.columns:
-                        result['alignment_pep'] = filtered_df['PEP'].values
-                    if 'QVALUE' in filtered_df.columns:
-                        result['alignment_qvalue'] = filtered_df['QVALUE'].values
-                    
+                    if "PEP" in filtered_df.columns:
+                        result["alignment_pep"] = filtered_df["PEP"].values
+                    if "QVALUE" in filtered_df.columns:
+                        result["alignment_qvalue"] = filtered_df["QVALUE"].values
+
                     # Convert alignment_group_id to int64
-                    if 'alignment_group_id' in result.columns:
-                        result['alignment_group_id'] = result['alignment_group_id'].astype('Int64')
-                    
-                    logger.info(f"Found {len(result)} aligned features passing alignment PEP < {max_alignment_pep} " +
-                               f"with reference features passing MS2 QVALUE < {max_rs_peakgroup_qvalue}")
+                    if "alignment_group_id" in result.columns:
+                        result["alignment_group_id"] = result[
+                            "alignment_group_id"
+                        ].astype("Int64")
+
+                    logger.info(
+                        f"Found {len(result)} aligned features passing alignment PEP < {max_alignment_pep} "
+                        + f"with reference features passing MS2 QVALUE < {max_rs_peakgroup_qvalue}"
+                    )
                     return result
         except Exception as e:
             logger.warning(f"Could not load alignment data: {e}")
-        
+
         return pd.DataFrame()
 
     def _get_ms1_score_info(self) -> tuple[str, str]:
@@ -916,11 +948,11 @@ class SplitParquetReader(BaseSplitParquetReader):
     def export_feature_scores(self, outfile: str, plot_callback):
         """
         Export feature scores from split Parquet directory for plotting.
-        
+
         Detects if SCORE columns exist and adjusts behavior:
         - If SCORE columns exist: applies RANK==1 filtering and plots SCORE + VAR_ columns
         - If SCORE columns don't exist: plots only VAR_ columns
-        
+
         Parameters
         ----------
         outfile : str
@@ -931,30 +963,32 @@ class SplitParquetReader(BaseSplitParquetReader):
         """
         # Ensure pyarrow is available
         pa, _, _ = _ensure_pyarrow()
-        
+
         # Read precursor features - only necessary columns
         precursor_file = os.path.join(self.infile, "precursors_features.parquet")
         logger.info(f"Reading precursor features from: {precursor_file}")
-        
+
         # First check what columns are available
         precursor_parquet = pa.parquet.ParquetFile(precursor_file)
         all_columns = precursor_parquet.schema.names
-        
+
         # Check for SCORE columns
         score_cols = [col for col in all_columns if col.startswith("SCORE_")]
         has_scores = len(score_cols) > 0
-        
+
         if has_scores:
-            logger.info("SCORE columns detected - applying RANK==1 filter and plotting SCORE + VAR_ columns")
+            logger.info(
+                "SCORE columns detected - applying RANK==1 filter and plotting SCORE + VAR_ columns"
+            )
         else:
             logger.info("No SCORE columns detected - plotting only VAR_ columns")
-        
+
         # Identify columns to read
         ms1_cols = [col for col in all_columns if col.startswith("FEATURE_MS1_VAR_")]
         ms2_cols = [col for col in all_columns if col.startswith("FEATURE_MS2_VAR_")]
-        
+
         cols_to_read = set()
-        
+
         # Add SCORE columns if they exist
         if has_scores:
             cols_to_read.update(score_cols)
@@ -966,113 +1000,144 @@ class SplitParquetReader(BaseSplitParquetReader):
                 cols_to_read.add("RUN_ID")
             if "PRECURSOR_ID" in all_columns:
                 cols_to_read.add("PRECURSOR_ID")
-        
+
         if ms1_cols and "PRECURSOR_DECOY" in all_columns:
             cols_to_read.update(ms1_cols)
             cols_to_read.add("PRECURSOR_DECOY")
         if ms2_cols and "PRECURSOR_DECOY" in all_columns:
             cols_to_read.update(ms2_cols)
             cols_to_read.add("PRECURSOR_DECOY")
-        
+
         if cols_to_read:
             logger.info(f"Reading {len(cols_to_read)} columns from precursor features")
             df_precursor = pd.read_parquet(precursor_file, columns=list(cols_to_read))
-            
+
             # Apply RANK==1 filter if SCORE columns exist
-            if has_scores and 'SCORE_MS2_PEAK_GROUP_RANK' in df_precursor.columns:
+            if has_scores and "SCORE_MS2_PEAK_GROUP_RANK" in df_precursor.columns:
                 logger.info(f"Filtering to RANK==1: {len(df_precursor)} -> ", end="")
-                df_precursor = df_precursor[df_precursor['SCORE_MS2_PEAK_GROUP_RANK'] == 1].copy()
+                df_precursor = df_precursor[
+                    df_precursor["SCORE_MS2_PEAK_GROUP_RANK"] == 1
+                ].copy()
                 logger.info(f"{len(df_precursor)} rows")
-            
+
             # Generate GROUP_ID if needed
-            if has_scores and 'GROUP_ID' not in df_precursor.columns:
-                if 'RUN_ID' in df_precursor.columns and 'PRECURSOR_ID' in df_precursor.columns:
-                    df_precursor['GROUP_ID'] = df_precursor['RUN_ID'].astype(str) + '_' + df_precursor['PRECURSOR_ID'].astype(str)
-            
+            if has_scores and "GROUP_ID" not in df_precursor.columns:
+                if (
+                    "RUN_ID" in df_precursor.columns
+                    and "PRECURSOR_ID" in df_precursor.columns
+                ):
+                    df_precursor["GROUP_ID"] = (
+                        df_precursor["RUN_ID"].astype(str)
+                        + "_"
+                        + df_precursor["PRECURSOR_ID"].astype(str)
+                    )
+
             # Process MS1 level
             if ms1_cols and "PRECURSOR_DECOY" in df_precursor.columns:
                 logger.info("Processing MS1 level feature scores")
                 select_cols = ms1_cols + ["PRECURSOR_DECOY"]
                 # Add SCORE columns if present
                 if has_scores:
-                    score_ms1_cols = [col for col in score_cols if 'MS1' in col.upper()]
+                    score_ms1_cols = [col for col in score_cols if "MS1" in col.upper()]
                     select_cols.extend(score_ms1_cols)
-                    if 'GROUP_ID' in df_precursor.columns:
-                        select_cols.append('GROUP_ID')
+                    if "GROUP_ID" in df_precursor.columns:
+                        select_cols.append("GROUP_ID")
                 ms1_df = df_precursor[select_cols].copy()
                 ms1_df.rename(columns={"PRECURSOR_DECOY": "DECOY"}, inplace=True)
                 plot_callback(ms1_df, outfile, "ms1", append=False)
                 del ms1_df  # Free memory
-            
+
             # Process MS2 level
             if ms2_cols and "PRECURSOR_DECOY" in df_precursor.columns:
                 logger.info("Processing MS2 level feature scores")
                 select_cols = ms2_cols + ["PRECURSOR_DECOY"]
                 # Add SCORE columns if present
                 if has_scores:
-                    score_ms2_cols = [col for col in score_cols if 'MS2' in col.upper() or 'MS1' not in col.upper()]
+                    score_ms2_cols = [
+                        col
+                        for col in score_cols
+                        if "MS2" in col.upper() or "MS1" not in col.upper()
+                    ]
                     select_cols.extend(score_ms2_cols)
-                    if 'GROUP_ID' in df_precursor.columns:
-                        select_cols.append('GROUP_ID')
+                    if "GROUP_ID" in df_precursor.columns:
+                        select_cols.append("GROUP_ID")
                 ms2_df = df_precursor[select_cols].copy()
                 ms2_df.rename(columns={"PRECURSOR_DECOY": "DECOY"}, inplace=True)
                 append = bool(ms1_cols)
                 plot_callback(ms2_df, outfile, "ms2", append=append)
                 del ms2_df  # Free memory
-            
+
             del df_precursor  # Free memory
-        
+
         # Read transition features if available
         transition_file = os.path.join(self.infile, "transition_features.parquet")
         if os.path.exists(transition_file):
             logger.info(f"Reading transition features from: {transition_file}")
-            
+
             # Check what columns are available
             transition_parquet = pa.parquet.ParquetFile(transition_file)
             transition_all_columns = transition_parquet.schema.names
-            transition_cols = [col for col in transition_all_columns if col.startswith("FEATURE_TRANSITION_VAR_")]
-            
+            transition_cols = [
+                col
+                for col in transition_all_columns
+                if col.startswith("FEATURE_TRANSITION_VAR_")
+            ]
+
             # Check for SCORE columns in transition file
-            transition_score_cols = [col for col in transition_all_columns if col.startswith("SCORE_") and 'TRANSITION' in col.upper()]
+            transition_score_cols = [
+                col
+                for col in transition_all_columns
+                if col.startswith("SCORE_") and "TRANSITION" in col.upper()
+            ]
             has_transition_scores = len(transition_score_cols) > 0
-            
+
             if transition_cols and "TRANSITION_DECOY" in transition_all_columns:
                 # Read only necessary columns
                 cols_to_read = transition_cols + ["TRANSITION_DECOY"]
                 if has_transition_scores:
                     cols_to_read.extend(transition_score_cols)
-                    if 'GROUP_ID' in transition_all_columns:
-                        cols_to_read.append('GROUP_ID')
-                
-                logger.info(f"Reading {len(cols_to_read)} columns from transition features")
+                    if "GROUP_ID" in transition_all_columns:
+                        cols_to_read.append("GROUP_ID")
+
+                logger.info(
+                    f"Reading {len(cols_to_read)} columns from transition features"
+                )
                 df_transition = pd.read_parquet(transition_file, columns=cols_to_read)
-                
+
                 logger.info("Processing transition level feature scores")
                 transition_df = df_transition.copy()
-                transition_df.rename(columns={"TRANSITION_DECOY": "DECOY"}, inplace=True)
+                transition_df.rename(
+                    columns={"TRANSITION_DECOY": "DECOY"}, inplace=True
+                )
                 append = bool(ms1_cols or ms2_cols)
                 plot_callback(transition_df, outfile, "transition", append=append)
                 del transition_df, df_transition  # Free memory
-        
+
         # Read alignment features if available
         alignment_file = os.path.join(self.infile, "feature_alignment.parquet")
         if os.path.exists(alignment_file):
             logger.info(f"Reading alignment features from: {alignment_file}")
-            
+
             # Check what columns are available
             alignment_parquet = pa.parquet.ParquetFile(alignment_file)
             alignment_all_columns = alignment_parquet.schema.names
             var_cols = [col for col in alignment_all_columns if col.startswith("VAR_")]
-            
+
             if var_cols and "DECOY" in alignment_all_columns:
                 # Read only necessary columns
                 cols_to_read = var_cols + ["DECOY"]
-                logger.info(f"Reading {len(cols_to_read)} columns from alignment features")
+                logger.info(
+                    f"Reading {len(cols_to_read)} columns from alignment features"
+                )
                 df_alignment = pd.read_parquet(alignment_file, columns=cols_to_read)
-                
+
                 logger.info("Processing alignment level feature scores")
                 alignment_df = df_alignment[var_cols + ["DECOY"]].copy()
-                append = bool(ms1_cols or ms2_cols or (os.path.exists(transition_file) and transition_cols))
+                append = bool(
+                    ms1_cols
+                    or ms2_cols
+                    or (os.path.exists(transition_file) and transition_cols)
+                )
                 plot_callback(alignment_df, outfile, "alignment", append=append)
                 del alignment_df, df_alignment  # Free memory
 

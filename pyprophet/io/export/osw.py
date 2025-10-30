@@ -163,9 +163,8 @@ class OSWReader(BaseOSWReader):
 
     def _check_alignment_presence(self, con):
         """Check if alignment data is present."""
-        return (
-            check_sqlite_table(con, "FEATURE_MS2_ALIGNMENT") 
-            and check_sqlite_table(con, "SCORE_ALIGNMENT")
+        return check_sqlite_table(con, "FEATURE_MS2_ALIGNMENT") and check_sqlite_table(
+            con, "SCORE_ALIGNMENT"
         )
 
     def _read_unscored_data(self, con):
@@ -326,7 +325,7 @@ class OSWReader(BaseOSWReader):
         """Read standard OpenSWATH data without IPF, optionally including aligned features."""
         # Check if we should attempt alignment integration
         use_alignment = cfg.use_alignment and self._check_alignment_presence(con)
-        
+
         # First, get features that pass MS2 QVALUE threshold
         query = f"""
             SELECT RUN.ID AS id_run,
@@ -354,7 +353,7 @@ class OSWReader(BaseOSWReader):
                   SCORE_MS2.RANK AS peak_group_rank,
                   SCORE_MS2.SCORE AS d_score,
                   SCORE_MS2.QVALUE AS m_score,
-                  SCORE_MS2.PEP AS MS2_PEAKGROUP_PEP
+                  SCORE_MS2.PEP AS pep
             FROM PRECURSOR
             INNER JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
             INNER JOIN PEPTIDE ON PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
@@ -367,33 +366,43 @@ class OSWReader(BaseOSWReader):
             ORDER BY transition_group_id, peak_group_rank;
         """
         data = pd.read_sql_query(query, con)
-        
+
         # If alignment is enabled and alignment data is present, fetch and merge aligned features
         if use_alignment:
             aligned_features = self._fetch_alignment_features(con, cfg)
-            
+
             if not aligned_features.empty:
                 # Get full feature data for aligned features that are NOT already in base results
                 # We only want to add features that didn't pass MS2 threshold but have good alignment
-                aligned_ids = aligned_features['id'].unique()
-                existing_ids = data['id'].unique()
-                new_aligned_ids = [aid for aid in aligned_ids if aid not in existing_ids]
-                
+                aligned_ids = aligned_features["id"].unique()
+                existing_ids = data["id"].unique()
+                new_aligned_ids = [
+                    aid for aid in aligned_ids if aid not in existing_ids
+                ]
+
                 # First, merge alignment info into existing features (those that passed MS2)
                 # Mark them with from_alignment=0
                 data = pd.merge(
                     data,
-                    aligned_features[['id', 'alignment_group_id', 'alignment_reference_feature_id', 
-                                     'alignment_reference_rt', 'alignment_pep', 'alignment_qvalue']],
-                    on='id',
-                    how='left'
+                    aligned_features[
+                        [
+                            "id",
+                            "alignment_group_id",
+                            "alignment_reference_feature_id",
+                            "alignment_reference_rt",
+                            "alignment_pep",
+                            "alignment_qvalue",
+                        ]
+                    ],
+                    on="id",
+                    how="left",
                 )
-                data['from_alignment'] = 0
-                
+                data["from_alignment"] = 0
+
                 # Now add features that didn't pass MS2 but have good alignment (recovered features)
                 if new_aligned_ids:
                     # Fetch full data for these new aligned features
-                    aligned_ids_str = ','.join(map(str, new_aligned_ids))
+                    aligned_ids_str = ",".join(map(str, new_aligned_ids))
                     aligned_query = f"""
                         SELECT RUN.ID AS id_run,
                               PEPTIDE.ID AS id_peptide,
@@ -420,7 +429,7 @@ class OSWReader(BaseOSWReader):
                               SCORE_MS2.RANK AS peak_group_rank,
                               SCORE_MS2.SCORE AS d_score,
                               SCORE_MS2.QVALUE AS m_score,
-                  SCORE_MS2.PEP AS MS2_PEAKGROUP_PEP
+                  SCORE_MS2.PEP AS pep
                         FROM PRECURSOR
                         INNER JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
                         INNER JOIN PEPTIDE ON PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
@@ -432,30 +441,44 @@ class OSWReader(BaseOSWReader):
                         WHERE FEATURE.ID IN ({aligned_ids_str})
                     """
                     aligned_data = pd.read_sql_query(aligned_query, con)
-                    
+
                     # Merge alignment scores and reference info into the aligned data
                     aligned_data = pd.merge(
                         aligned_data,
-                        aligned_features[['id', 'alignment_group_id', 'alignment_reference_feature_id', 
-                                         'alignment_reference_rt', 'alignment_pep', 'alignment_qvalue']],
-                        on='id',
-                        how='left'
+                        aligned_features[
+                            [
+                                "id",
+                                "alignment_group_id",
+                                "alignment_reference_feature_id",
+                                "alignment_reference_rt",
+                                "alignment_pep",
+                                "alignment_qvalue",
+                            ]
+                        ],
+                        on="id",
+                        how="left",
                     )
-                    
+
                     # Mark as recovered through alignment
-                    aligned_data['from_alignment'] = 1
-                    
-                    logger.info(f"Adding {len(aligned_data)} features recovered through alignment")
-                    
+                    aligned_data["from_alignment"] = 1
+
+                    logger.info(
+                        f"Adding {len(aligned_data)} features recovered through alignment"
+                    )
+
                     # Combine with base data
                     data = pd.concat([data, aligned_data], ignore_index=True)
-                
+
                 # Convert alignment_reference_feature_id to int64 to avoid scientific notation
-                if 'alignment_reference_feature_id' in data.columns:
-                    data['alignment_reference_feature_id'] = data['alignment_reference_feature_id'].astype('Int64')
-                if 'alignment_group_id' in data.columns:
-                    data['alignment_group_id'] = data['alignment_group_id'].astype('Int64')
-        
+                if "alignment_reference_feature_id" in data.columns:
+                    data["alignment_reference_feature_id"] = data[
+                        "alignment_reference_feature_id"
+                    ].astype("Int64")
+                if "alignment_group_id" in data.columns:
+                    data["alignment_group_id"] = data["alignment_group_id"].astype(
+                        "Int64"
+                    )
+
         return data
 
     def _augment_data(self, data, con, cfg):
@@ -554,7 +577,7 @@ class OSWReader(BaseOSWReader):
                   SCORE_MS2.RANK AS peak_group_rank,
                   SCORE_MS2.SCORE AS d_score,
                   SCORE_MS2.QVALUE AS m_score,
-                  SCORE_MS2.PEP AS MS2_PEAKGROUP_PEP
+                  SCORE_MS2.PEP AS pep
             FROM PRECURSOR
             INNER JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
             INNER JOIN PEPTIDE ON PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
@@ -739,22 +762,22 @@ class OSWReader(BaseOSWReader):
     def _fetch_alignment_features(self, con, cfg):
         """
         Fetch aligned features with good alignment scores.
-        
+
         This method retrieves features that have been aligned across runs
         and pass the alignment quality threshold. Only features whose reference
         feature passes the MS2 QVALUE threshold are included, ensuring that
         recovered peaks are aligned to high-quality reference features.
-        
+
         Args:
             con: Database connection
             cfg: Configuration object with max_alignment_pep threshold
-            
+
         Returns:
             DataFrame with aligned feature IDs that pass quality threshold
         """
         max_alignment_pep = cfg.max_alignment_pep
         max_rs_peakgroup_qvalue = cfg.max_rs_peakgroup_qvalue
-        
+
         query = f"""
             SELECT  
                 DENSE_RANK() OVER (ORDER BY FEATURE_MS2_ALIGNMENT.PRECURSOR_ID, FEATURE_MS2_ALIGNMENT.ALIGNMENT_ID) AS alignment_group_id,
@@ -783,9 +806,11 @@ class OSWReader(BaseOSWReader):
             AND SCORE_ALIGNMENT.PEP < {max_alignment_pep}
             AND REF_SCORE_MS2.QVALUE < {max_rs_peakgroup_qvalue}
         """
-        
+
         df = pd.read_sql_query(query, con)
-        logger.info(f"Found {len(df)} aligned features passing alignment PEP < {max_alignment_pep} with reference features passing MS2 QVALUE < {max_rs_peakgroup_qvalue}")
+        logger.info(
+            f"Found {len(df)} aligned features passing alignment PEP < {max_alignment_pep} with reference features passing MS2 QVALUE < {max_rs_peakgroup_qvalue}"
+        )
         return df
 
     ##################################
@@ -1018,11 +1043,11 @@ class OSWReader(BaseOSWReader):
     def export_feature_scores(self, outfile: str, plot_callback):
         """
         Export feature scores from OSW file for plotting.
-        
+
         Detects if SCORE tables exist and adjusts behavior:
         - If SCORE tables exist: applies RANK==1 filtering and plots SCORE + VAR_ columns
         - If SCORE tables don't exist: plots only VAR_ columns
-        
+
         Parameters
         ----------
         outfile : str
@@ -1032,22 +1057,24 @@ class OSWReader(BaseOSWReader):
             Signature: plot_callback(df, outfile, level, append)
         """
         con = sqlite3.connect(self.infile)
-        
+
         try:
             # Check for SCORE tables
             has_score_ms1 = check_sqlite_table(con, "SCORE_MS1")
             has_score_ms2 = check_sqlite_table(con, "SCORE_MS2")
             has_score_transition = check_sqlite_table(con, "SCORE_TRANSITION")
-            
+
             if has_score_ms1 or has_score_ms2 or has_score_transition:
-                logger.info("SCORE tables detected - applying RANK==1 filter and plotting SCORE + VAR_ columns")
+                logger.info(
+                    "SCORE tables detected - applying RANK==1 filter and plotting SCORE + VAR_ columns"
+                )
             else:
                 logger.info("No SCORE tables detected - plotting only VAR_ columns")
-            
+
             # Process MS1 level if available
             if check_sqlite_table(con, "FEATURE_MS1"):
                 logger.info("Processing MS1 level feature scores")
-                
+
                 if has_score_ms1:
                     # Scored mode: Include SCORE columns and apply RANK==1 filter
                     ms1_query = """
@@ -1077,9 +1104,11 @@ class OSWReader(BaseOSWReader):
                     cursor.execute("PRAGMA table_info(FEATURE_MS1)")
                     all_cols = [row[1] for row in cursor.fetchall()]
                     var_cols = [col for col in all_cols if "VAR_" in col.upper()]
-                    
+
                     if var_cols:
-                        var_cols_sql = ", ".join([f"FEATURE_MS1.{col}" for col in var_cols])
+                        var_cols_sql = ", ".join(
+                            [f"FEATURE_MS1.{col}" for col in var_cols]
+                        )
                         ms1_query = f"""
                             SELECT 
                                 {var_cols_sql},
@@ -1091,16 +1120,16 @@ class OSWReader(BaseOSWReader):
                     else:
                         logger.warning("No VAR_ columns found in FEATURE_MS1 table")
                         ms1_query = None
-                
+
                 if ms1_query:
                     df_ms1 = pd.read_sql_query(ms1_query, con)
                     if not df_ms1.empty:
                         plot_callback(df_ms1, outfile, "ms1", append=False)
-            
+
             # Process MS2 level if available
             if check_sqlite_table(con, "FEATURE_MS2"):
                 logger.info("Processing MS2 level feature scores")
-                
+
                 if has_score_ms2:
                     # Scored mode: Include SCORE columns and apply RANK==1 filter
                     ms2_query = """
@@ -1137,9 +1166,11 @@ class OSWReader(BaseOSWReader):
                     cursor.execute("PRAGMA table_info(FEATURE_MS2)")
                     all_cols = [row[1] for row in cursor.fetchall()]
                     var_cols = [col for col in all_cols if "VAR_" in col.upper()]
-                    
+
                     if var_cols:
-                        var_cols_sql = ", ".join([f"FEATURE_MS2.{col}" for col in var_cols])
+                        var_cols_sql = ", ".join(
+                            [f"FEATURE_MS2.{col}" for col in var_cols]
+                        )
                         ms2_query = f"""
                             SELECT 
                                 {var_cols_sql},
@@ -1151,17 +1182,17 @@ class OSWReader(BaseOSWReader):
                     else:
                         logger.warning("No VAR_ columns found in FEATURE_MS2 table")
                         ms2_query = None
-                
+
                 if ms2_query:
                     df_ms2 = pd.read_sql_query(ms2_query, con)
                     if not df_ms2.empty:
                         append = check_sqlite_table(con, "FEATURE_MS1")
                         plot_callback(df_ms2, outfile, "ms2", append=append)
-            
+
             # Process transition level if available
             if check_sqlite_table(con, "FEATURE_TRANSITION"):
                 logger.info("Processing transition level feature scores")
-                
+
                 if has_score_transition:
                     # Scored mode: Include SCORE columns and apply RANK==1 filter
                     transition_query = """
@@ -1197,9 +1228,11 @@ class OSWReader(BaseOSWReader):
                     cursor.execute("PRAGMA table_info(FEATURE_TRANSITION)")
                     all_cols = [row[1] for row in cursor.fetchall()]
                     var_cols = [col for col in all_cols if "VAR_" in col.upper()]
-                    
+
                     if var_cols:
-                        var_cols_sql = ", ".join([f"FEATURE_TRANSITION.{col}" for col in var_cols])
+                        var_cols_sql = ", ".join(
+                            [f"FEATURE_TRANSITION.{col}" for col in var_cols]
+                        )
                         transition_query = f"""
                             SELECT 
                                 {var_cols_sql},
@@ -1209,15 +1242,21 @@ class OSWReader(BaseOSWReader):
                             INNER JOIN TRANSITION ON FEATURE_TRANSITION.TRANSITION_ID = TRANSITION.ID
                         """
                     else:
-                        logger.warning("No VAR_ columns found in FEATURE_TRANSITION table")
+                        logger.warning(
+                            "No VAR_ columns found in FEATURE_TRANSITION table"
+                        )
                         transition_query = None
-                
+
                 if transition_query:
                     df_transition = pd.read_sql_query(transition_query, con)
                     if not df_transition.empty:
-                        append = check_sqlite_table(con, "FEATURE_MS1") or check_sqlite_table(con, "FEATURE_MS2")
-                        plot_callback(df_transition, outfile, "transition", append=append)
-            
+                        append = check_sqlite_table(
+                            con, "FEATURE_MS1"
+                        ) or check_sqlite_table(con, "FEATURE_MS2")
+                        plot_callback(
+                            df_transition, outfile, "transition", append=append
+                        )
+
             # Process alignment level if available (no SCORE tables for alignment)
             if check_sqlite_table(con, "FEATURE_MS2_ALIGNMENT"):
                 logger.info("Processing alignment level feature scores")
@@ -1226,7 +1265,7 @@ class OSWReader(BaseOSWReader):
                 cursor.execute("PRAGMA table_info(FEATURE_MS2_ALIGNMENT)")
                 all_cols = [row[1] for row in cursor.fetchall()]
                 var_cols = [col for col in all_cols if "VAR_" in col.upper()]
-                
+
                 if var_cols:
                     var_cols_sql = ", ".join(var_cols)
                     alignment_query = f"""
@@ -1237,13 +1276,17 @@ class OSWReader(BaseOSWReader):
                     """
                     df_alignment = pd.read_sql_query(alignment_query, con)
                     if not df_alignment.empty:
-                        append = (check_sqlite_table(con, "FEATURE_MS1") or 
-                                 check_sqlite_table(con, "FEATURE_MS2") or 
-                                 check_sqlite_table(con, "FEATURE_TRANSITION"))
+                        append = (
+                            check_sqlite_table(con, "FEATURE_MS1")
+                            or check_sqlite_table(con, "FEATURE_MS2")
+                            or check_sqlite_table(con, "FEATURE_TRANSITION")
+                        )
                         plot_callback(df_alignment, outfile, "alignment", append=append)
                 else:
-                    logger.warning("No VAR_ columns found in FEATURE_MS2_ALIGNMENT table")
-        
+                    logger.warning(
+                        "No VAR_ columns found in FEATURE_MS2_ALIGNMENT table"
+                    )
+
         finally:
             con.close()
 
@@ -1351,7 +1394,8 @@ class OSWWriter(BaseOSWWriter):
                     for col in get_table_columns_with_types(
                         self.config.infile, "FEATURE_TRANSITION"
                     )
-                    if col[0] not in ["FEATURE_ID", "TRANSITION_ID"] and col[1]  # Ensure column has a type
+                    if col[0] not in ["FEATURE_ID", "TRANSITION_ID"]
+                    and col[1]  # Ensure column has a type
                 ],
                 "score_ms1_exists": {"SCORE_MS1"}.issubset(table_names),
                 "score_ms2_exists": {"SCORE_MS2"}.issubset(table_names),
@@ -1421,9 +1465,13 @@ class OSWWriter(BaseOSWWriter):
                     f"{transition_query_run}\nUNION ALL\n{transition_query_null}"
                 )
                 logger.info(f"Exporting transition data to {transition_path}")
-                self._execute_copy_query(conn, combined_transition_query, transition_path)
+                self._execute_copy_query(
+                    conn, combined_transition_query, transition_path
+                )
             else:
-                logger.info("Skipping transition data export (include_transition_data=False)")
+                logger.info(
+                    "Skipping transition data export (include_transition_data=False)"
+                )
 
         # Export alignment data if exists
         if column_info["feature_ms2_alignment_exists"]:
@@ -1451,7 +1499,9 @@ class OSWWriter(BaseOSWWriter):
             transition_query = self._build_transition_query(column_info)
             self._execute_copy_query(conn, transition_query, transition_path)
         else:
-            logger.info("Skipping transition data export (include_transition_data=False)")
+            logger.info(
+                "Skipping transition data export (include_transition_data=False)"
+            )
 
         # Export alignment data if exists
         if column_info["feature_ms2_alignment_exists"]:
@@ -1475,7 +1525,9 @@ class OSWWriter(BaseOSWWriter):
             transition_query = self._build_combined_transition_query(column_info)
             conn.execute(f"INSERT INTO temp_table {transition_query}")
         else:
-            logger.info("Skipping transition data export (include_transition_data=False)")
+            logger.info(
+                "Skipping transition data export (include_transition_data=False)"
+            )
 
         # Export to parquet
         logger.info(f"Exporting combined data to {self.config.outfile}")
@@ -1630,12 +1682,16 @@ class OSWWriter(BaseOSWWriter):
             {score_table_joins}
             """
 
-    def _build_transition_score_columns_and_join(self, column_info: dict) -> Tuple[str, str]:
+    def _build_transition_score_columns_and_join(
+        self, column_info: dict
+    ) -> Tuple[str, str]:
         """Build score columns and join clause for transition scores"""
         score_transition_cols = ""
         score_transition_join = ""
         if column_info.get("score_transition_exists", False):
-            logger.debug("SCORE_TRANSITION table exists, adding score columns to transition query")
+            logger.debug(
+                "SCORE_TRANSITION table exists, adding score columns to transition query"
+            )
             score_cols = [
                 "SCORE_TRANSITION.SCORE AS SCORE_TRANSITION_SCORE",
                 "SCORE_TRANSITION.RANK AS SCORE_TRANSITION_RANK",
@@ -1665,7 +1721,9 @@ class OSWWriter(BaseOSWWriter):
         )
 
         # Add transition score columns if they exist
-        score_transition_cols, score_transition_join = self._build_transition_score_columns_and_join(column_info)
+        score_transition_cols, score_transition_join = (
+            self._build_transition_score_columns_and_join(column_info)
+        )
 
         return f"""
             SELECT 
@@ -1885,7 +1943,9 @@ class OSWWriter(BaseOSWWriter):
         )
 
         # Add transition score columns if they exist
-        score_transition_cols, score_transition_join = self._build_transition_score_columns_and_join(column_info)
+        score_transition_cols, score_transition_join = (
+            self._build_transition_score_columns_and_join(column_info)
+        )
 
         # Also need to add NULL columns for score columns that appear in precursor query
         as_null_score_cols = ""
@@ -1895,7 +1955,7 @@ class OSWWriter(BaseOSWWriter):
             as_null_score_cols += ", NULL AS SCORE_MS2_SCORE, NULL AS SCORE_MS2_PEAK_GROUP_RANK, NULL AS SCORE_MS2_P_VALUE, NULL AS SCORE_MS2_Q_VALUE, NULL AS SCORE_MS2_PEP"
         if column_info.get("score_ipf_exists", False):
             as_null_score_cols += ", NULL AS SCORE_IPF_PRECURSOR_PEAKGROUP_PEP, NULL AS SCORE_IPF_PEP, NULL AS SCORE_IPF_QVALUE"
-        
+
         # Add NULL columns for peptide and protein score contexts
         for table in ["peptide", "protein"]:
             if column_info.get(f"score_{table}_exists", False):
@@ -1977,52 +2037,64 @@ class OSWWriter(BaseOSWWriter):
         # Build score column types
         score_cols_types = []
         if column_info.get("score_ms1_exists", False):
-            score_cols_types.extend([
-                "SCORE_MS1_SCORE DOUBLE",
-                "SCORE_MS1_RANK INTEGER",
-                "SCORE_MS1_P_VALUE DOUBLE",
-                "SCORE_MS1_Q_VALUE DOUBLE",
-                "SCORE_MS1_PEP DOUBLE"
-            ])
+            score_cols_types.extend(
+                [
+                    "SCORE_MS1_SCORE DOUBLE",
+                    "SCORE_MS1_RANK INTEGER",
+                    "SCORE_MS1_P_VALUE DOUBLE",
+                    "SCORE_MS1_Q_VALUE DOUBLE",
+                    "SCORE_MS1_PEP DOUBLE",
+                ]
+            )
         if column_info.get("score_ms2_exists", False):
-            score_cols_types.extend([
-                "SCORE_MS2_SCORE DOUBLE",
-                "SCORE_MS2_PEAK_GROUP_RANK INTEGER",
-                "SCORE_MS2_P_VALUE DOUBLE",
-                "SCORE_MS2_Q_VALUE DOUBLE",
-                "SCORE_MS2_PEP DOUBLE"
-            ])
+            score_cols_types.extend(
+                [
+                    "SCORE_MS2_SCORE DOUBLE",
+                    "SCORE_MS2_PEAK_GROUP_RANK INTEGER",
+                    "SCORE_MS2_P_VALUE DOUBLE",
+                    "SCORE_MS2_Q_VALUE DOUBLE",
+                    "SCORE_MS2_PEP DOUBLE",
+                ]
+            )
         if column_info.get("score_ipf_exists", False):
-            score_cols_types.extend([
-                "SCORE_IPF_PRECURSOR_PEAKGROUP_PEP DOUBLE",
-                "SCORE_IPF_PEP DOUBLE",
-                "SCORE_IPF_QVALUE DOUBLE"
-            ])
-        
+            score_cols_types.extend(
+                [
+                    "SCORE_IPF_PRECURSOR_PEAKGROUP_PEP DOUBLE",
+                    "SCORE_IPF_PEP DOUBLE",
+                    "SCORE_IPF_QVALUE DOUBLE",
+                ]
+            )
+
         # Add peptide and protein score columns for each context
         for table in ["peptide", "protein"]:
             if column_info.get(f"score_{table}_exists", False):
                 for context in column_info.get(f"score_{table}_contexts", []):
                     safe_context = context.upper().replace("-", "_")
-                    score_cols_types.extend([
-                        f"SCORE_{table.upper()}_{safe_context}_SCORE DOUBLE",
-                        f"SCORE_{table.upper()}_{safe_context}_P_VALUE DOUBLE",
-                        f"SCORE_{table.upper()}_{safe_context}_Q_VALUE DOUBLE",
-                        f"SCORE_{table.upper()}_{safe_context}_PEP DOUBLE"
-                    ])
-        
+                    score_cols_types.extend(
+                        [
+                            f"SCORE_{table.upper()}_{safe_context}_SCORE DOUBLE",
+                            f"SCORE_{table.upper()}_{safe_context}_P_VALUE DOUBLE",
+                            f"SCORE_{table.upper()}_{safe_context}_Q_VALUE DOUBLE",
+                            f"SCORE_{table.upper()}_{safe_context}_PEP DOUBLE",
+                        ]
+                    )
+
         # Add transition score columns
         if column_info.get("score_transition_exists", False):
-            score_cols_types.extend([
-                "SCORE_TRANSITION_SCORE DOUBLE",
-                "SCORE_TRANSITION_RANK INTEGER",
-                "SCORE_TRANSITION_P_VALUE DOUBLE",
-                "SCORE_TRANSITION_Q_VALUE DOUBLE",
-                "SCORE_TRANSITION_PEP DOUBLE"
-            ])
+            score_cols_types.extend(
+                [
+                    "SCORE_TRANSITION_SCORE DOUBLE",
+                    "SCORE_TRANSITION_RANK INTEGER",
+                    "SCORE_TRANSITION_P_VALUE DOUBLE",
+                    "SCORE_TRANSITION_Q_VALUE DOUBLE",
+                    "SCORE_TRANSITION_PEP DOUBLE",
+                ]
+            )
 
         # Prepend comma and space to score columns if there are any
-        score_cols_types_sql = (", " + ", ".join(score_cols_types)) if score_cols_types else ""
+        score_cols_types_sql = (
+            (", " + ", ".join(score_cols_types)) if score_cols_types else ""
+        )
 
         create_temp_table_query = f"""
         CREATE TABLE temp_table (
@@ -2082,7 +2154,7 @@ class OSWWriter(BaseOSWWriter):
         # Check if SCORE_ALIGNMENT table exists
         with sqlite3.connect(self.config.infile) as sql_conn:
             has_score_alignment = check_sqlite_table(sql_conn, "SCORE_ALIGNMENT")
-        
+
         if has_score_alignment:
             # Export with alignment scores
             query = f"""
