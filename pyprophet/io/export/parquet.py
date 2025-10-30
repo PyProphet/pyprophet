@@ -287,7 +287,8 @@ class ParquetReader(BaseParquetReader):
                 RIGHT_WIDTH AS rightWidth,
                 SCORE_MS2_PEAK_GROUP_RANK AS peak_group_rank,
                 SCORE_MS2_SCORE AS d_score,
-                SCORE_MS2_Q_VALUE AS m_score
+                SCORE_MS2_Q_VALUE AS m_score,
+                SCORE_MS2_PEP AS MS2_PEAKGROUP_PEP
             FROM data
             WHERE PROTEIN_ID IS NOT NULL
             AND SCORE_MS2_Q_VALUE < {self.config.max_rs_peakgroup_qvalue}

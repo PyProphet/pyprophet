@@ -394,7 +394,8 @@ class SplitParquetReader(BaseSplitParquetReader):
                 p.RIGHT_WIDTH AS rightWidth,
                 p.SCORE_MS2_PEAK_GROUP_RANK AS peak_group_rank,
                 p.SCORE_MS2_SCORE AS d_score,
-                p.SCORE_MS2_Q_VALUE AS m_score
+                p.SCORE_MS2_Q_VALUE AS m_score,
+                p.SCORE_MS2_PEP AS MS2_PEAKGROUP_PEP
             FROM precursors p
             WHERE p.PROTEIN_ID IS NOT NULL
             AND p.SCORE_MS2_Q_VALUE < {self.config.max_rs_peakgroup_qvalue}

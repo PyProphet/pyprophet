@@ -353,7 +353,8 @@ class OSWReader(BaseOSWReader):
                   FEATURE.RIGHT_WIDTH AS rightWidth,
                   SCORE_MS2.RANK AS peak_group_rank,
                   SCORE_MS2.SCORE AS d_score,
-                  SCORE_MS2.QVALUE AS m_score
+                  SCORE_MS2.QVALUE AS m_score,
+                  SCORE_MS2.PEP AS MS2_PEAKGROUP_PEP
             FROM PRECURSOR
             INNER JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
             INNER JOIN PEPTIDE ON PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
@@ -418,7 +419,8 @@ class OSWReader(BaseOSWReader):
                               FEATURE.RIGHT_WIDTH AS rightWidth,
                               SCORE_MS2.RANK AS peak_group_rank,
                               SCORE_MS2.SCORE AS d_score,
-                              SCORE_MS2.QVALUE AS m_score
+                              SCORE_MS2.QVALUE AS m_score,
+                  SCORE_MS2.PEP AS MS2_PEAKGROUP_PEP
                         FROM PRECURSOR
                         INNER JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
                         INNER JOIN PEPTIDE ON PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
@@ -551,7 +553,8 @@ class OSWReader(BaseOSWReader):
                   FEATURE.RIGHT_WIDTH AS rightWidth,
                   SCORE_MS2.RANK AS peak_group_rank,
                   SCORE_MS2.SCORE AS d_score,
-                  SCORE_MS2.QVALUE AS m_score
+                  SCORE_MS2.QVALUE AS m_score,
+                  SCORE_MS2.PEP AS MS2_PEAKGROUP_PEP
             FROM PRECURSOR
             INNER JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
             INNER JOIN PEPTIDE ON PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
