@@ -664,6 +664,7 @@ class ParquetReader(BaseParquetReader):
         
         This method checks for an alignment parquet file and retrieves features
         that have been aligned across runs and pass the alignment quality threshold.
+        Only features whose reference feature passes the MS2 QVALUE threshold are included.
         
         Args:
             con: DuckDB connection
@@ -685,6 +686,7 @@ class ParquetReader(BaseParquetReader):
         
         logger.debug(f"Loading alignment data from {alignment_file}")
         max_alignment_pep = self.config.max_alignment_pep
+        max_rs_peakgroup_qvalue = self.config.max_rs_peakgroup_qvalue
         
         try:
             # Load alignment data
@@ -722,6 +724,28 @@ class ParquetReader(BaseParquetReader):
                     logger.warning("Alignment file found but no PEP/QVALUE scores present. Cannot filter by alignment quality.")
                     filtered_df = alignment_df[alignment_df['DECOY'] == 1].copy()
                 
+                # Now filter by reference feature MS2 QVALUE
+                # Need to join with main data to check reference feature QVALUE
+                if 'REFERENCE_FEATURE_ID' in filtered_df.columns:
+                    # Register filtered alignment data for SQL query
+                    con.register('filtered_alignment', filtered_df)
+                    
+                    # Query to get aligned features where reference passes MS2 QVALUE threshold
+                    ref_check_query = f"""
+                        SELECT 
+                            fa.FEATURE_ID,
+                            fa.PRECURSOR_ID,
+                            fa.RUN_ID,
+                            fa.REFERENCE_FEATURE_ID,
+                            fa.REFERENCE_RT,
+                            fa.PEP,
+                            fa.QVALUE
+                        FROM filtered_alignment fa
+                        INNER JOIN data d ON d.FEATURE_ID = fa.REFERENCE_FEATURE_ID
+                        WHERE d.SCORE_MS2_Q_VALUE < {max_rs_peakgroup_qvalue}
+                    """
+                    filtered_df = con.execute(ref_check_query).fetchdf()
+                    
                 # Rename columns to match expected format
                 if 'FEATURE_ID' in filtered_df.columns:
                     # Start with base columns
@@ -742,8 +766,8 @@ class ParquetReader(BaseParquetReader):
                     if 'QVALUE' in filtered_df.columns:
                         result['alignment_qvalue'] = filtered_df['QVALUE'].values
                     
-                    logger.info(f"Found {len(result)} aligned features" + 
-                               (f" passing alignment PEP < {max_alignment_pep}" if has_alignment_scores else ""))
+                    logger.info(f"Found {len(result)} aligned features passing alignment PEP < {max_alignment_pep} " +
+                               f"with reference features passing MS2 QVALUE < {max_rs_peakgroup_qvalue}")
                     return result
         except Exception as e:
             logger.warning(f"Could not load alignment data: {e}")

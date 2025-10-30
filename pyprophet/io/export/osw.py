@@ -720,9 +720,9 @@ class OSWReader(BaseOSWReader):
         Fetch aligned features with good alignment scores.
         
         This method retrieves features that have been aligned across runs
-        and pass the alignment quality threshold. These features can be used
-        to recover peaks in runs where the MS2 signal might be weak but the
-        alignment score is good.
+        and pass the alignment quality threshold. Only features whose reference
+        feature passes the MS2 QVALUE threshold are included, ensuring that
+        recovered peaks are aligned to high-quality reference features.
         
         Args:
             con: Database connection
@@ -732,6 +732,7 @@ class OSWReader(BaseOSWReader):
             DataFrame with aligned feature IDs that pass quality threshold
         """
         max_alignment_pep = cfg.max_alignment_pep
+        max_rs_peakgroup_qvalue = cfg.max_rs_peakgroup_qvalue
         
         query = f"""
             SELECT  
@@ -751,12 +752,18 @@ class OSWReader(BaseOSWReader):
                 GROUP BY FEATURE_ID
             ) AS SCORE_ALIGNMENT 
             ON SCORE_ALIGNMENT.FEATURE_ID = FEATURE_MS2_ALIGNMENT.ALIGNED_FEATURE_ID
+            INNER JOIN (
+                SELECT FEATURE_ID, QVALUE
+                FROM SCORE_MS2
+            ) AS REF_SCORE_MS2
+            ON REF_SCORE_MS2.FEATURE_ID = FEATURE_MS2_ALIGNMENT.REFERENCE_FEATURE_ID
             WHERE LABEL = 1
             AND SCORE_ALIGNMENT.PEP < {max_alignment_pep}
+            AND REF_SCORE_MS2.QVALUE < {max_rs_peakgroup_qvalue}
         """
         
         df = pd.read_sql_query(query, con)
-        logger.info(f"Found {len(df)} aligned features passing alignment PEP < {max_alignment_pep}")
+        logger.info(f"Found {len(df)} aligned features passing alignment PEP < {max_alignment_pep} with reference features passing MS2 QVALUE < {max_rs_peakgroup_qvalue}")
         return df
 
     ##################################
