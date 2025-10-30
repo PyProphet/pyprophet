@@ -328,8 +328,6 @@ class OSWReader(BaseOSWReader):
         use_alignment = cfg.use_alignment and self._check_alignment_presence(con)
         
         # First, get features that pass MS2 QVALUE threshold
-        # Only add from_alignment column if we're using alignment
-        from_alignment_col = ", 0 AS from_alignment" if use_alignment else ""
         query = f"""
             SELECT RUN.ID AS id_run,
                   PEPTIDE.ID AS id_peptide,
@@ -355,7 +353,7 @@ class OSWReader(BaseOSWReader):
                   FEATURE.RIGHT_WIDTH AS rightWidth,
                   SCORE_MS2.RANK AS peak_group_rank,
                   SCORE_MS2.SCORE AS d_score,
-                  SCORE_MS2.QVALUE AS m_score{from_alignment_col}
+                  SCORE_MS2.QVALUE AS m_score
             FROM PRECURSOR
             INNER JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
             INNER JOIN PEPTIDE ON PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
@@ -380,6 +378,18 @@ class OSWReader(BaseOSWReader):
                 existing_ids = data['id'].unique()
                 new_aligned_ids = [aid for aid in aligned_ids if aid not in existing_ids]
                 
+                # First, merge alignment info into existing features (those that passed MS2)
+                # Mark them with from_alignment=0
+                data = pd.merge(
+                    data,
+                    aligned_features[['id', 'alignment_group_id', 'alignment_reference_feature_id', 
+                                     'alignment_reference_rt', 'alignment_pep', 'alignment_qvalue']],
+                    on='id',
+                    how='left'
+                )
+                data['from_alignment'] = 0
+                
+                # Now add features that didn't pass MS2 but have good alignment (recovered features)
                 if new_aligned_ids:
                     # Fetch full data for these new aligned features
                     aligned_ids_str = ','.join(map(str, new_aligned_ids))
@@ -408,8 +418,7 @@ class OSWReader(BaseOSWReader):
                               FEATURE.RIGHT_WIDTH AS rightWidth,
                               SCORE_MS2.RANK AS peak_group_rank,
                               SCORE_MS2.SCORE AS d_score,
-                              SCORE_MS2.QVALUE AS m_score,
-                              1 AS from_alignment
+                              SCORE_MS2.QVALUE AS m_score
                         FROM PRECURSOR
                         INNER JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
                         INNER JOIN PEPTIDE ON PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
@@ -431,16 +440,19 @@ class OSWReader(BaseOSWReader):
                         how='left'
                     )
                     
-                    # Convert alignment_reference_feature_id to int64 to avoid scientific notation
-                    if 'alignment_reference_feature_id' in aligned_data.columns:
-                        aligned_data['alignment_reference_feature_id'] = aligned_data['alignment_reference_feature_id'].astype('Int64')
-                    if 'alignment_group_id' in aligned_data.columns:
-                        aligned_data['alignment_group_id'] = aligned_data['alignment_group_id'].astype('Int64')
+                    # Mark as recovered through alignment
+                    aligned_data['from_alignment'] = 1
                     
                     logger.info(f"Adding {len(aligned_data)} features recovered through alignment")
                     
                     # Combine with base data
                     data = pd.concat([data, aligned_data], ignore_index=True)
+                
+                # Convert alignment_reference_feature_id to int64 to avoid scientific notation
+                if 'alignment_reference_feature_id' in data.columns:
+                    data['alignment_reference_feature_id'] = data['alignment_reference_feature_id'].astype('Int64')
+                if 'alignment_group_id' in data.columns:
+                    data['alignment_group_id'] = data['alignment_group_id'].astype('Int64')
         
         return data
 

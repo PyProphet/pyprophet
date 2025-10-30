@@ -261,8 +261,6 @@ class ParquetReader(BaseParquetReader):
         use_alignment = self.config.use_alignment and self._has_alignment
         
         # First, get features that pass MS2 QVALUE threshold
-        # Only add from_alignment column if we're using alignment
-        from_alignment_col = ", 0 AS from_alignment" if use_alignment else ""
         query = f"""
             SELECT
                 RUN_ID AS id_run,
@@ -289,7 +287,7 @@ class ParquetReader(BaseParquetReader):
                 RIGHT_WIDTH AS rightWidth,
                 SCORE_MS2_PEAK_GROUP_RANK AS peak_group_rank,
                 SCORE_MS2_SCORE AS d_score,
-                SCORE_MS2_Q_VALUE AS m_score{from_alignment_col}
+                SCORE_MS2_Q_VALUE AS m_score
             FROM data
             WHERE PROTEIN_ID IS NOT NULL
             AND SCORE_MS2_Q_VALUE < {self.config.max_rs_peakgroup_qvalue}
@@ -308,6 +306,27 @@ class ParquetReader(BaseParquetReader):
                 existing_ids = data['id'].unique()
                 new_aligned_ids = [aid for aid in aligned_ids if aid not in existing_ids]
                 
+                # First, merge alignment info into existing features (those that passed MS2)
+                # Mark them with from_alignment=0
+                if 'alignment_pep' in aligned_features.columns:
+                    # Build list of columns to merge
+                    merge_cols = ['id', 'alignment_pep', 'alignment_qvalue']
+                    if 'alignment_group_id' in aligned_features.columns:
+                        merge_cols.append('alignment_group_id')
+                    if 'alignment_reference_feature_id' in aligned_features.columns:
+                        merge_cols.append('alignment_reference_feature_id')
+                    if 'alignment_reference_rt' in aligned_features.columns:
+                        merge_cols.append('alignment_reference_rt')
+                    
+                    data = pd.merge(
+                        data,
+                        aligned_features[merge_cols],
+                        on='id',
+                        how='left'
+                    )
+                data['from_alignment'] = 0
+                
+                # Now add features that didn't pass MS2 but have good alignment (recovered features)
                 if new_aligned_ids:
                     # Fetch full data for these new aligned features from the main data view
                     # Register aligned IDs as a temp table for the query
@@ -340,8 +359,7 @@ class ParquetReader(BaseParquetReader):
                             RIGHT_WIDTH AS rightWidth,
                             SCORE_MS2_PEAK_GROUP_RANK AS peak_group_rank,
                             SCORE_MS2_SCORE AS d_score,
-                            SCORE_MS2_Q_VALUE AS m_score,
-                            1 AS from_alignment
+                            SCORE_MS2_Q_VALUE AS m_score
                         FROM data
                         WHERE PROTEIN_ID IS NOT NULL
                         AND FEATURE_ID IN (SELECT id FROM aligned_ids_temp)
@@ -350,15 +368,6 @@ class ParquetReader(BaseParquetReader):
                     
                     # Merge alignment scores and reference info into the aligned data
                     if 'alignment_pep' in aligned_features.columns:
-                        # Build list of columns to merge
-                        merge_cols = ['id', 'alignment_pep', 'alignment_qvalue']
-                        if 'alignment_group_id' in aligned_features.columns:
-                            merge_cols.append('alignment_group_id')
-                        if 'alignment_reference_feature_id' in aligned_features.columns:
-                            merge_cols.append('alignment_reference_feature_id')
-                        if 'alignment_reference_rt' in aligned_features.columns:
-                            merge_cols.append('alignment_reference_rt')
-                        
                         aligned_data = pd.merge(
                             aligned_data,
                             aligned_features[merge_cols],
@@ -366,10 +375,19 @@ class ParquetReader(BaseParquetReader):
                             how='left'
                         )
                     
+                    # Mark as recovered through alignment
+                    aligned_data['from_alignment'] = 1
+                    
                     logger.info(f"Adding {len(aligned_data)} features recovered through alignment")
                     
                     # Combine with base data
                     data = pd.concat([data, aligned_data], ignore_index=True)
+                
+                # Convert alignment_reference_feature_id to int64 to avoid scientific notation
+                if 'alignment_reference_feature_id' in data.columns:
+                    data['alignment_reference_feature_id'] = data['alignment_reference_feature_id'].astype('Int64')
+                if 'alignment_group_id' in data.columns:
+                    data['alignment_group_id'] = data['alignment_group_id'].astype('Int64')
         
         return data
 
