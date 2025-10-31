@@ -815,7 +815,7 @@ class OSWReader(BaseOSWReader):
                 FEATURE_MS2_ALIGNMENT.ALIGNED_FEATURE_ID AS id,
                 FEATURE_MS2_ALIGNMENT.PRECURSOR_ID AS transition_group_id,
                 FEATURE_MS2_ALIGNMENT.RUN_ID AS run_id,
-                CAST(FEATURE_MS2_ALIGNMENT.REFERENCE_FEATURE_ID AS INTEGER) AS alignment_reference_feature_id,
+                FEATURE_MS2_ALIGNMENT.REFERENCE_FEATURE_ID AS alignment_reference_feature_id,
                 FEATURE_MS2_ALIGNMENT.REFERENCE_RT AS alignment_reference_rt,
                 SCORE_ALIGNMENT.PEP AS alignment_pep,
                 SCORE_ALIGNMENT.QVALUE AS alignment_qvalue
@@ -832,14 +832,21 @@ class OSWReader(BaseOSWReader):
                 SELECT FEATURE_ID, QVALUE
                 FROM SCORE_MS2
             ) AS REF_SCORE_MS2
-            ON CAST(REF_SCORE_MS2.FEATURE_ID AS INTEGER) = CAST(FEATURE_MS2_ALIGNMENT.REFERENCE_FEATURE_ID AS INTEGER)
+            ON REF_SCORE_MS2.FEATURE_ID = FEATURE_MS2_ALIGNMENT.REFERENCE_FEATURE_ID
             WHERE FEATURE_MS2_ALIGNMENT.LABEL = 1
             AND SCORE_ALIGNMENT.PEP < {max_alignment_pep}
             AND REF_SCORE_MS2.QVALUE < {max_rs_peakgroup_qvalue}
         """
-        # Note: SQLite INTEGER is 8 bytes (equivalent to BIGINT) and can store values up to 2^63-1
 
         df = pd.read_sql_query(query, con)
+        
+        # Ensure alignment_reference_feature_id is read as Int64 to preserve precision for large IDs
+        # SQLite stores these as INTEGER (8 bytes), but pandas may infer float64 which loses precision
+        if "alignment_reference_feature_id" in df.columns:
+            df["alignment_reference_feature_id"] = df["alignment_reference_feature_id"].astype("Int64")
+        if "alignment_group_id" in df.columns:
+            df["alignment_group_id"] = df["alignment_group_id"].astype("Int64")
+            
         logger.info(
             f"Found {len(df)} aligned features passing alignment PEP < {max_alignment_pep} with reference features passing MS2 QVALUE < {max_rs_peakgroup_qvalue}"
         )

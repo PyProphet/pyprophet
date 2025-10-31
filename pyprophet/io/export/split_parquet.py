@@ -893,19 +893,18 @@ class SplitParquetReader(BaseSplitParquetReader):
 
                     # Query to get aligned features where reference passes MS2 QVALUE threshold
                     # Also compute alignment_group_id using DENSE_RANK
-                    # Cast REFERENCE_FEATURE_ID to BIGINT to preserve precision and avoid float conversion
                     ref_check_query = f"""
                         SELECT 
                             DENSE_RANK() OVER (ORDER BY fa.PRECURSOR_ID, fa.ALIGNMENT_ID) AS ALIGNMENT_GROUP_ID,
                             fa.FEATURE_ID,
                             fa.PRECURSOR_ID,
                             fa.RUN_ID,
-                            CAST(fa.REFERENCE_FEATURE_ID AS BIGINT) AS REFERENCE_FEATURE_ID,
+                            fa.REFERENCE_FEATURE_ID,
                             fa.REFERENCE_RT,
                             fa.PEP,
                             fa.QVALUE
                         FROM filtered_alignment fa
-                        INNER JOIN precursors p ON CAST(p.FEATURE_ID AS BIGINT) = CAST(fa.REFERENCE_FEATURE_ID AS BIGINT)
+                        INNER JOIN precursors p ON p.FEATURE_ID = fa.REFERENCE_FEATURE_ID
                         WHERE p.SCORE_MS2_Q_VALUE < {max_rs_peakgroup_qvalue}
                     """
                     filtered_df = con.execute(ref_check_query).fetchdf()
@@ -923,6 +922,7 @@ class SplitParquetReader(BaseSplitParquetReader):
                         ].values
 
                     # Add reference feature ID and RT if available
+                    # Ensure Int64 dtype to preserve precision for large IDs
                     if "REFERENCE_FEATURE_ID" in filtered_df.columns:
                         result["alignment_reference_feature_id"] = (
                             filtered_df["REFERENCE_FEATURE_ID"].astype("Int64").values
