@@ -800,13 +800,14 @@ class ParquetReader(BaseParquetReader):
 
                     # Query to get aligned features where reference passes MS2 QVALUE threshold
                     # Also compute alignment_group_id using DENSE_RANK
+                    # CAST in SELECT preserves precision, but not in JOIN (for performance)
                     ref_check_query = f"""
                         SELECT 
                             DENSE_RANK() OVER (ORDER BY fa.PRECURSOR_ID, fa.ALIGNMENT_ID) AS ALIGNMENT_GROUP_ID,
                             fa.FEATURE_ID,
                             fa.PRECURSOR_ID,
                             fa.RUN_ID,
-                            fa.REFERENCE_FEATURE_ID,
+                            CAST(fa.REFERENCE_FEATURE_ID AS BIGINT) AS REFERENCE_FEATURE_ID,
                             fa.REFERENCE_RT,
                             fa.PEP,
                             fa.QVALUE
