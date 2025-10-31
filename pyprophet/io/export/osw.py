@@ -340,7 +340,7 @@ class OSWReader(BaseOSWReader):
                   FEATURE.NORM_RT AS iRT,
                   PRECURSOR.LIBRARY_RT AS assay_iRT,
                   FEATURE.NORM_RT - PRECURSOR.LIBRARY_RT AS delta_iRT,
-                  FEATURE.ID AS id,
+                  CAST(FEATURE.ID AS INTEGER) AS id,
                   PEPTIDE.UNMODIFIED_SEQUENCE AS Sequence,
                   PEPTIDE.MODIFIED_SEQUENCE AS FullPeptideName,
                   PRECURSOR.CHARGE AS Charge,
@@ -366,6 +366,10 @@ class OSWReader(BaseOSWReader):
             ORDER BY transition_group_id, peak_group_rank;
         """
         data = pd.read_sql_query(query, con)
+        
+        # Ensure id column is Int64 to preserve precision for large feature IDs
+        if "id" in data.columns:
+            data["id"] = data["id"].astype("Int64")
 
         # If alignment is enabled and alignment data is present, fetch and merge aligned features
         if use_alignment:
@@ -416,7 +420,7 @@ class OSWReader(BaseOSWReader):
                               FEATURE.NORM_RT AS iRT,
                               PRECURSOR.LIBRARY_RT AS assay_iRT,
                               FEATURE.NORM_RT - PRECURSOR.LIBRARY_RT AS delta_iRT,
-                              FEATURE.ID AS id,
+                              CAST(FEATURE.ID AS INTEGER) AS id,
                               PEPTIDE.UNMODIFIED_SEQUENCE AS Sequence,
                               PEPTIDE.MODIFIED_SEQUENCE AS FullPeptideName,
                               PRECURSOR.CHARGE AS Charge,
@@ -441,6 +445,10 @@ class OSWReader(BaseOSWReader):
                         WHERE FEATURE.ID IN ({aligned_ids_str})
                     """
                     aligned_data = pd.read_sql_query(aligned_query, con)
+                    
+                    # Ensure id column is Int64 to preserve precision
+                    if "id" in aligned_data.columns:
+                        aligned_data["id"] = aligned_data["id"].astype("Int64")
 
                     # Merge alignment scores and reference info into the aligned data
                     aligned_data = pd.merge(
@@ -478,6 +486,37 @@ class OSWReader(BaseOSWReader):
                     data["alignment_group_id"] = data["alignment_group_id"].astype(
                         "Int64"
                     )
+
+                # Assign alignment_group_id to reference features
+                # Create a mapping from reference feature IDs to their alignment_group_ids
+                if "alignment_reference_feature_id" in data.columns and "alignment_group_id" in data.columns:
+                    # Get all reference feature IDs and their corresponding alignment_group_ids
+                    ref_mapping = data[
+                        data["alignment_reference_feature_id"].notna()
+                    ][["alignment_reference_feature_id", "alignment_group_id"]].drop_duplicates()
+                    
+                    # For each reference feature ID, we need to assign the alignment_group_id
+                    # to the feature row where id == alignment_reference_feature_id
+                    if not ref_mapping.empty:
+                        # Merge the alignment_group_id for reference features
+                        # First create a DataFrame mapping id -> alignment_group_id for references
+                        ref_group_mapping = ref_mapping.rename(
+                            columns={"alignment_reference_feature_id": "id", "alignment_group_id": "ref_alignment_group_id"}
+                        )
+                        
+                        # Merge this mapping to assign alignment_group_id to reference features
+                        data = pd.merge(data, ref_group_mapping, on="id", how="left")
+                        
+                        # Fill in alignment_group_id for reference features (where it's currently null but ref_alignment_group_id is not)
+                        mask = data["alignment_group_id"].isna() & data["ref_alignment_group_id"].notna()
+                        data.loc[mask, "alignment_group_id"] = data.loc[mask, "ref_alignment_group_id"]
+                        
+                        # Drop the temporary column
+                        data = data.drop(columns=["ref_alignment_group_id"])
+                        
+                        logger.debug(
+                            f"Assigned alignment_group_id to {mask.sum()} reference features"
+                        )
 
         return data
 
@@ -784,7 +823,7 @@ class OSWReader(BaseOSWReader):
                 FEATURE_MS2_ALIGNMENT.ALIGNED_FEATURE_ID AS id,
                 FEATURE_MS2_ALIGNMENT.PRECURSOR_ID AS transition_group_id,
                 FEATURE_MS2_ALIGNMENT.RUN_ID AS run_id,
-                FEATURE_MS2_ALIGNMENT.REFERENCE_FEATURE_ID AS alignment_reference_feature_id,
+                CAST(FEATURE_MS2_ALIGNMENT.REFERENCE_FEATURE_ID AS INTEGER) AS alignment_reference_feature_id,
                 FEATURE_MS2_ALIGNMENT.REFERENCE_RT AS alignment_reference_rt,
                 SCORE_ALIGNMENT.PEP AS alignment_pep,
                 SCORE_ALIGNMENT.QVALUE AS alignment_qvalue
@@ -808,6 +847,13 @@ class OSWReader(BaseOSWReader):
         """
 
         df = pd.read_sql_query(query, con)
+        
+        # Ensure Int64 dtype for large integer IDs (pandas nullable integer type)
+        if "alignment_reference_feature_id" in df.columns:
+            df["alignment_reference_feature_id"] = df["alignment_reference_feature_id"].astype("Int64")
+        if "alignment_group_id" in df.columns:
+            df["alignment_group_id"] = df["alignment_group_id"].astype("Int64")
+            
         logger.info(
             f"Found {len(df)} aligned features passing alignment PEP < {max_alignment_pep} with reference features passing MS2 QVALUE < {max_rs_peakgroup_qvalue}"
         )
