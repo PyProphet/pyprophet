@@ -366,7 +366,7 @@ class OSWReader(BaseOSWReader):
             ORDER BY transition_group_id, peak_group_rank;
         """
         data = pd.read_sql_query(query, con)
-        
+
         # Ensure id column is Int64 to preserve precision for large feature IDs
         if "id" in data.columns:
             data["id"] = data["id"].astype("Int64")
@@ -445,7 +445,7 @@ class OSWReader(BaseOSWReader):
                         WHERE FEATURE.ID IN ({aligned_ids_str})
                     """
                     aligned_data = pd.read_sql_query(aligned_query, con)
-                    
+
                     # Ensure id column is Int64 to preserve precision
                     if "id" in aligned_data.columns:
                         aligned_data["id"] = aligned_data["id"].astype("Int64")
@@ -489,31 +489,42 @@ class OSWReader(BaseOSWReader):
 
                 # Assign alignment_group_id to reference features
                 # Create a mapping from reference feature IDs to their alignment_group_ids
-                if "alignment_reference_feature_id" in data.columns and "alignment_group_id" in data.columns:
+                if (
+                    "alignment_reference_feature_id" in data.columns
+                    and "alignment_group_id" in data.columns
+                ):
                     # Get all reference feature IDs and their corresponding alignment_group_ids
-                    ref_mapping = data[
-                        data["alignment_reference_feature_id"].notna()
-                    ][["alignment_reference_feature_id", "alignment_group_id"]].drop_duplicates()
-                    
+                    ref_mapping = data[data["alignment_reference_feature_id"].notna()][
+                        ["alignment_reference_feature_id", "alignment_group_id"]
+                    ].drop_duplicates()
+
                     # For each reference feature ID, we need to assign the alignment_group_id
                     # to the feature row where id == alignment_reference_feature_id
                     if not ref_mapping.empty:
                         # Merge the alignment_group_id for reference features
                         # First create a DataFrame mapping id -> alignment_group_id for references
                         ref_group_mapping = ref_mapping.rename(
-                            columns={"alignment_reference_feature_id": "id", "alignment_group_id": "ref_alignment_group_id"}
+                            columns={
+                                "alignment_reference_feature_id": "id",
+                                "alignment_group_id": "ref_alignment_group_id",
+                            }
                         )
-                        
+
                         # Merge this mapping to assign alignment_group_id to reference features
                         data = pd.merge(data, ref_group_mapping, on="id", how="left")
-                        
+
                         # Fill in alignment_group_id for reference features (where it's currently null but ref_alignment_group_id is not)
-                        mask = data["alignment_group_id"].isna() & data["ref_alignment_group_id"].notna()
-                        data.loc[mask, "alignment_group_id"] = data.loc[mask, "ref_alignment_group_id"]
-                        
+                        mask = (
+                            data["alignment_group_id"].isna()
+                            & data["ref_alignment_group_id"].notna()
+                        )
+                        data.loc[mask, "alignment_group_id"] = data.loc[
+                            mask, "ref_alignment_group_id"
+                        ]
+
                         # Drop the temporary column
                         data = data.drop(columns=["ref_alignment_group_id"])
-                        
+
                         logger.debug(
                             f"Assigned alignment_group_id to {mask.sum()} reference features"
                         )
@@ -847,13 +858,15 @@ class OSWReader(BaseOSWReader):
         """
 
         df = pd.read_sql_query(query, con)
-        
+
         # Ensure Int64 dtype for large integer IDs (pandas nullable integer type)
         if "alignment_reference_feature_id" in df.columns:
-            df["alignment_reference_feature_id"] = df["alignment_reference_feature_id"].astype("Int64")
+            df["alignment_reference_feature_id"] = df[
+                "alignment_reference_feature_id"
+            ].astype("Int64")
         if "alignment_group_id" in df.columns:
             df["alignment_group_id"] = df["alignment_group_id"].astype("Int64")
-            
+
         logger.info(
             f"Found {len(df)} aligned features passing alignment PEP < {max_alignment_pep} with reference features passing MS2 QVALUE < {max_rs_peakgroup_qvalue}"
         )
@@ -1563,6 +1576,7 @@ class OSWWriter(BaseOSWWriter):
         # Insert precursor data
         logger.debug("Inserting precursor data into temp table")
         precursor_query = self._build_combined_precursor_query(conn, column_info)
+        # print(precursor_query)
         conn.execute(f"INSERT INTO temp_table {precursor_query}")
 
         # Insert transition data if requested
@@ -1587,6 +1601,183 @@ class OSWWriter(BaseOSWWriter):
             logger.info(f"Exporting alignment data to {alignment_path}")
             self._export_alignment_data(conn, alignment_path)
 
+    def _register_peptide_ipf_map(self, conn: duckdb.DuckDBPyConnection) -> None:
+        """Create or refresh peptide ↔ IPF peptide mapping inside DuckDB."""
+        logger.info("Preparing peptide unimod to codename mapping view")
+        conn.create_function("unimod_to_codename", unimod_to_codename, [str], str)
+        conn.execute(
+            f"""
+            CREATE OR REPLACE TEMP TABLE UNIMOD_TO_CODENAME_PEPTIDE_ID_MAPPING AS
+            WITH peptides AS (
+                SELECT
+                    ID,
+                    MODIFIED_SEQUENCE,
+                    unimod_to_codename(MODIFIED_SEQUENCE) AS CODENAME,
+                    MODIFIED_SEQUENCE LIKE '%%UniMod%%' AS HAS_UNIMOD
+                FROM sqlite_scan('{self.config.infile}', 'PEPTIDE')
+            ),
+            unimod_peptides AS (
+                SELECT CODENAME, ID AS PEPTIDE_ID
+                FROM peptides
+                WHERE HAS_UNIMOD
+            ),
+            codename_peptides AS (
+                SELECT CODENAME, ID AS IPF_PEPTIDE_ID
+                FROM peptides
+                WHERE NOT HAS_UNIMOD
+            )
+            SELECT DISTINCT
+                COALESCE(unimod_peptides.PEPTIDE_ID, codename_peptides.IPF_PEPTIDE_ID) AS PEPTIDE_ID,
+                COALESCE(codename_peptides.IPF_PEPTIDE_ID, unimod_peptides.PEPTIDE_ID) AS IPF_PEPTIDE_ID,
+                COALESCE(unimod_peptides.CODENAME, codename_peptides.CODENAME) AS CODENAME
+            FROM unimod_peptides
+            FULL OUTER JOIN codename_peptides USING (CODENAME)
+            """
+        )
+
+    def _create_unimod_to_codename_peptide_id_mapping_table(self) -> None:
+        """Create peptide unimod to codename mapping table in SQLite database."""
+        logger.info(
+            "Generating peptide unimod to codename mapping and storing in SQLite"
+        )
+
+        with sqlite3.connect(self.config.infile) as sql_conn:
+            # First get the peptide table and process it with pyopenms
+            peptide_df = pd.read_sql_query(
+                "SELECT ID, MODIFIED_SEQUENCE FROM PEPTIDE", sql_conn
+            )
+
+            peptide_df["codename"] = peptide_df["MODIFIED_SEQUENCE"].apply(
+                unimod_to_codename
+            )
+
+            # Create the merged mapping
+            unimod_mask = peptide_df["MODIFIED_SEQUENCE"].str.contains("UniMod")
+            merged_df = pd.merge(
+                peptide_df[unimod_mask][["codename", "ID"]],
+                peptide_df[~unimod_mask][["codename", "ID"]],
+                on="codename",
+                suffixes=("_unimod", "_codename"),
+                how="outer",
+            )
+
+            # Fill NaN values in the 'ID_codename' column with the 'ID_unimod' values
+            merged_df["ID_codename"] = merged_df["ID_codename"].fillna(
+                merged_df["ID_unimod"]
+            )
+            # Fill NaN values in the 'ID_unimod' column with the 'ID_codename' values
+            merged_df["ID_unimod"] = merged_df["ID_unimod"].fillna(
+                merged_df["ID_codename"]
+            )
+
+            merged_df["ID_unimod"] = merged_df["ID_unimod"].astype(int)
+            merged_df["ID_codename"] = merged_df["ID_codename"].astype(int)
+
+            # Create the UNIMOD_TO_CODENAME_PEPTIDE_ID_MAPPING table in SQLite
+            sql_conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS UNIMOD_TO_CODENAME_PEPTIDE_ID_MAPPING (
+                    ID_unimod INTEGER,
+                    ID_codename INTEGER,
+                    codename TEXT,
+                    PRIMARY KEY (ID_unimod, ID_codename)
+                )
+                """
+            )
+            sql_conn.execute("DELETE FROM UNIMOD_TO_CODENAME_PEPTIDE_ID_MAPPING")
+
+            # Insert the data into SQLite table
+            merged_df[["ID_unimod", "ID_codename", "codename"]].to_sql(
+                "UNIMOD_TO_CODENAME_PEPTIDE_ID_MAPPING",
+                sql_conn,
+                if_exists="append",
+                index=False,
+            )
+
+            # Create indices for better performance
+            sql_conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_peptide_ipf_unimod ON UNIMOD_TO_CODENAME_PEPTIDE_ID_MAPPING(ID_unimod)"
+            )
+            sql_conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_peptide_ipf_codename ON UNIMOD_TO_CODENAME_PEPTIDE_ID_MAPPING(ID_codename)"
+            )
+            sql_conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_peptide_ipf_codename_text ON UNIMOD_TO_CODENAME_PEPTIDE_ID_MAPPING(codename)"
+            )
+
+            sql_conn.commit()
+            logger.info(
+                f"Successfully created UNIMOD_TO_CODENAME_PEPTIDE_ID_MAPPING table with {len(merged_df)} mappings"
+            )
+
+    def _insert_precursor_peptide_ipf_map(self) -> None:
+        """Insert precursor-peptide-IPF table into the input sqlite OSW file."""
+        logger.info("Inserting precursor-peptide-IPF mapping into OSW file")
+        with sqlite3.connect(self.config.infile) as sql_conn:
+            # Create the main mapping table
+            sql_conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS PRECURSOR_PEPTIDE_IPF_MAPPING (
+                    PRECURSOR_ID INTEGER,
+                    ID_unimod INTEGER,
+                    ID_codename INTEGER,
+                    MODIFIED_SEQUENCE TEXT,
+                    CODENAME TEXT,
+                    FEATURE_ID INTEGER,
+                    PRECURSOR_PEAKGROUP_PEP REAL,
+                    QVALUE REAL,
+                    PEP REAL
+                )
+                """
+            )
+            sql_conn.execute("DELETE FROM PRECURSOR_PEPTIDE_IPF_MAPPING")
+
+            # Insert the data using your join logic
+            sql_conn.execute(
+                """
+                INSERT INTO PRECURSOR_PEPTIDE_IPF_MAPPING (
+                    PRECURSOR_ID, ID_unimod, ID_codename, MODIFIED_SEQUENCE, 
+                    CODENAME, FEATURE_ID, PRECURSOR_PEAKGROUP_PEP, QVALUE, PEP
+                )
+                SELECT 
+                    ppm.PRECURSOR_ID,
+                    pim.ID_unimod,
+                    pim.ID_codename,
+                    p.MODIFIED_SEQUENCE,
+                    pim.codename,
+                    si.FEATURE_ID,
+                    si.PRECURSOR_PEAKGROUP_PEP,
+                    si.QVALUE,
+                    si.PEP
+                FROM PEPTIDE p
+                INNER JOIN UNIMOD_TO_CODENAME_PEPTIDE_ID_MAPPING pim ON pim.ID_unimod = p.ID
+                INNER JOIN PRECURSOR_PEPTIDE_MAPPING ppm ON ppm.PEPTIDE_ID = p.ID
+                INNER JOIN SCORE_IPF si ON si.PEPTIDE_ID = pim.ID_codename
+                """
+            )
+
+            # Create indices for better query performance
+            sql_conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_ppim_precursor_id ON PRECURSOR_PEPTIDE_IPF_MAPPING(PRECURSOR_ID)"
+            )
+            sql_conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_ppim_feature_id ON PRECURSOR_PEPTIDE_IPF_MAPPING(FEATURE_ID)"
+            )
+            sql_conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_ppim_id_unimod ON PRECURSOR_PEPTIDE_IPF_MAPPING(ID_unimod)"
+            )
+            sql_conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_ppim_id_codename ON PRECURSOR_PEPTIDE_IPF_MAPPING(ID_codename)"
+            )
+            sql_conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_ppim_precursor_feature ON PRECURSOR_PEPTIDE_IPF_MAPPING(PRECURSOR_ID, FEATURE_ID)"
+            )
+
+            sql_conn.commit()
+            logger.info(
+                "Successfully created PRECURSOR_PEPTIDE_IPF_MAPPING table with indices"
+            )
+
     def _build_precursor_query(self, conn, column_info: dict) -> str:
         """Build SQL query for precursor data"""
         feature_ms1_cols_sql = ", ".join(
@@ -1599,47 +1790,13 @@ class OSWWriter(BaseOSWWriter):
             for col in column_info["feature_ms2_cols"]
         )
 
+        # First get the peptide table and process it with pyopenms
+        # self._register_peptide_ipf_map(conn)
+        self._create_unimod_to_codename_peptide_id_mapping_table()
+
         # Check if score tables exist and build score SQLs
         score_cols_selct, score_table_joins, score_column_views = (
             self._build_score_column_selection_and_joins(column_info)
-        )
-
-        # First get the peptide table and process it with pyopenms
-        logger.info("Generating peptide unimod to codename mapping")
-        with sqlite3.connect(self.config.infile) as sql_conn:
-            peptide_df = pd.read_sql_query(
-                "SELECT ID, MODIFIED_SEQUENCE FROM PEPTIDE", sql_conn
-            )
-        peptide_df["codename"] = peptide_df["MODIFIED_SEQUENCE"].apply(
-            unimod_to_codename
-        )
-
-        # Create the merged mapping
-        unimod_mask = peptide_df["MODIFIED_SEQUENCE"].str.contains("UniMod")
-        merged_df = pd.merge(
-            peptide_df[unimod_mask][["codename", "ID"]],
-            peptide_df[~unimod_mask][["codename", "ID"]],
-            on="codename",
-            suffixes=("_unimod", "_codename"),
-            how="outer",
-        )
-
-        # Fill NaN values in the 'ID_codename' column with the 'ID_unimod' values
-        merged_df["ID_codename"] = merged_df["ID_codename"].fillna(
-            merged_df["ID_unimod"]
-        )
-        # Fill NaN values in the 'ID_unimod' column with the 'ID_codename' values
-        merged_df["ID_unimod"] = merged_df["ID_unimod"].fillna(merged_df["ID_codename"])
-
-        merged_df["ID_unimod"] = merged_df["ID_unimod"].astype(int)
-        merged_df["ID_codename"] = merged_df["ID_codename"].astype(int)
-
-        # Register peptide_ipf_map
-        conn.register(
-            "peptide_ipf_map",
-            merged_df.rename(
-                columns={"ID_unimod": "PEPTIDE_ID", "ID_codename": "IPF_PEPTIDE_ID"}
-            ),
         )
 
         return f"""
@@ -1663,7 +1820,7 @@ class OSWWriter(BaseOSWWriter):
             --    FROM normalized_peptides
             --    GROUP BY NORMALIZED_SEQUENCE
             --),
-            --peptide_ipf_map AS (
+            --UNIMOD_TO_CODENAME_PEPTIDE_ID_MAPPING AS (
             --    SELECT 
             --        np.PEPTIDE_ID,
             --        g.IPF_PEPTIDE_ID
@@ -1674,12 +1831,12 @@ class OSWWriter(BaseOSWWriter):
             {score_column_views}
             SELECT 
                 PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID AS PROTEIN_ID,
-                PEPTIDE.ID AS PEPTIDE_ID,
-                pipf.IPF_PEPTIDE_ID AS IPF_PEPTIDE_ID,
-                PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID AS PRECURSOR_ID,
+                {"SCORE_IPF.ID_unimod AS PEPTIDE_ID," if column_info["score_ipf_exists"] else "PEPTIDE.ID AS PEPTIDE_ID,"}
+                {"SCORE_IPF.ID_codename AS IPF_PEPTIDE_ID," if column_info["score_ipf_exists"] else "pipf.IPF_PEPTIDE_ID AS IPF_PEPTIDE_ID,"}
+                {"SCORE_IPF.PRECURSOR_ID AS PRECURSOR_ID," if column_info["score_ipf_exists"] else "PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID AS PRECURSOR_ID,"}
                 PROTEIN.PROTEIN_ACCESSION AS PROTEIN_ACCESSION,
                 PEPTIDE.UNMODIFIED_SEQUENCE,
-                PEPTIDE.MODIFIED_SEQUENCE,
+                {"SCORE_IPF.MODIFIED_SEQUENCE AS MODIFIED_SEQUENCE," if column_info["score_ipf_exists"] else "PEPTIDE.MODIFIED_SEQUENCE,"}
                 PRECURSOR.TRAML_ID AS PRECURSOR_TRAML_ID,
                 PRECURSOR.GROUP_LABEL AS PRECURSOR_GROUP_LABEL,
                 PRECURSOR.PRECURSOR_MZ AS PRECURSOR_MZ,
@@ -1710,8 +1867,8 @@ class OSWWriter(BaseOSWWriter):
                 ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
             INNER JOIN sqlite_scan('{self.config.infile}', 'PEPTIDE') AS PEPTIDE 
                 ON PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
-            INNER JOIN peptide_ipf_map AS pipf
-                ON PEPTIDE.ID = pipf.PEPTIDE_ID
+            INNER JOIN sqlite_scan('{self.config.infile}', 'UNIMOD_TO_CODENAME_PEPTIDE_ID_MAPPING') AS pipf
+                ON PEPTIDE.ID = pipf.ID_unimod
             INNER JOIN sqlite_scan('{self.config.infile}', 'PEPTIDE_PROTEIN_MAPPING') AS PEPTIDE_PROTEIN_MAPPING 
                 ON PEPTIDE.ID = PEPTIDE_PROTEIN_MAPPING.PEPTIDE_ID
             INNER JOIN sqlite_scan('{self.config.infile}', 'PROTEIN') AS PROTEIN 
@@ -1821,6 +1978,10 @@ class OSWWriter(BaseOSWWriter):
             for col in column_info["feature_transition_cols"]
         )
 
+        # First get the peptide table and process it with pyopenms
+        # self._register_peptide_ipf_map(conn)
+        self._create_unimod_to_codename_peptide_id_mapping_table()
+
         # Get score columns for precursor level
         score_cols_select, score_table_joins, score_column_views = (
             self._build_score_column_selection_and_joins(column_info)
@@ -1830,44 +1991,6 @@ class OSWWriter(BaseOSWWriter):
         as_null_transition_score_cols = ""
         if column_info.get("score_transition_exists", False):
             as_null_transition_score_cols = ", NULL AS SCORE_TRANSITION_SCORE, NULL AS SCORE_TRANSITION_RANK, NULL AS SCORE_TRANSITION_P_VALUE, NULL AS SCORE_TRANSITION_Q_VALUE, NULL AS SCORE_TRANSITION_PEP"
-
-        # First get the peptide table and process it with pyopenms
-        logger.info("Generating peptide unimod to codename mapping")
-        with sqlite3.connect(self.config.infile) as sql_conn:
-            peptide_df = pd.read_sql_query(
-                "SELECT ID, MODIFIED_SEQUENCE FROM PEPTIDE", sql_conn
-            )
-        peptide_df["codename"] = peptide_df["MODIFIED_SEQUENCE"].apply(
-            unimod_to_codename
-        )
-
-        # Create the merged mapping as you did in your example
-        unimod_mask = peptide_df["MODIFIED_SEQUENCE"].str.contains("UniMod")
-        merged_df = pd.merge(
-            peptide_df[unimod_mask][["codename", "ID"]],
-            peptide_df[~unimod_mask][["codename", "ID"]],
-            on="codename",
-            suffixes=("_unimod", "_codename"),
-            how="outer",
-        )
-
-        # Fill NaN values in the 'ID_codename' column with the 'ID_unimod' values
-        merged_df["ID_codename"] = merged_df["ID_codename"].fillna(
-            merged_df["ID_unimod"]
-        )
-        # Fill NaN values in the 'ID_unimod' column with the 'ID_codename' values
-        merged_df["ID_unimod"] = merged_df["ID_unimod"].fillna(merged_df["ID_codename"])
-
-        merged_df["ID_unimod"] = merged_df["ID_unimod"].astype(int)
-        merged_df["ID_codename"] = merged_df["ID_codename"].astype(int)
-
-        # Register peptide_ipf_map
-        conn.register(
-            "peptide_ipf_map",
-            merged_df.rename(
-                columns={"ID_unimod": "PEPTIDE_ID", "ID_codename": "IPF_PEPTIDE_ID"}
-            ),
-        )
 
         return f"""
             -- Need to map the unimod peptide ids to the ipf codename peptide ids. The section below is commented out, since it's limited to only the 4 common modifications. Have replaced it above with a more general approach that handles all modifications using pyopenms
@@ -1890,7 +2013,7 @@ class OSWWriter(BaseOSWWriter):
             --    FROM normalized_peptides
             --    GROUP BY NORMALIZED_SEQUENCE
             --),
-            --peptide_ipf_map AS (
+            --UNIMOD_TO_CODENAME_PEPTIDE_ID_MAPPING AS (
             --    SELECT 
             --        np.PEPTIDE_ID,
             --        g.IPF_PEPTIDE_ID
@@ -1901,12 +2024,12 @@ class OSWWriter(BaseOSWWriter):
             {score_column_views}
             SELECT 
                 PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID AS PROTEIN_ID,
-                PEPTIDE.ID AS PEPTIDE_ID,
-                pipf.IPF_PEPTIDE_ID AS IPF_PEPTIDE_ID,
-                PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID AS PRECURSOR_ID,
+                {"SCORE_IPF.ID_unimod AS PEPTIDE_ID," if column_info["score_ipf_exists"] else "PEPTIDE.ID AS PEPTIDE_ID,"}
+                {"SCORE_IPF.ID_codename AS IPF_PEPTIDE_ID," if column_info["score_ipf_exists"] else "pipf.IPF_PEPTIDE_ID AS IPF_PEPTIDE_ID,"}
+                {"SCORE_IPF.PRECURSOR_ID AS PRECURSOR_ID," if column_info["score_ipf_exists"] else "PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID AS PRECURSOR_ID,"}
                 PROTEIN.PROTEIN_ACCESSION AS PROTEIN_ACCESSION,
                 PEPTIDE.UNMODIFIED_SEQUENCE,
-                PEPTIDE.MODIFIED_SEQUENCE,
+                {"SCORE_IPF.MODIFIED_SEQUENCE AS MODIFIED_SEQUENCE," if column_info["score_ipf_exists"] else "PEPTIDE.MODIFIED_SEQUENCE,"}
                 PRECURSOR.TRAML_ID AS PRECURSOR_TRAML_ID,
                 PRECURSOR.GROUP_LABEL AS PRECURSOR_GROUP_LABEL,
                 PRECURSOR.PRECURSOR_MZ AS PRECURSOR_MZ,
@@ -1949,8 +2072,8 @@ class OSWWriter(BaseOSWWriter):
                 ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
             INNER JOIN sqlite_scan('{self.config.infile}', 'PEPTIDE') AS PEPTIDE 
                 ON PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
-            INNER JOIN peptide_ipf_map AS pipf
-                ON PEPTIDE.ID = pipf.PEPTIDE_ID
+            INNER JOIN sqlite_scan('{self.config.infile}', 'UNIMOD_TO_CODENAME_PEPTIDE_ID_MAPPING') AS pipf
+                ON PEPTIDE.ID = pipf.ID_unimod
             INNER JOIN sqlite_scan('{self.config.infile}', 'PEPTIDE_PROTEIN_MAPPING') AS PEPTIDE_PROTEIN_MAPPING 
                 ON PEPTIDE.ID = PEPTIDE_PROTEIN_MAPPING.PEPTIDE_ID
             INNER JOIN sqlite_scan('{self.config.infile}', 'PROTEIN') AS PROTEIN 
@@ -2394,8 +2517,13 @@ class OSWWriter(BaseOSWWriter):
             score_columns_to_select.append(
                 "SCORE_IPF.PRECURSOR_PEAKGROUP_PEP AS SCORE_IPF_PRECURSOR_PEAKGROUP_PEP, SCORE_IPF.PEP AS SCORE_IPF_PEP, SCORE_IPF.QVALUE AS SCORE_IPF_QVALUE"
             )
+            # NOTE: UNIMOD_TO_CODENAME_PEPTIDE_ID_MAPPING needs to be created before this join is actually executed. This is done by registering the table in DuckDB in the precursor query builder.
+            # TODO: We should maybe add the UNIMOD_TO_CODENAME_PEPTIDE_ID_MAPPING during OpenSwathWorkflow execution to avoid doing it here?
+            self._insert_precursor_peptide_ipf_map()
             score_tables_to_join.append(
-                f"LEFT JOIN sqlite_scan('{self.config.infile}', 'SCORE_IPF') AS SCORE_IPF ON FEATURE.ID = SCORE_IPF.FEATURE_ID"
+                f"""
+                LEFT JOIN sqlite_scan('{self.config.infile}', 'PRECURSOR_PEPTIDE_IPF_MAPPING') AS SCORE_IPF ON SCORE_IPF.FEATURE_ID = FEATURE.ID
+                """
             )
 
         # Create views for peptide and protein score tables if they exist
