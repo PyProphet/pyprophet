@@ -1434,6 +1434,10 @@ class OSWWriter(BaseOSWWriter):
                 "has_annotation": "ANNOTATION"
                 in get_table_columns(self.config.infile, "TRANSITION"),
                 "has_im": "EXP_IM" in get_table_columns(self.config.infile, "FEATURE"),
+                "has_im_boundaries": all(
+                    col in get_table_columns(self.config.infile, "FEATURE")
+                    for col in ["EXP_IM_LEFTWIDTH", "EXP_IM_RIGHTWIDTH"]
+                ),
                 "feature_ms1_cols": [
                     col
                     for col in get_table_columns_with_types(
@@ -1859,6 +1863,8 @@ class OSWWriter(BaseOSWWriter):
                 FEATURE.DELTA_RT,
                 FEATURE.LEFT_WIDTH,
                 FEATURE.RIGHT_WIDTH,
+                {"FEATURE.EXP_IM_LEFTWIDTH" if column_info["has_im_boundaries"] else "NULL"} AS IM_leftWidth,
+                {"FEATURE.EXP_IM_RIGHTWIDTH" if column_info["has_im_boundaries"] else "NULL"} AS IM_rightWidth,
                 {feature_ms1_cols_sql},
                 {feature_ms2_cols_sql},
                 {score_cols_selct}
@@ -2052,6 +2058,8 @@ class OSWWriter(BaseOSWWriter):
                 FEATURE.DELTA_RT,
                 FEATURE.LEFT_WIDTH,
                 FEATURE.RIGHT_WIDTH,
+                {"FEATURE.EXP_IM_LEFTWIDTH" if column_info["has_im_boundaries"] else "NULL"} AS IM_leftWidth,
+                {"FEATURE.EXP_IM_RIGHTWIDTH" if column_info["has_im_boundaries"] else "NULL"} AS IM_rightWidth,
                 {feature_ms1_cols_sql},
                 {feature_ms2_cols_sql},
                 NULL AS TRANSITION_ID,
@@ -2296,6 +2304,8 @@ class OSWWriter(BaseOSWWriter):
             DELTA_RT DOUBLE,
             LEFT_WIDTH DOUBLE,
             RIGHT_WIDTH DOUBLE,
+            IM_leftWidth DOUBLE,
+            IM_rightWidth DOUBLE,
             {feature_ms1_cols_types},
             {feature_ms2_cols_types},
             TRANSITION_ID BIGINT,
