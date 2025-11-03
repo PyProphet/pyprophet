@@ -1836,7 +1836,7 @@ class OSWWriter(BaseOSWWriter):
             SELECT 
                 PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID AS PROTEIN_ID,
                 {"SCORE_IPF.ID_unimod AS PEPTIDE_ID," if column_info["score_ipf_exists"] else "PEPTIDE.ID AS PEPTIDE_ID,"}
-                {"SCORE_IPF.ID_codename AS IPF_PEPTIDE_ID," if column_info["score_ipf_exists"] else "pipf.IPF_PEPTIDE_ID AS IPF_PEPTIDE_ID,"}
+                {"SCORE_IPF.ID_codename AS IPF_PEPTIDE_ID," if column_info["score_ipf_exists"] else "pipf.ID_codename AS IPF_PEPTIDE_ID,"}
                 {"SCORE_IPF.PRECURSOR_ID AS PRECURSOR_ID," if column_info["score_ipf_exists"] else "PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID AS PRECURSOR_ID,"}
                 PROTEIN.PROTEIN_ACCESSION AS PROTEIN_ACCESSION,
                 PEPTIDE.UNMODIFIED_SEQUENCE,
@@ -1863,8 +1863,8 @@ class OSWWriter(BaseOSWWriter):
                 FEATURE.DELTA_RT,
                 FEATURE.LEFT_WIDTH,
                 FEATURE.RIGHT_WIDTH,
-                {"FEATURE.EXP_IM_LEFTWIDTH" if column_info["has_im_boundaries"] else "NULL"} AS IM_leftWidth,
-                {"FEATURE.EXP_IM_RIGHTWIDTH" if column_info["has_im_boundaries"] else "NULL"} AS IM_rightWidth,
+                {"FEATURE.EXP_IM_LEFTWIDTH" if column_info.get("has_im_boundaries", False) else "NULL"} AS IM_leftWidth,
+                {"FEATURE.EXP_IM_RIGHTWIDTH" if column_info.get("has_im_boundaries", False) else "NULL"} AS IM_rightWidth,
                 {feature_ms1_cols_sql},
                 {feature_ms2_cols_sql},
                 {score_cols_selct}
@@ -2031,7 +2031,7 @@ class OSWWriter(BaseOSWWriter):
             SELECT 
                 PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID AS PROTEIN_ID,
                 {"SCORE_IPF.ID_unimod AS PEPTIDE_ID," if column_info["score_ipf_exists"] else "PEPTIDE.ID AS PEPTIDE_ID,"}
-                {"SCORE_IPF.ID_codename AS IPF_PEPTIDE_ID," if column_info["score_ipf_exists"] else "pipf.IPF_PEPTIDE_ID AS IPF_PEPTIDE_ID,"}
+                {"SCORE_IPF.ID_codename AS IPF_PEPTIDE_ID," if column_info["score_ipf_exists"] else "pipf.ID_codename AS IPF_PEPTIDE_ID,"}
                 {"SCORE_IPF.PRECURSOR_ID AS PRECURSOR_ID," if column_info["score_ipf_exists"] else "PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID AS PRECURSOR_ID,"}
                 PROTEIN.PROTEIN_ACCESSION AS PROTEIN_ACCESSION,
                 PEPTIDE.UNMODIFIED_SEQUENCE,
@@ -2058,8 +2058,8 @@ class OSWWriter(BaseOSWWriter):
                 FEATURE.DELTA_RT,
                 FEATURE.LEFT_WIDTH,
                 FEATURE.RIGHT_WIDTH,
-                {"FEATURE.EXP_IM_LEFTWIDTH" if column_info["has_im_boundaries"] else "NULL"} AS IM_leftWidth,
-                {"FEATURE.EXP_IM_RIGHTWIDTH" if column_info["has_im_boundaries"] else "NULL"} AS IM_rightWidth,
+                {"FEATURE.EXP_IM_LEFTWIDTH" if column_info.get("has_im_boundaries", False) else "NULL"} AS IM_leftWidth,
+                {"FEATURE.EXP_IM_RIGHTWIDTH" if column_info.get("has_im_boundaries", False) else "NULL"} AS IM_rightWidth,
                 {feature_ms1_cols_sql},
                 {feature_ms2_cols_sql},
                 NULL AS TRANSITION_ID,
@@ -2171,6 +2171,8 @@ class OSWWriter(BaseOSWWriter):
                 NULL AS DELTA_RT,
                 NULL AS LEFT_WIDTH,
                 NULL AS RIGHT_WIDTH,
+                NULL AS IM_leftWidth,
+                NULL AS IM_rightWidth,
                 {as_null_feature_ms1_cols_sql},
                 {as_null_feature_ms2_cols_sql},
                 TRANSITION.ID AS TRANSITION_ID,
@@ -2322,6 +2324,7 @@ class OSWWriter(BaseOSWWriter):
             {score_cols_types_sql}
         );
         """
+        print(create_temp_table_query)
 
         conn.execute(create_temp_table_query)
 
