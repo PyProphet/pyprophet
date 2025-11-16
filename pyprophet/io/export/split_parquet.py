@@ -512,31 +512,42 @@ class SplitParquetReader(BaseSplitParquetReader):
 
                 # Assign alignment_group_id to reference features
                 # Create a mapping from reference feature IDs to their alignment_group_ids
-                if "alignment_reference_feature_id" in data.columns and "alignment_group_id" in data.columns:
+                if (
+                    "alignment_reference_feature_id" in data.columns
+                    and "alignment_group_id" in data.columns
+                ):
                     # Get all reference feature IDs and their corresponding alignment_group_ids
-                    ref_mapping = data[
-                        data["alignment_reference_feature_id"].notna()
-                    ][["alignment_reference_feature_id", "alignment_group_id"]].drop_duplicates()
-                    
+                    ref_mapping = data[data["alignment_reference_feature_id"].notna()][
+                        ["alignment_reference_feature_id", "alignment_group_id"]
+                    ].drop_duplicates()
+
                     # For each reference feature ID, we need to assign the alignment_group_id
                     # to the feature row where id == alignment_reference_feature_id
                     if not ref_mapping.empty:
                         # Merge the alignment_group_id for reference features
                         # First create a DataFrame mapping id -> alignment_group_id for references
                         ref_group_mapping = ref_mapping.rename(
-                            columns={"alignment_reference_feature_id": "id", "alignment_group_id": "ref_alignment_group_id"}
+                            columns={
+                                "alignment_reference_feature_id": "id",
+                                "alignment_group_id": "ref_alignment_group_id",
+                            }
                         )
-                        
+
                         # Merge this mapping to assign alignment_group_id to reference features
                         data = pd.merge(data, ref_group_mapping, on="id", how="left")
-                        
+
                         # Fill in alignment_group_id for reference features (where it's currently null but ref_alignment_group_id is not)
-                        mask = data["alignment_group_id"].isna() & data["ref_alignment_group_id"].notna()
-                        data.loc[mask, "alignment_group_id"] = data.loc[mask, "ref_alignment_group_id"]
-                        
+                        mask = (
+                            data["alignment_group_id"].isna()
+                            & data["ref_alignment_group_id"].notna()
+                        )
+                        data.loc[mask, "alignment_group_id"] = data.loc[
+                            mask, "ref_alignment_group_id"
+                        ]
+
                         # Drop the temporary column
                         data = data.drop(columns=["ref_alignment_group_id"])
-                        
+
                         logger.debug(
                             f"Assigned alignment_group_id to {mask.sum()} reference features"
                         )
@@ -825,7 +836,6 @@ class SplitParquetReader(BaseSplitParquetReader):
         Returns:
             DataFrame with aligned feature IDs that pass quality threshold
         """
-        import os
 
         # For split parquet, alignment file is at parent directory level
         alignment_file = os.path.join(self.infile, "feature_alignment.parquet")
@@ -851,18 +861,25 @@ class SplitParquetReader(BaseSplitParquetReader):
                 "DECOY" in alignment_df.columns
                 and "VAR_XCORR_SHAPE" in alignment_df.columns
             ):
-                # This looks like the feature_alignment table structure
-
                 # Check if we have alignment scores (PEP/QVALUE) in the file
                 # If not, we'll need to rely on the base MS2 scores and just use alignment to identify features
                 has_alignment_scores = (
-                    "PEP" in alignment_df.columns or "QVALUE" in alignment_df.columns
+                    "SCORE_ALIGNMENT_PEP" in alignment_df.columns
+                    or "SCORE_ALIGNMENT_Q_VALUE" in alignment_df.columns
                 )
 
                 if has_alignment_scores:
                     # Filter by alignment PEP threshold
-                    pep_col = "PEP" if "PEP" in alignment_df.columns else None
-                    qvalue_col = "QVALUE" if "QVALUE" in alignment_df.columns else None
+                    pep_col = (
+                        "SCORE_ALIGNMENT_PEP"
+                        if "SCORE_ALIGNMENT_PEP" in alignment_df.columns
+                        else None
+                    )
+                    qvalue_col = (
+                        "SCORE_ALIGNMENT_Q_VALUE"
+                        if "SCORE_ALIGNMENT_Q_VALUE" in alignment_df.columns
+                        else None
+                    )
 
                     if pep_col:
                         filtered_df = alignment_df[
@@ -872,7 +889,7 @@ class SplitParquetReader(BaseSplitParquetReader):
                             & (alignment_df[pep_col] < max_alignment_pep)
                         ].copy()
                     else:
-                        # Use QVALUE if PEP not available (less ideal but workable)
+                        # Use QVALUE if SCORE_ALIGNMENT_PEP not available (less ideal but workable)
                         filtered_df = alignment_df[
                             (alignment_df["DECOY"] == 1)
                             & (alignment_df[qvalue_col] < max_alignment_pep)
@@ -902,8 +919,8 @@ class SplitParquetReader(BaseSplitParquetReader):
                             fa.RUN_ID,
                             CAST(fa.REFERENCE_FEATURE_ID AS BIGINT) AS REFERENCE_FEATURE_ID,
                             fa.REFERENCE_RT,
-                            fa.PEP,
-                            fa.QVALUE
+                            fa.SCORE_ALIGNMENT_PEP,
+                            fa.SCORE_ALIGNMENT_Q_VALUE
                         FROM filtered_alignment fa
                         INNER JOIN precursors p ON p.FEATURE_ID = fa.REFERENCE_FEATURE_ID
                         WHERE p.SCORE_MS2_Q_VALUE < {max_rs_peakgroup_qvalue}
@@ -934,10 +951,14 @@ class SplitParquetReader(BaseSplitParquetReader):
                         ].values
 
                     # Add alignment scores if available
-                    if "PEP" in filtered_df.columns:
-                        result["alignment_pep"] = filtered_df["PEP"].values
-                    if "QVALUE" in filtered_df.columns:
-                        result["alignment_qvalue"] = filtered_df["QVALUE"].values
+                    if "SCORE_ALIGNMENT_PEP" in filtered_df.columns:
+                        result["alignment_pep"] = filtered_df[
+                            "SCORE_ALIGNMENT_PEP"
+                        ].values
+                    if "SCORE_ALIGNMENT_Q_VALUE" in filtered_df.columns:
+                        result["alignment_qvalue"] = filtered_df[
+                            "SCORE_ALIGNMENT_Q_VALUE"
+                        ].values
 
                     # Convert alignment_group_id to int64
                     if "alignment_group_id" in result.columns:
