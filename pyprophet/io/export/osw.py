@@ -2324,7 +2324,6 @@ class OSWWriter(BaseOSWWriter):
             {score_cols_types_sql}
         );
         """
-        print(create_temp_table_query)
 
         conn.execute(create_temp_table_query)
 
