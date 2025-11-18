@@ -71,6 +71,9 @@ class SplitParquetReader(BaseSplitParquetReader):
         try:
             self._init_duckdb_views(con)
 
+            if self.config.context == "export_scored_report":
+                return self._read_for_export_scored_report(con)
+
             if self.config.export_format == "library":
                 if self._is_unscored_file():
                     descr = "Files must be scored for library generation."
@@ -998,6 +1001,52 @@ class SplitParquetReader(BaseSplitParquetReader):
                 feature_vars.append(f"p.{col} AS var_ms2_{var_name}")
 
         return ", " + ", ".join(feature_vars) if feature_vars else ""
+
+    ##################################
+    # Export-specific readers below
+    ##################################
+
+    def _read_for_export_scored_report(self, con) -> pd.DataFrame:
+        """
+        Lightweight reader that returns the minimal scored-report columns from split Parquet files.
+        """
+        select_cols = [
+            "RUN_ID",
+            "PROTEIN_ID",
+            "PEPTIDE_ID",
+            "PRECURSOR_ID",
+            "PRECURSOR_DECOY",
+            "FEATURE_MS2_AREA_INTENSITY",
+            "SCORE_MS2_SCORE",
+            "SCORE_MS2_PEAK_GROUP_RANK",
+            "SCORE_MS2_Q_VALUE",
+            "SCORE_PEPTIDE_GLOBAL_SCORE",
+            "SCORE_PEPTIDE_GLOBAL_Q_VALUE",
+            "SCORE_PEPTIDE_EXPERIMENT_WIDE_SCORE",
+            "SCORE_PEPTIDE_EXPERIMENT_WIDE_Q_VALUE",
+            "SCORE_PEPTIDE_RUN_SPECIFIC_SCORE",
+            "SCORE_PEPTIDE_RUN_SPECIFIC_Q_VALUE",
+            "SCORE_PROTEIN_GLOBAL_SCORE",
+            "SCORE_PROTEIN_GLOBAL_Q_VALUE",
+            "SCORE_PROTEIN_EXPERIMENT_WIDE_SCORE",
+            "SCORE_PROTEIN_EXPERIMENT_WIDE_Q_VALUE",
+            "SCORE_IPF_QVALUE",
+        ]
+
+        # Filter select cols based on available columns in the precursor files
+        select_cols = [col for col in select_cols if col in self._columns]
+
+        # Build query to select only the needed columns from precursors view
+        cols_str = ", ".join([f"p.{col}" for col in select_cols])
+
+        query = f"""
+            SELECT {cols_str}
+            FROM precursors p
+            WHERE p.PROTEIN_ID IS NOT NULL
+        """
+
+        df = con.execute(query).fetchdf()
+        return df
 
     def export_feature_scores(self, outfile: str, plot_callback):
         """
