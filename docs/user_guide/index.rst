@@ -8,3 +8,4 @@ Some useful guides to help you get started with some functionalities of PyProphe
 
    file_conversion
    pyprophet_workflow
+   alignment_integration_workflow
