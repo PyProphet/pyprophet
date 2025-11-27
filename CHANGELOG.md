@@ -2,20 +2,85 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [3.0.5] - 2025-11-27
 
 ### 🚀 Features
 
-- Add unified `pyprophet export feature-scores` command that works with all file formats (OSW, Parquet, Split Parquet)
-  - Auto-detects SCORE tables and adjusts behavior intelligently
-  - Applies RANK==1 filtering when SCORE tables exist
-  - Plots only VAR_ columns for unscored files
-  - Supports MS1, MS2, and transition level features
+- Add native installer creation scripts (DEB, RPM, DMG, EXE)
+- Add native installer creation scripts (DEB, RPM, DMG, EXE)
+- Enhance artifact upload process in GitHub Actions for Linux, Windows, and macOS
+- *(build)* Improve DMG testing and installation process for macOS
+- *(build)* Enhance build scripts for Windows and macOS with UPX compression and runtime dependency installation
+- *(build)* Add --onefile option to PyInstaller for all platforms
+- *(build)* Enhance runtime dependency installation in build scripts for Linux, macOS, and Windows
+- *(build)* Streamline PyInstaller build process with onefile mode and module exclusions for macOS and Linux
+- *(build)* Implement UPX compression for final binaries in build scripts for Linux, macOS, and Windows
+- *(build)* Update packaging scripts to use single-file executable for Linux, macOS, and Windows
+- *(build)* Enforce Python 3.11+ requirement in build scripts for Linux, macOS, and Windows
+- *(build)* Create minimal entry point script to avoid path conflicts in PyInstaller builds for Linux, macOS, and Windows
+- *(build)* Install pyprophet as a regular package to avoid import conflicts in build scripts for Linux, macOS, and Windows
+- *(build)* Build and install pyprophet as a wheel for cleaner installation in Linux and Windows scripts
+- *(build)* Optimize PyInstaller build process with temporary directory for cleaner execution
+- *(build)* Enhance build script to save original directory and clean up previous builds
+- *(build)* Clean up build artifacts and optimize wheel installation process in Linux script
+- *(build)* Modify installation process to ensure pyprophet is installed in site-packages and verify dependencies
+- *(build)* Enhance installation script to uninstall existing pyprophet and optimize wheel build process
+- *(build)* Create isolated virtual environment for building and streamline pyprophet installation process
+- *(build)* Streamline build script by cleaning artifacts and optimizing virtual environment setup
+- *(build)* Optimize Linux build script by simplifying installation steps and improving error handling
+- *(build)* Enhance Windows build script to clean Python cache and improve installation process
+- *(build)* Update GitHub Actions workflow to improve error handling and streamline command execution
+- *(build)* Enhance Windows build script to optimize PyInstaller process and add self-extracting archive support
+- Implement lazy loading for pyarrow imports and improve error handling for parquet support
+- Enhance version retrieval and sanitization for macOS build scripts
+- *(export)* Add support for exporting minimal scored-report columns from split Parquet files
 
-### 🔧 Deprecated
+### 🐛 Bug Fixes
 
-- Deprecate `pyprophet export score-plots` command in favor of `pyprophet export feature-scores`
-  - Old command still works with deprecation warning for backward compatibility
+- *(build)* Handle errors in file permission setting and listing during package creation
+- *(tests)* Fix bug with restructuring of ipf score to precursor mapping and IM boundaries
+- *(osw)* Remove debug print statement for temporary table query in OSWWriter
+- *(report)* Ensure axes are consistently indexed in plot_score_distributions function
+
+### 💼 Other
+
+- Requirements.txt
+- Only add from_alignment column when alignment is actually used
+- Extract helper method to reduce code duplication
+- Filter out columns without types when building temp table schema
+- Add RUN_ID to score peptide/protein views for proper joining
+- Use LEFT JOIN for score views to avoid filtering out rows without matching RUN_ID
+- Regtest for new test
+- Regtest output
+- Extract pyarrow import check to helper function to reduce code duplication
+- Move file type reader methods into IO export classes
+- Use existing _ensure_pyarrow() instead of custom function
+- Regtest outputs
+
+### 🚜 Refactor
+
+- Simplify parquet reader and writer initialization by using utility functions
+- Update pyarrow import to improve parquet file handling
+- Streamline parquet file imports and initialization using utility functions
+- Avoid circular imports by using type names for config checks
+- Reorganize parquet file imports for improved clarity and initialization
+- Enhance lazy loading for pyarrow imports and improve parquet initialization
+- *(parquet)* Improve alignment group ID assignment and update score column references
+
+### ⚙️ Miscellaneous Tasks
+
+- Update CHANGELOG.md
+- Replace xgboost with xgboost-cpu to reduce package size
+- Update Python version to 3.11 in GitHub Actions workflows
+- Remove local path for pyprophet in requirements.txt
+- Simplify command paths in GitHub Actions workflow for pyprophet
+- Remove tomli module exclusion from PyInstaller build scripts for Linux, macOS, and Windows
+- Remove pip install command from GitHub Actions workflow to resolve numpy source directory issue
+- Remove sklearn metadata copy from PyInstaller build script for Linux
+- Add error handling to cleanup commands in Windows build script
+- Remove pyarrow from main dependencies and add to parquet group
+- Update pyarrow dependency to optional for Parquet support
+- Exclude unnecessary modules from PyInstaller builds for Linux, macOS, and Windows
 
 ## [3.0.4] - 2025-10-21
 
