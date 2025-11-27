@@ -1,4 +1,4 @@
-Exported 97965 rows with 103 columns
+Exported 97964 rows with 105 columns
 SCORE_IPF columns found: ['SCORE_IPF_PEP', 'SCORE_IPF_PRECURSOR_PEAKGROUP_PEP', 'SCORE_IPF_QVALUE']
 Sample data with IPF scores:
    FEATURE_ID  SCORE_IPF_PEP  SCORE_IPF_PRECURSOR_PEAKGROUP_PEP  SCORE_IPF_QVALUE

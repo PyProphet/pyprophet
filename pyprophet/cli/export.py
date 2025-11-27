@@ -146,6 +146,19 @@ def create_export_group():
     type=float,
     help="[format: matrix/legacy] Filter results to maximum global protein-level q-value.",
 )
+@click.option(
+    "--use_alignment/--no-use_alignment",
+    default=True,
+    show_default=True,
+    help="Use alignment results to recover peaks with good alignment scores if alignment data is present in the input file.",
+)
+@click.option(
+    "--max_alignment_pep",
+    default=0.7,
+    show_default=True,
+    type=float,
+    help="[format: matrix/legacy] Maximum PEP to consider for good alignments when use_alignment is enabled.",
+)
 @measure_memory_usage_and_time
 def export_tsv(
     infile,
@@ -161,6 +174,8 @@ def export_tsv(
     max_global_peptide_qvalue,
     protein,
     max_global_protein_qvalue,
+    use_alignment,
+    max_alignment_pep,
 ):
     """
     Export Proteomics/Peptidoform TSV/CSV tables
@@ -190,6 +205,8 @@ def export_tsv(
         max_global_peptide_qvalue=max_global_peptide_qvalue,
         protein=protein,
         max_global_protein_qvalue=max_global_protein_qvalue,
+        use_alignment=use_alignment,
+        max_alignment_pep=max_alignment_pep,
     )
 
     reader = ReaderDispatcher.get_reader(config)
@@ -279,6 +296,19 @@ def export_tsv(
     help="[format: matrix/legacy] Filter results to maximum global protein-level q-value.",
 )
 @click.option(
+    "--use_alignment/--no-use_alignment",
+    default=True,
+    show_default=True,
+    help="Use alignment results to recover peaks with good alignment scores if alignment data is present in the input file.",
+)
+@click.option(
+    "--max_alignment_pep",
+    default=0.7,
+    show_default=True,
+    type=float,
+    help="[format: matrix/legacy] Maximum PEP to consider for good alignments when use_alignment is enabled.",
+)
+@click.option(
     "--top_n",
     default=3,
     show_default=True,
@@ -312,6 +342,8 @@ def export_matrix(
     max_rs_peakgroup_qvalue,
     max_global_peptide_qvalue,
     max_global_protein_qvalue,
+    use_alignment,
+    max_alignment_pep,
     top_n,
     consistent_top,
     normalization,
@@ -344,6 +376,8 @@ def export_matrix(
         max_global_peptide_qvalue=max_global_peptide_qvalue,
         protein=True,
         max_global_protein_qvalue=max_global_protein_qvalue,
+        use_alignment=use_alignment,
+        max_alignment_pep=max_alignment_pep,
         top_n=top_n,
         consistent_top=consistent_top,
         normalization=normalization,

@@ -161,6 +161,12 @@ class OSWReader(BaseOSWReader):
         """Check if IPF data is present and should be used."""
         return cfg.ipf != "disable" and check_sqlite_table(con, "SCORE_IPF")
 
+    def _check_alignment_presence(self, con):
+        """Check if alignment data is present."""
+        return check_sqlite_table(con, "FEATURE_MS2_ALIGNMENT") and check_sqlite_table(
+            con, "SCORE_ALIGNMENT"
+        )
+
     def _read_unscored_data(self, con):
         """Read data from unscored files."""
         score_sql = self._build_score_sql(con)
@@ -316,7 +322,11 @@ class OSWReader(BaseOSWReader):
         return pd.merge(data, ipf_data, how="left", on="id")
 
     def _read_standard_data(self, con, cfg):
-        """Read standard OpenSWATH data without IPF."""
+        """Read standard OpenSWATH data without IPF, optionally including aligned features."""
+        # Check if we should attempt alignment integration
+        use_alignment = cfg.use_alignment and self._check_alignment_presence(con)
+
+        # First, get features that pass MS2 QVALUE threshold
         query = f"""
             SELECT RUN.ID AS id_run,
                   PEPTIDE.ID AS id_peptide,
@@ -330,7 +340,7 @@ class OSWReader(BaseOSWReader):
                   FEATURE.NORM_RT AS iRT,
                   PRECURSOR.LIBRARY_RT AS assay_iRT,
                   FEATURE.NORM_RT - PRECURSOR.LIBRARY_RT AS delta_iRT,
-                  FEATURE.ID AS id,
+                  CAST(FEATURE.ID AS INTEGER) AS id,
                   PEPTIDE.UNMODIFIED_SEQUENCE AS Sequence,
                   PEPTIDE.MODIFIED_SEQUENCE AS FullPeptideName,
                   PRECURSOR.CHARGE AS Charge,
@@ -342,7 +352,8 @@ class OSWReader(BaseOSWReader):
                   FEATURE.RIGHT_WIDTH AS rightWidth,
                   SCORE_MS2.RANK AS peak_group_rank,
                   SCORE_MS2.SCORE AS d_score,
-                  SCORE_MS2.QVALUE AS m_score
+                  SCORE_MS2.QVALUE AS m_score,
+                  SCORE_MS2.PEP AS pep
             FROM PRECURSOR
             INNER JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
             INNER JOIN PEPTIDE ON PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
@@ -354,7 +365,171 @@ class OSWReader(BaseOSWReader):
             WHERE SCORE_MS2.QVALUE < {cfg.max_rs_peakgroup_qvalue}
             ORDER BY transition_group_id, peak_group_rank;
         """
-        return pd.read_sql_query(query, con)
+        data = pd.read_sql_query(query, con)
+
+        # Ensure id column is Int64 to preserve precision for large feature IDs
+        if "id" in data.columns:
+            data["id"] = data["id"].astype("Int64")
+
+        # If alignment is enabled and alignment data is present, fetch and merge aligned features
+        if use_alignment:
+            aligned_features = self._fetch_alignment_features(con, cfg)
+
+            if not aligned_features.empty:
+                # Get full feature data for aligned features that are NOT already in base results
+                # We only want to add features that didn't pass MS2 threshold but have good alignment
+                aligned_ids = aligned_features["id"].unique()
+                existing_ids = data["id"].unique()
+                new_aligned_ids = [
+                    aid for aid in aligned_ids if aid not in existing_ids
+                ]
+
+                # First, merge alignment info into existing features (those that passed MS2)
+                # Mark them with from_alignment=0
+                data = pd.merge(
+                    data,
+                    aligned_features[
+                        [
+                            "id",
+                            "alignment_group_id",
+                            "alignment_reference_feature_id",
+                            "alignment_reference_rt",
+                            "alignment_pep",
+                            "alignment_qvalue",
+                        ]
+                    ],
+                    on="id",
+                    how="left",
+                )
+                data["from_alignment"] = 0
+
+                # Now add features that didn't pass MS2 but have good alignment (recovered features)
+                if new_aligned_ids:
+                    # Fetch full data for these new aligned features
+                    aligned_ids_str = ",".join(map(str, new_aligned_ids))
+                    aligned_query = f"""
+                        SELECT RUN.ID AS id_run,
+                              PEPTIDE.ID AS id_peptide,
+                              PRECURSOR.ID AS transition_group_id,
+                              PRECURSOR.DECOY AS decoy,
+                              RUN.ID AS run_id,
+                              RUN.FILENAME AS filename,
+                              FEATURE.EXP_RT AS RT,
+                              FEATURE.EXP_RT - FEATURE.DELTA_RT AS assay_rt,
+                              FEATURE.DELTA_RT AS delta_rt,
+                              FEATURE.NORM_RT AS iRT,
+                              PRECURSOR.LIBRARY_RT AS assay_iRT,
+                              FEATURE.NORM_RT - PRECURSOR.LIBRARY_RT AS delta_iRT,
+                              CAST(FEATURE.ID AS INTEGER) AS id,
+                              PEPTIDE.UNMODIFIED_SEQUENCE AS Sequence,
+                              PEPTIDE.MODIFIED_SEQUENCE AS FullPeptideName,
+                              PRECURSOR.CHARGE AS Charge,
+                              PRECURSOR.PRECURSOR_MZ AS mz,
+                              FEATURE_MS2.AREA_INTENSITY AS Intensity,
+                              FEATURE_MS1.AREA_INTENSITY AS aggr_prec_Peak_Area,
+                              FEATURE_MS1.APEX_INTENSITY AS aggr_prec_Peak_Apex,
+                              FEATURE.LEFT_WIDTH AS leftWidth,
+                              FEATURE.RIGHT_WIDTH AS rightWidth,
+                              SCORE_MS2.RANK AS peak_group_rank,
+                              SCORE_MS2.SCORE AS d_score,
+                              SCORE_MS2.QVALUE AS m_score,
+                  SCORE_MS2.PEP AS pep
+                        FROM PRECURSOR
+                        INNER JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
+                        INNER JOIN PEPTIDE ON PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
+                        INNER JOIN FEATURE ON FEATURE.PRECURSOR_ID = PRECURSOR.ID
+                        INNER JOIN RUN ON RUN.ID = FEATURE.RUN_ID
+                        LEFT JOIN FEATURE_MS1 ON FEATURE_MS1.FEATURE_ID = FEATURE.ID
+                        LEFT JOIN FEATURE_MS2 ON FEATURE_MS2.FEATURE_ID = FEATURE.ID
+                        LEFT JOIN SCORE_MS2 ON SCORE_MS2.FEATURE_ID = FEATURE.ID
+                        WHERE FEATURE.ID IN ({aligned_ids_str})
+                    """
+                    aligned_data = pd.read_sql_query(aligned_query, con)
+
+                    # Ensure id column is Int64 to preserve precision
+                    if "id" in aligned_data.columns:
+                        aligned_data["id"] = aligned_data["id"].astype("Int64")
+
+                    # Merge alignment scores and reference info into the aligned data
+                    aligned_data = pd.merge(
+                        aligned_data,
+                        aligned_features[
+                            [
+                                "id",
+                                "alignment_group_id",
+                                "alignment_reference_feature_id",
+                                "alignment_reference_rt",
+                                "alignment_pep",
+                                "alignment_qvalue",
+                            ]
+                        ],
+                        on="id",
+                        how="left",
+                    )
+
+                    # Mark as recovered through alignment
+                    aligned_data["from_alignment"] = 1
+
+                    logger.info(
+                        f"Adding {len(aligned_data)} features recovered through alignment"
+                    )
+
+                    # Combine with base data
+                    data = pd.concat([data, aligned_data], ignore_index=True)
+
+                # Convert alignment_reference_feature_id to int64 to avoid scientific notation
+                if "alignment_reference_feature_id" in data.columns:
+                    data["alignment_reference_feature_id"] = data[
+                        "alignment_reference_feature_id"
+                    ].astype("Int64")
+                if "alignment_group_id" in data.columns:
+                    data["alignment_group_id"] = data["alignment_group_id"].astype(
+                        "Int64"
+                    )
+
+                # Assign alignment_group_id to reference features
+                # Create a mapping from reference feature IDs to their alignment_group_ids
+                if (
+                    "alignment_reference_feature_id" in data.columns
+                    and "alignment_group_id" in data.columns
+                ):
+                    # Get all reference feature IDs and their corresponding alignment_group_ids
+                    ref_mapping = data[data["alignment_reference_feature_id"].notna()][
+                        ["alignment_reference_feature_id", "alignment_group_id"]
+                    ].drop_duplicates()
+
+                    # For each reference feature ID, we need to assign the alignment_group_id
+                    # to the feature row where id == alignment_reference_feature_id
+                    if not ref_mapping.empty:
+                        # Merge the alignment_group_id for reference features
+                        # First create a DataFrame mapping id -> alignment_group_id for references
+                        ref_group_mapping = ref_mapping.rename(
+                            columns={
+                                "alignment_reference_feature_id": "id",
+                                "alignment_group_id": "ref_alignment_group_id",
+                            }
+                        )
+
+                        # Merge this mapping to assign alignment_group_id to reference features
+                        data = pd.merge(data, ref_group_mapping, on="id", how="left")
+
+                        # Fill in alignment_group_id for reference features (where it's currently null but ref_alignment_group_id is not)
+                        mask = (
+                            data["alignment_group_id"].isna()
+                            & data["ref_alignment_group_id"].notna()
+                        )
+                        data.loc[mask, "alignment_group_id"] = data.loc[
+                            mask, "ref_alignment_group_id"
+                        ]
+
+                        # Drop the temporary column
+                        data = data.drop(columns=["ref_alignment_group_id"])
+
+                        logger.debug(
+                            f"Assigned alignment_group_id to {mask.sum()} reference features"
+                        )
+
+        return data
 
     def _augment_data(self, data, con, cfg):
         """Apply common data augmentations to the base dataset."""
@@ -451,7 +626,8 @@ class OSWReader(BaseOSWReader):
                   FEATURE.RIGHT_WIDTH AS rightWidth,
                   SCORE_MS2.RANK AS peak_group_rank,
                   SCORE_MS2.SCORE AS d_score,
-                  SCORE_MS2.QVALUE AS m_score
+                  SCORE_MS2.QVALUE AS m_score,
+                  SCORE_MS2.PEP AS pep
             FROM PRECURSOR
             INNER JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
             INNER JOIN PEPTIDE ON PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
@@ -632,6 +808,69 @@ class OSWReader(BaseOSWReader):
             )
 
         return data
+
+    def _fetch_alignment_features(self, con, cfg):
+        """
+        Fetch aligned features with good alignment scores.
+
+        This method retrieves features that have been aligned across runs
+        and pass the alignment quality threshold. Only features whose reference
+        feature passes the MS2 QVALUE threshold are included, ensuring that
+        recovered peaks are aligned to high-quality reference features.
+
+        Args:
+            con: Database connection
+            cfg: Configuration object with max_alignment_pep threshold
+
+        Returns:
+            DataFrame with aligned feature IDs that pass quality threshold
+        """
+        max_alignment_pep = cfg.max_alignment_pep
+        max_rs_peakgroup_qvalue = cfg.max_rs_peakgroup_qvalue
+
+        query = f"""
+            SELECT  
+                DENSE_RANK() OVER (ORDER BY FEATURE_MS2_ALIGNMENT.PRECURSOR_ID, FEATURE_MS2_ALIGNMENT.ALIGNMENT_ID) AS alignment_group_id,
+                FEATURE_MS2_ALIGNMENT.ALIGNED_FEATURE_ID AS id,
+                FEATURE_MS2_ALIGNMENT.PRECURSOR_ID AS transition_group_id,
+                FEATURE_MS2_ALIGNMENT.RUN_ID AS run_id,
+                CAST(FEATURE_MS2_ALIGNMENT.REFERENCE_FEATURE_ID AS INTEGER) AS alignment_reference_feature_id,
+                FEATURE_MS2_ALIGNMENT.REFERENCE_RT AS alignment_reference_rt,
+                SCORE_ALIGNMENT.PEP AS alignment_pep,
+                SCORE_ALIGNMENT.QVALUE AS alignment_qvalue
+            FROM (
+                SELECT DISTINCT * FROM FEATURE_MS2_ALIGNMENT
+            ) AS FEATURE_MS2_ALIGNMENT
+            INNER JOIN (
+                SELECT DISTINCT *, MIN(QVALUE) 
+                FROM SCORE_ALIGNMENT 
+                GROUP BY FEATURE_ID
+            ) AS SCORE_ALIGNMENT 
+            ON SCORE_ALIGNMENT.FEATURE_ID = FEATURE_MS2_ALIGNMENT.ALIGNED_FEATURE_ID
+            INNER JOIN (
+                SELECT FEATURE_ID, QVALUE
+                FROM SCORE_MS2
+            ) AS REF_SCORE_MS2
+            ON REF_SCORE_MS2.FEATURE_ID = FEATURE_MS2_ALIGNMENT.REFERENCE_FEATURE_ID
+            WHERE FEATURE_MS2_ALIGNMENT.LABEL = 1
+            AND SCORE_ALIGNMENT.PEP < {max_alignment_pep}
+            AND REF_SCORE_MS2.QVALUE < {max_rs_peakgroup_qvalue}
+        """
+
+        df = pd.read_sql_query(query, con)
+
+        # Ensure Int64 dtype for large integer IDs (pandas nullable integer type)
+        if "alignment_reference_feature_id" in df.columns:
+            df["alignment_reference_feature_id"] = df[
+                "alignment_reference_feature_id"
+            ].astype("Int64")
+        if "alignment_group_id" in df.columns:
+            df["alignment_group_id"] = df["alignment_group_id"].astype("Int64")
+
+        logger.info(
+            f"Found {len(df)} aligned features passing alignment PEP < {max_alignment_pep} with reference features passing MS2 QVALUE < {max_rs_peakgroup_qvalue}"
+        )
+        return df
 
     ##################################
     # Export-specific readers below
@@ -863,11 +1102,11 @@ class OSWReader(BaseOSWReader):
     def export_feature_scores(self, outfile: str, plot_callback):
         """
         Export feature scores from OSW file for plotting.
-        
+
         Detects if SCORE tables exist and adjusts behavior:
         - If SCORE tables exist: applies RANK==1 filtering and plots SCORE + VAR_ columns
         - If SCORE tables don't exist: plots only VAR_ columns
-        
+
         Parameters
         ----------
         outfile : str
@@ -877,22 +1116,24 @@ class OSWReader(BaseOSWReader):
             Signature: plot_callback(df, outfile, level, append)
         """
         con = sqlite3.connect(self.infile)
-        
+
         try:
             # Check for SCORE tables
             has_score_ms1 = check_sqlite_table(con, "SCORE_MS1")
             has_score_ms2 = check_sqlite_table(con, "SCORE_MS2")
             has_score_transition = check_sqlite_table(con, "SCORE_TRANSITION")
-            
+
             if has_score_ms1 or has_score_ms2 or has_score_transition:
-                logger.info("SCORE tables detected - applying RANK==1 filter and plotting SCORE + VAR_ columns")
+                logger.info(
+                    "SCORE tables detected - applying RANK==1 filter and plotting SCORE + VAR_ columns"
+                )
             else:
                 logger.info("No SCORE tables detected - plotting only VAR_ columns")
-            
+
             # Process MS1 level if available
             if check_sqlite_table(con, "FEATURE_MS1"):
                 logger.info("Processing MS1 level feature scores")
-                
+
                 if has_score_ms1:
                     # Scored mode: Include SCORE columns and apply RANK==1 filter
                     ms1_query = """
@@ -922,9 +1163,11 @@ class OSWReader(BaseOSWReader):
                     cursor.execute("PRAGMA table_info(FEATURE_MS1)")
                     all_cols = [row[1] for row in cursor.fetchall()]
                     var_cols = [col for col in all_cols if "VAR_" in col.upper()]
-                    
+
                     if var_cols:
-                        var_cols_sql = ", ".join([f"FEATURE_MS1.{col}" for col in var_cols])
+                        var_cols_sql = ", ".join(
+                            [f"FEATURE_MS1.{col}" for col in var_cols]
+                        )
                         ms1_query = f"""
                             SELECT 
                                 {var_cols_sql},
@@ -936,16 +1179,16 @@ class OSWReader(BaseOSWReader):
                     else:
                         logger.warning("No VAR_ columns found in FEATURE_MS1 table")
                         ms1_query = None
-                
+
                 if ms1_query:
                     df_ms1 = pd.read_sql_query(ms1_query, con)
                     if not df_ms1.empty:
                         plot_callback(df_ms1, outfile, "ms1", append=False)
-            
+
             # Process MS2 level if available
             if check_sqlite_table(con, "FEATURE_MS2"):
                 logger.info("Processing MS2 level feature scores")
-                
+
                 if has_score_ms2:
                     # Scored mode: Include SCORE columns and apply RANK==1 filter
                     ms2_query = """
@@ -982,9 +1225,11 @@ class OSWReader(BaseOSWReader):
                     cursor.execute("PRAGMA table_info(FEATURE_MS2)")
                     all_cols = [row[1] for row in cursor.fetchall()]
                     var_cols = [col for col in all_cols if "VAR_" in col.upper()]
-                    
+
                     if var_cols:
-                        var_cols_sql = ", ".join([f"FEATURE_MS2.{col}" for col in var_cols])
+                        var_cols_sql = ", ".join(
+                            [f"FEATURE_MS2.{col}" for col in var_cols]
+                        )
                         ms2_query = f"""
                             SELECT 
                                 {var_cols_sql},
@@ -996,17 +1241,17 @@ class OSWReader(BaseOSWReader):
                     else:
                         logger.warning("No VAR_ columns found in FEATURE_MS2 table")
                         ms2_query = None
-                
+
                 if ms2_query:
                     df_ms2 = pd.read_sql_query(ms2_query, con)
                     if not df_ms2.empty:
                         append = check_sqlite_table(con, "FEATURE_MS1")
                         plot_callback(df_ms2, outfile, "ms2", append=append)
-            
+
             # Process transition level if available
             if check_sqlite_table(con, "FEATURE_TRANSITION"):
                 logger.info("Processing transition level feature scores")
-                
+
                 if has_score_transition:
                     # Scored mode: Include SCORE columns and apply RANK==1 filter
                     transition_query = """
@@ -1042,9 +1287,11 @@ class OSWReader(BaseOSWReader):
                     cursor.execute("PRAGMA table_info(FEATURE_TRANSITION)")
                     all_cols = [row[1] for row in cursor.fetchall()]
                     var_cols = [col for col in all_cols if "VAR_" in col.upper()]
-                    
+
                     if var_cols:
-                        var_cols_sql = ", ".join([f"FEATURE_TRANSITION.{col}" for col in var_cols])
+                        var_cols_sql = ", ".join(
+                            [f"FEATURE_TRANSITION.{col}" for col in var_cols]
+                        )
                         transition_query = f"""
                             SELECT 
                                 {var_cols_sql},
@@ -1054,15 +1301,21 @@ class OSWReader(BaseOSWReader):
                             INNER JOIN TRANSITION ON FEATURE_TRANSITION.TRANSITION_ID = TRANSITION.ID
                         """
                     else:
-                        logger.warning("No VAR_ columns found in FEATURE_TRANSITION table")
+                        logger.warning(
+                            "No VAR_ columns found in FEATURE_TRANSITION table"
+                        )
                         transition_query = None
-                
+
                 if transition_query:
                     df_transition = pd.read_sql_query(transition_query, con)
                     if not df_transition.empty:
-                        append = check_sqlite_table(con, "FEATURE_MS1") or check_sqlite_table(con, "FEATURE_MS2")
-                        plot_callback(df_transition, outfile, "transition", append=append)
-            
+                        append = check_sqlite_table(
+                            con, "FEATURE_MS1"
+                        ) or check_sqlite_table(con, "FEATURE_MS2")
+                        plot_callback(
+                            df_transition, outfile, "transition", append=append
+                        )
+
             # Process alignment level if available (no SCORE tables for alignment)
             if check_sqlite_table(con, "FEATURE_MS2_ALIGNMENT"):
                 logger.info("Processing alignment level feature scores")
@@ -1071,7 +1324,7 @@ class OSWReader(BaseOSWReader):
                 cursor.execute("PRAGMA table_info(FEATURE_MS2_ALIGNMENT)")
                 all_cols = [row[1] for row in cursor.fetchall()]
                 var_cols = [col for col in all_cols if "VAR_" in col.upper()]
-                
+
                 if var_cols:
                     var_cols_sql = ", ".join(var_cols)
                     alignment_query = f"""
@@ -1082,13 +1335,17 @@ class OSWReader(BaseOSWReader):
                     """
                     df_alignment = pd.read_sql_query(alignment_query, con)
                     if not df_alignment.empty:
-                        append = (check_sqlite_table(con, "FEATURE_MS1") or 
-                                 check_sqlite_table(con, "FEATURE_MS2") or 
-                                 check_sqlite_table(con, "FEATURE_TRANSITION"))
+                        append = (
+                            check_sqlite_table(con, "FEATURE_MS1")
+                            or check_sqlite_table(con, "FEATURE_MS2")
+                            or check_sqlite_table(con, "FEATURE_TRANSITION")
+                        )
                         plot_callback(df_alignment, outfile, "alignment", append=append)
                 else:
-                    logger.warning("No VAR_ columns found in FEATURE_MS2_ALIGNMENT table")
-        
+                    logger.warning(
+                        "No VAR_ columns found in FEATURE_MS2_ALIGNMENT table"
+                    )
+
         finally:
             con.close()
 
@@ -1177,6 +1434,10 @@ class OSWWriter(BaseOSWWriter):
                 "has_annotation": "ANNOTATION"
                 in get_table_columns(self.config.infile, "TRANSITION"),
                 "has_im": "EXP_IM" in get_table_columns(self.config.infile, "FEATURE"),
+                "has_im_boundaries": all(
+                    col in get_table_columns(self.config.infile, "FEATURE")
+                    for col in ["EXP_IM_LEFTWIDTH", "EXP_IM_RIGHTWIDTH"]
+                ),
                 "feature_ms1_cols": [
                     col
                     for col in get_table_columns_with_types(
@@ -1196,7 +1457,8 @@ class OSWWriter(BaseOSWWriter):
                     for col in get_table_columns_with_types(
                         self.config.infile, "FEATURE_TRANSITION"
                     )
-                    if col[0] not in ["FEATURE_ID", "TRANSITION_ID"] and col[1]  # Ensure column has a type
+                    if col[0] not in ["FEATURE_ID", "TRANSITION_ID"]
+                    and col[1]  # Ensure column has a type
                 ],
                 "score_ms1_exists": {"SCORE_MS1"}.issubset(table_names),
                 "score_ms2_exists": {"SCORE_MS2"}.issubset(table_names),
@@ -1266,9 +1528,13 @@ class OSWWriter(BaseOSWWriter):
                     f"{transition_query_run}\nUNION ALL\n{transition_query_null}"
                 )
                 logger.info(f"Exporting transition data to {transition_path}")
-                self._execute_copy_query(conn, combined_transition_query, transition_path)
+                self._execute_copy_query(
+                    conn, combined_transition_query, transition_path
+                )
             else:
-                logger.info("Skipping transition data export (include_transition_data=False)")
+                logger.info(
+                    "Skipping transition data export (include_transition_data=False)"
+                )
 
         # Export alignment data if exists
         if column_info["feature_ms2_alignment_exists"]:
@@ -1296,7 +1562,9 @@ class OSWWriter(BaseOSWWriter):
             transition_query = self._build_transition_query(column_info)
             self._execute_copy_query(conn, transition_query, transition_path)
         else:
-            logger.info("Skipping transition data export (include_transition_data=False)")
+            logger.info(
+                "Skipping transition data export (include_transition_data=False)"
+            )
 
         # Export alignment data if exists
         if column_info["feature_ms2_alignment_exists"]:
@@ -1312,6 +1580,7 @@ class OSWWriter(BaseOSWWriter):
         # Insert precursor data
         logger.debug("Inserting precursor data into temp table")
         precursor_query = self._build_combined_precursor_query(conn, column_info)
+        # print(precursor_query)
         conn.execute(f"INSERT INTO temp_table {precursor_query}")
 
         # Insert transition data if requested
@@ -1320,7 +1589,9 @@ class OSWWriter(BaseOSWWriter):
             transition_query = self._build_combined_transition_query(column_info)
             conn.execute(f"INSERT INTO temp_table {transition_query}")
         else:
-            logger.info("Skipping transition data export (include_transition_data=False)")
+            logger.info(
+                "Skipping transition data export (include_transition_data=False)"
+            )
 
         # Export to parquet
         logger.info(f"Exporting combined data to {self.config.outfile}")
@@ -1334,6 +1605,183 @@ class OSWWriter(BaseOSWWriter):
             logger.info(f"Exporting alignment data to {alignment_path}")
             self._export_alignment_data(conn, alignment_path)
 
+    def _register_peptide_ipf_map(self, conn: duckdb.DuckDBPyConnection) -> None:
+        """Create or refresh peptide ↔ IPF peptide mapping inside DuckDB."""
+        logger.info("Preparing peptide unimod to codename mapping view")
+        conn.create_function("unimod_to_codename", unimod_to_codename, [str], str)
+        conn.execute(
+            f"""
+            CREATE OR REPLACE TEMP TABLE UNIMOD_TO_CODENAME_PEPTIDE_ID_MAPPING AS
+            WITH peptides AS (
+                SELECT
+                    ID,
+                    MODIFIED_SEQUENCE,
+                    unimod_to_codename(MODIFIED_SEQUENCE) AS CODENAME,
+                    MODIFIED_SEQUENCE LIKE '%%UniMod%%' AS HAS_UNIMOD
+                FROM sqlite_scan('{self.config.infile}', 'PEPTIDE')
+            ),
+            unimod_peptides AS (
+                SELECT CODENAME, ID AS PEPTIDE_ID
+                FROM peptides
+                WHERE HAS_UNIMOD
+            ),
+            codename_peptides AS (
+                SELECT CODENAME, ID AS IPF_PEPTIDE_ID
+                FROM peptides
+                WHERE NOT HAS_UNIMOD
+            )
+            SELECT DISTINCT
+                COALESCE(unimod_peptides.PEPTIDE_ID, codename_peptides.IPF_PEPTIDE_ID) AS PEPTIDE_ID,
+                COALESCE(codename_peptides.IPF_PEPTIDE_ID, unimod_peptides.PEPTIDE_ID) AS IPF_PEPTIDE_ID,
+                COALESCE(unimod_peptides.CODENAME, codename_peptides.CODENAME) AS CODENAME
+            FROM unimod_peptides
+            FULL OUTER JOIN codename_peptides USING (CODENAME)
+            """
+        )
+
+    def _create_unimod_to_codename_peptide_id_mapping_table(self) -> None:
+        """Create peptide unimod to codename mapping table in SQLite database."""
+        logger.info(
+            "Generating peptide unimod to codename mapping and storing in SQLite"
+        )
+
+        with sqlite3.connect(self.config.infile) as sql_conn:
+            # First get the peptide table and process it with pyopenms
+            peptide_df = pd.read_sql_query(
+                "SELECT ID, MODIFIED_SEQUENCE FROM PEPTIDE", sql_conn
+            )
+
+            peptide_df["codename"] = peptide_df["MODIFIED_SEQUENCE"].apply(
+                unimod_to_codename
+            )
+
+            # Create the merged mapping
+            unimod_mask = peptide_df["MODIFIED_SEQUENCE"].str.contains("UniMod")
+            merged_df = pd.merge(
+                peptide_df[unimod_mask][["codename", "ID"]],
+                peptide_df[~unimod_mask][["codename", "ID"]],
+                on="codename",
+                suffixes=("_unimod", "_codename"),
+                how="outer",
+            )
+
+            # Fill NaN values in the 'ID_codename' column with the 'ID_unimod' values
+            merged_df["ID_codename"] = merged_df["ID_codename"].fillna(
+                merged_df["ID_unimod"]
+            )
+            # Fill NaN values in the 'ID_unimod' column with the 'ID_codename' values
+            merged_df["ID_unimod"] = merged_df["ID_unimod"].fillna(
+                merged_df["ID_codename"]
+            )
+
+            merged_df["ID_unimod"] = merged_df["ID_unimod"].astype(int)
+            merged_df["ID_codename"] = merged_df["ID_codename"].astype(int)
+
+            # Create the UNIMOD_TO_CODENAME_PEPTIDE_ID_MAPPING table in SQLite
+            sql_conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS UNIMOD_TO_CODENAME_PEPTIDE_ID_MAPPING (
+                    ID_unimod INTEGER,
+                    ID_codename INTEGER,
+                    codename TEXT,
+                    PRIMARY KEY (ID_unimod, ID_codename)
+                )
+                """
+            )
+            sql_conn.execute("DELETE FROM UNIMOD_TO_CODENAME_PEPTIDE_ID_MAPPING")
+
+            # Insert the data into SQLite table
+            merged_df[["ID_unimod", "ID_codename", "codename"]].to_sql(
+                "UNIMOD_TO_CODENAME_PEPTIDE_ID_MAPPING",
+                sql_conn,
+                if_exists="append",
+                index=False,
+            )
+
+            # Create indices for better performance
+            sql_conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_peptide_ipf_unimod ON UNIMOD_TO_CODENAME_PEPTIDE_ID_MAPPING(ID_unimod)"
+            )
+            sql_conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_peptide_ipf_codename ON UNIMOD_TO_CODENAME_PEPTIDE_ID_MAPPING(ID_codename)"
+            )
+            sql_conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_peptide_ipf_codename_text ON UNIMOD_TO_CODENAME_PEPTIDE_ID_MAPPING(codename)"
+            )
+
+            sql_conn.commit()
+            logger.info(
+                f"Successfully created UNIMOD_TO_CODENAME_PEPTIDE_ID_MAPPING table with {len(merged_df)} mappings"
+            )
+
+    def _insert_precursor_peptide_ipf_map(self) -> None:
+        """Insert precursor-peptide-IPF table into the input sqlite OSW file."""
+        logger.info("Inserting precursor-peptide-IPF mapping into OSW file")
+        with sqlite3.connect(self.config.infile) as sql_conn:
+            # Create the main mapping table
+            sql_conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS PRECURSOR_PEPTIDE_IPF_MAPPING (
+                    PRECURSOR_ID INTEGER,
+                    ID_unimod INTEGER,
+                    ID_codename INTEGER,
+                    MODIFIED_SEQUENCE TEXT,
+                    CODENAME TEXT,
+                    FEATURE_ID INTEGER,
+                    PRECURSOR_PEAKGROUP_PEP REAL,
+                    QVALUE REAL,
+                    PEP REAL
+                )
+                """
+            )
+            sql_conn.execute("DELETE FROM PRECURSOR_PEPTIDE_IPF_MAPPING")
+
+            # Insert the data using your join logic
+            sql_conn.execute(
+                """
+                INSERT INTO PRECURSOR_PEPTIDE_IPF_MAPPING (
+                    PRECURSOR_ID, ID_unimod, ID_codename, MODIFIED_SEQUENCE, 
+                    CODENAME, FEATURE_ID, PRECURSOR_PEAKGROUP_PEP, QVALUE, PEP
+                )
+                SELECT 
+                    ppm.PRECURSOR_ID,
+                    pim.ID_unimod,
+                    pim.ID_codename,
+                    p.MODIFIED_SEQUENCE,
+                    pim.codename,
+                    si.FEATURE_ID,
+                    si.PRECURSOR_PEAKGROUP_PEP,
+                    si.QVALUE,
+                    si.PEP
+                FROM PEPTIDE p
+                INNER JOIN UNIMOD_TO_CODENAME_PEPTIDE_ID_MAPPING pim ON pim.ID_unimod = p.ID
+                INNER JOIN PRECURSOR_PEPTIDE_MAPPING ppm ON ppm.PEPTIDE_ID = p.ID
+                INNER JOIN SCORE_IPF si ON si.PEPTIDE_ID = pim.ID_codename
+                """
+            )
+
+            # Create indices for better query performance
+            sql_conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_ppim_precursor_id ON PRECURSOR_PEPTIDE_IPF_MAPPING(PRECURSOR_ID)"
+            )
+            sql_conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_ppim_feature_id ON PRECURSOR_PEPTIDE_IPF_MAPPING(FEATURE_ID)"
+            )
+            sql_conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_ppim_id_unimod ON PRECURSOR_PEPTIDE_IPF_MAPPING(ID_unimod)"
+            )
+            sql_conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_ppim_id_codename ON PRECURSOR_PEPTIDE_IPF_MAPPING(ID_codename)"
+            )
+            sql_conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_ppim_precursor_feature ON PRECURSOR_PEPTIDE_IPF_MAPPING(PRECURSOR_ID, FEATURE_ID)"
+            )
+
+            sql_conn.commit()
+            logger.info(
+                "Successfully created PRECURSOR_PEPTIDE_IPF_MAPPING table with indices"
+            )
+
     def _build_precursor_query(self, conn, column_info: dict) -> str:
         """Build SQL query for precursor data"""
         feature_ms1_cols_sql = ", ".join(
@@ -1346,47 +1794,13 @@ class OSWWriter(BaseOSWWriter):
             for col in column_info["feature_ms2_cols"]
         )
 
+        # First get the peptide table and process it with pyopenms
+        # self._register_peptide_ipf_map(conn)
+        self._create_unimod_to_codename_peptide_id_mapping_table()
+
         # Check if score tables exist and build score SQLs
         score_cols_selct, score_table_joins, score_column_views = (
             self._build_score_column_selection_and_joins(column_info)
-        )
-
-        # First get the peptide table and process it with pyopenms
-        logger.info("Generating peptide unimod to codename mapping")
-        with sqlite3.connect(self.config.infile) as sql_conn:
-            peptide_df = pd.read_sql_query(
-                "SELECT ID, MODIFIED_SEQUENCE FROM PEPTIDE", sql_conn
-            )
-        peptide_df["codename"] = peptide_df["MODIFIED_SEQUENCE"].apply(
-            unimod_to_codename
-        )
-
-        # Create the merged mapping
-        unimod_mask = peptide_df["MODIFIED_SEQUENCE"].str.contains("UniMod")
-        merged_df = pd.merge(
-            peptide_df[unimod_mask][["codename", "ID"]],
-            peptide_df[~unimod_mask][["codename", "ID"]],
-            on="codename",
-            suffixes=("_unimod", "_codename"),
-            how="outer",
-        )
-
-        # Fill NaN values in the 'ID_codename' column with the 'ID_unimod' values
-        merged_df["ID_codename"] = merged_df["ID_codename"].fillna(
-            merged_df["ID_unimod"]
-        )
-        # Fill NaN values in the 'ID_unimod' column with the 'ID_codename' values
-        merged_df["ID_unimod"] = merged_df["ID_unimod"].fillna(merged_df["ID_codename"])
-
-        merged_df["ID_unimod"] = merged_df["ID_unimod"].astype(int)
-        merged_df["ID_codename"] = merged_df["ID_codename"].astype(int)
-
-        # Register peptide_ipf_map
-        conn.register(
-            "peptide_ipf_map",
-            merged_df.rename(
-                columns={"ID_unimod": "PEPTIDE_ID", "ID_codename": "IPF_PEPTIDE_ID"}
-            ),
         )
 
         return f"""
@@ -1410,7 +1824,7 @@ class OSWWriter(BaseOSWWriter):
             --    FROM normalized_peptides
             --    GROUP BY NORMALIZED_SEQUENCE
             --),
-            --peptide_ipf_map AS (
+            --UNIMOD_TO_CODENAME_PEPTIDE_ID_MAPPING AS (
             --    SELECT 
             --        np.PEPTIDE_ID,
             --        g.IPF_PEPTIDE_ID
@@ -1421,12 +1835,12 @@ class OSWWriter(BaseOSWWriter):
             {score_column_views}
             SELECT 
                 PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID AS PROTEIN_ID,
-                PEPTIDE.ID AS PEPTIDE_ID,
-                pipf.IPF_PEPTIDE_ID AS IPF_PEPTIDE_ID,
-                PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID AS PRECURSOR_ID,
+                {"SCORE_IPF.ID_unimod AS PEPTIDE_ID," if column_info["score_ipf_exists"] else "PEPTIDE.ID AS PEPTIDE_ID,"}
+                {"SCORE_IPF.ID_codename AS IPF_PEPTIDE_ID," if column_info["score_ipf_exists"] else "pipf.ID_codename AS IPF_PEPTIDE_ID,"}
+                {"SCORE_IPF.PRECURSOR_ID AS PRECURSOR_ID," if column_info["score_ipf_exists"] else "PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID AS PRECURSOR_ID,"}
                 PROTEIN.PROTEIN_ACCESSION AS PROTEIN_ACCESSION,
                 PEPTIDE.UNMODIFIED_SEQUENCE,
-                PEPTIDE.MODIFIED_SEQUENCE,
+                {"SCORE_IPF.MODIFIED_SEQUENCE AS MODIFIED_SEQUENCE," if column_info["score_ipf_exists"] else "PEPTIDE.MODIFIED_SEQUENCE,"}
                 PRECURSOR.TRAML_ID AS PRECURSOR_TRAML_ID,
                 PRECURSOR.GROUP_LABEL AS PRECURSOR_GROUP_LABEL,
                 PRECURSOR.PRECURSOR_MZ AS PRECURSOR_MZ,
@@ -1449,6 +1863,8 @@ class OSWWriter(BaseOSWWriter):
                 FEATURE.DELTA_RT,
                 FEATURE.LEFT_WIDTH,
                 FEATURE.RIGHT_WIDTH,
+                {"FEATURE.EXP_IM_LEFTWIDTH" if column_info.get("has_im_boundaries", False) else "NULL"} AS IM_leftWidth,
+                {"FEATURE.EXP_IM_RIGHTWIDTH" if column_info.get("has_im_boundaries", False) else "NULL"} AS IM_rightWidth,
                 {feature_ms1_cols_sql},
                 {feature_ms2_cols_sql},
                 {score_cols_selct}
@@ -1457,8 +1873,8 @@ class OSWWriter(BaseOSWWriter):
                 ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
             INNER JOIN sqlite_scan('{self.config.infile}', 'PEPTIDE') AS PEPTIDE 
                 ON PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
-            INNER JOIN peptide_ipf_map AS pipf
-                ON PEPTIDE.ID = pipf.PEPTIDE_ID
+            INNER JOIN sqlite_scan('{self.config.infile}', 'UNIMOD_TO_CODENAME_PEPTIDE_ID_MAPPING') AS pipf
+                ON PEPTIDE.ID = pipf.ID_unimod
             INNER JOIN sqlite_scan('{self.config.infile}', 'PEPTIDE_PROTEIN_MAPPING') AS PEPTIDE_PROTEIN_MAPPING 
                 ON PEPTIDE.ID = PEPTIDE_PROTEIN_MAPPING.PEPTIDE_ID
             INNER JOIN sqlite_scan('{self.config.infile}', 'PROTEIN') AS PROTEIN 
@@ -1475,12 +1891,16 @@ class OSWWriter(BaseOSWWriter):
             {score_table_joins}
             """
 
-    def _build_transition_score_columns_and_join(self, column_info: dict) -> Tuple[str, str]:
+    def _build_transition_score_columns_and_join(
+        self, column_info: dict
+    ) -> Tuple[str, str]:
         """Build score columns and join clause for transition scores"""
         score_transition_cols = ""
         score_transition_join = ""
         if column_info.get("score_transition_exists", False):
-            logger.debug("SCORE_TRANSITION table exists, adding score columns to transition query")
+            logger.debug(
+                "SCORE_TRANSITION table exists, adding score columns to transition query"
+            )
             score_cols = [
                 "SCORE_TRANSITION.SCORE AS SCORE_TRANSITION_SCORE",
                 "SCORE_TRANSITION.RANK AS SCORE_TRANSITION_RANK",
@@ -1510,7 +1930,9 @@ class OSWWriter(BaseOSWWriter):
         )
 
         # Add transition score columns if they exist
-        score_transition_cols, score_transition_join = self._build_transition_score_columns_and_join(column_info)
+        score_transition_cols, score_transition_join = (
+            self._build_transition_score_columns_and_join(column_info)
+        )
 
         return f"""
             SELECT 
@@ -1562,6 +1984,10 @@ class OSWWriter(BaseOSWWriter):
             for col in column_info["feature_transition_cols"]
         )
 
+        # First get the peptide table and process it with pyopenms
+        # self._register_peptide_ipf_map(conn)
+        self._create_unimod_to_codename_peptide_id_mapping_table()
+
         # Get score columns for precursor level
         score_cols_select, score_table_joins, score_column_views = (
             self._build_score_column_selection_and_joins(column_info)
@@ -1571,44 +1997,6 @@ class OSWWriter(BaseOSWWriter):
         as_null_transition_score_cols = ""
         if column_info.get("score_transition_exists", False):
             as_null_transition_score_cols = ", NULL AS SCORE_TRANSITION_SCORE, NULL AS SCORE_TRANSITION_RANK, NULL AS SCORE_TRANSITION_P_VALUE, NULL AS SCORE_TRANSITION_Q_VALUE, NULL AS SCORE_TRANSITION_PEP"
-
-        # First get the peptide table and process it with pyopenms
-        logger.info("Generating peptide unimod to codename mapping")
-        with sqlite3.connect(self.config.infile) as sql_conn:
-            peptide_df = pd.read_sql_query(
-                "SELECT ID, MODIFIED_SEQUENCE FROM PEPTIDE", sql_conn
-            )
-        peptide_df["codename"] = peptide_df["MODIFIED_SEQUENCE"].apply(
-            unimod_to_codename
-        )
-
-        # Create the merged mapping as you did in your example
-        unimod_mask = peptide_df["MODIFIED_SEQUENCE"].str.contains("UniMod")
-        merged_df = pd.merge(
-            peptide_df[unimod_mask][["codename", "ID"]],
-            peptide_df[~unimod_mask][["codename", "ID"]],
-            on="codename",
-            suffixes=("_unimod", "_codename"),
-            how="outer",
-        )
-
-        # Fill NaN values in the 'ID_codename' column with the 'ID_unimod' values
-        merged_df["ID_codename"] = merged_df["ID_codename"].fillna(
-            merged_df["ID_unimod"]
-        )
-        # Fill NaN values in the 'ID_unimod' column with the 'ID_codename' values
-        merged_df["ID_unimod"] = merged_df["ID_unimod"].fillna(merged_df["ID_codename"])
-
-        merged_df["ID_unimod"] = merged_df["ID_unimod"].astype(int)
-        merged_df["ID_codename"] = merged_df["ID_codename"].astype(int)
-
-        # Register peptide_ipf_map
-        conn.register(
-            "peptide_ipf_map",
-            merged_df.rename(
-                columns={"ID_unimod": "PEPTIDE_ID", "ID_codename": "IPF_PEPTIDE_ID"}
-            ),
-        )
 
         return f"""
             -- Need to map the unimod peptide ids to the ipf codename peptide ids. The section below is commented out, since it's limited to only the 4 common modifications. Have replaced it above with a more general approach that handles all modifications using pyopenms
@@ -1631,7 +2019,7 @@ class OSWWriter(BaseOSWWriter):
             --    FROM normalized_peptides
             --    GROUP BY NORMALIZED_SEQUENCE
             --),
-            --peptide_ipf_map AS (
+            --UNIMOD_TO_CODENAME_PEPTIDE_ID_MAPPING AS (
             --    SELECT 
             --        np.PEPTIDE_ID,
             --        g.IPF_PEPTIDE_ID
@@ -1642,12 +2030,12 @@ class OSWWriter(BaseOSWWriter):
             {score_column_views}
             SELECT 
                 PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID AS PROTEIN_ID,
-                PEPTIDE.ID AS PEPTIDE_ID,
-                pipf.IPF_PEPTIDE_ID AS IPF_PEPTIDE_ID,
-                PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID AS PRECURSOR_ID,
+                {"SCORE_IPF.ID_unimod AS PEPTIDE_ID," if column_info["score_ipf_exists"] else "PEPTIDE.ID AS PEPTIDE_ID,"}
+                {"SCORE_IPF.ID_codename AS IPF_PEPTIDE_ID," if column_info["score_ipf_exists"] else "pipf.ID_codename AS IPF_PEPTIDE_ID,"}
+                {"SCORE_IPF.PRECURSOR_ID AS PRECURSOR_ID," if column_info["score_ipf_exists"] else "PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID AS PRECURSOR_ID,"}
                 PROTEIN.PROTEIN_ACCESSION AS PROTEIN_ACCESSION,
                 PEPTIDE.UNMODIFIED_SEQUENCE,
-                PEPTIDE.MODIFIED_SEQUENCE,
+                {"SCORE_IPF.MODIFIED_SEQUENCE AS MODIFIED_SEQUENCE," if column_info["score_ipf_exists"] else "PEPTIDE.MODIFIED_SEQUENCE,"}
                 PRECURSOR.TRAML_ID AS PRECURSOR_TRAML_ID,
                 PRECURSOR.GROUP_LABEL AS PRECURSOR_GROUP_LABEL,
                 PRECURSOR.PRECURSOR_MZ AS PRECURSOR_MZ,
@@ -1670,6 +2058,8 @@ class OSWWriter(BaseOSWWriter):
                 FEATURE.DELTA_RT,
                 FEATURE.LEFT_WIDTH,
                 FEATURE.RIGHT_WIDTH,
+                {"FEATURE.EXP_IM_LEFTWIDTH" if column_info.get("has_im_boundaries", False) else "NULL"} AS IM_leftWidth,
+                {"FEATURE.EXP_IM_RIGHTWIDTH" if column_info.get("has_im_boundaries", False) else "NULL"} AS IM_rightWidth,
                 {feature_ms1_cols_sql},
                 {feature_ms2_cols_sql},
                 NULL AS TRANSITION_ID,
@@ -1690,8 +2080,8 @@ class OSWWriter(BaseOSWWriter):
                 ON PRECURSOR.ID = PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID
             INNER JOIN sqlite_scan('{self.config.infile}', 'PEPTIDE') AS PEPTIDE 
                 ON PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID = PEPTIDE.ID
-            INNER JOIN peptide_ipf_map AS pipf
-                ON PEPTIDE.ID = pipf.PEPTIDE_ID
+            INNER JOIN sqlite_scan('{self.config.infile}', 'UNIMOD_TO_CODENAME_PEPTIDE_ID_MAPPING') AS pipf
+                ON PEPTIDE.ID = pipf.ID_unimod
             INNER JOIN sqlite_scan('{self.config.infile}', 'PEPTIDE_PROTEIN_MAPPING') AS PEPTIDE_PROTEIN_MAPPING 
                 ON PEPTIDE.ID = PEPTIDE_PROTEIN_MAPPING.PEPTIDE_ID
             INNER JOIN sqlite_scan('{self.config.infile}', 'PROTEIN') AS PROTEIN 
@@ -1730,7 +2120,9 @@ class OSWWriter(BaseOSWWriter):
         )
 
         # Add transition score columns if they exist
-        score_transition_cols, score_transition_join = self._build_transition_score_columns_and_join(column_info)
+        score_transition_cols, score_transition_join = (
+            self._build_transition_score_columns_and_join(column_info)
+        )
 
         # Also need to add NULL columns for score columns that appear in precursor query
         as_null_score_cols = ""
@@ -1740,7 +2132,7 @@ class OSWWriter(BaseOSWWriter):
             as_null_score_cols += ", NULL AS SCORE_MS2_SCORE, NULL AS SCORE_MS2_PEAK_GROUP_RANK, NULL AS SCORE_MS2_P_VALUE, NULL AS SCORE_MS2_Q_VALUE, NULL AS SCORE_MS2_PEP"
         if column_info.get("score_ipf_exists", False):
             as_null_score_cols += ", NULL AS SCORE_IPF_PRECURSOR_PEAKGROUP_PEP, NULL AS SCORE_IPF_PEP, NULL AS SCORE_IPF_QVALUE"
-        
+
         # Add NULL columns for peptide and protein score contexts
         for table in ["peptide", "protein"]:
             if column_info.get(f"score_{table}_exists", False):
@@ -1779,6 +2171,8 @@ class OSWWriter(BaseOSWWriter):
                 NULL AS DELTA_RT,
                 NULL AS LEFT_WIDTH,
                 NULL AS RIGHT_WIDTH,
+                NULL AS IM_leftWidth,
+                NULL AS IM_rightWidth,
                 {as_null_feature_ms1_cols_sql},
                 {as_null_feature_ms2_cols_sql},
                 TRANSITION.ID AS TRANSITION_ID,
@@ -1822,52 +2216,64 @@ class OSWWriter(BaseOSWWriter):
         # Build score column types
         score_cols_types = []
         if column_info.get("score_ms1_exists", False):
-            score_cols_types.extend([
-                "SCORE_MS1_SCORE DOUBLE",
-                "SCORE_MS1_RANK INTEGER",
-                "SCORE_MS1_P_VALUE DOUBLE",
-                "SCORE_MS1_Q_VALUE DOUBLE",
-                "SCORE_MS1_PEP DOUBLE"
-            ])
+            score_cols_types.extend(
+                [
+                    "SCORE_MS1_SCORE DOUBLE",
+                    "SCORE_MS1_RANK INTEGER",
+                    "SCORE_MS1_P_VALUE DOUBLE",
+                    "SCORE_MS1_Q_VALUE DOUBLE",
+                    "SCORE_MS1_PEP DOUBLE",
+                ]
+            )
         if column_info.get("score_ms2_exists", False):
-            score_cols_types.extend([
-                "SCORE_MS2_SCORE DOUBLE",
-                "SCORE_MS2_PEAK_GROUP_RANK INTEGER",
-                "SCORE_MS2_P_VALUE DOUBLE",
-                "SCORE_MS2_Q_VALUE DOUBLE",
-                "SCORE_MS2_PEP DOUBLE"
-            ])
+            score_cols_types.extend(
+                [
+                    "SCORE_MS2_SCORE DOUBLE",
+                    "SCORE_MS2_PEAK_GROUP_RANK INTEGER",
+                    "SCORE_MS2_P_VALUE DOUBLE",
+                    "SCORE_MS2_Q_VALUE DOUBLE",
+                    "SCORE_MS2_PEP DOUBLE",
+                ]
+            )
         if column_info.get("score_ipf_exists", False):
-            score_cols_types.extend([
-                "SCORE_IPF_PRECURSOR_PEAKGROUP_PEP DOUBLE",
-                "SCORE_IPF_PEP DOUBLE",
-                "SCORE_IPF_QVALUE DOUBLE"
-            ])
-        
+            score_cols_types.extend(
+                [
+                    "SCORE_IPF_PRECURSOR_PEAKGROUP_PEP DOUBLE",
+                    "SCORE_IPF_PEP DOUBLE",
+                    "SCORE_IPF_QVALUE DOUBLE",
+                ]
+            )
+
         # Add peptide and protein score columns for each context
         for table in ["peptide", "protein"]:
             if column_info.get(f"score_{table}_exists", False):
                 for context in column_info.get(f"score_{table}_contexts", []):
                     safe_context = context.upper().replace("-", "_")
-                    score_cols_types.extend([
-                        f"SCORE_{table.upper()}_{safe_context}_SCORE DOUBLE",
-                        f"SCORE_{table.upper()}_{safe_context}_P_VALUE DOUBLE",
-                        f"SCORE_{table.upper()}_{safe_context}_Q_VALUE DOUBLE",
-                        f"SCORE_{table.upper()}_{safe_context}_PEP DOUBLE"
-                    ])
-        
+                    score_cols_types.extend(
+                        [
+                            f"SCORE_{table.upper()}_{safe_context}_SCORE DOUBLE",
+                            f"SCORE_{table.upper()}_{safe_context}_P_VALUE DOUBLE",
+                            f"SCORE_{table.upper()}_{safe_context}_Q_VALUE DOUBLE",
+                            f"SCORE_{table.upper()}_{safe_context}_PEP DOUBLE",
+                        ]
+                    )
+
         # Add transition score columns
         if column_info.get("score_transition_exists", False):
-            score_cols_types.extend([
-                "SCORE_TRANSITION_SCORE DOUBLE",
-                "SCORE_TRANSITION_RANK INTEGER",
-                "SCORE_TRANSITION_P_VALUE DOUBLE",
-                "SCORE_TRANSITION_Q_VALUE DOUBLE",
-                "SCORE_TRANSITION_PEP DOUBLE"
-            ])
+            score_cols_types.extend(
+                [
+                    "SCORE_TRANSITION_SCORE DOUBLE",
+                    "SCORE_TRANSITION_RANK INTEGER",
+                    "SCORE_TRANSITION_P_VALUE DOUBLE",
+                    "SCORE_TRANSITION_Q_VALUE DOUBLE",
+                    "SCORE_TRANSITION_PEP DOUBLE",
+                ]
+            )
 
         # Prepend comma and space to score columns if there are any
-        score_cols_types_sql = (", " + ", ".join(score_cols_types)) if score_cols_types else ""
+        score_cols_types_sql = (
+            (", " + ", ".join(score_cols_types)) if score_cols_types else ""
+        )
 
         create_temp_table_query = f"""
         CREATE TABLE temp_table (
@@ -1900,6 +2306,8 @@ class OSWWriter(BaseOSWWriter):
             DELTA_RT DOUBLE,
             LEFT_WIDTH DOUBLE,
             RIGHT_WIDTH DOUBLE,
+            IM_leftWidth DOUBLE,
+            IM_rightWidth DOUBLE,
             {feature_ms1_cols_types},
             {feature_ms2_cols_types},
             TRANSITION_ID BIGINT,
@@ -1920,30 +2328,67 @@ class OSWWriter(BaseOSWWriter):
         conn.execute(create_temp_table_query)
 
     def _export_alignment_data(self, conn, path: str = None) -> None:
-        """Export feature alignment data"""
+        """Export feature alignment data with scores if available"""
         if path is None:
             path = os.path.join(self.config.outfile, "feature_alignment.parquet")
 
-        query = f"""
-        SELECT
-            ALIGNMENT_ID,
-            RUN_ID,
-            PRECURSOR_ID,
-            ALIGNED_FEATURE_ID AS FEATURE_ID,
-            REFERENCE_FEATURE_ID,
-            ALIGNED_RT,
-            REFERENCE_RT,
-            XCORR_COELUTION_TO_REFERENCE AS VAR_XCORR_COELUTION_TO_REFERENCE,
-            XCORR_SHAPE_TO_REFERENCE AS VAR_XCORR_SHAPE_TO_REFERENCE, 
-            MI_TO_REFERENCE AS VAR_MI_TO_REFERENCE, 
-            XCORR_COELUTION_TO_ALL AS VAR_XCORR_COELUTION_TO_ALL,  
-            XCORR_SHAPE_TO_ALL AS VAR_XCORR_SHAPE, 
-            MI_TO_ALL AS VAR_MI_TO_ALL, 
-            RETENTION_TIME_DEVIATION AS VAR_RETENTION_TIME_DEVIATION, 
-            PEAK_INTENSITY_RATIO AS VAR_PEAK_INTENSITY_RATIO,
-            LABEL AS DECOY
-        FROM sqlite_scan('{self.config.infile}', 'FEATURE_MS2_ALIGNMENT')
-        """
+        # Check if SCORE_ALIGNMENT table exists
+        with sqlite3.connect(self.config.infile) as sql_conn:
+            has_score_alignment = check_sqlite_table(sql_conn, "SCORE_ALIGNMENT")
+
+        if has_score_alignment:
+            # Export with alignment scores
+            query = f"""
+            SELECT
+                FEATURE_MS2_ALIGNMENT.ALIGNMENT_ID,
+                FEATURE_MS2_ALIGNMENT.RUN_ID,
+                FEATURE_MS2_ALIGNMENT.PRECURSOR_ID,
+                FEATURE_MS2_ALIGNMENT.ALIGNED_FEATURE_ID AS FEATURE_ID,
+                FEATURE_MS2_ALIGNMENT.REFERENCE_FEATURE_ID,
+                FEATURE_MS2_ALIGNMENT.ALIGNED_RT,
+                FEATURE_MS2_ALIGNMENT.REFERENCE_RT,
+                FEATURE_MS2_ALIGNMENT.XCORR_COELUTION_TO_REFERENCE AS VAR_XCORR_COELUTION_TO_REFERENCE,
+                FEATURE_MS2_ALIGNMENT.XCORR_SHAPE_TO_REFERENCE AS VAR_XCORR_SHAPE_TO_REFERENCE, 
+                FEATURE_MS2_ALIGNMENT.MI_TO_REFERENCE AS VAR_MI_TO_REFERENCE, 
+                FEATURE_MS2_ALIGNMENT.XCORR_COELUTION_TO_ALL AS VAR_XCORR_COELUTION_TO_ALL,  
+                FEATURE_MS2_ALIGNMENT.XCORR_SHAPE_TO_ALL AS VAR_XCORR_SHAPE, 
+                FEATURE_MS2_ALIGNMENT.MI_TO_ALL AS VAR_MI_TO_ALL, 
+                FEATURE_MS2_ALIGNMENT.RETENTION_TIME_DEVIATION AS VAR_RETENTION_TIME_DEVIATION, 
+                FEATURE_MS2_ALIGNMENT.PEAK_INTENSITY_RATIO AS VAR_PEAK_INTENSITY_RATIO,
+                FEATURE_MS2_ALIGNMENT.LABEL AS DECOY,
+                SCORE_ALIGNMENT.SCORE AS SCORE,
+                SCORE_ALIGNMENT.PEP AS PEP,
+                SCORE_ALIGNMENT.QVALUE AS QVALUE
+            FROM sqlite_scan('{self.config.infile}', 'FEATURE_MS2_ALIGNMENT') AS FEATURE_MS2_ALIGNMENT
+            LEFT JOIN (
+                SELECT FEATURE_ID, SCORE, PEP, QVALUE, MIN(QVALUE) as MIN_QVALUE
+                FROM sqlite_scan('{self.config.infile}', 'SCORE_ALIGNMENT')
+                GROUP BY FEATURE_ID
+            ) AS SCORE_ALIGNMENT
+            ON FEATURE_MS2_ALIGNMENT.ALIGNED_FEATURE_ID = SCORE_ALIGNMENT.FEATURE_ID
+            """
+        else:
+            # Export without scores (original behavior)
+            query = f"""
+            SELECT
+                ALIGNMENT_ID,
+                RUN_ID,
+                PRECURSOR_ID,
+                ALIGNED_FEATURE_ID AS FEATURE_ID,
+                REFERENCE_FEATURE_ID,
+                ALIGNED_RT,
+                REFERENCE_RT,
+                XCORR_COELUTION_TO_REFERENCE AS VAR_XCORR_COELUTION_TO_REFERENCE,
+                XCORR_SHAPE_TO_REFERENCE AS VAR_XCORR_SHAPE_TO_REFERENCE, 
+                MI_TO_REFERENCE AS VAR_MI_TO_REFERENCE, 
+                XCORR_COELUTION_TO_ALL AS VAR_XCORR_COELUTION_TO_ALL,  
+                XCORR_SHAPE_TO_ALL AS VAR_XCORR_SHAPE, 
+                MI_TO_ALL AS VAR_MI_TO_ALL, 
+                RETENTION_TIME_DEVIATION AS VAR_RETENTION_TIME_DEVIATION, 
+                PEAK_INTENSITY_RATIO AS VAR_PEAK_INTENSITY_RATIO,
+                LABEL AS DECOY
+            FROM sqlite_scan('{self.config.infile}', 'FEATURE_MS2_ALIGNMENT')
+            """
 
         self._execute_copy_query(conn, query, path)
 
@@ -2084,8 +2529,13 @@ class OSWWriter(BaseOSWWriter):
             score_columns_to_select.append(
                 "SCORE_IPF.PRECURSOR_PEAKGROUP_PEP AS SCORE_IPF_PRECURSOR_PEAKGROUP_PEP, SCORE_IPF.PEP AS SCORE_IPF_PEP, SCORE_IPF.QVALUE AS SCORE_IPF_QVALUE"
             )
+            # NOTE: UNIMOD_TO_CODENAME_PEPTIDE_ID_MAPPING needs to be created before this join is actually executed. This is done by registering the table in DuckDB in the precursor query builder.
+            # TODO: We should maybe add the UNIMOD_TO_CODENAME_PEPTIDE_ID_MAPPING during OpenSwathWorkflow execution to avoid doing it here?
+            self._insert_precursor_peptide_ipf_map()
             score_tables_to_join.append(
-                f"LEFT JOIN sqlite_scan('{self.config.infile}', 'SCORE_IPF') AS SCORE_IPF ON FEATURE.ID = SCORE_IPF.FEATURE_ID"
+                f"""
+                LEFT JOIN sqlite_scan('{self.config.infile}', 'PRECURSOR_PEPTIDE_IPF_MAPPING') AS SCORE_IPF ON SCORE_IPF.FEATURE_ID = FEATURE.ID
+                """
             )
 
         # Create views for peptide and protein score tables if they exist
