@@ -1,25 +1,24 @@
 import os
-import pickle
-from shutil import copyfile
-import sqlite3
-from typing import Literal, Tuple
 import re
-import duckdb
-import pandas as pd
-import numpy as np
+import sqlite3
+from typing import Tuple
+
 import click
+import duckdb
+import numpy as np
+import pandas as pd
 from loguru import logger
+
+from ..._config import ExportIOConfig
+from .._base import BaseOSWReader, BaseOSWWriter
 from ..util import (
     check_sqlite_table,
-    check_duckdb_table,
-    unimod_to_codename,
-    write_scores_sql_command,
-    load_sqlite_scanner,
     get_table_columns,
     get_table_columns_with_types,
+    load_sqlite_scanner,
+    unimod_to_codename,
+    write_scores_sql_command,
 )
-from .._base import BaseOSWReader, BaseOSWWriter
-from ..._config import ExportIOConfig
 
 
 class OSWReader(BaseOSWReader):
