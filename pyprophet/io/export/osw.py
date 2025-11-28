@@ -181,17 +181,43 @@ class OSWReader(BaseOSWReader):
             return False
         return "EXP_IM_LEFTWIDTH" in cols and "EXP_IM_RIGHTWIDTH" in cols
 
+    def _has_im(self, con) -> bool:
+        """Return True if the FEATURE table contains the EXP_IM column.
+
+        Older OSW files may not have this column; centralise the PRAGMA
+        check so callers don't duplicate the logic.
+        """
+        try:
+            cols = [
+                r[1] for r in con.execute("PRAGMA table_info('FEATURE')").fetchall()
+            ]
+        except Exception:
+            return False
+        return "EXP_IM" in cols
+
     def _read_unscored_data(self, con):
         """Read data from unscored files."""
         score_sql = self._build_score_sql(con)
 
-        # IM boundary columns may or may not be present; centralised check
+        # IM columns may or may not be present; centralised checks
         has_im_boundaries = self._has_im_boundaries(con)
+        has_im = self._has_im(con)
 
+        # Compose EXP_IM (or NULL) plus IM boundary columns (or NULLs)
         im_cols_sql = (
-            "FEATURE.EXP_IM_LEFTWIDTH AS IM_leftWidth,\n                FEATURE.EXP_IM_RIGHTWIDTH AS IM_rightWidth,"
-            if has_im_boundaries
-            else "NULL AS IM_leftWidth,\n                NULL AS IM_rightWidth,"
+            (
+                "FEATURE.EXP_IM AS EXP_IM,\n                FEATURE.EXP_IM_LEFTWIDTH AS IM_leftWidth,\n                FEATURE.EXP_IM_RIGHTWIDTH AS IM_rightWidth,"
+            )
+            if has_im and has_im_boundaries
+            else (
+                "FEATURE.EXP_IM AS EXP_IM,\n                NULL AS IM_leftWidth,\n                NULL AS IM_rightWidth,"
+            )
+            if has_im and not has_im_boundaries
+            else (
+                "NULL AS EXP_IM,\n                FEATURE.EXP_IM_LEFTWIDTH AS IM_leftWidth,\n                FEATURE.EXP_IM_RIGHTWIDTH AS IM_rightWidth,"
+            )
+            if (not has_im) and has_im_boundaries
+            else "NULL AS EXP_IM,\n                NULL AS IM_leftWidth,\n                NULL AS IM_rightWidth,"
         )
 
         query = f"""
@@ -248,13 +274,24 @@ class OSWReader(BaseOSWReader):
         """Read data with peptidoform IPF information."""
         score_ms1_pep, link_ms1 = self._get_ms1_score_info(con)
 
-        # IM boundary columns may or may not be present; centralised check
+        # IM columns may or may not be present; centralised checks
         has_im_boundaries = self._has_im_boundaries(con)
+        has_im = self._has_im(con)
 
         im_cols_sql = (
-            "FEATURE.EXP_IM_LEFTWIDTH AS IM_leftWidth,\n                FEATURE.EXP_IM_RIGHTWIDTH AS IM_rightWidth,"
-            if has_im_boundaries
-            else "NULL AS IM_leftWidth,\n                NULL AS IM_rightWidth,"
+            (
+                "FEATURE.EXP_IM AS EXP_IM,\n                FEATURE.EXP_IM_LEFTWIDTH AS IM_leftWidth,\n                FEATURE.EXP_IM_RIGHTWIDTH AS IM_rightWidth,"
+            )
+            if has_im and has_im_boundaries
+            else (
+                "FEATURE.EXP_IM AS EXP_IM,\n                NULL AS IM_leftWidth,\n                NULL AS IM_rightWidth,"
+            )
+            if has_im and not has_im_boundaries
+            else (
+                "NULL AS EXP_IM,\n                FEATURE.EXP_IM_LEFTWIDTH AS IM_leftWidth,\n                FEATURE.EXP_IM_RIGHTWIDTH AS IM_rightWidth,"
+            )
+            if (not has_im) and has_im_boundaries
+            else "NULL AS EXP_IM,\n                NULL AS IM_leftWidth,\n                NULL AS IM_rightWidth,"
         )
 
         query = f"""
@@ -309,13 +346,24 @@ class OSWReader(BaseOSWReader):
         """Read standard data augmented with IPF information."""
         score_ms1_pep, link_ms1 = self._get_ms1_score_info(con)
 
-        # IM boundary columns may or may not be present; centralised check
+        # IM columns may or may not be present; centralised checks
         has_im_boundaries = self._has_im_boundaries(con)
+        has_im = self._has_im(con)
 
         im_cols_sql = (
-            "FEATURE.EXP_IM_LEFTWIDTH AS IM_leftWidth,\n                FEATURE.EXP_IM_RIGHTWIDTH AS IM_rightWidth,"
-            if has_im_boundaries
-            else "NULL AS IM_leftWidth,\n                NULL AS IM_rightWidth,"
+            (
+                "FEATURE.EXP_IM AS EXP_IM,\n                FEATURE.EXP_IM_LEFTWIDTH AS IM_leftWidth,\n                FEATURE.EXP_IM_RIGHTWIDTH AS IM_rightWidth,"
+            )
+            if has_im and has_im_boundaries
+            else (
+                "FEATURE.EXP_IM AS EXP_IM,\n                NULL AS IM_leftWidth,\n                NULL AS IM_rightWidth,"
+            )
+            if has_im and not has_im_boundaries
+            else (
+                "NULL AS EXP_IM,\n                FEATURE.EXP_IM_LEFTWIDTH AS IM_leftWidth,\n                FEATURE.EXP_IM_RIGHTWIDTH AS IM_rightWidth,"
+            )
+            if (not has_im) and has_im_boundaries
+            else "NULL AS EXP_IM,\n                NULL AS IM_leftWidth,\n                NULL AS IM_rightWidth,"
         )
 
         query = f"""
