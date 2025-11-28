@@ -287,18 +287,26 @@ class OSWReader(BaseOSWReader):
 
         im_cols_sql = (
             (
-                "FEATURE.EXP_IM AS EXP_IM,\n                FEATURE.EXP_IM_LEFTWIDTH AS IM_leftWidth,\n                FEATURE.EXP_IM_RIGHTWIDTH AS IM_rightWidth,"
+                """FEATURE.EXP_IM AS EXP_IM,
+            FEATURE.EXP_IM_LEFTWIDTH AS IM_leftWidth,
+            FEATURE.EXP_IM_RIGHTWIDTH AS IM_rightWidth,"""
             )
             if has_im and has_im_boundaries
             else (
-                "FEATURE.EXP_IM AS EXP_IM,\n                NULL AS IM_leftWidth,\n                NULL AS IM_rightWidth,"
+                """FEATURE.EXP_IM AS EXP_IM,
+            NULL AS IM_leftWidth,
+            NULL AS IM_rightWidth,"""
             )
             if has_im and not has_im_boundaries
             else (
-                "NULL AS EXP_IM,\n                FEATURE.EXP_IM_LEFTWIDTH AS IM_leftWidth,\n                FEATURE.EXP_IM_RIGHTWIDTH AS IM_rightWidth,"
+                """NULL AS EXP_IM,
+            FEATURE.EXP_IM_LEFTWIDTH AS IM_leftWidth,
+            FEATURE.EXP_IM_RIGHTWIDTH AS IM_rightWidth,"""
             )
             if (not has_im) and has_im_boundaries
-            else "NULL AS EXP_IM,\n                NULL AS IM_leftWidth,\n                NULL AS IM_rightWidth,"
+            else """NULL AS EXP_IM,
+            NULL AS IM_leftWidth,
+            NULL AS IM_rightWidth,"""
         )
 
         query = f"""
@@ -359,18 +367,26 @@ class OSWReader(BaseOSWReader):
 
         im_cols_sql = (
             (
-                "FEATURE.EXP_IM AS EXP_IM,\n                FEATURE.EXP_IM_LEFTWIDTH AS IM_leftWidth,\n                FEATURE.EXP_IM_RIGHTWIDTH AS IM_rightWidth,"
+                """FEATURE.EXP_IM AS EXP_IM,
+            FEATURE.EXP_IM_LEFTWIDTH AS IM_leftWidth,
+            FEATURE.EXP_IM_RIGHTWIDTH AS IM_rightWidth,"""
             )
             if has_im and has_im_boundaries
             else (
-                "FEATURE.EXP_IM AS EXP_IM,\n                NULL AS IM_leftWidth,\n                NULL AS IM_rightWidth,"
+                """FEATURE.EXP_IM AS EXP_IM,
+            NULL AS IM_leftWidth,
+            NULL AS IM_rightWidth,"""
             )
             if has_im and not has_im_boundaries
             else (
-                "NULL AS EXP_IM,\n                FEATURE.EXP_IM_LEFTWIDTH AS IM_leftWidth,\n                FEATURE.EXP_IM_RIGHTWIDTH AS IM_rightWidth,"
+                """NULL AS EXP_IM,
+            FEATURE.EXP_IM_LEFTWIDTH AS IM_leftWidth,
+            FEATURE.EXP_IM_RIGHTWIDTH AS IM_rightWidth,"""
             )
             if (not has_im) and has_im_boundaries
-            else "NULL AS EXP_IM,\n                NULL AS IM_leftWidth,\n                NULL AS IM_rightWidth,"
+            else """NULL AS EXP_IM,
+            NULL AS IM_leftWidth,
+            NULL AS IM_rightWidth,"""
         )
 
         query = f"""
@@ -429,9 +445,11 @@ class OSWReader(BaseOSWReader):
         has_im_boundaries = self._has_im_boundaries(con)
 
         im_cols_sql = (
-            "FEATURE.EXP_IM_LEFTWIDTH AS IM_leftWidth,\n                FEATURE.EXP_IM_RIGHTWIDTH AS IM_rightWidth,"
+            """FEATURE.EXP_IM_LEFTWIDTH AS IM_leftWidth,
+            FEATURE.EXP_IM_RIGHTWIDTH AS IM_rightWidth,"""
             if has_im_boundaries
-            else "NULL AS IM_leftWidth,\n                NULL AS IM_rightWidth,"
+            else """NULL AS IM_leftWidth,
+            NULL AS IM_rightWidth,"""
         )
 
         # First, get features that pass MS2 QVALUE threshold

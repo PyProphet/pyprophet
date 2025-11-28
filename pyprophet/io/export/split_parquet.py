@@ -249,7 +249,7 @@ class SplitParquetReader(BaseSplitParquetReader):
                 p.FEATURE_MS1_APEX_INTENSITY AS aggr_prec_Peak_Apex,
                 p.LEFT_WIDTH AS leftWidth,
                 p.RIGHT_WIDTH AS rightWidth,
-                {im_cols_sql}
+                {im_cols_sql},
                 {score_ms1_pep} AS ms1_pep,
                 p.SCORE_MS2_PEP AS ms2_pep,
                 p.SCORE_IPF_PRECURSOR_PEAKGROUP_PEP AS precursor_pep,
@@ -317,7 +317,7 @@ class SplitParquetReader(BaseSplitParquetReader):
                 p.FEATURE_MS1_APEX_INTENSITY AS aggr_prec_Peak_Apex,
                 p.LEFT_WIDTH AS leftWidth,
                 p.RIGHT_WIDTH AS rightWidth,
-                {im_cols_sql}
+                {im_cols_sql},
                 p.SCORE_MS2_PEAK_GROUP_RANK AS peak_group_rank,
                 p.SCORE_MS2_SCORE AS d_score,
                 p.SCORE_MS2_Q_VALUE AS m_score,
@@ -486,7 +486,7 @@ class SplitParquetReader(BaseSplitParquetReader):
                 p.FEATURE_MS1_APEX_INTENSITY AS aggr_prec_Peak_Apex,
                 p.LEFT_WIDTH AS leftWidth,
                 p.RIGHT_WIDTH AS rightWidth,
-                {im_cols_sql}
+                {im_cols_sql},
                 p.SCORE_MS2_PEAK_GROUP_RANK AS peak_group_rank,
                 p.SCORE_MS2_SCORE AS d_score,
                 p.SCORE_MS2_Q_VALUE AS m_score,
