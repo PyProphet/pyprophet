@@ -736,6 +736,49 @@ def test_osw_4(test_runner, test_config, regtest):
     )
 
 
+def test_osw_xgboost_importance_apply_weights(test_runner, test_config):
+    """Ensure feature importances printed during training and when applying weights are identical.
+    """
+    # Run in the current environment; allow failures to surface so CI can catch regressions.
+    # Prepare test file
+    strategy = OSWTestStrategy(test_runner, test_config)
+    strategy.prepare()
+
+    # First, run training to produce an output OSW that contains the XGBoost model
+    train_cmd = f"pyprophet score --level ms2 --classifier=XGBoost --pi0_lambda=0 0 0 --in={strategy.input_file} --out=test_data_scored.osw --test"
+    out1 = test_runner.run_command(train_cmd)
+
+    # Parse importance lines from stdout
+    import re
+
+    pattern = re.compile(r"Importance of (\S+):\s*([0-9eE+\-\.]+)")
+    imp1 = {m.group(1): float(m.group(2)) for m in pattern.finditer(out1)}
+
+    assert imp1, "No feature importances found in training output"
+
+    # Print importances from training for visual inspection
+    print("Training importances:")
+    for feat, val in sorted(imp1.items(), key=lambda x: x[0]):
+        print(f"{feat}: {val}")
+
+    # Now apply the saved weights from the scored OSW and capture importances
+    apply_cmd = f"pyprophet score --level ms2 --classifier=XGBoost --pi0_lambda=0 0 0 --in={strategy.input_file} --apply_weights=test_data_scored.osw --out=test_data_scored_weight.osw --test"
+    out2 = test_runner.run_command(apply_cmd)
+    imp2 = {m.group(1): float(m.group(2)) for m in pattern.finditer(out2)}
+
+    assert imp2, "No feature importances found in apply_weights output"
+
+    # Print importances from apply_weights for visual inspection
+    print("Apply-weights importances:")
+    for feat, val in sorted(imp2.items(), key=lambda x: x[0]):
+        print(f"{feat}: {val}")
+
+    # Keys should match and values should be equal (allow small numerical tolerance)
+    assert set(imp1.keys()) == set(imp2.keys())
+    for k in imp1:
+        assert imp1[k] == pytest.approx(imp2[k], rel=1e-6, abs=1e-9)
+
+
 def test_osw_5(test_runner, test_config, regtest):
     run_generic_test(
         test_runner,
