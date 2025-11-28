@@ -150,6 +150,26 @@ class SplitParquetReader(BaseSplitParquetReader):
         """
         feature_vars_sql = self._build_feature_vars_sql()
 
+        # IM columns may or may not be present in the parquet files
+        has_im = "EXP_IM" in self._columns
+        has_im_boundaries = (
+            "IM_leftWidth" in self._columns and "IM_rightWidth" in self._columns
+        )
+
+        im_cols_sql = (
+            (
+                "p.EXP_IM AS EXP_IM, p.IM_leftWidth AS IM_leftWidth, p.IM_rightWidth AS IM_rightWidth,"
+            )
+            if has_im and has_im_boundaries
+            else ("p.EXP_IM AS EXP_IM, NULL AS IM_leftWidth, NULL AS IM_rightWidth,")
+            if has_im and not has_im_boundaries
+            else (
+                "NULL AS EXP_IM, p.IM_leftWidth AS IM_leftWidth, p.IM_rightWidth AS IM_rightWidth,"
+            )
+            if (not has_im) and has_im_boundaries
+            else "NULL AS EXP_IM, NULL AS IM_leftWidth, NULL AS IM_rightWidth,"
+        )
+
         query = f"""
             SELECT
                 p.RUN_ID AS id_run,
@@ -170,7 +190,8 @@ class SplitParquetReader(BaseSplitParquetReader):
                 p.FEATURE_MS1_AREA_INTENSITY AS aggr_prec_Peak_Area,
                 p.FEATURE_MS1_APEX_INTENSITY AS aggr_prec_Peak_Apex,
                 p.LEFT_WIDTH AS leftWidth,
-                p.RIGHT_WIDTH AS rightWidth
+                p.RIGHT_WIDTH AS rightWidth,
+                {im_cols_sql}
                 {feature_vars_sql}
             FROM precursors p
             WHERE p.PROTEIN_ID IS NOT NULL  -- Filter to precursor rows
@@ -183,6 +204,26 @@ class SplitParquetReader(BaseSplitParquetReader):
         Read data with peptidoform IPF information from split files.
         """
         score_ms1_pep, _link_ms1 = self._get_ms1_score_info()
+
+        # IM columns may or may not be present in the parquet files
+        has_im = "EXP_IM" in self._columns
+        has_im_boundaries = (
+            "IM_leftWidth" in self._columns and "IM_rightWidth" in self._columns
+        )
+
+        im_cols_sql = (
+            (
+                "p.EXP_IM AS EXP_IM, p.IM_leftWidth AS IM_leftWidth, p.IM_rightWidth AS IM_rightWidth,"
+            )
+            if has_im and has_im_boundaries
+            else ("p.EXP_IM AS EXP_IM, NULL AS IM_leftWidth, NULL AS IM_rightWidth,")
+            if has_im and not has_im_boundaries
+            else (
+                "NULL AS EXP_IM, p.IM_leftWidth AS IM_leftWidth, p.IM_rightWidth AS IM_rightWidth,"
+            )
+            if (not has_im) and has_im_boundaries
+            else "NULL AS EXP_IM, NULL AS IM_leftWidth, NULL AS IM_rightWidth,"
+        )
 
         query = f"""
             SELECT
@@ -208,6 +249,7 @@ class SplitParquetReader(BaseSplitParquetReader):
                 p.FEATURE_MS1_APEX_INTENSITY AS aggr_prec_Peak_Apex,
                 p.LEFT_WIDTH AS leftWidth,
                 p.RIGHT_WIDTH AS rightWidth,
+                {im_cols_sql}
                 {score_ms1_pep} AS ms1_pep,
                 p.SCORE_MS2_PEP AS ms2_pep,
                 p.SCORE_IPF_PRECURSOR_PEAKGROUP_PEP AS precursor_pep,
@@ -229,6 +271,26 @@ class SplitParquetReader(BaseSplitParquetReader):
         Read standard data augmented with IPF information from split files.
         """
         score_ms1_pep, _link_ms1 = self._get_ms1_score_info()
+
+        # IM columns may or may not be present in the parquet files
+        has_im = "EXP_IM" in self._columns
+        has_im_boundaries = (
+            "IM_leftWidth" in self._columns and "IM_rightWidth" in self._columns
+        )
+
+        im_cols_sql = (
+            (
+                "p.EXP_IM AS EXP_IM, p.IM_leftWidth AS IM_leftWidth, p.IM_rightWidth AS IM_rightWidth,"
+            )
+            if has_im and has_im_boundaries
+            else ("p.EXP_IM AS EXP_IM, NULL AS IM_leftWidth, NULL AS IM_rightWidth,")
+            if has_im and not has_im_boundaries
+            else (
+                "NULL AS EXP_IM, p.IM_leftWidth AS IM_leftWidth, p.IM_rightWidth AS IM_rightWidth,"
+            )
+            if (not has_im) and has_im_boundaries
+            else "NULL AS EXP_IM, NULL AS IM_leftWidth, NULL AS IM_rightWidth,"
+        )
 
         # First get main data
         query = f"""
@@ -255,6 +317,7 @@ class SplitParquetReader(BaseSplitParquetReader):
                 p.FEATURE_MS1_APEX_INTENSITY AS aggr_prec_Peak_Apex,
                 p.LEFT_WIDTH AS leftWidth,
                 p.RIGHT_WIDTH AS rightWidth,
+                {im_cols_sql}
                 p.SCORE_MS2_PEAK_GROUP_RANK AS peak_group_rank,
                 p.SCORE_MS2_SCORE AS d_score,
                 p.SCORE_MS2_Q_VALUE AS m_score,
@@ -379,6 +442,26 @@ class SplitParquetReader(BaseSplitParquetReader):
         use_alignment = self.config.use_alignment and self._has_alignment
 
         # First, get features that pass MS2 QVALUE threshold
+        # IM columns may or may not be present in the parquet files
+        has_im = "EXP_IM" in self._columns
+        has_im_boundaries = (
+            "IM_leftWidth" in self._columns and "IM_rightWidth" in self._columns
+        )
+
+        im_cols_sql = (
+            (
+                "p.EXP_IM AS EXP_IM, p.IM_leftWidth AS IM_leftWidth, p.IM_rightWidth AS IM_rightWidth,"
+            )
+            if has_im and has_im_boundaries
+            else ("p.EXP_IM AS EXP_IM, NULL AS IM_leftWidth, NULL AS IM_rightWidth,")
+            if has_im and not has_im_boundaries
+            else (
+                "NULL AS EXP_IM, p.IM_leftWidth AS IM_leftWidth, p.IM_rightWidth AS IM_rightWidth,"
+            )
+            if (not has_im) and has_im_boundaries
+            else "NULL AS EXP_IM, NULL AS IM_leftWidth, NULL AS IM_rightWidth,"
+        )
+
         query = f"""
             SELECT
                 p.RUN_ID AS id_run,
@@ -403,6 +486,7 @@ class SplitParquetReader(BaseSplitParquetReader):
                 p.FEATURE_MS1_APEX_INTENSITY AS aggr_prec_Peak_Apex,
                 p.LEFT_WIDTH AS leftWidth,
                 p.RIGHT_WIDTH AS rightWidth,
+                {im_cols_sql}
                 p.SCORE_MS2_PEAK_GROUP_RANK AS peak_group_rank,
                 p.SCORE_MS2_SCORE AS d_score,
                 p.SCORE_MS2_Q_VALUE AS m_score,
@@ -451,6 +535,7 @@ class SplitParquetReader(BaseSplitParquetReader):
                     aligned_ids_df = pd.DataFrame({"id": new_aligned_ids})
                     con.register("aligned_ids_temp", aligned_ids_df)
 
+                    # For recovered aligned features include IM columns the same way
                     aligned_query = f"""
                         SELECT
                             p.RUN_ID AS id_run,
@@ -475,6 +560,7 @@ class SplitParquetReader(BaseSplitParquetReader):
                             p.FEATURE_MS1_APEX_INTENSITY AS aggr_prec_Peak_Apex,
                             p.LEFT_WIDTH AS leftWidth,
                             p.RIGHT_WIDTH AS rightWidth,
+                            {im_cols_sql}
                             p.SCORE_MS2_PEAK_GROUP_RANK AS peak_group_rank,
                             p.SCORE_MS2_SCORE AS d_score,
                             p.SCORE_MS2_Q_VALUE AS m_score
