@@ -44,13 +44,40 @@ Usage:
 import os
 from collections import defaultdict
 import sqlite3
+import importlib
+from typing import Type
 import duckdb
 import click
 import pandas as pd
-import pyarrow.parquet as pq
 import pyopenms as poms
 from loguru import logger
-from pyarrow.lib import ArrowInvalid, ArrowIOError
+
+
+def _ensure_pyarrow():
+    """
+    Avoid importing pyarrow at module import time; import lazily in functions that need it.
+    """
+    try:
+        import pyarrow as pa  # pylint: disable=C0415
+
+        # Ensure the parquet submodule is loaded and available as pa.parquet
+        try:
+            import pyarrow.parquet as pq  # pylint: disable=C0415
+        except Exception:
+            pq = None
+        from pyarrow.lib import ArrowInvalid, ArrowIOError  # pylint: disable=C0415
+
+        # Some pyarrow installs don't automatically expose the parquet submodule
+        # as an attribute on the top-level module until it's imported. Attach it
+        # so callers can use pa.parquet.*
+        if pq is not None and not hasattr(pa, "parquet"):
+            setattr(pa, "parquet", pq)
+
+        return pa, ArrowInvalid, ArrowIOError
+    except ImportError as exc:
+        raise click.ClickException(
+            "Parquet support requires 'pyarrow'. Install with 'pip install pyarrow' or 'pip install pyprophet[parquet]'."
+        ) from exc
 
 
 def is_tsv_file(file_path):
@@ -248,6 +275,60 @@ def create_index_if_not_exists(con, index_name, table_name, column_name):
         con.execute(f"CREATE INDEX {index_name} ON {table_name} ({column_name})")
 
 
+def _lazy_parquet_class(module_path: str, class_name: str) -> Type:
+    """
+    Import the given module (relative to this package) and return the class.
+    Raises a ClickException with a friendly message if the import fails (e.g. missing pyarrow).
+    """
+    try:
+        mod = importlib.import_module(module_path, package=__package__)
+        return getattr(mod, class_name)
+    except ModuleNotFoundError as exc:
+        # Likely pyarrow or the module itself is missing; user should install the parquet extra.
+        raise click.ClickException(
+            "Parquet support requires the 'pyarrow' package. "
+            "Install it with 'pip install pyarrow' or 'pip install pyprophet[parquet]'."
+        ) from exc
+    except Exception:
+        # Propagate other exceptions (syntax errors, attribute errors) to surface the real problem.
+        raise
+
+
+def _area_from_config(config) -> str:
+    """
+    Map a config instance to its package area name used in the io package.
+    """
+    # Avoid importing config classes here to prevent circular imports.
+    cname = type(config).__name__
+    if cname == "RunnerIOConfig":
+        return "scoring"
+    if cname == "IPFIOConfig":
+        return "ipf"
+    if cname == "LevelContextIOConfig":
+        return "levels_context"
+    if cname == "ExportIOConfig":
+        return "export"
+    raise ValueError(f"Unsupported config context: {type(config).__name__}")
+
+
+def _get_parquet_reader_class_for_config(config, split: bool = False) -> Type:
+    _, _, _ = _ensure_pyarrow()
+    area = _area_from_config(config)
+    module = f".{area}.split_parquet" if split else f".{area}.parquet"
+    return _lazy_parquet_class(
+        module, "SplitParquetReader" if split else "ParquetReader"
+    )
+
+
+def _get_parquet_writer_class_for_config(config, split: bool = False) -> Type:
+    _, _, _ = _ensure_pyarrow()
+    area = _area_from_config(config)
+    module = f".{area}.split_parquet" if split else f".{area}.parquet"
+    return _lazy_parquet_class(
+        module, "SplitParquetWriter" if split else "ParquetWriter"
+    )
+
+
 def is_parquet_file(file_path):
     """
     Check if the file is a valid Parquet file.
@@ -259,7 +340,8 @@ def is_parquet_file(file_path):
 
     # Then verify it's actually a parquet file
     try:
-        pq.read_schema(file_path)
+        pa, ArrowInvalid, ArrowIOError = _ensure_pyarrow()  # pylint: disable=C0103
+        pa.parquet.read_schema(file_path)
         return True
     except (ArrowInvalid, ArrowIOError, OSError):
         return False
@@ -327,7 +409,8 @@ def get_parquet_column_names(file_path):
     Retrieves column names from a Parquet file without reading the entire file.
     """
     try:
-        table_schema = pq.read_schema(file_path)
+        pa, _, _ = _ensure_pyarrow()
+        table_schema = pa.parquet.read_schema(file_path)
         return table_schema.names
     except Exception as e:
         print(f"An error occurred while reading schema from '{file_path}': {e}")

@@ -853,11 +853,12 @@ def plot_scores(df, out, color_palette="normal"):
             "Error: The matplotlib package is required to create a report."
         )
 
-    score_columns = (
-        ["SCORE"]
-        + [c for c in df.columns if c.startswith("MAIN_VAR_")]
-        + [c for c in df.columns if c.startswith("VAR_")]
-    )
+    # Build score_columns list, only including SCORE if it exists
+    score_columns = []
+    if "SCORE" in df.columns:
+        score_columns.append("SCORE")
+    score_columns += [c for c in df.columns if c.startswith("MAIN_VAR_")]
+    score_columns += [c for c in df.columns if c.startswith("VAR_")]
 
     t_col, d_col = color_blind_friendly(color_palette)
 
@@ -917,14 +918,19 @@ def plot_score_distributions(pdf, plotter, df, score_mapping):
     n_rows = (n_scores + n_cols - 1) // n_cols  # Calculate needed rows
 
     fig, axes = plt.subplots(n_rows, n_cols, figsize=(15, 5 * n_rows))
+
+    # Ensure axes is always a flat array for consistent indexing
+    # plt.subplots returns different types based on grid size:
+    # - Single subplot (1,1): returns single Axes object
+    # - Single row/col (1,n) or (n,1): returns 1D array
+    # - Grid (m,n): returns 2D array
+    if not isinstance(axes, np.ndarray):
+        axes = np.array([axes])
+    elif axes.ndim > 1:
+        axes = axes.flatten()
+
     fig.suptitle("Score Distributions", y=1.02, fontsize=14)
     plt.subplots_adjust(hspace=0.4, wspace=0.3)
-
-    # Flatten axes array for easy iteration
-    if n_scores > 1:
-        axes = axes.flatten()
-    else:
-        axes = [axes]  # Make it iterable even for single plot
 
     for i, (base_key, base_dict) in enumerate(score_mapping.items()):
         score_col = base_dict["score"]

@@ -15,7 +15,7 @@ Submodules:
 Dependencies:
 -------------
 - `pandas`
-- `pyarrow`
+- `pyarrow`(optional, for Parquet support)
 - `duckdb`
 - `sqlite3`
 - `loguru`

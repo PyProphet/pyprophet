@@ -14,6 +14,9 @@ from ..export.export_report import (
 from ..export.export_report import (
     export_scored_report as _export_scored_report,
 )
+from ..export.export_report import (
+    export_feature_scores as _export_feature_scores,
+)
 from ..export.calibration_report import generate_report as generate_calibration_report
 from ..glyco.export import (
     export_score_plots as export_glyco_score_plots,
@@ -43,8 +46,10 @@ def create_export_group():
     export.add_command(export_parquet, name="parquet")
     export.add_command(export_compound, name="compound")
     export.add_command(export_glyco, name="glyco")
-    export.add_command(export_score_plots, name="score-plots")
+    export.add_command(export_feature_scores, name="feature-scores")
+    export.add_command(export_score_plots, name="score-plots")  # Deprecated
     export.add_command(export_scored_report, name="score-report")
+    export.add_command(export_feature_scores, name="feature-scores")
     export.add_command(export_calibration_report, name="calibration-report")
 
     return export
@@ -141,6 +146,19 @@ def create_export_group():
     type=float,
     help="[format: matrix/legacy] Filter results to maximum global protein-level q-value.",
 )
+@click.option(
+    "--use_alignment/--no-use_alignment",
+    default=True,
+    show_default=True,
+    help="Use alignment results to recover peaks with good alignment scores if alignment data is present in the input file.",
+)
+@click.option(
+    "--max_alignment_pep",
+    default=0.7,
+    show_default=True,
+    type=float,
+    help="[format: matrix/legacy] Maximum PEP to consider for good alignments when use_alignment is enabled.",
+)
 @measure_memory_usage_and_time
 def export_tsv(
     infile,
@@ -156,6 +174,8 @@ def export_tsv(
     max_global_peptide_qvalue,
     protein,
     max_global_protein_qvalue,
+    use_alignment,
+    max_alignment_pep,
 ):
     """
     Export Proteomics/Peptidoform TSV/CSV tables
@@ -185,6 +205,8 @@ def export_tsv(
         max_global_peptide_qvalue=max_global_peptide_qvalue,
         protein=protein,
         max_global_protein_qvalue=max_global_protein_qvalue,
+        use_alignment=use_alignment,
+        max_alignment_pep=max_alignment_pep,
     )
 
     reader = ReaderDispatcher.get_reader(config)
@@ -274,6 +296,19 @@ def export_tsv(
     help="[format: matrix/legacy] Filter results to maximum global protein-level q-value.",
 )
 @click.option(
+    "--use_alignment/--no-use_alignment",
+    default=True,
+    show_default=True,
+    help="Use alignment results to recover peaks with good alignment scores if alignment data is present in the input file.",
+)
+@click.option(
+    "--max_alignment_pep",
+    default=0.7,
+    show_default=True,
+    type=float,
+    help="[format: matrix/legacy] Maximum PEP to consider for good alignments when use_alignment is enabled.",
+)
+@click.option(
     "--top_n",
     default=3,
     show_default=True,
@@ -307,6 +342,8 @@ def export_matrix(
     max_rs_peakgroup_qvalue,
     max_global_peptide_qvalue,
     max_global_protein_qvalue,
+    use_alignment,
+    max_alignment_pep,
     top_n,
     consistent_top,
     normalization,
@@ -339,6 +376,8 @@ def export_matrix(
         max_global_peptide_qvalue=max_global_peptide_qvalue,
         protein=True,
         max_global_protein_qvalue=max_global_protein_qvalue,
+        use_alignment=use_alignment,
+        max_alignment_pep=max_alignment_pep,
         top_n=top_n,
         consistent_top=consistent_top,
         normalization=normalization,
@@ -553,6 +592,13 @@ def export_library(
     type=int,
     help="Compression level to use for parquet file.",
 )
+@click.option(
+    "--include_transition_data/--no-include_transition_data",
+    "include_transition_data",
+    default=True,
+    show_default=True,
+    help="Include transition data in the exported parquet file(s). When disabled, only precursor-level data is exported.",
+)
 @measure_memory_usage_and_time
 def export_parquet(
     infile,
@@ -565,6 +611,7 @@ def export_parquet(
     split_runs,
     compression,
     compression_level,
+    include_transition_data,
 ):
     """
     Export OSW or sqMass to parquet format
@@ -600,6 +647,7 @@ def export_parquet(
             split_runs=split_runs,
             compression_method=compression,
             compression_level=compression_level,
+            include_transition_data=include_transition_data,
         )
 
         writer = WriterDispatcher.get_writer(config)
@@ -820,7 +868,35 @@ def export_glyco(
     )
 
 
-# Export score plots
+# Export feature scores (unified command)
+@click.command(name="feature-scores", cls=AdvancedHelpCommand)
+@click.option(
+    "--in",
+    "infile",
+    required=True,
+    type=click.Path(exists=True),
+    help="PyProphet input file (OSW, Parquet, or Split Parquet directory).",
+)
+@click.option(
+    "--out",
+    "outfile",
+    type=click.Path(exists=False),
+    help="Output PDF file path. If not specified, will be derived from input filename.",
+)
+@measure_memory_usage_and_time
+def export_feature_scores(infile, outfile):
+    """
+    Export feature score plots
+    
+    Works with OSW, Parquet, and Split Parquet formats.
+    - If SCORE tables exist: applies RANK==1 filtering and plots SCORE + VAR_ columns
+    - If SCORE tables don't exist: plots only VAR_ columns
+    """
+    from ..export.export_report import export_feature_scores as _export_feature_scores
+    _export_feature_scores(infile, outfile)
+
+
+# Export score plots (deprecated - use feature-scores instead)
 @click.command(name="score-plots", cls=AdvancedHelpCommand)
 @click.option(
     "--in",
@@ -840,8 +916,11 @@ def export_glyco(
 @measure_memory_usage_and_time
 def export_score_plots(infile, glycoform):
     """
-    Export score plots
+    Export score plots (DEPRECATED - use 'feature-scores' instead)
+    
+    This command is deprecated. Please use 'pyprophet export feature-scores' instead.
     """
+    logger.warning("DEPRECATED: 'pyprophet export score-plots' is deprecated. Use 'pyprophet export feature-scores' instead.")
     if infile.endswith(".osw"):
         if not glycoform:
             _export_score_plots(infile)
@@ -869,6 +948,33 @@ def export_scored_report(infile):
     outfile = Path(infile).stem + "_score_plots.pdf"
     logger.info(f"Exporting score plots to {outfile}")
     _export_scored_report(infile, outfile)
+
+
+# Export feature scores
+@click.command(name="feature-scores", cls=AdvancedHelpCommand)
+@click.option(
+    "--in",
+    "infile",
+    required=True,
+    type=click.Path(exists=True),
+    help="PyProphet input file (OSW, Parquet, or Split Parquet directory).",
+)
+@click.option(
+    "--out",
+    "outfile",
+    type=click.Path(exists=False),
+    help="Output PDF file. If not provided, will be auto-generated based on input filename.",
+)
+@measure_memory_usage_and_time
+def export_feature_scores(infile, outfile):
+    """
+    Export feature score plots from a PyProphet input file.
+    
+    Creates plots showing the distribution of feature scores (var_* columns)
+    at different levels (ms1, ms2, transition, alignment) colored by target/decoy status.
+    Works with OSW, Parquet, and Split Parquet files (scored or unscored).
+    """
+    _export_feature_scores(infile, outfile)
 
 
 # Export OpenSwath Calibration debug plots

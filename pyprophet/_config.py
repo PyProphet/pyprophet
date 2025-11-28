@@ -649,6 +649,8 @@ class ExportIOConfig(BaseIOConfig):
         max_global_peptide_qvalue (float): Filter results to maximum global peptide-level q-value.
         protein (bool): Append protein-level error-rate estimates if available.
         max_global_protein_qvalue (float): Filter results to maximum global protein-level q-value.
+        use_alignment (bool): Use alignment results to recover peaks with good alignment scores if alignment data is present (default: True).
+        max_alignment_pep (float): Maximum PEP to consider for good alignments when use_alignment is True (default: 0.7).
 
         # Quantification matrix options
         top_n (int): Number of top intense features to use for summarization
@@ -688,6 +690,10 @@ class ExportIOConfig(BaseIOConfig):
     protein: bool = True
     max_global_protein_qvalue: float = 0.01
     test: bool = False
+    
+    # Alignment options
+    use_alignment: bool = True
+    max_alignment_pep: float = 0.7
 
     # Quantification matrix options
     top_n: int = 3
@@ -699,6 +705,7 @@ class ExportIOConfig(BaseIOConfig):
     compression_level: int = 11
     split_transition_data: bool = True
     split_runs: bool = False
+    include_transition_data: bool = True  # Whether to include transition data in parquet export
 
     # SqMass: Export to parquet
     pqp_file: Optional[str] = None  # Path to PQP file for precursor/transition mapping

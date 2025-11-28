@@ -1,3 +1,3 @@
 Empty DataFrame
-Columns: [Charge, FullPeptideName, Intensity, ProteinName, RT, Sequence, aggr_prec_Peak_Apex, aggr_prec_Peak_Area, assay_iRT, assay_rt, d_score, decoy, delta_iRT, delta_rt, filename, iRT, id, leftWidth, m_score, m_score_protein_experiment_wide, m_score_protein_global, m_score_protein_run_specific, mz, peak_group_rank, rightWidth, run_id, transition_group_id]
+Columns: [Charge, FullPeptideName, IM_leftWidth, IM_rightWidth, Intensity, ProteinName, RT, Sequence, aggr_prec_Peak_Apex, aggr_prec_Peak_Area, assay_iRT, assay_rt, d_score, decoy, delta_iRT, delta_rt, filename, iRT, id, leftWidth, m_score, m_score_protein_experiment_wide, m_score_protein_global, m_score_protein_run_specific, mz, peak_group_rank, pep, rightWidth, run_id, transition_group_id]
 Index: []

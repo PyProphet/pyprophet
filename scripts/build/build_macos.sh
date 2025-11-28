@@ -7,17 +7,88 @@ echo "============================================"
 echo "Building PyProphet for macOS"
 echo "============================================"
 
-# Clean previous builds
-rm -rf build dist
+# Check Python version
+PYTHON_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+echo "Using Python version: $PYTHON_VERSION"
+
+REQUIRED_VERSION="3.11"
+if [ "$(printf '%s\n' "$REQUIRED_VERSION" "$PYTHON_VERSION" | sort -V | head -n1)" != "$REQUIRED_VERSION" ]; then
+    echo "ERROR: Python 3.11+ is required for building."
+    echo "Your Python version: $PYTHON_VERSION"
+    echo ""
+    echo "Please install Python 3.11 or later using Homebrew:"
+    echo "  brew install python@3.11"
+    exit 1
+fi
+
+# Get version: prefer GITHUB_REF_NAME (CI), then pyproject.toml, then git tag, then default
+if [ -n "${GITHUB_REF_NAME:-}" ]; then
+    VERSION="${GITHUB_REF_NAME#v}"
+else
+    # Use tomllib (Python 3.11) to read pyproject.toml
+    VERSION=$(
+        python3 - <<'PY'
+import tomllib, sys, subprocess
+try:
+    with open("pyproject.toml", "rb") as f:
+        cfg = tomllib.load(f)
+        v = cfg.get("project", {}).get("version")
+        if v:
+            print(v)
+            sys.exit(0)
+except Exception:
+    pass
+# fallback to git tag
+try:
+    tag = subprocess.check_output(["git", "describe", "--tags", "--abbrev=0"], stderr=subprocess.DEVNULL).decode().strip()
+    print(tag.lstrip("v"))
+    sys.exit(0)
+except Exception:
+    print("0.0.0")
+PY
+    )
+fi
+
+# sanitize for filenames
+VERSION_SAFE="${VERSION//\//-}"
+VERSION_SAFE="${VERSION_SAFE// /-}"
+VERSION_SAFE="$(echo "$VERSION_SAFE" | tr -cd 'A-Za-z0-9._-')"
+
 
 # Install/upgrade build dependencies
 python3 -m pip install --upgrade pip setuptools wheel cython numpy pyinstaller
 
-# Install the package in editable mode to ensure it's importable
-python3 -m pip install -e .
+# Parse and install runtime dependencies from pyproject.toml
+echo "Installing runtime dependencies..."
+python3 << 'PYEOF'
+import tomllib
+import subprocess
+import sys
 
-# Build Cython extensions in-place
+with open('pyproject.toml', 'rb') as f:
+    config = tomllib.load(f)
+
+deps = config['project']['dependencies']
+
+# Filter out any malformed entries and install one by one
+for dep in deps:
+    dep = dep.strip()
+    if dep and not dep.startswith('#'):
+        try:
+            print(f"Installing: {dep}")
+            subprocess.check_call([sys.executable, '-m', 'pip', 'install', '--no-cache-dir', dep])
+        except subprocess.CalledProcessError as e:
+            print(f"Warning: Failed to install {dep}: {e}")
+            continue
+PYEOF
+
+# Build C extensions in-place
+echo "Building C extensions..."
 python3 setup.py build_ext --inplace
+
+# Install pyprophet as a regular package (not editable) to avoid import conflicts
+echo "Installing pyprophet package..."
+python3 -m pip install --no-deps .
 
 # Collect compiled extension binaries for pyprophet/scoring
 ADD_BINARY_ARGS=()
@@ -28,33 +99,34 @@ for so in pyprophet/scoring/_optimized*.so pyprophet/scoring/_optimized*.dylib; 
   fi
 done
 
-# Locate xgboost native library (macOS uses .dylib)
-DYLIB_PATH=$(python3 - <<'PY'
-import importlib, os
-try:
-    m = importlib.import_module("xgboost")
-    p = os.path.join(os.path.dirname(m.__file__), "lib", "libxgboost.dylib")
-    print(p if os.path.exists(p) else "")
-except Exception:
-    print("")
-PY
-)
-if [ -n "$DYLIB_PATH" ]; then
-  echo "Including xgboost native lib: $DYLIB_PATH"
-  ADD_BINARY_ARGS+=(--add-binary "$DYLIB_PATH:xgboost/lib")
-fi
+# Clean previous builds
+rm -rf build dist pyprophet.spec
 
-# Run PyInstaller with metadata collection and explicit library collection
+# Run PyInstaller in onefile mode (single executable)
+echo "Running PyInstaller (onefile mode)..."
 python3 -m PyInstaller \
-  --name pyprophet \
-  --onedir \
-  --console \
   --clean \
   --noconfirm \
+  --onefile \
+  --name pyprophet \
+  --strip \
   --log-level INFO \
   --additional-hooks-dir packaging/pyinstaller/hooks \
-  --hidden-import=pyprophet \
-  --hidden-import=pyprophet.main \
+  --exclude-module pyarrow \
+  --exclude-module sphinx \
+  --exclude-module sphinx_rtd_theme \
+  --exclude-module pydata_sphinx_theme \
+  --exclude-module sphinx_copybutton \
+  --exclude-module sphinx.ext \
+  --exclude-module alabaster \
+  --exclude-module babel \
+  --exclude-module docutils \
+  --exclude-module mypy \
+  --exclude-module pytest \
+  --exclude-module pytest-regtest \
+  --exclude-module pytest-xdist \
+  --exclude-module black \
+  --exclude-module ruff \
   --collect-submodules pyprophet \
   --collect-all numpy \
   --collect-all pandas \
@@ -69,24 +141,25 @@ python3 -m PyInstaller \
   packaging/pyinstaller/run_pyprophet.py
 
 echo "============================================"
-echo "Build complete! Executable at: dist/pyprophet/pyprophet"
+echo "Build complete! Single executable at: dist/pyprophet"
+ls -lh dist/pyprophet
 echo "============================================"
 
 # Make executable
-chmod +x dist/pyprophet/pyprophet
+chmod +x dist/pyprophet
 
 # Create tarball for distribution
 cd dist
 ARCH=$(uname -m)
 ARCHIVE_NAME="pyprophet-macos-${ARCH}.tar.gz"
-tar -czf "../${ARCHIVE_NAME}" pyprophet/
+tar -czf "../${ARCHIVE_NAME}" pyprophet
 cd ..
 
 echo "============================================"
 echo "Archive created: ${ARCHIVE_NAME}"
 echo "============================================"
 
-# Optional: Generate SHA256 checksum
+# Generate SHA256 checksum
 if command -v shasum &> /dev/null; then
     shasum -a 256 "${ARCHIVE_NAME}" > "${ARCHIVE_NAME}.sha256"
     echo "Checksum: ${ARCHIVE_NAME}.sha256"
@@ -95,7 +168,4 @@ fi
 
 echo ""
 echo "To test locally:"
-echo "  cd dist/pyprophet && ./pyprophet --help"
-echo ""
-echo "To distribute:"
-echo "  Upload ${ARCHIVE_NAME} to GitHub releases"
+echo "  ./dist/pyprophet --help"

@@ -1,18 +1,16 @@
-import os
 import glob
-from shutil import copyfile
-from typing import Literal
-import pandas as pd
-import pyarrow as pa
-import duckdb
+import os
+
 import click
+import duckdb
+import pandas as pd
 from loguru import logger
 
-from .._base import BaseSplitParquetReader, BaseSplitParquetWriter
 from ..._config import LevelContextIOConfig
-from ..util import (
-    get_parquet_column_names,
-)
+from .._base import BaseSplitParquetReader, BaseSplitParquetWriter
+from ..util import _ensure_pyarrow, get_parquet_column_names
+
+pa, _, _ = _ensure_pyarrow()
 
 
 class SplitParquetReader(BaseSplitParquetReader):

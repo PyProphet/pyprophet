@@ -7,6 +7,8 @@
 
 <!-- [![Build Status](https://travis-ci.org/PyProphet/pyprophet.svg?branch=master)](https://travis-ci.org/PyProphet/pyprophet)  -->
 [![continuous-integration](https://github.com/PyProphet/pyprophet/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/PyProphet/pyprophet/actions/workflows/ci.yml)
+[![Test Package Build](https://github.com/PyProphet/pyprophet/actions/workflows/test-build.yml/badge.svg)](https://github.com/PyProphet/pyprophet/actions/workflows/test-build.yml)
+[![Build and Release](https://github.com/PyProphet/pyprophet/actions/workflows/build-release.yml/badge.svg)](https://github.com/PyProphet/pyprophet/actions/workflows/build-release.yml)
 [![Project Stats](https://www.openhub.net/p/PyProphet/widgets/project_thin_badge.gif)](https://www.openhub.net/p/PyProphet)
 ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/pyprophet)
 [![PyPI - Version](https://img.shields.io/pypi/v/pyprophet)](https://pypi.org/project/pyprophet/)
@@ -34,16 +36,11 @@ Install the stable version of *pyprophet* from the PyPI:
 ### Option 2: Pre-built Executables (No Python Required)
 
 Download from [GitHub Releases](https://github.com/pyprophet/pyprophet/releases):
-- Linux: `pyprophet-linux-x86_64.tar.gz`
-- Windows: `pyprophet-windows-x86_64.zip`  
-- macOS Intel: `pyprophet-macos-x86_64.tar.gz`
-- macOS Apple Silicon: `pyprophet-macos-arm64.tar.gz`
+- Linux: [![Ubuntu Installer](https://img.shields.io/badge/Install-Ubuntu-purple)](https://github.com/PyProphet/pyprophet/releases/download/v3.0.4/pyprophet-linux-x86_64-deb.zip)
+- Windows: [![Windows Installer](https://img.shields.io/badge/Install-Windows-blue)](https://github.com/PyProphet/pyprophet/releases/download/v3.0.4/pyprophet-windows-x86_64-installer.zip)  
+- macOS Intel: [![MacOS Intel Installer](https://img.shields.io/badge/Install-macOS_Intel-white)](https://github.com/PyProphet/pyprophet/releases/download/v3.0.4/pyprophet-macos-x86_64-dmg.zip)
+- macOS Apple Silicon: [![MacOS Apple Silicon Installer](https://img.shields.io/badge/Install-macOS_Apple_Silicon-white)](https://github.com/PyProphet/pyprophet/releases/download/v3.0.4/pyprophet-macos-arm64-dmg.zip)
 
-```bash
-tar -xzf pyprophet-*.tar.gz
-cd pyprophet
-./pyprophet --help
-```
 ### Option 3: From Source
 
 We strongly advise to install PyProphet in a Python [*virtualenv*](https://virtualenv.pypa.io/en/stable/). PyProphet is compatible with Python 3.

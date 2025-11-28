@@ -27,18 +27,13 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.9'
+          python-version: '3.11'
 
       - name: Install system dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential
-
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e .
 
       - name: Build executable (Linux)
         if: runner.os == 'Linux'
@@ -47,69 +42,121 @@ jobs:
       - name: Build executable (Windows)
         if: runner.os == 'Windows'
         run: scripts/build/build_windows.bat
+        shell: cmd
 
       - name: Build executable (macOS)
         if: runner.os == 'macOS'
         run: bash scripts/build/build_macos.sh
 
+      # Create installers
+      - name: Create Linux packages (DEB/RPM)
+        if: runner.os == 'Linux'
+        run: bash scripts/build/create_linux_packages.sh
+
+      - name: Create Windows installer
+        if: runner.os == 'Windows'
+        run: pwsh scripts/build/create_windows_installer.ps1
+
+      - name: Create macOS DMG
+        if: runner.os == 'macOS'
+        run: bash scripts/build/create_macos_dmg.sh
+
+      # Test the built executable
       - name: Test basic commands (Linux/macOS)
         if: runner.os != 'Windows'
         run: |
           echo "Testing --help and --version..."
-          dist/pyprophet/pyprophet --help
-          dist/pyprophet/pyprophet --version
+          dist/pyprophet --help
+          dist/pyprophet --version
 
       - name: Test basic commands (Windows)
         if: runner.os == 'Windows'
         run: |
-          echo "Testing --help and --version..."
-          dist\pyprophet\pyprophet.exe --help
-          dist\pyprophet\pyprophet.exe --version
+          Write-Host "Testing --help and --version..."
+          
+          Write-Host "Running: dist\pyprophet.exe --help"
+          & dist\pyprophet.exe --help
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "pyprophet.exe --help failed with exit code $LASTEXITCODE"
+            exit $LASTEXITCODE
+          }
+          
+          Write-Host "Running: dist\pyprophet.exe --version"
+          & dist\pyprophet.exe --version
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "pyprophet.exe --version failed with exit code $LASTEXITCODE"
+            exit $LASTEXITCODE
+          }
+          
+          Write-Host "✅ Basic commands test passed"
+        shell: pwsh
 
       - name: Test score commands (Linux/macOS)
         if: runner.os != 'Windows'
         run: |
           echo "Testing score at ms1ms2 level..."
-          dist/pyprophet/pyprophet score --in tests/data/test_data.osw --level ms1ms2 --pi0_lambda 0 0 0
+          dist/pyprophet score --in tests/data/test_data.osw --level ms1ms2 --pi0_lambda 0 0 0
           
           echo "Testing score at transition level..."
-          dist/pyprophet/pyprophet score --in tests/data/test_data.osw --level transition --pi0_lambda 0 0 0
+          dist/pyprophet score --in tests/data/test_data.osw --level transition --pi0_lambda 0 0 0
 
       - name: Test score commands (Windows)
         if: runner.os == 'Windows'
         run: |
-          echo "Testing score at ms1ms2 level..."
-          dist\pyprophet\pyprophet.exe score --in tests/data/test_data.osw --level ms1ms2 --pi0_lambda 0 0 0
+          Write-Host "Testing score at ms1ms2 level..."
+          & dist\pyprophet.exe score --in tests/data/test_data.osw --level ms1ms2 --pi0_lambda 0 0 0
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "score ms1ms2 failed with exit code $LASTEXITCODE"
+            exit $LASTEXITCODE
+          }
           
-          echo "Testing score at transition level..."
-          dist\pyprophet\pyprophet.exe score --in tests/data/test_data.osw --level transition --pi0_lambda 0 0 0
+          Write-Host "Testing score at transition level..."
+          & dist\pyprophet.exe score --in tests/data/test_data.osw --level transition --pi0_lambda 0 0 0
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "score transition failed with exit code $LASTEXITCODE"
+            exit $LASTEXITCODE
+          }
+          
+          Write-Host "✅ Score commands test passed"
+        shell: pwsh
 
       - name: Test infer commands (Linux/macOS)
         if: runner.os != 'Windows'
         run: |
           echo "Testing infer peptide..."
-          dist/pyprophet/pyprophet infer peptide --in tests/data/test_data.osw --context global
+          dist/pyprophet infer peptide --in tests/data/test_data.osw --context global
           
           echo "Testing infer peptidoform..."
-          dist/pyprophet/pyprophet infer peptidoform --in tests/data/test_data.osw --no-ipf_ms1_scoring
+          dist/pyprophet infer peptidoform --in tests/data/test_data.osw --no-ipf_ms1_scoring
 
       - name: Test infer commands (Windows)
         if: runner.os == 'Windows'
         run: |
-          echo "Testing infer peptide..."
-          dist\pyprophet\pyprophet.exe infer peptide --in tests/data/test_data.osw --context global
+          Write-Host "Testing infer peptide..."
+          & dist\pyprophet.exe infer peptide --in tests/data/test_data.osw --context global
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "infer peptide failed with exit code $LASTEXITCODE"
+            exit $LASTEXITCODE
+          }
           
-          echo "Testing infer peptidoform..."
-          dist\pyprophet\pyprophet.exe infer peptidoform --in tests/data/test_data.osw --no-ipf_ms1_scoring
+          Write-Host "Testing infer peptidoform..."
+          & dist\pyprophet.exe infer peptidoform --in tests/data/test_data.osw --no-ipf_ms1_scoring
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "infer peptidoform failed with exit code $LASTEXITCODE"
+            exit $LASTEXITCODE
+          }
+          
+          Write-Host "✅ Infer commands test passed"
+        shell: pwsh
 
       - name: Test export commands (Linux/macOS)
         if: runner.os != 'Windows'
         run: |
           echo "Testing export score-report..."
-          dist/pyprophet/pyprophet export score-report --in tests/data/test_data.osw
+          dist/pyprophet export score-report --in tests/data/test_data.osw
           
           echo "Testing export tsv..."
-          dist/pyprophet/pyprophet export tsv --in tests/data/test_data.osw --out test_data.tsv
+          dist/pyprophet export tsv --in tests/data/test_data.osw --out test_data.tsv
           
           # Verify output file was created
           if [ ! -f test_data.tsv ]; then
@@ -121,19 +168,185 @@ jobs:
       - name: Test export commands (Windows)
         if: runner.os == 'Windows'
         run: |
-          echo "Testing export score-report..."
-          dist\pyprophet\pyprophet.exe export score-report --in tests/data/test_data.osw
+          Write-Host "Testing export score-report..."
+          & dist\pyprophet.exe export score-report --in tests/data/test_data.osw
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "export score-report failed with exit code $LASTEXITCODE"
+            exit $LASTEXITCODE
+          }
           
-          echo "Testing export tsv..."
-          dist\pyprophet\pyprophet.exe export tsv --in tests/data/test_data.osw --out test_data.tsv
+          Write-Host "Testing export tsv..."
+          & dist\pyprophet.exe export tsv --in tests/data/test_data.osw --out test_data.tsv
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "export tsv failed with exit code $LASTEXITCODE"
+            exit $LASTEXITCODE
+          }
           
           # Verify output file was created
           if (-not (Test-Path test_data.tsv)) {
             Write-Error "ERROR: test_data.tsv was not created!"
             exit 1
           }
-          Write-Output "Output file created successfully: test_data.tsv"
+          Write-Host "Output file created successfully: test_data.tsv"
+          Write-Host "✅ Export commands test passed"
         shell: pwsh
+
+      # Test DEB package installation
+      - name: Test DEB package installation
+        if: runner.os == 'Linux'
+        run: |
+          echo "============================================"
+          echo "Testing DEB Package Installation"
+          echo "============================================"
+          
+          DEB_FILE=$(ls pyprophet_*.deb)
+          echo "Installing: $DEB_FILE"
+          
+          # Install the package
+          sudo dpkg -i "$DEB_FILE" || {
+            echo "Installation failed, attempting to fix dependencies..."
+            sudo apt-get install -f -y
+          }
+          
+          # Verify installation
+          if ! command -v pyprophet &> /dev/null; then
+            echo "ERROR: pyprophet command not found after DEB installation!"
+            exit 1
+          fi
+          
+          # Test installed package
+          echo "Testing installed pyprophet..."
+          pyprophet --version
+          pyprophet --help
+          
+          # Test with actual data
+          pyprophet score --in tests/data/test_data.osw --level ms1ms2 --pi0_lambda 0 0 0
+          
+          # Clean up
+          echo "Uninstalling package..."
+          sudo dpkg -r pyprophet
+          
+          echo "✅ DEB package test passed!"
+
+      # Test Windows installer
+      - name: Test Windows installer
+        if: runner.os == 'Windows'
+        run: |
+          Write-Host "============================================"
+          Write-Host "Testing Windows Installer"
+          Write-Host "============================================"
+          
+          $installerFile = Get-ChildItem pyprophet-setup-*.exe | Select-Object -First 1
+          
+          if (-not $installerFile) {
+            Write-Error "No installer file found!"
+            exit 1
+          }
+          
+          Write-Host "Installer: $($installerFile.Name)"
+          
+          # Install silently
+          Write-Host "Installing silently..."
+          Start-Process -FilePath $installerFile.FullName -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/DIR=$env:TEMP\PyProphet" -Wait
+          
+          # Verify installation
+          $installPath = "$env:TEMP\PyProphet\pyprophet.exe"
+          if (-not (Test-Path $installPath)) {
+            Write-Error "pyprophet.exe not found at expected location: $installPath"
+            exit 1
+          }
+          
+          # Test installed executable
+          Write-Host "Testing installed pyprophet..."
+          & $installPath --version
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Installed pyprophet --version failed"
+            exit $LASTEXITCODE
+          }
+          
+          & $installPath --help
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Installed pyprophet --help failed"
+            exit $LASTEXITCODE
+          }
+          
+          # Test with actual data
+          & $installPath score --in tests/data/test_data.osw --level ms1ms2 --pi0_lambda 0 0 0
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Installed pyprophet score failed"
+            exit $LASTEXITCODE
+          }
+          
+          # Clean up - uninstall silently
+          Write-Host "Uninstalling..."
+          $uninstallPath = "$env:TEMP\PyProphet\unins000.exe"
+          if (Test-Path $uninstallPath) {
+            Start-Process -FilePath $uninstallPath -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -Wait
+          }
+          
+          Write-Host "✅ Windows installer test passed!"
+        shell: pwsh
+
+      # Test macOS DMG
+      - name: Test macOS DMG
+        if: runner.os == 'macOS'
+        run: |
+          echo "============================================"
+          echo "Testing macOS DMG"
+          echo "============================================"
+          
+          DMG_FILE=$(ls pyprophet-*.dmg)
+          echo "DMG file: $DMG_FILE"
+          
+          # Mount the DMG
+          echo "Mounting DMG..."
+          hdiutil attach "$DMG_FILE" -mountpoint /Volumes/PyProphet
+          
+          # Verify PyProphet directory exists
+          if [ ! -d "/Volumes/PyProphet/PyProphet" ]; then
+            echo "ERROR: PyProphet directory not found in DMG!"
+            hdiutil detach /Volumes/PyProphet || true
+            exit 1
+          fi
+          
+          # Verify executable exists
+          if [ ! -f "/Volumes/PyProphet/PyProphet/pyprophet" ]; then
+            echo "ERROR: pyprophet executable not found!"
+            ls -la /Volumes/PyProphet/PyProphet/
+            hdiutil detach /Volumes/PyProphet || true
+            exit 1
+          fi
+          
+          # Test directly from mounted DMG
+          echo "Testing pyprophet from DMG..."
+          /Volumes/PyProphet/PyProphet/pyprophet --version
+          /Volumes/PyProphet/PyProphet/pyprophet --help
+          
+          # Test with actual data
+          echo "Running score test..."
+          /Volumes/PyProphet/PyProphet/pyprophet score --in tests/data/test_data.osw --level ms1ms2 --pi0_lambda 0 0 0
+          
+          # Copy to temporary location (simulating installation)
+          echo "Testing installation by copying to /tmp..."
+          TEMP_DIR="/tmp/PyProphet-test"
+          rm -rf "$TEMP_DIR"
+          cp -r /Volumes/PyProphet/PyProphet "$TEMP_DIR"
+          
+          # Unmount DMG
+          echo "Unmounting DMG..."
+          hdiutil detach /Volumes/PyProphet
+          
+          # Test from copied location
+          echo "Testing from installed location..."
+          "$TEMP_DIR/pyprophet" --version
+          "$TEMP_DIR/pyprophet" --help
+          "$TEMP_DIR/pyprophet" score --in tests/data/test_data.osw --level ms1ms2 --pi0_lambda 0 0 0
+          
+          # Clean up
+          echo "Cleaning up..."
+          rm -rf "$TEMP_DIR"
+          
+          echo "✅ macOS DMG test passed!"
 
       - name: Upload test outputs as artifacts
         if: always()  # Upload even if tests fail
@@ -150,3 +363,5 @@ jobs:
         if: success()
         run: |
           echo "✅ All tests passed on ${{ matrix.os }}!"
+          echo "  - Executable tests: PASSED"
+          echo "  - Installer tests: PASSED"
