@@ -103,16 +103,16 @@ class ParquetReader(BaseParquetReader):
 
         im_cols_sql = (
             (
-                "EXP_IM AS EXP_IM, IM_leftWidth AS IM_leftWidth, IM_rightWidth AS IM_rightWidth,"
+                "EXP_IM AS EXP_IM, IM_leftWidth AS IM_leftWidth, IM_rightWidth AS IM_rightWidth"
             )
             if has_im and has_im_boundaries
-            else ("EXP_IM AS EXP_IM, NULL AS IM_leftWidth, NULL AS IM_rightWidth,")
+            else ("EXP_IM AS EXP_IM, NULL AS IM_leftWidth, NULL AS IM_rightWidth")
             if has_im and not has_im_boundaries
             else (
-                "NULL AS EXP_IM, IM_leftWidth AS IM_leftWidth, IM_rightWidth AS IM_rightWidth,"
+                "NULL AS EXP_IM, IM_leftWidth AS IM_leftWidth, IM_rightWidth AS IM_rightWidth"
             )
             if (not has_im) and has_im_boundaries
-            else "NULL AS EXP_IM, NULL AS IM_leftWidth, NULL AS IM_rightWidth,"
+            else "NULL AS EXP_IM, NULL AS IM_leftWidth, NULL AS IM_rightWidth"
         )
 
         query = f"""
@@ -135,7 +135,7 @@ class ParquetReader(BaseParquetReader):
                 FEATURE_MS1_AREA_INTENSITY AS aggr_prec_Peak_Area,
                 FEATURE_MS1_APEX_INTENSITY AS aggr_prec_Peak_Apex,
                 LEFT_WIDTH AS leftWidth,
-                RIGHT_WIDTH AS rightWidth
+                RIGHT_WIDTH AS rightWidth,
                 {im_cols_sql}
                 {feature_vars_sql}
             FROM data
@@ -158,16 +158,16 @@ class ParquetReader(BaseParquetReader):
 
         im_cols_sql = (
             (
-                "EXP_IM AS EXP_IM, IM_leftWidth AS IM_leftWidth, IM_rightWidth AS IM_rightWidth,"
+                "EXP_IM AS EXP_IM, IM_leftWidth AS IM_leftWidth, IM_rightWidth AS IM_rightWidth"
             )
             if has_im and has_im_boundaries
-            else ("EXP_IM AS EXP_IM, NULL AS IM_leftWidth, NULL AS IM_rightWidth,")
+            else ("EXP_IM AS EXP_IM, NULL AS IM_leftWidth, NULL AS IM_rightWidth")
             if has_im and not has_im_boundaries
             else (
-                "NULL AS EXP_IM, IM_leftWidth AS IM_leftWidth, IM_rightWidth AS IM_rightWidth,"
+                "NULL AS EXP_IM, IM_leftWidth AS IM_leftWidth, IM_rightWidth AS IM_rightWidth"
             )
             if (not has_im) and has_im_boundaries
-            else "NULL AS EXP_IM, NULL AS IM_leftWidth, NULL AS IM_rightWidth,"
+            else "NULL AS EXP_IM, NULL AS IM_leftWidth, NULL AS IM_rightWidth"
         )
 
         query = f"""
@@ -225,16 +225,16 @@ class ParquetReader(BaseParquetReader):
 
         im_cols_sql = (
             (
-                "EXP_IM AS EXP_IM, IM_leftWidth AS IM_leftWidth, IM_rightWidth AS IM_rightWidth,"
+                "EXP_IM AS EXP_IM, IM_leftWidth AS IM_leftWidth, IM_rightWidth AS IM_rightWidth"
             )
             if has_im and has_im_boundaries
-            else ("EXP_IM AS EXP_IM, NULL AS IM_leftWidth, NULL AS IM_rightWidth,")
+            else ("EXP_IM AS EXP_IM, NULL AS IM_leftWidth, NULL AS IM_rightWidth")
             if has_im and not has_im_boundaries
             else (
-                "NULL AS EXP_IM, IM_leftWidth AS IM_leftWidth, IM_rightWidth AS IM_rightWidth,"
+                "NULL AS EXP_IM, IM_leftWidth AS IM_leftWidth, IM_rightWidth AS IM_rightWidth"
             )
             if (not has_im) and has_im_boundaries
-            else "NULL AS EXP_IM, NULL AS IM_leftWidth, NULL AS IM_rightWidth,"
+            else "NULL AS EXP_IM, NULL AS IM_leftWidth, NULL AS IM_rightWidth"
         )
 
         # First get main data

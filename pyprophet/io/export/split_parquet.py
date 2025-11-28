@@ -158,16 +158,16 @@ class SplitParquetReader(BaseSplitParquetReader):
 
         im_cols_sql = (
             (
-                "p.EXP_IM AS EXP_IM, p.IM_leftWidth AS IM_leftWidth, p.IM_rightWidth AS IM_rightWidth,"
+                "p.EXP_IM AS EXP_IM, p.IM_leftWidth AS IM_leftWidth, p.IM_rightWidth AS IM_rightWidth"
             )
             if has_im and has_im_boundaries
-            else ("p.EXP_IM AS EXP_IM, NULL AS IM_leftWidth, NULL AS IM_rightWidth,")
+            else ("p.EXP_IM AS EXP_IM, NULL AS IM_leftWidth, NULL AS IM_rightWidth")
             if has_im and not has_im_boundaries
             else (
-                "NULL AS EXP_IM, p.IM_leftWidth AS IM_leftWidth, p.IM_rightWidth AS IM_rightWidth,"
+                "NULL AS EXP_IM, p.IM_leftWidth AS IM_leftWidth, p.IM_rightWidth AS IM_rightWidth"
             )
             if (not has_im) and has_im_boundaries
-            else "NULL AS EXP_IM, NULL AS IM_leftWidth, NULL AS IM_rightWidth,"
+            else "NULL AS EXP_IM, NULL AS IM_leftWidth, NULL AS IM_rightWidth"
         )
 
         query = f"""
@@ -213,16 +213,16 @@ class SplitParquetReader(BaseSplitParquetReader):
 
         im_cols_sql = (
             (
-                "p.EXP_IM AS EXP_IM, p.IM_leftWidth AS IM_leftWidth, p.IM_rightWidth AS IM_rightWidth,"
+                "p.EXP_IM AS EXP_IM, p.IM_leftWidth AS IM_leftWidth, p.IM_rightWidth AS IM_rightWidth"
             )
             if has_im and has_im_boundaries
-            else ("p.EXP_IM AS EXP_IM, NULL AS IM_leftWidth, NULL AS IM_rightWidth,")
+            else ("p.EXP_IM AS EXP_IM, NULL AS IM_leftWidth, NULL AS IM_rightWidth")
             if has_im and not has_im_boundaries
             else (
-                "NULL AS EXP_IM, p.IM_leftWidth AS IM_leftWidth, p.IM_rightWidth AS IM_rightWidth,"
+                "NULL AS EXP_IM, p.IM_leftWidth AS IM_leftWidth, p.IM_rightWidth AS IM_rightWidth"
             )
             if (not has_im) and has_im_boundaries
-            else "NULL AS EXP_IM, NULL AS IM_leftWidth, NULL AS IM_rightWidth,"
+            else "NULL AS EXP_IM, NULL AS IM_leftWidth, NULL AS IM_rightWidth"
         )
 
         query = f"""
@@ -280,16 +280,16 @@ class SplitParquetReader(BaseSplitParquetReader):
 
         im_cols_sql = (
             (
-                "p.EXP_IM AS EXP_IM, p.IM_leftWidth AS IM_leftWidth, p.IM_rightWidth AS IM_rightWidth,"
+                "p.EXP_IM AS EXP_IM, p.IM_leftWidth AS IM_leftWidth, p.IM_rightWidth AS IM_rightWidth"
             )
             if has_im and has_im_boundaries
-            else ("p.EXP_IM AS EXP_IM, NULL AS IM_leftWidth, NULL AS IM_rightWidth,")
+            else ("p.EXP_IM AS EXP_IM, NULL AS IM_leftWidth, NULL AS IM_rightWidth")
             if has_im and not has_im_boundaries
             else (
-                "NULL AS EXP_IM, p.IM_leftWidth AS IM_leftWidth, p.IM_rightWidth AS IM_rightWidth,"
+                "NULL AS EXP_IM, p.IM_leftWidth AS IM_leftWidth, p.IM_rightWidth AS IM_rightWidth"
             )
             if (not has_im) and has_im_boundaries
-            else "NULL AS EXP_IM, NULL AS IM_leftWidth, NULL AS IM_rightWidth,"
+            else "NULL AS EXP_IM, NULL AS IM_leftWidth, NULL AS IM_rightWidth"
         )
 
         # First get main data
@@ -450,16 +450,16 @@ class SplitParquetReader(BaseSplitParquetReader):
 
         im_cols_sql = (
             (
-                "p.EXP_IM AS EXP_IM, p.IM_leftWidth AS IM_leftWidth, p.IM_rightWidth AS IM_rightWidth,"
+                "p.EXP_IM AS EXP_IM, p.IM_leftWidth AS IM_leftWidth, p.IM_rightWidth AS IM_rightWidth"
             )
             if has_im and has_im_boundaries
-            else ("p.EXP_IM AS EXP_IM, NULL AS IM_leftWidth, NULL AS IM_rightWidth,")
+            else ("p.EXP_IM AS EXP_IM, NULL AS IM_leftWidth, NULL AS IM_rightWidth")
             if has_im and not has_im_boundaries
             else (
-                "NULL AS EXP_IM, p.IM_leftWidth AS IM_leftWidth, p.IM_rightWidth AS IM_rightWidth,"
+                "NULL AS EXP_IM, p.IM_leftWidth AS IM_leftWidth, p.IM_rightWidth AS IM_rightWidth"
             )
             if (not has_im) and has_im_boundaries
-            else "NULL AS EXP_IM, NULL AS IM_leftWidth, NULL AS IM_rightWidth,"
+            else "NULL AS EXP_IM, NULL AS IM_leftWidth, NULL AS IM_rightWidth"
         )
 
         query = f"""
