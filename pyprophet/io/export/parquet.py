@@ -95,6 +95,26 @@ class ParquetReader(BaseParquetReader):
         """
         feature_vars_sql = self._build_feature_vars_sql()
 
+        # IM columns may or may not be present in the parquet file
+        has_im = "EXP_IM" in self._columns
+        has_im_boundaries = (
+            "IM_leftWidth" in self._columns and "IM_rightWidth" in self._columns
+        )
+
+        im_cols_sql = (
+            (
+                "EXP_IM AS EXP_IM, IM_leftWidth AS IM_leftWidth, IM_rightWidth AS IM_rightWidth"
+            )
+            if has_im and has_im_boundaries
+            else ("EXP_IM AS EXP_IM, NULL AS IM_leftWidth, NULL AS IM_rightWidth")
+            if has_im and not has_im_boundaries
+            else (
+                "NULL AS EXP_IM, IM_leftWidth AS IM_leftWidth, IM_rightWidth AS IM_rightWidth"
+            )
+            if (not has_im) and has_im_boundaries
+            else "NULL AS EXP_IM, NULL AS IM_leftWidth, NULL AS IM_rightWidth"
+        )
+
         query = f"""
             SELECT
                 RUN_ID AS id_run,
@@ -115,7 +135,8 @@ class ParquetReader(BaseParquetReader):
                 FEATURE_MS1_AREA_INTENSITY AS aggr_prec_Peak_Area,
                 FEATURE_MS1_APEX_INTENSITY AS aggr_prec_Peak_Apex,
                 LEFT_WIDTH AS leftWidth,
-                RIGHT_WIDTH AS rightWidth
+                RIGHT_WIDTH AS rightWidth,
+                {im_cols_sql}
                 {feature_vars_sql}
             FROM data
             WHERE PROTEIN_ID IS NOT NULL  -- Filter to precursor rows
@@ -128,6 +149,26 @@ class ParquetReader(BaseParquetReader):
         Read data with peptidoform IPF information.
         """
         score_ms1_pep, _link_ms1 = self._get_ms1_score_info()
+
+        # IM columns may or may not be present in the parquet file
+        has_im = "EXP_IM" in self._columns
+        has_im_boundaries = (
+            "IM_leftWidth" in self._columns and "IM_rightWidth" in self._columns
+        )
+
+        im_cols_sql = (
+            (
+                "EXP_IM AS EXP_IM, IM_leftWidth AS IM_leftWidth, IM_rightWidth AS IM_rightWidth"
+            )
+            if has_im and has_im_boundaries
+            else ("EXP_IM AS EXP_IM, NULL AS IM_leftWidth, NULL AS IM_rightWidth")
+            if has_im and not has_im_boundaries
+            else (
+                "NULL AS EXP_IM, IM_leftWidth AS IM_leftWidth, IM_rightWidth AS IM_rightWidth"
+            )
+            if (not has_im) and has_im_boundaries
+            else "NULL AS EXP_IM, NULL AS IM_leftWidth, NULL AS IM_rightWidth"
+        )
 
         query = f"""
             SELECT
@@ -153,6 +194,7 @@ class ParquetReader(BaseParquetReader):
                 FEATURE_MS1_APEX_INTENSITY AS aggr_prec_Peak_Apex,
                 LEFT_WIDTH AS leftWidth,
                 RIGHT_WIDTH AS rightWidth,
+                {im_cols_sql}
                 {score_ms1_pep} AS ms1_pep,
                 SCORE_MS2_PEP AS ms2_pep,
                 SCORE_IPF_PRECURSOR_PEAKGROUP_PEP AS precursor_pep,
@@ -174,6 +216,26 @@ class ParquetReader(BaseParquetReader):
         Read standard data augmented with IPF information.
         """
         score_ms1_pep, _link_ms1 = self._get_ms1_score_info()
+
+        # IM columns may or may not be present in the parquet file
+        has_im = "EXP_IM" in self._columns
+        has_im_boundaries = (
+            "IM_leftWidth" in self._columns and "IM_rightWidth" in self._columns
+        )
+
+        im_cols_sql = (
+            (
+                "EXP_IM AS EXP_IM, IM_leftWidth AS IM_leftWidth, IM_rightWidth AS IM_rightWidth"
+            )
+            if has_im and has_im_boundaries
+            else ("EXP_IM AS EXP_IM, NULL AS IM_leftWidth, NULL AS IM_rightWidth")
+            if has_im and not has_im_boundaries
+            else (
+                "NULL AS EXP_IM, IM_leftWidth AS IM_leftWidth, IM_rightWidth AS IM_rightWidth"
+            )
+            if (not has_im) and has_im_boundaries
+            else "NULL AS EXP_IM, NULL AS IM_leftWidth, NULL AS IM_rightWidth"
+        )
 
         # First get main data
         query = f"""
@@ -200,6 +262,7 @@ class ParquetReader(BaseParquetReader):
                 FEATURE_MS1_APEX_INTENSITY AS aggr_prec_Peak_Apex,
                 LEFT_WIDTH AS leftWidth,
                 RIGHT_WIDTH AS rightWidth,
+                {im_cols_sql}
                 SCORE_MS2_PEAK_GROUP_RANK AS peak_group_rank,
                 SCORE_MS2_SCORE AS d_score,
                 SCORE_MS2_Q_VALUE AS m_score,
@@ -262,6 +325,26 @@ class ParquetReader(BaseParquetReader):
         use_alignment = self.config.use_alignment and self._has_alignment
 
         # First, get features that pass MS2 QVALUE threshold
+        # IM columns may or may not be present in the parquet file
+        has_im = "EXP_IM" in self._columns
+        has_im_boundaries = (
+            "IM_leftWidth" in self._columns and "IM_rightWidth" in self._columns
+        )
+
+        im_cols_sql = (
+            (
+                "EXP_IM AS EXP_IM, IM_leftWidth AS IM_leftWidth, IM_rightWidth AS IM_rightWidth,"
+            )
+            if has_im and has_im_boundaries
+            else ("EXP_IM AS EXP_IM, NULL AS IM_leftWidth, NULL AS IM_rightWidth,")
+            if has_im and not has_im_boundaries
+            else (
+                "NULL AS EXP_IM, IM_leftWidth AS IM_leftWidth, IM_rightWidth AS IM_rightWidth,"
+            )
+            if (not has_im) and has_im_boundaries
+            else "NULL AS EXP_IM, NULL AS IM_leftWidth, NULL AS IM_rightWidth,"
+        )
+
         query = f"""
             SELECT
                 RUN_ID AS id_run,
@@ -286,6 +369,7 @@ class ParquetReader(BaseParquetReader):
                 FEATURE_MS1_APEX_INTENSITY AS aggr_prec_Peak_Apex,
                 LEFT_WIDTH AS leftWidth,
                 RIGHT_WIDTH AS rightWidth,
+                {im_cols_sql}
                 SCORE_MS2_PEAK_GROUP_RANK AS peak_group_rank,
                 SCORE_MS2_SCORE AS d_score,
                 SCORE_MS2_Q_VALUE AS m_score,
@@ -334,6 +418,7 @@ class ParquetReader(BaseParquetReader):
                     aligned_ids_df = pd.DataFrame({"id": new_aligned_ids})
                     con.register("aligned_ids_temp", aligned_ids_df)
 
+                    # For recovered aligned features include IM columns the same way
                     aligned_query = f"""
                         SELECT
                             RUN_ID AS id_run,
@@ -358,6 +443,7 @@ class ParquetReader(BaseParquetReader):
                             FEATURE_MS1_APEX_INTENSITY AS aggr_prec_Peak_Apex,
                             LEFT_WIDTH AS leftWidth,
                             RIGHT_WIDTH AS rightWidth,
+                            {im_cols_sql}
                             SCORE_MS2_PEAK_GROUP_RANK AS peak_group_rank,
                             SCORE_MS2_SCORE AS d_score,
                             SCORE_MS2_Q_VALUE AS m_score
