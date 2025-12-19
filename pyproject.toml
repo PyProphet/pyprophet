@@ -46,7 +46,8 @@ dependencies = [
     "psutil",
     "pyopenms",
     "lxml",
-    "packaging"
+    "packaging",
+    "pyarrow"
 ]
 
 # Optional dependencies 
