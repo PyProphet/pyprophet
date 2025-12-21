@@ -1,7 +1,7 @@
 name: Upload Singularity Images
 
 on:  
-  workflow_run:
+  workflow_run: 
     workflows: ["Upload Docker image"]
     types: [completed]
     branches: [main, master]
@@ -44,7 +44,7 @@ jobs:
         id: tag
         run: |
           if [ "${{ github. event_name }}" == "workflow_dispatch" ]; then
-            if [ -n "${{ github.event.inputs.release_tag }}" ]; then
+            if [ -n "${{ github. event.inputs.release_tag }}" ]; then
               TAG="${{ github.event.inputs.release_tag }}"
             else
               TAG="latest"
@@ -58,12 +58,14 @@ jobs:
       - name: Build and push Singularity images
         run: |
           TAG="${{ steps.tag.outputs.tag }}"
+          # Convert repository name to lowercase for Singularity
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
           
           # Build Singularity image from the Docker image
-          singularity build pyprophet.sif docker://ghcr.io/${{ github.repository }}:${TAG}
+          singularity build pyprophet.sif docker://ghcr.io/${REPO_LOWER}:${TAG}
           
           # Push to GHCR with -sif suffix
-          singularity push pyprophet.sif oras://ghcr.io/${{ github.repository }}-sif:${TAG}
+          singularity push pyprophet.sif oras://ghcr.io/${REPO_LOWER}-sif: ${TAG}
           
           # Also tag as latest (always)
-          singularity push pyprophet.sif oras://ghcr.io/${{ github.repository }}-sif:latest
+          singularity push pyprophet.sif oras://ghcr.io/${REPO_LOWER}-sif:latest
