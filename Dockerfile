@@ -36,7 +36,7 @@ RUN python -m pip install --no-cache-dir "setuptools<75" wheel
 RUN python setup.py build_ext --inplace
 
 # Install PyProphet into the venv (reuse prebuilt wheels, no isolation)
-RUN pip install --no-cache-dir --no-build-isolation .
+RUN pip install --no-cache-dir --no-build-isolation .[parquet]
 
 # Verify the optimized module is importable (fail-fast if not)
 RUN python - <<'PY'
