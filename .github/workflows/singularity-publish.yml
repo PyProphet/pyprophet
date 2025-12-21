@@ -1,0 +1,71 @@
+name: Upload Singularity Images
+
+on:  
+  workflow_run: 
+    workflows: ["Upload Docker image"]
+    types: [completed]
+    branches: [main, master]
+  workflow_dispatch: 
+    inputs:  
+      release_tag:  
+        description:  'Release tag to build Singularity image for (leave empty to build from current branch and tag as latest)'
+        required: false
+        type: string
+
+concurrency:  
+  group: ${{ github. workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  push_singularity:
+    name: Push Singularity image to registry
+    runs-on: ubuntu-latest
+    # Only run if the Docker workflow succeeded, or if manually triggered
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event. workflow_run.conclusion == 'success' }}
+    permissions: 
+      packages:  write
+      contents: read
+    steps:  
+      - name: Check out the repo
+        uses: actions/checkout@v3
+        with:  
+          ref: ${{ github.event.inputs.release_tag || github.event.workflow_run.head_branch }}
+      
+      - name: Set up Singularity
+        uses: eWaterCycle/setup-singularity@v7
+        with:  
+          singularity-version: 3.8.7
+      
+      - name: Log in to GitHub Container Registry for Singularity
+        run: |
+          echo ${{ secrets.GITHUB_TOKEN }} | singularity remote login -u ${{ github.actor }} --password-stdin oras://ghcr.io
+      
+      - name: Determine tag
+        id: tag
+        run: |
+          if [ "${{ github. event_name }}" == "workflow_dispatch" ]; then
+            if [ -n "${{ github. event.inputs.release_tag }}" ]; then
+              TAG="${{ github.event.inputs.release_tag }}"
+            else
+              TAG="latest"
+            fi
+          else
+            # Extract tag from the triggering workflow
+            TAG="${{ github.event.workflow_run.head_branch }}"
+          fi
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+      
+      - name: Build and push Singularity images
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          # Convert repository name to lowercase for Singularity
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          
+          # Build Singularity image from the Docker image
+          singularity build pyprophet.sif docker://ghcr.io/${REPO_LOWER}:${TAG}
+          
+          # Push to GHCR with -sif suffix
+          singularity push pyprophet.sif oras://ghcr.io/${REPO_LOWER}-sif:${TAG}
+          
+          # Also tag as latest (always)
+          singularity push pyprophet.sif oras://ghcr.io/${REPO_LOWER}-sif:latest
