@@ -65,7 +65,7 @@ jobs:
           singularity build pyprophet.sif docker://ghcr.io/${REPO_LOWER}:${TAG}
           
           # Push to GHCR with -sif suffix
-          singularity push pyprophet.sif oras://ghcr.io/${REPO_LOWER}-sif: ${TAG}
+          singularity push pyprophet.sif oras://ghcr.io/${REPO_LOWER}-sif:${TAG}
           
           # Also tag as latest (always)
           singularity push pyprophet.sif oras://ghcr.io/${REPO_LOWER}-sif:latest
