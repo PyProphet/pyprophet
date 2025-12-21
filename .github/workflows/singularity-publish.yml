@@ -60,7 +60,7 @@ jobs:
           TAG="${{ steps. tag.outputs.tag }}"
           
           # Build Singularity image from the Docker image
-          singularity build pyprophet. sif docker://ghcr.io/${{ github.repository }}: ${TAG}
+          singularity build pyprophet. sif docker://ghcr.io/${{ github.repository }}:${TAG}
           
           # Push to GHCR with -sif suffix
           singularity push pyprophet.sif oras://ghcr.io/${{ github.repository }}-sif:${TAG}
