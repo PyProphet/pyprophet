@@ -59,7 +59,7 @@ or
     $ pip install git+https://github.com/PyProphet/pyprophet.git@master
 ```
 
-### Option 4: Docker 
+### Option 4: Docker / Singularity
 
 PyProphet is also available from Docker (automated builds):
 
@@ -71,6 +71,9 @@ Pull the latest version of *pyprophet* from DockerHub or Github Container Regist
 
     # Github Container Registry
     $ docker pull ghcr.io/pyprophet/pyprophet:latest
+
+    # Singularity image
+    $ singularity pull pyprophet.sif oras://ghcr.io/pyprophet/pyprophet-sif:latest
 ````
 
 Running pyprophet
