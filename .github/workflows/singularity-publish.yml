@@ -2,14 +2,14 @@ name: Upload Singularity Images
 
 on:  
   workflow_run:
-    workflows: ["Upload Docker Images"]
+    workflows: ["Upload Docker image"]
     types: [completed]
     branches: [main, master]
   workflow_dispatch: 
     inputs:  
       release_tag:  
-        description: 'Release tag to build Singularity image for'
-        required: true
+        description:  'Release tag to build Singularity image for (leave empty to build from current branch and tag as latest)'
+        required: false
         type: string
 
 concurrency:  
@@ -21,15 +21,15 @@ jobs:
     name: Push Singularity image to registry
     runs-on: ubuntu-latest
     # Only run if the Docker workflow succeeded, or if manually triggered
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
-    permissions:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event. workflow_run.conclusion == 'success' }}
+    permissions: 
       packages:  write
       contents: read
-    steps: 
+    steps:  
       - name:  Check out the repo
         uses:  actions/checkout@v3
         with: 
-          ref: ${{ github. event.inputs.release_tag || github.event.workflow_run.head_branch }}
+          ref: ${{ github.event.inputs.release_tag || github.event.workflow_run.head_branch }}
       
       - name:  Set up Singularity
         uses: eWaterCycle/setup-singularity@v7
@@ -44,7 +44,11 @@ jobs:
         id: tag
         run:  |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            TAG="${{ github.event. inputs.release_tag }}"
+            if [ -n "${{ github.event.inputs.release_tag }}" ]; then
+              TAG="${{ github.event.inputs.release_tag }}"
+            else
+              TAG="latest"
+            fi
           else
             # Extract tag from the triggering workflow
             TAG="${{ github.event.workflow_run.head_branch }}"
@@ -52,16 +56,14 @@ jobs:
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
       
       - name: Build and push Singularity images
-        run: |
-          TAG="${{ steps.tag.outputs. tag }}"
+        run:  |
+          TAG="${{ steps. tag.outputs.tag }}"
           
           # Build Singularity image from the Docker image
-          singularity build pyprophet.sif docker://ghcr.io/${{ github.repository }}:${TAG}
+          singularity build pyprophet. sif docker://ghcr.io/${{ github.repository }}: ${TAG}
           
           # Push to GHCR with -sif suffix
           singularity push pyprophet.sif oras://ghcr.io/${{ github.repository }}-sif:${TAG}
           
-          # Also tag as latest if appropriate
-          if [ "${{ github.event_name }}" == "workflow_run" ] || [ -n "${{ github. event.inputs.release_tag }}" ]; then
-            singularity push pyprophet. sif oras://ghcr.io/${{ github.repository }}-sif:latest
-          fi
+          # Also tag as latest (always)
+          singularity push pyprophet.sif oras://ghcr.io/${{ github.repository }}-sif:latest
