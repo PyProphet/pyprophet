@@ -3,6 +3,12 @@ name: Upload Docker image
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      release_tag: 
+        description: 'Release tag to build Docker image for'
+        required: true
+        type: string
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
