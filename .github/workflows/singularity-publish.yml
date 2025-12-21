@@ -26,24 +26,24 @@ jobs:
       packages:  write
       contents: read
     steps:  
-      - name:  Check out the repo
-        uses:  actions/checkout@v3
-        with: 
+      - name: Check out the repo
+        uses: actions/checkout@v3
+        with:  
           ref: ${{ github.event.inputs.release_tag || github.event.workflow_run.head_branch }}
       
-      - name:  Set up Singularity
+      - name: Set up Singularity
         uses: eWaterCycle/setup-singularity@v7
-        with: 
+        with:  
           singularity-version: 3.8.7
       
       - name: Log in to GitHub Container Registry for Singularity
         run: |
           echo ${{ secrets.GITHUB_TOKEN }} | singularity remote login -u ${{ github.actor }} --password-stdin oras://ghcr.io
       
-      - name:  Determine tag
+      - name: Determine tag
         id: tag
-        run:  |
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+        run: |
+          if [ "${{ github. event_name }}" == "workflow_dispatch" ]; then
             if [ -n "${{ github.event.inputs.release_tag }}" ]; then
               TAG="${{ github.event.inputs.release_tag }}"
             else
@@ -56,11 +56,11 @@ jobs:
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
       
       - name: Build and push Singularity images
-        run:  |
-          TAG="${{ steps. tag.outputs.tag }}"
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
           
           # Build Singularity image from the Docker image
-          singularity build pyprophet. sif docker://ghcr.io/${{ github.repository }}:${TAG}
+          singularity build pyprophet.sif docker://ghcr.io/${{ github.repository }}:${TAG}
           
           # Push to GHCR with -sif suffix
           singularity push pyprophet.sif oras://ghcr.io/${{ github.repository }}-sif:${TAG}
