@@ -774,11 +774,8 @@ class BaseWriter(ABC):
         Just select top peak group per precursor.
         """
         # Select top ranking peak group only
-        data = data.iloc[
-            data.groupby(["run_id", "transition_group_id"]).apply(
-                lambda x: x["m_score"].idxmin()
-            )
-        ]
+        idx = data.groupby(["run_id", "transition_group_id"])["m_score"].idxmin()
+        data = data.loc[idx]
         logger.info("Summarizing to precursor level.")
         # Create matrix
         matrix = data.pivot_table(
@@ -801,11 +798,8 @@ class BaseWriter(ABC):
         Summarize to peptide level using top N precursors.
         """
         # First get top peak group per precursor
-        data = data.iloc[
-            data.groupby(["run_id", "transition_group_id"]).apply(
-                lambda x: x["m_score"].idxmin()
-            )
-        ]
+        idx = data.groupby(["run_id", "transition_group_id"])["m_score"].idxmin()
+        data = data.loc[idx]
         logger.info("Summarizing to peptide level.")
         # Get top precursors for each peptide
         if consistent_top:
