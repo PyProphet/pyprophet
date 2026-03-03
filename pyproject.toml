@@ -61,7 +61,7 @@ parquet = ["pyarrow"]
 pyprophet = "pyprophet.main:cli"
 
 [tool.setuptools]
-packages = { find = { where = ["."], exclude = ["tests*", "docs*", "examples*", "scripts*", "packaging*"] } }
+packages = { find = { where = ["."], exclude = ["tests*", "docs*", "examples*", "scripts*"] } }
 include-package-data = true
 zip-safe = false
 
