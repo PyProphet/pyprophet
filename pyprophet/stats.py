@@ -143,8 +143,13 @@ def pemp(stat, stat0):
     m = len(stat)
     m0 = len(stat0)
 
-    statc = np.concatenate((stat, stat0))
-    v = np.array([True] * m + [False] * m0)
+    # ------- originally (as in r implementation): 
+    #statc = np.concatenate((stat, stat0)) 
+    #v = np.array([True] * m + [False] * m0) 
+    # ------- switching the positions of Targets and decoys to avoid pi0 becoming negative, basically, decoys win ties making p values more conservative
+    statc = np.concatenate((stat0, stat)) 
+    v = np.array( [False] * m0 + [True] * m) 
+
     perm = np.argsort(-statc, kind="mergesort")  # reversed sort, mergesort is stable
     v = v[perm]
 
