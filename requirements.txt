@@ -159,7 +159,7 @@ pyopenms==3.4.0
     #   pyprophet (setup.py)
 pyparsing==3.2.3
     # via matplotlib
-pypdf==6.4.0
+pypdf==6.8.0
     # via
     #   pyprophet
     #   pyprophet (setup.py)
