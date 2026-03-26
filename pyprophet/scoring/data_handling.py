@@ -77,6 +77,12 @@ def check_for_unique_blocks(tg_ids):
     return True
 
 
+def _to_writable_c_array(values, dtype):
+    """Return a writable, C-contiguous numpy array for Cython memoryviews."""
+    arr = np.asarray(values, dtype=dtype)
+    return np.require(arr, dtype=dtype, requirements=["C", "W"])
+
+
 @profile
 def cleanup_and_check(df):
     """
@@ -435,10 +441,11 @@ class Experiment(object):
         Args:
             score_col_name (str): Name of the score column to rank by.
         """
-        flags = find_top_ranked(
-            self.df.tg_num_id.values,
-            self.df[score_col_name].values.astype(np.float32, copy=False),
+        tg_ids = _to_writable_c_array(self.df.tg_num_id.to_numpy(copy=False), np.int64)
+        scores = _to_writable_c_array(
+            self.df[score_col_name].to_numpy(copy=False), np.float32
         )
+        flags = find_top_ranked(tg_ids, scores)
         self.df.is_top_peak = flags
 
     def get_top_test_peaks(self):
@@ -537,9 +544,9 @@ class Experiment(object):
         """
         Adds a peak group rank column to the data.
         """
-        ids = self.df.tg_num_id.values
-        scores = self.df.d_score.values
-        peak_group_ranks = rank(ids, scores.astype(np.float32, copy=False))
+        ids = _to_writable_c_array(self.df.tg_num_id.to_numpy(copy=False), np.int64)
+        scores = _to_writable_c_array(self.df.d_score.to_numpy(copy=False), np.float32)
+        peak_group_ranks = rank(ids, scores)
         self.df["peak_group_rank"] = peak_group_ranks
 
     @profile
