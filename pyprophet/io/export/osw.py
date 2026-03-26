@@ -497,7 +497,6 @@ class OSWReader(BaseOSWReader):
         logger.trace(
             f"Initial standard data read with {len(data)} rows and columns: {data.columns.tolist()}"
         )
-        print(query)
 
         # Ensure id column is Int64 to preserve precision for large feature IDs
         if "id" in data.columns:
