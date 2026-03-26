@@ -127,20 +127,21 @@ class OSWReader(BaseOSWReader):
             )
 
         if self._is_unscored_file(con):
-            logger.info("Reading unscored data from Parquet file.")
+            logger.info("Reading unscored data from OSW file.")
             return self._read_unscored_data(con)
 
         ipf_present = self._check_ipf_presence(con, cfg)
 
         if ipf_present and cfg.ipf == "peptidoform":
-            logger.info("Reading peptidoform IPF data from Parquet file.")
+            logger.info("Reading peptidoform IPF data from OSW file.")
             data = self._read_peptidoform_data(con, cfg)
         elif ipf_present and cfg.ipf == "augmented":
-            logger.info("Reading augmented data with IPF from Parquet file.")
+            logger.info("Reading augmented data with IPF from OSW file.")
             data = self._read_augmented_data(con, cfg)
         else:
-            logger.info("Reading standard OpenSWATH data from Parquet file.")
+            logger.info("Reading standard OpenSWATH data from OSW file.")
             data = self._read_standard_data(con, cfg)
+            logger.debug(f"Base data read with {len(data)} rows")
 
         # Apply common augmentations to all scored data types
         return self._augment_data(data, con, cfg)
@@ -493,6 +494,9 @@ class OSWReader(BaseOSWReader):
             ORDER BY transition_group_id, peak_group_rank;
         """
         data = pd.read_sql_query(query, con)
+        logger.trace(
+            f"Initial standard data read with {len(data)} rows and columns: {data.columns.tolist()}"
+        )
 
         # Ensure id column is Int64 to preserve precision for large feature IDs
         if "id" in data.columns:
@@ -655,6 +659,10 @@ class OSWReader(BaseOSWReader):
                         logger.debug(
                             f"Assigned alignment_group_id to {mask.sum()} reference features"
                         )
+
+            logger.trace(
+                f"Data after merging alignment features has {len(data)} rows and columns: {data.columns.tolist()}"
+            )
 
         return data
 
