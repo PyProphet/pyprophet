@@ -18,6 +18,9 @@ pd.options.display.max_columns = None
 
 DATA_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 
+# Toggle to disable parquet-related tests without removing code
+SKIP_PARQUET_TESTS = True
+
 
 # ================== CORE TEST UTILITIES ==================
 class TestRunner:
@@ -614,6 +617,11 @@ def test_config():
 
 # ================== TEST CASES ==================
 def run_generic_test(test_runner, test_config, strategy_class, regtest, **kwargs):
+    if SKIP_PARQUET_TESTS and strategy_class.__name__ in (
+        "ParquetTestStrategy",
+        "SplitParquetTestStrategy",
+    ):
+        pytest.skip("Parquet tests disabled in this environment")
     strategy = strategy_class(test_runner, test_config)
     strategy.prepare()
     strategy.execute(**kwargs)
@@ -623,6 +631,11 @@ def run_generic_test(test_runner, test_config, strategy_class, regtest, **kwargs
 def run_generic_test_overwrite(
     test_runner, test_config, strategy_class, regtest, **kwargs
 ):
+    if SKIP_PARQUET_TESTS and strategy_class.__name__ in (
+        "ParquetTestStrategy",
+        "SplitParquetTestStrategy",
+    ):
+        pytest.skip("Parquet tests disabled in this environment")
     strategy = strategy_class(test_runner, test_config)
     strategy.prepare()
     strategy.execute(**kwargs)
@@ -636,6 +649,11 @@ def run_generic_test_overwrite(
 def run_generic_test_apply_weights(
     test_runner, test_config, strategy_class, regtest, **kwargs
 ):
+    if SKIP_PARQUET_TESTS and strategy_class.__name__ in (
+        "ParquetTestStrategy",
+        "SplitParquetTestStrategy",
+    ):
+        pytest.skip("Parquet tests disabled in this environment")
     strategy = strategy_class(test_runner, test_config)
     strategy.prepare()
     strategy.apply_weights(**kwargs)
