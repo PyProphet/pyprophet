@@ -36,7 +36,7 @@ dependencies = [
     "duckdb-extension-sqlite-scanner",
     "numpy >= 1.26.4",
     "scipy",
-    "pandas >= 2.0",
+    "pandas == 2.2.3",
     "polars >= 1.28.1",
     "cython",
     "scikit-learn >= 1.5",

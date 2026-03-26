@@ -229,8 +229,9 @@ def prepare_data_table(
         var_column_names = var_columns_available
 
     # collect needed data:
-    empty_col = [0] * N
+    empty_bool_col = [False] * N
     empty_none_col = [None] * N
+    empty_float_col = [0.0] * N
 
     tg_ids = table[tg_id_name]
 
@@ -248,7 +249,7 @@ def prepare_data_table(
         tg_id=tg_ids.values,
         tg_num_id=tg_num_ids,
         is_decoy=table[decoy_name].values.astype(bool),
-        is_top_peak=empty_col,
+        is_top_peak=empty_bool_col,
         is_train=empty_none_col,
         main_score=table[main_score_name].values,
     )
@@ -278,7 +279,7 @@ def prepare_data_table(
         data[col_name] = col_data
         column_names.append(col_name)
 
-    data["classifier_score"] = empty_col
+    data["classifier_score"] = empty_float_col
     column_names.append("classifier_score")
 
     # build data frame:

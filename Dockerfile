@@ -20,7 +20,7 @@ ENV PATH="/opt/venv/bin:${PATH}"
 # Pins chosen to have manylinux wheels for Python 3.12
 RUN python -m pip install --no-cache-dir --upgrade pip && \
     python -m pip install --no-cache-dir --prefer-binary \
-        "numpy==1.26.4" "cython==0.29.36" "scipy==1.12.*" \
+        "numpy==1.26.4" "cython==0.29.36" "pandas==2.2.3" "scipy==1.12.*" \
         duckdb seaborn psutil
 
 # Bring in the PyProphet source tree
