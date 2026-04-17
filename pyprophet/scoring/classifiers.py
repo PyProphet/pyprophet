@@ -169,7 +169,10 @@ class LDALearner(LinearLearner):
 
     def get_parameters(self):
         """Retrieve the scaling parameters of the LDA model."""
-        return self.scalings
+        # Ensure parameters are always returned as a NumPy array (fixes sequence type error)
+        if self.scalings is None:
+            return None
+        return np.asarray(self.scalings, dtype=np.float32)
 
     def set_parameters(self, w):
         """Set the scaling parameters of the LDA model."""
