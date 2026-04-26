@@ -5,6 +5,7 @@ import subprocess
 import shutil
 import sys
 import sqlite3
+import math
 
 import pandas as pd
 import pytest
@@ -20,6 +21,33 @@ DATA_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 
 # Toggle to disable parquet-related tests without removing code
 SKIP_PARQUET_TESTS = True
+
+
+def _round_sig(value, sig_digits=4):
+    if pd.isna(value) or value == 0:
+        return value
+    return round(value, sig_digits - int(math.floor(math.log10(abs(value)))) - 1)
+
+
+def _normalize_peakgroup_regtest_frame(df):
+    """
+    Normalize tiny floating-point values so regtest output is stable across
+    Python/pandas/platform combinations. This only affects the peakgroup
+    summary tables used by the OSW/parquet score tests.
+    """
+    normalized = df.head(100).sort_index(axis=1).copy()
+    float_cols = normalized.select_dtypes(include=["floating"]).columns
+
+    for col in float_cols:
+        values = normalized[col]
+        mask = values.notna() & values.ne(0) & values.abs().lt(1e-6)
+        normalized.loc[mask, col] = values.loc[mask].map(_round_sig)
+
+    return normalized
+
+
+def _print_peakgroup_regtest_frame(df, regtest):
+    print(_normalize_peakgroup_regtest_frame(df), file=regtest)
 
 
 # ================== CORE TEST UTILITIES ==================
@@ -233,7 +261,7 @@ class OSWTestStrategy(TestStrategy):
             ]
             table = table.sort_values(sort_cols).reset_index(drop=True)
 
-        print(table.head(100).sort_index(axis=1), file=regtest)
+        _print_peakgroup_regtest_frame(table, regtest)
 
     def apply_weights(self):
         """Apply weights for OSW subsampling workflow"""
@@ -287,7 +315,7 @@ class OSWTestStrategy(TestStrategy):
             ]
             table = table.sort_values(sort_cols).reset_index(drop=True)
 
-        print(table.head(100).sort_index(axis=1), file=regtest)
+        _print_peakgroup_regtest_frame(table, regtest)
 
 
 class ParquetTestStrategy(TestStrategy):
@@ -351,7 +379,7 @@ class ParquetTestStrategy(TestStrategy):
             "ms2_precursor_pep",
         ]
         table = table.sort_values(sort_cols).reset_index(drop=True)
-        print(table.head(100).sort_index(axis=1), file=regtest)
+        _print_peakgroup_regtest_frame(table, regtest)
 
     def apply_weights(self):
         # Run scoring without weights to generate initial scores
@@ -398,7 +426,7 @@ class ParquetTestStrategy(TestStrategy):
             "ms2_precursor_pep",
         ]
         table = table.sort_values(sort_cols).reset_index(drop=True)
-        print(table.head(100).sort_index(axis=1), file=regtest)
+        _print_peakgroup_regtest_frame(table, regtest)
 
 
 class SplitParquetTestStrategy(TestStrategy):
@@ -465,7 +493,7 @@ class SplitParquetTestStrategy(TestStrategy):
             "ms2_precursor_pep",
         ]
         table = table.sort_values(sort_cols).reset_index(drop=True)
-        print(table.head(100).sort_index(axis=1), file=regtest)
+        _print_peakgroup_regtest_frame(table, regtest)
 
     def apply_weights(self):
         # Run scoring without weights to generate initial scores
@@ -526,7 +554,7 @@ class SplitParquetTestStrategy(TestStrategy):
             "ms2_precursor_pep",
         ]
         table = table.sort_values(sort_cols).reset_index(drop=True)
-        print(table.head(100).sort_index(axis=1), file=regtest)
+        _print_peakgroup_regtest_frame(table, regtest)
 
 
 class MultiSplitParquetTestStrategy(TestStrategy):
@@ -596,7 +624,7 @@ class MultiSplitParquetTestStrategy(TestStrategy):
             "ms2_precursor_pep",
         ]
         table = table.sort_values(sort_cols).reset_index(drop=True)
-        print(table.head(100).sort_index(axis=1), file=regtest)
+        _print_peakgroup_regtest_frame(table, regtest)
 
     def apply_weights(self):
         # Run scoring without weights to generate initial scores
@@ -657,7 +685,7 @@ class MultiSplitParquetTestStrategy(TestStrategy):
             "ms2_precursor_pep",
         ]
         table = table.sort_values(sort_cols).reset_index(drop=True)
-        print(table.head(100).sort_index(axis=1), file=regtest)
+        _print_peakgroup_regtest_frame(table, regtest)
 
 
 # ================== TEST FIXTURES ==================
