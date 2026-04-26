@@ -239,20 +239,20 @@ class OSWTestStrategy(TestStrategy):
         """Apply weights for OSW subsampling workflow"""
         if self.is_metabo:
             # Metabolomics workflow
-            cmd = f"pyprophet score --level ms2 --pi0_method=smoother --pi0_lambda 0.001 0 0 --in={self.input_file} --test --ss_iteration_fdr=0.02 --subsample_ratio=1.0"
+            cmd = f"pyprophet score --level ms2 --pi0_method=smoother --pi0_lambda 0.001 0 0 --in={self.input_file} --test --ss_iteration_fdr=0.02 --subsample_ratio=0.5"
             self.runner.run_command(cmd)
 
             cmd = f"pyprophet score --level ms2 --pi0_method=smoother --pi0_lambda 0.4 0 0 --in={self.input_file} --apply_weights={self.input_file} --test --ss_iteration_fdr=0.02"
             self.runner.run_command(cmd)
         else:
             # Regular OSW workflow with ms1, ms2, transition levels
-            cmd = f"pyprophet score --level ms2 --pi0_method=smoother --pi0_lambda 0.001 0 0 --in={self.input_file} --test --ss_iteration_fdr=0.02 --subsample_ratio=1.0"
+            cmd = f"pyprophet score --level ms2 --pi0_method=smoother --pi0_lambda 0.001 0 0 --in={self.input_file} --test --ss_iteration_fdr=0.02 --subsample_ratio=0.5"
             self.runner.run_command(cmd)
 
             cmd = f"pyprophet score --level ms2 --pi0_method=smoother --pi0_lambda 0.4 0 0 --in={self.input_file} --apply_weights={self.input_file} --test --ss_iteration_fdr=0.02"
             self.runner.run_command(cmd)
 
-            cmd = f"pyprophet score --level transition --pi0_method=smoother --pi0_lambda 0.001 0 0 --in={self.input_file} --test --ss_iteration_fdr=0.02 --subsample_ratio=1.0"
+            cmd = f"pyprophet score --level transition --pi0_method=smoother --pi0_lambda 0.001 0 0 --in={self.input_file} --test --ss_iteration_fdr=0.02 --subsample_ratio=0.5"
             self.runner.run_command(cmd)
 
             cmd = f"pyprophet score --level transition --pi0_method=smoother --pi0_lambda 0.4 0 0 --in={self.input_file} --apply_weights={self.input_file} --test --ss_iteration_fdr=0.02"

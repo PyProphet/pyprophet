@@ -149,14 +149,15 @@ class OSWReader(BaseOSWReader):
         ).fetchdf()
         return tables
 
-    def _get_precursor_filter_clause(self):
+    def _get_precursor_filter_clause(self, precursor_id_expr="PRECURSOR_ID"):
         """
         Return a WHERE/AND clause fragment for filtering by sampled precursor IDs when subsampling is enabled.
-        Returns empty string if no subsampling, otherwise returns a clause like:
-        " AND f.PRECURSOR_ID IN (SELECT PRECURSOR_ID FROM sampled_precursor_ids)"
+        The caller may provide a `precursor_id_expr` such as "f.PRECURSOR_ID" or "fa.PRECURSOR_ID"
+        to match the table alias used in the surrounding query. If subsampling is disabled,
+        an empty string is returned.
         """
         if self.subsample_ratio < 1.0:
-            return " AND f.PRECURSOR_ID IN (SELECT PRECURSOR_ID FROM sampled_precursor_ids)"
+            return f" AND {precursor_id_expr} IN (SELECT PRECURSOR_ID FROM sampled_precursor_ids)"
         return ""
 
     def _fetch_ms2_features_duckdb(self, con):
@@ -165,7 +166,7 @@ class OSWReader(BaseOSWReader):
                 f"MS2-level feature table not present in file.\nTable Info:\n{self._fetch_tables_duckdb(con)}"
             )
 
-        filter_clause = self._get_precursor_filter_clause()
+        filter_clause = self._get_precursor_filter_clause("f.PRECURSOR_ID")
 
         if self.glyco:
             con.execute(
@@ -258,7 +259,7 @@ class OSWReader(BaseOSWReader):
         rc = self.config.runner
         glyco = rc.glyco
         ipf_max_rank = rc.ipf_max_peakgroup_rank
-        filter_clause = self._get_precursor_filter_clause()
+        filter_clause = self._get_precursor_filter_clause("f.PRECURSOR_ID")
 
         if not glyco:
             con.execute(
@@ -320,7 +321,7 @@ class OSWReader(BaseOSWReader):
             )
 
         rc = self.config.runner
-        filter_clause = self._get_precursor_filter_clause()
+        filter_clause = self._get_precursor_filter_clause("f.PRECURSOR_ID")
         con.execute(
             f"""
             CREATE OR REPLACE VIEW transition_table AS
@@ -361,7 +362,7 @@ class OSWReader(BaseOSWReader):
                 f"MS2-level feature alignment table not present in file.\nTable Info:\n{self._fetch_tables_duckdb(con)}"
             )
         
-        filter_clause = self._get_precursor_filter_clause()
+        filter_clause = self._get_precursor_filter_clause("fa.PRECURSOR_ID")
         con.execute(
             f"""
             CREATE OR REPLACE VIEW alignment_table AS
@@ -718,32 +719,25 @@ class OSWWriter(BaseOSWWriter):
         """
         if self.classifier in ("LDA", "SVM"):
             weights["level"] = self.level
-            con = sqlite3.connect(self.outfile)
 
-            c = con.cursor()
-            if self.glyco and self.level in ["ms2", "ms1ms2"]:
+            table_name = (
+                "GLYCOPEPTIDEPROPHET_WEIGHTS"
+                if (self.glyco and self.level in ["ms2", "ms1ms2"])
+                else "PYPROPHET_WEIGHTS"
+            )
+
+            # Use a context manager to ensure the SQLite connection is closed properly
+            with sqlite3.connect(self.outfile) as con:
+                c = con.cursor()
                 c.execute(
-                    'SELECT count(name) FROM sqlite_master WHERE type="table" AND name="GLYCOPEPTIDEPROPHET_WEIGHTS";'
+                    'SELECT count(name) FROM sqlite_master WHERE type="table" AND name=?;'
+                    , (table_name,)
                 )
                 if c.fetchone()[0] == 1:
-                    c.execute(
-                        'DELETE FROM GLYCOPEPTIDEPROPHET_WEIGHTS WHERE LEVEL =="%s"'
-                        % self.level
-                    )
-            else:
-                c.execute(
-                    'SELECT count(name) FROM sqlite_master WHERE type="table" AND name="PYPROPHET_WEIGHTS";'
-                )
-                if c.fetchone()[0] == 1:
-                    c.execute(
-                        'DELETE FROM PYPROPHET_WEIGHTS WHERE LEVEL =="%s"' % self.level
-                    )
-            c.close()
-
-            # print(weights)
-
-            weights.to_sql("PYPROPHET_WEIGHTS", con, index=False, if_exists="append")
-            con.commit()
+                    c.execute(f'DELETE FROM {table_name} WHERE LEVEL = ?', (self.level,))
+                # Append the new weights to the appropriate table
+                weights.to_sql(table_name, con, index=False, if_exists="append")
+                con.commit()
 
         elif self.classifier == "XGBoost":
             con = sqlite3.connect(self.outfile)
