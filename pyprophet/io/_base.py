@@ -38,6 +38,7 @@ Dependencies:
 """
 
 import glob
+import math
 import os
 import pickle
 import sys
@@ -993,6 +994,7 @@ class BaseOSWReader(BaseReader):
 
     Methods:
         read(): Read data from the input file based on the alogorithm.
+        _init_duckdb_views(): Initialize DuckDB views with optional subsampling.
     """
 
     def __init__(self, config: BaseIOConfig):
@@ -1005,6 +1007,41 @@ class BaseOSWReader(BaseReader):
         raise NotImplementedError(
             "The read method must be implemented in subclasses of BaseOSWReader."
         )
+
+    def _init_duckdb_views(self, con):
+        """
+        Initialize DuckDB views for the OSW file with optional subsampling support.
+        
+        Creates a TEMP table of sampled precursor IDs if subsample_ratio < 1.0,
+        which can be used by subclasses to filter feature queries.
+        
+        Subclasses should call this method before creating feature views and then
+        filter views with: WHERE PRECURSOR_ID IN (SELECT PRECURSOR_ID FROM sampled_precursor_ids)
+        when self.subsample_ratio < 1.0.
+        
+        Args:
+            con: DuckDB connection with OSW database attached as 'osw'
+        """
+        # Create TEMP table of sampled precursor IDs (if needed)
+        if self.subsample_ratio < 1.0:
+            logger.info(
+                f"Subsampling data for semi-supervised learning. Ratio: {self.subsample_ratio:.2f}"
+            )
+            precursor_count = con.execute(
+                "SELECT COUNT(DISTINCT ID) FROM osw.PRECURSOR"
+            ).fetchone()[0]
+            sample_size = max(1, math.ceil(precursor_count * self.subsample_ratio))
+            con.execute(
+                f"""
+                CREATE TEMP TABLE sampled_precursor_ids AS
+                SELECT DISTINCT ID AS PRECURSOR_ID
+                FROM osw.PRECURSOR
+                ORDER BY hash(ID)
+                LIMIT {sample_size}
+                """
+            )
+            n = con.execute("SELECT COUNT(*) FROM sampled_precursor_ids").fetchone()[0]
+            logger.info(f"Sampled {n} precursor IDs")
 
 
 @dataclass

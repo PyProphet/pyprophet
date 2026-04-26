@@ -270,6 +270,8 @@ class PyProphetRunner(object):
 
         logger.info("Total time: %d seconds and %d msecs wall time" % (seconds, msecs))
 
+        if self.config.file_type == "osw":
+            return self.outfile
         if self.runner_config.classifier == "LDA":
             return self.config.extra_writes.get("trained_weights_path")
         elif self.runner_config.classifier == "SVM":
@@ -372,7 +374,7 @@ class PyProphetWeightApplier(PyProphetRunner):
 
                     if not check_sqlite_table(con, "PYPROPHET_WEIGHTS"):
                         raise click.ClickException(
-                            "PYPROPHET_WEIGHTS table is not present in file, cannot apply weights for LDA classifier! Make sure you have run the scoring on a subset of the data first, or that you supplied the right `--classifier` parameter."
+                            "PYPROPHET_WEIGHTS table is not present in file, cannot apply weights for %s classifier! Make sure you have run the scoring on a subset of the data first, or that you supplied the right `--classifier` parameter." % self.classifier
                         )
                     data = pd.read_sql_query(
                         "SELECT * FROM PYPROPHET_WEIGHTS WHERE LEVEL=='%s'"

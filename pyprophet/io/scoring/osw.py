@@ -46,6 +46,7 @@ class OSWReader(BaseOSWReader):
             con.execute("INSTALL sqlite_scanner;")
             con.execute("LOAD sqlite_scanner;")
             con.execute(f"ATTACH DATABASE '{self.infile}' AS osw (TYPE sqlite);")
+            self._init_duckdb_views(con)
             return self._read_using_duckdb(con)
         except ModuleNotFoundError as e:
             logger.warning(
@@ -148,15 +149,27 @@ class OSWReader(BaseOSWReader):
         ).fetchdf()
         return tables
 
+    def _get_precursor_filter_clause(self):
+        """
+        Return a WHERE/AND clause fragment for filtering by sampled precursor IDs when subsampling is enabled.
+        Returns empty string if no subsampling, otherwise returns a clause like:
+        " AND f.PRECURSOR_ID IN (SELECT PRECURSOR_ID FROM sampled_precursor_ids)"
+        """
+        if self.subsample_ratio < 1.0:
+            return " AND f.PRECURSOR_ID IN (SELECT PRECURSOR_ID FROM sampled_precursor_ids)"
+        return ""
+
     def _fetch_ms2_features_duckdb(self, con):
         if not check_duckdb_table(con, "main", "FEATURE_MS2"):
             raise click.ClickException(
                 f"MS2-level feature table not present in file.\nTable Info:\n{self._fetch_tables_duckdb(con)}"
             )
 
+        filter_clause = self._get_precursor_filter_clause()
+
         if self.glyco:
             con.execute(
-                """
+                f"""
                 CREATE OR REPLACE VIEW ms2_table AS
                 SELECT
                     fm.*,
@@ -189,11 +202,12 @@ class OSWReader(BaseOSWReader):
                     WHERE t.DETECTING = 1
                     GROUP BY tpm.PRECURSOR_ID
                 ) ts ON f.PRECURSOR_ID = ts.PRECURSOR_ID
+                WHERE 1=1{filter_clause}
                 """
             )
         else:
             con.execute(
-                """
+                f"""
                 CREATE OR REPLACE VIEW ms2_table AS
                 SELECT
                     fm.*,
@@ -216,6 +230,7 @@ class OSWReader(BaseOSWReader):
                     WHERE t.DETECTING = 1
                     GROUP BY tpm.PRECURSOR_ID
                 ) ts ON f.PRECURSOR_ID = ts.PRECURSOR_ID
+                WHERE 1=1{filter_clause}
                 """
             )
 
@@ -243,10 +258,11 @@ class OSWReader(BaseOSWReader):
         rc = self.config.runner
         glyco = rc.glyco
         ipf_max_rank = rc.ipf_max_peakgroup_rank
+        filter_clause = self._get_precursor_filter_clause()
 
         if not glyco:
             con.execute(
-                """
+                f"""
                 CREATE OR REPLACE VIEW ms1_table AS
                 SELECT fm.*, f.RUN_ID, f.PRECURSOR_ID, f.EXP_RT,
                     p.CHARGE AS PRECURSOR_CHARGE, p.DECOY,
@@ -254,6 +270,7 @@ class OSWReader(BaseOSWReader):
                 FROM osw.FEATURE_MS1 fm
                 INNER JOIN osw.FEATURE f ON fm.FEATURE_ID = f.ID
                 INNER JOIN osw.PRECURSOR p ON f.PRECURSOR_ID = p.ID
+                WHERE 1=1{filter_clause}
                 ORDER BY f.RUN_ID, p.ID, f.EXP_RT
                 """
             )
@@ -281,7 +298,7 @@ class OSWReader(BaseOSWReader):
                     FROM osw.PRECURSOR_GLYCOPEPTIDE_MAPPING pgm
                     INNER JOIN osw.GLYCOPEPTIDE gp ON pgm.GLYCOPEPTIDE_ID = gp.ID
                 ) g ON f.PRECURSOR_ID = g.PRECURSOR_ID
-                WHERE s.RANK <= {ipf_max_rank}
+                WHERE s.RANK <= {ipf_max_rank}{filter_clause}
                 ORDER BY f.RUN_ID, p.ID, f.EXP_RT
                 """
             )
@@ -303,6 +320,7 @@ class OSWReader(BaseOSWReader):
             )
 
         rc = self.config.runner
+        filter_clause = self._get_precursor_filter_clause()
         con.execute(
             f"""
             CREATE OR REPLACE VIEW transition_table AS
@@ -324,7 +342,7 @@ class OSWReader(BaseOSWReader):
             AND s.PEP <= {rc.ipf_max_peakgroup_pep}
             AND ft.VAR_ISOTOPE_OVERLAP_SCORE <= {rc.ipf_max_transition_isotope_overlap}
             AND ft.VAR_LOG_SN_SCORE > {rc.ipf_min_transition_sn}
-            AND p.DECOY = 0
+            AND p.DECOY = 0{filter_clause}
             """
         )
         df = con.execute(
@@ -342,8 +360,10 @@ class OSWReader(BaseOSWReader):
             raise click.ClickException(
                 f"MS2-level feature alignment table not present in file.\nTable Info:\n{self._fetch_tables_duckdb(con)}"
             )
+        
+        filter_clause = self._get_precursor_filter_clause()
         con.execute(
-            """
+            f"""
             CREATE OR REPLACE VIEW alignment_table AS
             SELECT
                 fa.ALIGNMENT_ID AS ALIGNMENT_ID, fa.RUN_ID,
@@ -359,6 +379,7 @@ class OSWReader(BaseOSWReader):
                 fa.PEAK_INTENSITY_RATIO AS VAR_PEAK_INTENSITY_RATIO,
                 fa.ALIGNED_FEATURE_ID || '_' || fa.PRECURSOR_ID AS GROUP_ID
             FROM osw.FEATURE_MS2_ALIGNMENT fa
+            WHERE 1=1{filter_clause}
             ORDER BY fa.RUN_ID, fa.PRECURSOR_ID, fa.REFERENCE_RT
         """
         )
@@ -692,10 +713,10 @@ class OSWWriter(BaseOSWWriter):
     def save_weights(self, weights):
         """
         Save the weights to a SQLite database based on the classifier type.
-        If classifier is "LDA", weights are saved to PYPROPHET_WEIGHTS table.
+        If classifier is "LDA" or "SVM", weights are saved to PYPROPHET_WEIGHTS table.
         If classifier is "XGBoost", weights are saved to PYPROPHET_XGB or GLYCOPEPTIDEPROPHET_XGB table based on glyco and level.
         """
-        if self.classifier == "LDA":
+        if self.classifier in ("LDA", "SVM"):
             weights["level"] = self.level
             con = sqlite3.connect(self.outfile)
 
@@ -722,6 +743,7 @@ class OSWWriter(BaseOSWWriter):
             # print(weights)
 
             weights.to_sql("PYPROPHET_WEIGHTS", con, index=False, if_exists="append")
+            con.commit()
 
         elif self.classifier == "XGBoost":
             con = sqlite3.connect(self.outfile)
