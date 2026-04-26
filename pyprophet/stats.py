@@ -50,7 +50,10 @@ def to_one_dim_array(values, as_type=None):
 @profile
 def lookup_values_from_error_table(scores, err_df):
     """Find matching q-value for each score in 'scores'"""
-    ix = find_nearest_matches(np.float32(err_df.cutoff.values), np.float32(scores))
+    # Ensure arrays are writable copies (fixes read-only buffer issue with numpy 1.26+)
+    cutoff_array = np.asarray(err_df.cutoff.values, dtype=np.float32).copy()
+    scores_array = np.asarray(scores, dtype=np.float32).copy()
+    ix = find_nearest_matches(cutoff_array, scores_array)
     return (
         err_df.pvalue.iloc[ix].values,
         err_df.svalue.iloc[ix].values,

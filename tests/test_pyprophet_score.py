@@ -5,6 +5,7 @@ import subprocess
 import shutil
 import sys
 import sqlite3
+import math
 
 import pandas as pd
 import pytest
@@ -20,6 +21,33 @@ DATA_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 
 # Toggle to disable parquet-related tests without removing code
 SKIP_PARQUET_TESTS = True
+
+
+def _round_sig(value, sig_digits=4):
+    if pd.isna(value) or value == 0:
+        return value
+    return round(value, sig_digits - int(math.floor(math.log10(abs(value)))) - 1)
+
+
+def _normalize_peakgroup_regtest_frame(df):
+    """
+    Normalize tiny floating-point values so regtest output is stable across
+    Python/pandas/platform combinations. This only affects the peakgroup
+    summary tables used by the OSW/parquet score tests.
+    """
+    normalized = df.head(100).sort_index(axis=1).copy()
+    float_cols = normalized.select_dtypes(include=["floating"]).columns
+
+    for col in float_cols:
+        values = normalized[col]
+        mask = values.notna() & values.ne(0) & values.abs().lt(1e-6)
+        normalized.loc[mask, col] = values.loc[mask].map(_round_sig)
+
+    return normalized
+
+
+def _print_peakgroup_regtest_frame(df, regtest):
+    print(_normalize_peakgroup_regtest_frame(df), file=regtest)
 
 
 # ================== CORE TEST UTILITIES ==================
@@ -184,6 +212,8 @@ class OSWTestStrategy(TestStrategy):
         for level in levels:
             level_cmd = self.config.build_command(self.input_file, level)
 
+            if kwargs.get("subsample_ratio"):
+                level_cmd += f" --subsample_ratio={kwargs['subsample_ratio']}"
             if kwargs.get("parametric"):
                 level_cmd += " --parametric"
             if kwargs.get("pfdr"):
@@ -231,7 +261,61 @@ class OSWTestStrategy(TestStrategy):
             ]
             table = table.sort_values(sort_cols).reset_index(drop=True)
 
-        print(table.head(100).sort_index(axis=1), file=regtest)
+        _print_peakgroup_regtest_frame(table, regtest)
+
+    def apply_weights(self):
+        """Apply weights for OSW subsampling workflow"""
+        if self.is_metabo:
+            # Metabolomics workflow
+            cmd = f"pyprophet score --level ms2 --pi0_method=smoother --pi0_lambda 0.001 0 0 --in={self.input_file} --test --ss_iteration_fdr=0.02 --subsample_ratio=1.0"
+            self.runner.run_command(cmd)
+
+            cmd = f"pyprophet score --level ms2 --pi0_method=smoother --pi0_lambda 0.4 0 0 --in={self.input_file} --apply_weights={self.input_file} --test --ss_iteration_fdr=0.02"
+            self.runner.run_command(cmd)
+        else:
+            # Regular OSW workflow with ms1, ms2, transition levels
+            cmd = f"pyprophet score --level ms2 --pi0_method=smoother --pi0_lambda 0.001 0 0 --in={self.input_file} --test --ss_iteration_fdr=0.02 --subsample_ratio=1.0"
+            self.runner.run_command(cmd)
+
+            cmd = f"pyprophet score --level ms2 --pi0_method=smoother --pi0_lambda 0.4 0 0 --in={self.input_file} --apply_weights={self.input_file} --test --ss_iteration_fdr=0.02"
+            self.runner.run_command(cmd)
+
+            cmd = f"pyprophet score --level transition --pi0_method=smoother --pi0_lambda 0.001 0 0 --in={self.input_file} --test --ss_iteration_fdr=0.02 --subsample_ratio=1.0"
+            self.runner.run_command(cmd)
+
+            cmd = f"pyprophet score --level transition --pi0_method=smoother --pi0_lambda 0.4 0 0 --in={self.input_file} --apply_weights={self.input_file} --test --ss_iteration_fdr=0.02"
+            self.runner.run_command(cmd)
+
+    def verify_weights(self, regtest):
+        """Verify weights applied to OSW files"""
+        if self.is_metabo:
+            with sqlite3.connect("test_data_compound.osw") as conn:
+                table = pd.read_sql_query(
+                    "SELECT * FROM PYPROPHET_WEIGHTS ORDER BY score", conn
+                )
+        else:
+            config = IPFIOConfig(
+                infile=self.input_file,
+                outfile=self.input_file,
+                subsample_ratio=1.0,
+                level="peakgroup_precursor",
+                context="ipf",
+            )
+            config.file_type = "osw"
+            config.ipf_max_peakgroup_pep = 1.0
+            config.ipf_ms1_scoring = False
+            config.ipf_ms2_scoring = False
+            reader = ReaderDispatcher.get_reader(config)
+            table = reader.read(level="peakgroup_precursor")
+            sort_cols = [
+                "feature_id",
+                "ms2_peakgroup_pep",
+                "ms1_precursor_pep",
+                "ms2_precursor_pep",
+            ]
+            table = table.sort_values(sort_cols).reset_index(drop=True)
+
+        _print_peakgroup_regtest_frame(table, regtest)
 
 
 class ParquetTestStrategy(TestStrategy):
@@ -295,7 +379,7 @@ class ParquetTestStrategy(TestStrategy):
             "ms2_precursor_pep",
         ]
         table = table.sort_values(sort_cols).reset_index(drop=True)
-        print(table.head(100).sort_index(axis=1), file=regtest)
+        _print_peakgroup_regtest_frame(table, regtest)
 
     def apply_weights(self):
         # Run scoring without weights to generate initial scores
@@ -342,7 +426,7 @@ class ParquetTestStrategy(TestStrategy):
             "ms2_precursor_pep",
         ]
         table = table.sort_values(sort_cols).reset_index(drop=True)
-        print(table.head(100).sort_index(axis=1), file=regtest)
+        _print_peakgroup_regtest_frame(table, regtest)
 
 
 class SplitParquetTestStrategy(TestStrategy):
@@ -409,7 +493,7 @@ class SplitParquetTestStrategy(TestStrategy):
             "ms2_precursor_pep",
         ]
         table = table.sort_values(sort_cols).reset_index(drop=True)
-        print(table.head(100).sort_index(axis=1), file=regtest)
+        _print_peakgroup_regtest_frame(table, regtest)
 
     def apply_weights(self):
         # Run scoring without weights to generate initial scores
@@ -470,7 +554,7 @@ class SplitParquetTestStrategy(TestStrategy):
             "ms2_precursor_pep",
         ]
         table = table.sort_values(sort_cols).reset_index(drop=True)
-        print(table.head(100).sort_index(axis=1), file=regtest)
+        _print_peakgroup_regtest_frame(table, regtest)
 
 
 class MultiSplitParquetTestStrategy(TestStrategy):
@@ -540,7 +624,7 @@ class MultiSplitParquetTestStrategy(TestStrategy):
             "ms2_precursor_pep",
         ]
         table = table.sort_values(sort_cols).reset_index(drop=True)
-        print(table.head(100).sort_index(axis=1), file=regtest)
+        _print_peakgroup_regtest_frame(table, regtest)
 
     def apply_weights(self):
         # Run scoring without weights to generate initial scores
@@ -601,7 +685,7 @@ class MultiSplitParquetTestStrategy(TestStrategy):
             "ms2_precursor_pep",
         ]
         table = table.sort_values(sort_cols).reset_index(drop=True)
-        print(table.head(100).sort_index(axis=1), file=regtest)
+        _print_peakgroup_regtest_frame(table, regtest)
 
 
 # ================== TEST FIXTURES ==================
@@ -834,6 +918,25 @@ def test_osw_histgbc_multilevel(test_runner, test_config, regtest):
         pfdr=True,
         pi0_lambda="0 0 0",
         histgbc=True,
+    )
+
+
+def test_osw_subsample(test_runner, test_config, regtest):
+    """Test OSW subsampling for semi-supervised learning"""
+    run_generic_test(
+        test_runner,
+        test_config,
+        OSWTestStrategy,
+        regtest,
+        pi0_lambda="0 0 0",
+        subsample_ratio=0.5,
+    )
+
+
+def test_osw_subsample_apply_weights(test_runner, test_config, regtest):
+    """Test OSW subsampling with weight application to full dataset"""
+    run_generic_test_apply_weights(
+        test_runner, test_config, OSWTestStrategy, regtest
     )
 
 

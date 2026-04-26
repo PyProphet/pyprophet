@@ -84,7 +84,14 @@ class LinearLearner(AbstractLearner):
     def score(self, peaks, use_main_score):
         """Score the given peaks using the linear model."""
         X = peaks.get_feature_matrix(use_main_score)
-        result = np.dot(X, self.get_parameters()).astype(np.float32)
+        # Ensure X is a proper numpy array (fixes pandas compatibility issues)
+        X = np.asarray(X, dtype=np.float32)
+        params = self.get_parameters()
+        if params is None:
+            raise ValueError("Model parameters not set. Call learn() first.")
+        # Ensure params is also a numpy array
+        params = np.asarray(params, dtype=np.float32)
+        result = np.dot(X, params).astype(np.float32)
         return result
 
     @classmethod
@@ -169,7 +176,10 @@ class LDALearner(LinearLearner):
 
     def get_parameters(self):
         """Retrieve the scaling parameters of the LDA model."""
-        return self.scalings
+        # Ensure parameters are always returned as a NumPy array (fixes sequence type error)
+        if self.scalings is None:
+            return None
+        return np.asarray(self.scalings, dtype=np.float32)
 
     def set_parameters(self, w):
         """Set the scaling parameters of the LDA model."""
@@ -287,9 +297,12 @@ class SVMLearner(LinearLearner):
     def score(self, peaks, use_main_score):
         """Score the given peaks using the SVM model."""
         X = peaks.get_feature_matrix(use_main_score)
+        # Ensure X is a proper numpy array (fixes pandas compatibility issues)
+        X = np.asarray(X, dtype=np.float32)
         # Check if self.classifier is loaded weights (an numpy.ndarray object)
         if isinstance(self.classifier, np.ndarray):
-            return np.dot(X, self.classifier).astype(np.float32)
+            classifier = np.asarray(self.classifier, dtype=np.float32)
+            return np.dot(X, classifier).astype(np.float32)
         elif isinstance(self.classifier, LinearSVC):
             return self.classifier.decision_function(X)
 
@@ -528,6 +541,8 @@ class HistGBCLearner(AbstractLearner):
     def score(self, peaks, use_main_score):
         """Score the given peaks using the HistGradientBoosting model."""
         X = peaks.get_feature_matrix(use_main_score)
+        # Ensure X is a proper numpy array (fixes pandas compatibility issues)
+        X = np.asarray(X, dtype=np.float32)
         # Use decision_function for compatibility with XGBoost scoring
         result = self.classifier.decision_function(X)
         return result.astype(np.float32)
@@ -709,6 +724,8 @@ class XGBLearner(AbstractLearner):
     def score(self, peaks, use_main_score):
         """Score the given peaks using the XGBoost model."""
         X = peaks.get_feature_matrix(use_main_score)
+        # Ensure X is a proper numpy array (fixes pandas compatibility issues)
+        X = np.asarray(X, dtype=np.float32)
         dtest = xgb.DMatrix(X)
         result = self.classifier.predict(dtest)
         return result.astype(np.float32)

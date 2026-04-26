@@ -373,13 +373,13 @@ def score(
         ctx.obj["LOG_HEADER"],
     )
 
-    # Validate file type and subsample ratio, subsample_ratio is currently only applicateble for "parquet_split", "parquet_split_multi". If this combination is not met, throw warning and set subsample_ratio to 1.0
+    # Validate file type and subsample ratio. OSW, parquet, parquet_split, and parquet_split_multi all support subsampling
     if (
-        config.file_type not in ["parquet", "parquet_split", "parquet_split_multi"]
+        config.file_type not in ["osw", "parquet", "parquet_split", "parquet_split_multi"]
         and subsample_ratio < 1.0
     ):
         logger.warning(
-            "Semi-supervised learning on a subset of the data, and then applying the weights to the full data is currently only supported for `parquet_split` and `parquet_split_multi` files.\nFor `osw`, you need to manually subsample the osw using the `subsample` module.\nSetting subsample_ratio to 1.0.",
+            "Semi-supervised learning on a subset of the data, and then applying the weights to the full data is currently only supported for OSW, `parquet`, `parquet_split`, and `parquet_split_multi` files.\nFor TSV and other formats, you need to manually prepare a subsampled input file.\nSetting subsample_ratio to 1.0.",
         )
         config.subsample_ratio = 1.0
 
