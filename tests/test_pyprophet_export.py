@@ -421,6 +421,8 @@ def test_parquet_export_split_format(test_data_osw, temp_folder, regtest):
         "Precursor parquet should contain SCORE_ columns"
     )
 
+    precursor_df = sort_parquet_export_frame(precursor_df)
+
     print(
         f"Precursor data: {len(precursor_df)} rows with {len(precursor_df.columns)} columns",
         file=regtest,
