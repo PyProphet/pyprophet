@@ -864,19 +864,20 @@ class BaseWriter(ABC):
         # Group and aggregate
         grouped = data.groupby(["Sequence", "FullPeptideName", "filename"])["Intensity"].mean()
         
-        # Unstack carefully to avoid index conflicts
+        # Unstack and reset index carefully to avoid column name conflicts
         try:
-            peptide_matrix = grouped.unstack(fill_value=None)
+            peptide_matrix = grouped.unstack()
+            # Reset index to convert index columns to regular columns
+            peptide_matrix = peptide_matrix.reset_index()
         except ValueError as e:
             if "cannot insert" in str(e):
                 raise ValueError(
-                    "Failed to create quantification matrix due to duplicate column names. "
-                    "This may indicate malformed data or inconsistent peptide annotations."
+                    "Failed to create quantification matrix because a run filename "
+                    "conflicts with reserved column names ('Sequence' or 'FullPeptideName'). "
+                    "Please rename the conflicting input file or adjust the data before summarization."
                 ) from e
             raise
         
-        # Reset index to convert index columns to regular columns
-        peptide_matrix = peptide_matrix.reset_index()
         return peptide_matrix
 
     def _summarize_protein_level(
@@ -906,7 +907,7 @@ class BaseWriter(ABC):
             how="left",
         )
         
-        if protein_matrix.empty:
+        if protein_map.empty or protein_matrix["ProteinName"].isna().all():
             raise ValueError(
                 "No protein data available after mapping peptides to proteins. "
                 "Check that protein annotations are present in the data."
@@ -972,7 +973,7 @@ class BaseWriter(ABC):
             how="left",
         )
         
-        if gene_matrix.empty:
+        if gene_map.empty or gene_matrix["Gene"].isna().all():
             raise ValueError(
                 "No gene data available after mapping peptides to genes. "
                 "Check that gene annotations are present in the data."
