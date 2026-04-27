@@ -737,6 +737,16 @@ class BaseWriter(ABC):
         """
         cfg = self.config
 
+        # Check if data is empty
+        if data.empty:
+            raise ValueError(
+                "No identification results passed the filtering criteria. "
+                "The filtered dataset is empty. Please check your filter settings: "
+                f"max_rs_peakgroup_qvalue={cfg.max_rs_peakgroup_qvalue}, "
+                f"max_global_peptide_qvalue={cfg.max_global_peptide_qvalue}, "
+                f"max_global_protein_qvalue={cfg.max_global_protein_qvalue}"
+            )
+
         sep = "," if cfg.out_type == "csv" else "\t"
         level = self.level
         normalization = self.config.normalization
@@ -777,6 +787,13 @@ class BaseWriter(ABC):
         # Select top ranking peak group only
         idx = data.groupby(["run_id", "transition_group_id"])["m_score"].idxmin()
         data = data.loc[idx]
+        
+        if data.empty:
+            raise ValueError(
+                "No data available for precursor-level summarization. "
+                "This typically occurs when no peak groups pass the q-value thresholds."
+            )
+        
         logger.info("Summarizing to precursor level.")
         # Create matrix
         matrix = data.pivot_table(
@@ -801,6 +818,13 @@ class BaseWriter(ABC):
         # First get top peak group per precursor
         idx = data.groupby(["run_id", "transition_group_id"])["m_score"].idxmin()
         data = data.loc[idx]
+        
+        if data.empty:
+            raise ValueError(
+                "No data available after filtering for peptide-level summarization. "
+                "This typically occurs when no peak groups pass the q-value thresholds."
+            )
+        
         logger.info("Summarizing to peptide level.")
         # Get top precursors for each peptide
         if consistent_top:
@@ -830,12 +854,29 @@ class BaseWriter(ABC):
                 .reset_index(drop=True)
             )
 
+        if data.empty:
+            raise ValueError(
+                "No data available after selecting top precursors for peptide-level summarization. "
+                "Check that top_n is not too large for your dataset."
+            )
+
         # Summarize by peptide (mean of top precursors)
-        peptide_matrix = (
-            data.groupby(["Sequence", "FullPeptideName", "filename"])["Intensity"]
-            .mean()
-            .unstack()
-        ).reset_index()
+        # Group and aggregate
+        grouped = data.groupby(["Sequence", "FullPeptideName", "filename"])["Intensity"].mean()
+        
+        # Unstack carefully to avoid index conflicts
+        try:
+            peptide_matrix = grouped.unstack(fill_value=None)
+        except ValueError as e:
+            if "cannot insert" in str(e):
+                raise ValueError(
+                    "Failed to create quantification matrix due to duplicate column names. "
+                    "This may indicate malformed data or inconsistent peptide annotations."
+                ) from e
+            raise
+        
+        # Reset index to convert index columns to regular columns
+        peptide_matrix = peptide_matrix.reset_index()
         return peptide_matrix
 
     def _summarize_protein_level(
@@ -864,6 +905,13 @@ class BaseWriter(ABC):
             right_on="FullPeptideName",
             how="left",
         )
+        
+        if protein_matrix.empty:
+            raise ValueError(
+                "No protein data available after mapping peptides to proteins. "
+                "Check that protein annotations are present in the data."
+            )
+        
         protein_matrix = protein_matrix.explode("ProteinName")
 
         if consistent_top:
@@ -888,6 +936,12 @@ class BaseWriter(ABC):
         protein_matrix = (
             protein_matrix.groupby("ProteinName").mean(numeric_only=True).reset_index()
         )
+        
+        if protein_matrix.empty:
+            raise ValueError(
+                "No data available after protein-level summarization. "
+                "This may indicate all proteins were filtered out."
+            )
 
         return protein_matrix
 
@@ -917,6 +971,13 @@ class BaseWriter(ABC):
             right_on="FullPeptideName",
             how="left",
         )
+        
+        if gene_matrix.empty:
+            raise ValueError(
+                "No gene data available after mapping peptides to genes. "
+                "Check that gene annotations are present in the data."
+            )
+        
         gene_matrix = gene_matrix.explode("Gene")
 
         if consistent_top:
@@ -939,6 +1000,12 @@ class BaseWriter(ABC):
 
         # Summarize by gene (mean of top peptides)
         gene_matrix = gene_matrix.groupby("Gene").mean(numeric_only=True).reset_index()
+        
+        if gene_matrix.empty:
+            raise ValueError(
+                "No data available after gene-level summarization. "
+                "This may indicate all genes were filtered out."
+            )
 
         return gene_matrix
 
