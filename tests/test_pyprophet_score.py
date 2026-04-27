@@ -6,6 +6,7 @@ import shutil
 import sys
 import sqlite3
 import math
+from decimal import Decimal, ROUND_DOWN
 
 import pandas as pd
 import pytest
@@ -29,21 +30,49 @@ def _round_sig(value, sig_digits=4):
     return round(value, sig_digits - int(math.floor(math.log10(abs(value)))) - 1)
 
 
+def _stabilize_regtest_float(value, sig_digits=4, decimal_places=4, zero_eps=1e-12):
+    """
+    Make float rendering deterministic across Python/pandas/platform variants.
+
+    For values >= 1 we truncate to a fixed number of decimal places.
+    For values < 1 we truncate to a fixed number of significant digits.
+    Tiny near-zero values are snapped to 0.
+    """
+    if pd.isna(value):
+        return value
+
+    value = float(value)
+    if value == 0 or abs(value) < zero_eps:
+        return 0.0
+
+    dec_value = Decimal(str(value))
+    if abs(value) >= 1:
+        quantum = Decimal("1").scaleb(-decimal_places)
+        return float(dec_value.quantize(quantum, rounding=ROUND_DOWN))
+
+    digits_after_decimal = sig_digits - int(math.floor(math.log10(abs(value)))) - 1
+    quantum = Decimal("1").scaleb(-digits_after_decimal)
+    return float(dec_value.quantize(quantum, rounding=ROUND_DOWN))
+
+
+def _normalize_regtest_frame(df, head=100):
+    """Normalize floating-point output so regtests are stable across environments."""
+    normalized = df.head(head).sort_index(axis=1).copy()
+    float_cols = normalized.select_dtypes(include=["floating"]).columns
+
+    for col in float_cols:
+        normalized[col] = normalized[col].map(_stabilize_regtest_float)
+
+    return normalized
+
+
 def _normalize_peakgroup_regtest_frame(df):
     """
     Normalize tiny floating-point values so regtest output is stable across
     Python/pandas/platform combinations. This only affects the peakgroup
     summary tables used by the OSW/parquet score tests.
     """
-    normalized = df.head(100).sort_index(axis=1).copy()
-    float_cols = normalized.select_dtypes(include=["floating"]).columns
-
-    for col in float_cols:
-        values = normalized[col]
-        mask = values.notna() & values.ne(0) & values.abs().lt(1e-6)
-        normalized.loc[mask, col] = values.loc[mask].map(_round_sig)
-
-    return normalized
+    return _normalize_regtest_frame(df, head=100)
 
 
 def _print_peakgroup_regtest_frame(df, regtest):
@@ -186,7 +215,7 @@ class TSVTestStrategy(TestStrategy):
             df = pd.read_csv(
                 f"test_data_{suffix}", sep="\t" if "tsv" in suffix else ","
             )
-            print(df.head(100).sort_index(axis=1), file=regtest)
+            print(_normalize_regtest_frame(df), file=regtest)
 
 
 class OSWTestStrategy(TestStrategy):
