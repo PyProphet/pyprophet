@@ -866,7 +866,7 @@ class BaseWriter(ABC):
         
         # Unstack and reset index carefully to avoid column name conflicts
         try:
-            peptide_matrix = grouped.unstack()
+            peptide_matrix = grouped.unstack(fill_value=None)
             # Reset index to convert index columns to regular columns
             peptide_matrix = peptide_matrix.reset_index()
         except ValueError as e:
