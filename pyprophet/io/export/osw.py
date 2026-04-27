@@ -2556,13 +2556,20 @@ class OSWWriter(BaseOSWWriter):
 
         view_name = f"{score_table.lower()}_view"
 
-        # Build pivot columns for available contexts
+        # Build pivot columns for non-global contexts.
         pivot_cols = []
+        non_global_col_names = []
         for context in contexts:
-            # Skip 'global' context as it will be handled separately
             if context != "global":
-                # Convert context to column-safe format: 'run-specific' -> 'RUN_SPECIFIC'
                 safe_context = context.upper().replace("-", "_")
+                non_global_col_names.extend(
+                    [
+                        f"{score_table}_{safe_context}_SCORE",
+                        f"{score_table}_{safe_context}_PVALUE",
+                        f"{score_table}_{safe_context}_QVALUE",
+                        f"{score_table}_{safe_context}_PEP",
+                    ]
+                )
                 pivot_cols.extend(
                     [
                         f"ANY_VALUE(CASE WHEN context = '{context}' THEN SCORE END) as {score_table}_{safe_context}_SCORE",
@@ -2574,8 +2581,8 @@ class OSWWriter(BaseOSWWriter):
 
         pivot_cols_str = ", ".join(pivot_cols)
 
-        # Non-global contexts pivot query
-        if pivot_cols_str:  # Only if there are non-global contexts
+        # Non-global contexts are keyed by (ID, RUN_ID).
+        if pivot_cols_str:
             non_global_query = f"""
             SELECT {id_col}, RUN_ID, {pivot_cols_str}
             FROM sqlite_scan('{self.config.infile}', '{score_table}')
@@ -2583,47 +2590,61 @@ class OSWWriter(BaseOSWWriter):
             GROUP BY {id_col}, RUN_ID
             """
         else:
-            # If no non-global contexts, create empty result with same structure
-            non_global_query = f"""
-            SELECT {id_col}, RUN_ID
-            FROM sqlite_scan('{self.config.infile}', '{score_table}')
-            WHERE 1=0
-            """
+            non_global_query = None
 
         global_exists = "global" in contexts
-        # Global data query (only if global context exists)
+        global_col_names = [
+            f"{score_table}_GLOBAL_SCORE",
+            f"{score_table}_GLOBAL_PVALUE",
+            f"{score_table}_GLOBAL_QVALUE",
+            f"{score_table}_GLOBAL_PEP",
+        ]
+        # Global scores are keyed only by the entity ID. Some files store RUN_ID as NULL.
         if global_exists:
             glob_query = f"""
             SELECT {id_col}, 
-                RUN_ID,
-                SCORE as {score_table}_GLOBAL_SCORE, 
-                PVALUE as {score_table}_GLOBAL_PVALUE, 
-                QVALUE as {score_table}_GLOBAL_QVALUE, 
-                PEP as {score_table}_GLOBAL_PEP
+                ANY_VALUE(SCORE) as {score_table}_GLOBAL_SCORE, 
+                ANY_VALUE(PVALUE) as {score_table}_GLOBAL_PVALUE, 
+                ANY_VALUE(QVALUE) as {score_table}_GLOBAL_QVALUE, 
+                ANY_VALUE(PEP) as {score_table}_GLOBAL_PEP
             FROM sqlite_scan('{self.config.infile}', '{score_table}') 
             WHERE context = 'global'
+            GROUP BY {id_col}
             """
+        else:
+            glob_query = None
 
         # Build final merged query based on what exists
-        if pivot_cols_str and global_exists:
-            # Both non-global and global contexts exist
+        if non_global_query and glob_query:
+            non_global_select_cols = ",\n                ".join(
+                f"ng.{col}" for col in non_global_col_names
+            )
+            global_select_cols = ",\n                ".join(
+                f"g.{col}" for col in global_col_names
+            )
             merged_query = f"""
-            SELECT ng.*, 
-                g.{score_table}_GLOBAL_SCORE, 
-                g.{score_table}_GLOBAL_PVALUE, 
-                g.{score_table}_GLOBAL_QVALUE, 
-                g.{score_table}_GLOBAL_PEP
+            SELECT
+                COALESCE(ng.{id_col}, g.{id_col}) AS {id_col},
+                ng.RUN_ID,
+                {non_global_select_cols},
+                {global_select_cols}
             FROM ({non_global_query}) ng
-            LEFT JOIN ({glob_query}) g ON ng.{id_col} = g.{id_col} AND ng.RUN_ID = g.RUN_ID
+            FULL OUTER JOIN ({glob_query}) g ON ng.{id_col} = g.{id_col}
             """
-        elif pivot_cols_str and not global_exists:
-            # Only non-global contexts exist
+        elif non_global_query:
             merged_query = non_global_query
-        elif not pivot_cols_str and global_exists:
-            # Only global context exists
-            merged_query = glob_query
+        elif glob_query:
+            global_select_cols = ",\n                ".join(
+                f"g.{col}" for col in global_col_names
+            )
+            merged_query = f"""
+            SELECT
+                g.{id_col},
+                NULL AS RUN_ID,
+                {global_select_cols}
+            FROM ({glob_query}) g
+            """
         else:
-            # No contexts exist - return empty result with ID columns
             merged_query = f"""
             SELECT {id_col}, RUN_ID
             FROM sqlite_scan('{self.config.infile}', '{score_table}')
@@ -2683,7 +2704,8 @@ class OSWWriter(BaseOSWWriter):
             )
             # Add JOIN for peptide score view
             score_tables_to_join.append(
-                "LEFT JOIN score_peptide_view ON PEPTIDE.ID = score_peptide_view.PEPTIDE_ID AND FEATURE.RUN_ID = score_peptide_view.RUN_ID"
+                "LEFT JOIN score_peptide_view ON PEPTIDE.ID = score_peptide_view.PEPTIDE_ID "
+                "AND (FEATURE.RUN_ID = score_peptide_view.RUN_ID OR score_peptide_view.RUN_ID IS NULL)"
             )
         if column_info["score_protein_exists"]:
             logger.debug("SCORE_PROTEIN table exists, adding score table view to query")
@@ -2694,7 +2716,8 @@ class OSWWriter(BaseOSWWriter):
             )
             # Add JOIN for protein score view
             score_tables_to_join.append(
-                "LEFT JOIN score_protein_view ON PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID = score_protein_view.PROTEIN_ID AND FEATURE.RUN_ID = score_protein_view.RUN_ID"
+                "LEFT JOIN score_protein_view ON PEPTIDE_PROTEIN_MAPPING.PROTEIN_ID = score_protein_view.PROTEIN_ID "
+                "AND (FEATURE.RUN_ID = score_protein_view.RUN_ID OR score_protein_view.RUN_ID IS NULL)"
             )
 
         # Add score columns for peptide and protein contexts

@@ -101,6 +101,25 @@ def run_pyprophet_command(cmd, temp_folder):
             raise
 
 
+def sort_parquet_export_frame(df):
+    """Sort exported parquet rows by stable ID columns for deterministic snapshots."""
+    sort_cols = [
+        col
+        for col in [
+            "RUN_ID",
+            "PROTEIN_ID",
+            "PEPTIDE_ID",
+            "PRECURSOR_ID",
+            "FEATURE_ID",
+            "TRANSITION_ID",
+        ]
+        if col in df.columns
+    ]
+    return df.sort_values(sort_cols, kind="mergesort", na_position="last").reset_index(
+        drop=True
+    )
+
+
 def validate_export_results(
     regtest, input_path, input_type, output_file="test_data.tsv"
 ):
@@ -303,6 +322,7 @@ def test_parquet_export_scored_osw(test_data_osw, temp_folder, regtest):
     score_columns = [col for col in df.columns if col.startswith("SCORE_")]
     assert len(score_columns) > 0, "Exported parquet should contain SCORE_ columns"
 
+    df = sort_parquet_export_frame(df)
     print(f"Exported {len(df)} rows with {len(df.columns)} columns", file=regtest)
     print(f"Score columns found: {sorted(score_columns)}", file=regtest)
     print(df.head(10).sort_index(axis=1), file=regtest)
@@ -344,6 +364,7 @@ def test_parquet_export_no_transition_data(test_data_osw, temp_folder, regtest):
     score_columns = [col for col in df.columns if col.startswith("SCORE_")]
     assert len(score_columns) > 0, "Exported parquet should contain SCORE_ columns"
 
+    df = sort_parquet_export_frame(df)
     print(
         f"Exported {len(df)} rows with {len(df.columns)} columns (no transition data)",
         file=regtest,
@@ -399,6 +420,8 @@ def test_parquet_export_split_format(test_data_osw, temp_folder, regtest):
     assert len(precursor_score_columns) > 0, (
         "Precursor parquet should contain SCORE_ columns"
     )
+
+    precursor_df = sort_parquet_export_frame(precursor_df)
 
     print(
         f"Precursor data: {len(precursor_df)} rows with {len(precursor_df.columns)} columns",
