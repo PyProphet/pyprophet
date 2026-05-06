@@ -717,3 +717,6 @@ class ExportIOConfig(BaseIOConfig):
     min_fragments: int = 4
     keep_decoys: bool = False  # Whether to keep decoy entries in the library
     rt_unit: Literal["iRT", "RT"] = "iRT"
+
+    # TSV/Matrix export options
+    exclude_decoys: bool = True  # Whether to exclude decoy entries from TSV/matrix export (default: True, exclude decoys)

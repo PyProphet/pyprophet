@@ -159,6 +159,13 @@ def create_export_group():
     type=float,
     help="[format: matrix/legacy] Maximum PEP to consider for good alignments when use_alignment is enabled.",
 )
+@click.option(
+    "--exclude-decoys/--no-exclude-decoys",
+    "exclude_decoys",
+    default=True,
+    show_default=True,
+    help="Exclude decoy entries from the exported results. Use --no-exclude-decoys to retain decoys.",
+)
 @measure_memory_usage_and_time
 def export_tsv(
     infile,
@@ -176,6 +183,7 @@ def export_tsv(
     max_global_protein_qvalue,
     use_alignment,
     max_alignment_pep,
+    exclude_decoys,
 ):
     """
     Export Proteomics/Peptidoform TSV/CSV tables
@@ -207,6 +215,7 @@ def export_tsv(
         max_global_protein_qvalue=max_global_protein_qvalue,
         use_alignment=use_alignment,
         max_alignment_pep=max_alignment_pep,
+        exclude_decoys=exclude_decoys,
     )
 
     reader = ReaderDispatcher.get_reader(config)
@@ -329,6 +338,13 @@ def export_tsv(
     type=click.Choice(["none", "median", "medianmedian", "quantile"]),
     help="[format: matrix/legacy] Normalization method to apply to the quantification matrix.",
 )
+@click.option(
+    "--exclude-decoys/--no-exclude-decoys",
+    "exclude_decoys",
+    default=True,
+    show_default=True,
+    help="Exclude decoy entries from the exported matrix. Use --no-exclude-decoys to retain decoys.",
+)
 @measure_memory_usage_and_time
 def export_matrix(
     infile,
@@ -347,6 +363,7 @@ def export_matrix(
     top_n,
     consistent_top,
     normalization,
+    exclude_decoys,
 ):
     """
     Export Proteomics/Peptidoform Quantification Matrix
@@ -381,6 +398,7 @@ def export_matrix(
         top_n=top_n,
         consistent_top=consistent_top,
         normalization=normalization,
+        exclude_decoys=exclude_decoys,
     )
 
     reader = ReaderDispatcher.get_reader(config)
