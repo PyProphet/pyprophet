@@ -592,7 +592,7 @@ class BaseWriter(ABC):
         # Filter out decoys if exclude_decoys is True
         if cfg.exclude_decoys and "decoy" in data.columns:
             initial_count = len(data)
-            data = data[data["decoy"] == 0]
+            data = data.loc[data["decoy"].eq(0)].copy()
             decoy_count = initial_count - len(data)
             if decoy_count > 0:
                 logger.info(f"Excluded {decoy_count} decoy entries from export.")
