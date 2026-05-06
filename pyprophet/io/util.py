@@ -497,25 +497,27 @@ def get_num_runs(infile, file_type):
                 con.close()
 
         elif file_type == "parquet":
-            # Single parquet file - need to check RUN_ID column
+            # Single parquet file - use DuckDB for efficient streaming count
             if not is_parquet_file(infile):
                 return 0
 
             try:
-                df = pd.read_parquet(infile, columns=["RUN_ID"])
-                return df["RUN_ID"].nunique()
+                con = duckdb.connect()
+                query = f"""
+                    SELECT COUNT(DISTINCT RUN_ID) as num_runs
+                    FROM read_parquet('{infile}')
+                """
+                result = con.execute(query).fetchone()
+                return result[0] if result else 0
             except Exception:
                 return 0
 
         elif file_type == "parquet_split":
-            # Single-run split parquet directory
+            # Single-run split parquet directory - by definition, there is only 1 run
+            # (parquet_split is validated to contain one set of run files)
             precursor_path = os.path.join(infile, "precursors_features.parquet")
             if os.path.exists(precursor_path) and is_parquet_file(precursor_path):
-                try:
-                    df = pd.read_parquet(precursor_path, columns=["RUN_ID"])
-                    return df["RUN_ID"].nunique()
-                except Exception:
-                    return 0
+                return 1
             return 0
 
         elif file_type == "parquet_split_multi":
