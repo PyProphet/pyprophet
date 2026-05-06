@@ -335,12 +335,12 @@ class OSWReader(BaseOSWReader):
                 WHERE fma.LABEL = 1
                 AND fma.REFERENCE_FEATURE_ID != fma.ALIGNED_FEATURE_ID
             ) AS merged
-            LEFT JOIN (
+            INNER JOIN (
                 SELECT 
                     FEATURE_ID,
                     MIN(PEP) AS pep
                 FROM osw.SCORE_ALIGNMENT
-                WHERE PEP <= {pep_threshold}
+                WHERE PEP < {pep_threshold}
                 GROUP BY FEATURE_ID
             ) AS sa
             ON merged.FEATURE_ID = sa.FEATURE_ID
@@ -545,18 +545,32 @@ class OSWReader(BaseOSWReader):
         query = f"""
             SELECT  
                 DENSE_RANK() OVER (ORDER BY PRECURSOR_ID, ALIGNMENT_ID) AS ALIGNMENT_GROUP_ID,
-                ALIGNED_FEATURE_ID AS FEATURE_ID 
+                FEATURE_ID 
             FROM (
-                SELECT DISTINCT * FROM FEATURE_MS2_ALIGNMENT
-            ) AS FEATURE_MS2_ALIGNMENT
+                SELECT DISTINCT
+                    ALIGNMENT_ID,
+                    PRECURSOR_ID,
+                    REFERENCE_FEATURE_ID AS FEATURE_ID
+                FROM FEATURE_MS2_ALIGNMENT
+                WHERE LABEL = 1
+                AND REFERENCE_FEATURE_ID != ALIGNED_FEATURE_ID
+                
+                UNION
+                
+                SELECT DISTINCT
+                    ALIGNMENT_ID,
+                    PRECURSOR_ID,
+                    ALIGNED_FEATURE_ID AS FEATURE_ID
+                FROM FEATURE_MS2_ALIGNMENT
+                WHERE LABEL = 1
+                AND REFERENCE_FEATURE_ID != ALIGNED_FEATURE_ID
+            ) AS feature_list
             INNER JOIN (
-                SELECT DISTINCT *, MIN(QVALUE) 
+                SELECT DISTINCT FEATURE_ID
                 FROM SCORE_ALIGNMENT 
-                GROUP BY FEATURE_ID
-            ) AS SCORE_ALIGNMENT 
-            ON SCORE_ALIGNMENT.FEATURE_ID = FEATURE_MS2_ALIGNMENT.ALIGNED_FEATURE_ID
-            WHERE LABEL = 1
-            AND SCORE_ALIGNMENT.PEP < {pep_threshold}
+                WHERE PEP < {pep_threshold}
+            ) AS good_alignments 
+            ON good_alignments.FEATURE_ID = feature_list.FEATURE_ID
             ORDER BY ALIGNMENT_GROUP_ID
         """
 

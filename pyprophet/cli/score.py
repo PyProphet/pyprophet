@@ -12,6 +12,7 @@ from .util import (
     memray_profile,
 )
 from .._config import RunnerIOConfig
+from ..io.util import get_num_runs
 # Defer import of runner to avoid premature sklearn import before OMP_NUM_THREADS is set
 # from ..scoring.runner import PyProphetLearner, PyProphetWeightApplier
 
@@ -37,7 +38,7 @@ from .._config import RunnerIOConfig
     default=1.0,
     show_default=True,
     type=float,
-    help="Subsampling ratio for large data. Use <1.0 to subsample precursors for semi-supervised learning, the learned weights will then be applied to the full data set.",
+    help="Subsampling ratio for large data. Use <1.0 to subsample precursors for semi-supervised learning, the learned weights will then be applied to the full data set. When set to 1.0 (default) and the input has >20 runs, auto-subsampling to 1/N is applied (N=number of runs). Set to -1.0 to disable auto-subsampling and use full data.",
 )
 # Semi-supervised learning
 @click.option(
@@ -373,10 +374,29 @@ def score(
         ctx.obj["LOG_HEADER"],
     )
 
+    # Auto-subsample based on number of runs if applicable
+    if subsample_ratio == 1.0:
+        # Check if we should auto-subsample
+        num_runs = get_num_runs(infile, config.file_type)
+        if num_runs > 20:
+            config.subsample_ratio = 1.0 / num_runs
+            logger.info(
+                f"Auto-subsampling enabled: {num_runs} runs detected. "
+                f"Setting subsample_ratio to 1/{num_runs} = {config.subsample_ratio:.4f} "
+                f"for efficient semi-supervised learning. Use --subsample_ratio -1 to disable auto-subsampling."
+            )
+    elif subsample_ratio == -1.0:
+        # User explicitly disabled auto-subsampling
+        config.subsample_ratio = 1.0
+        logger.info(
+            "Auto-subsampling disabled (subsample_ratio set to -1.0). "
+            "Using full dataset for semi-supervised learning."
+        )
+
     # Validate file type and subsample ratio. OSW, parquet, parquet_split, and parquet_split_multi all support subsampling
     if (
         config.file_type not in ["osw", "parquet", "parquet_split", "parquet_split_multi"]
-        and subsample_ratio < 1.0
+        and config.subsample_ratio < 1.0
     ):
         logger.warning(
             "Semi-supervised learning on a subset of the data, and then applying the weights to the full data is currently only supported for OSW, `parquet`, `parquet_split`, and `parquet_split_multi` files.\nFor TSV and other formats, you need to manually prepare a subsampled input file.\nSetting subsample_ratio to 1.0.",

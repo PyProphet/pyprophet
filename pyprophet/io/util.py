@@ -465,6 +465,83 @@ def print_parquet_tree(root_dir, precursors, transitions, alignment=None, max_ru
         click.echo(f"    └── 📄 {os.path.basename(alignment)}")
 
 
+def get_num_runs(infile, file_type):
+    """
+    Get the number of runs in the input file.
+
+    Supports OSW (SQLite), Parquet, Parquet split, and Parquet split multi formats.
+
+    Args:
+        infile (str): Path to the input file or directory.
+        file_type (str): Type of input file ('osw', 'parquet', 'parquet_split', 'parquet_split_multi', 'tsv').
+
+    Returns:
+        int: Number of runs in the input file, or 0 if unable to determine.
+    """
+    try:
+        if file_type == "osw":
+            # Query RUN table from SQLite database
+            if not is_sqlite_file(infile):
+                return 0
+
+            con = sqlite3.connect(infile)
+            try:
+                cursor = con.cursor()
+                cursor.execute("SELECT COUNT(*) FROM RUN")
+                num_runs = cursor.fetchone()[0]
+                return num_runs
+            except sqlite3.OperationalError:
+                # RUN table doesn't exist
+                return 0
+            finally:
+                con.close()
+
+        elif file_type == "parquet":
+            # Single parquet file - use DuckDB for efficient streaming count
+            if not is_parquet_file(infile):
+                return 0
+
+            try:
+                con = duckdb.connect()
+                query = f"""
+                    SELECT COUNT(DISTINCT RUN_ID) as num_runs
+                    FROM read_parquet('{infile}')
+                """
+                result = con.execute(query).fetchone()
+                return result[0] if result else 0
+            except Exception:
+                return 0
+
+        elif file_type == "parquet_split":
+            # Single-run split parquet directory - by definition, there is only 1 run
+            # (parquet_split is validated to contain one set of run files)
+            precursor_path = os.path.join(infile, "precursors_features.parquet")
+            if os.path.exists(precursor_path) and is_parquet_file(precursor_path):
+                return 1
+            return 0
+
+        elif file_type == "parquet_split_multi":
+            # Multi-run split parquet directory - count .oswpq subdirectories
+            if not os.path.isdir(infile):
+                return 0
+
+            # Each .oswpq directory represents one run
+            runs = [
+                d for d in os.listdir(infile)
+                if d.endswith(".oswpq") and os.path.isdir(os.path.join(infile, d))
+            ]
+            return len(runs)
+
+        elif file_type == "tsv":
+            return 1
+
+        return 0
+
+    except Exception as e:
+        logger.warning(f"Error getting number of runs from {infile}: {e}")
+        return 0
+
+
 def unimod_to_codename(seq):
     """
     Convert a sequence with unimod modifications to a codename.
