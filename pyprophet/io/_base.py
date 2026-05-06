@@ -589,6 +589,14 @@ class BaseWriter(ABC):
         """
         cfg = self.config
 
+        # Filter out decoys if exclude_decoys is True
+        if cfg.exclude_decoys and "decoy" in data.columns:
+            initial_count = len(data)
+            data = data[data["decoy"] == 0]
+            decoy_count = initial_count - len(data)
+            if decoy_count > 0:
+                logger.info(f"Excluded {decoy_count} decoy entries from export.")
+
         sep = "," if cfg.out_type == "csv" else "\t"
 
         if cfg.export_format == "legacy_split":
@@ -736,6 +744,14 @@ class BaseWriter(ABC):
 
         """
         cfg = self.config
+
+        # Filter out decoys if exclude_decoys is True
+        if cfg.exclude_decoys and "decoy" in data.columns:
+            initial_count = len(data)
+            data = data[data["decoy"] == 0]
+            decoy_count = initial_count - len(data)
+            if decoy_count > 0:
+                logger.info(f"Excluded {decoy_count} decoy entries from quantification matrix.")
 
         # Check if data is empty
         if data.empty:
