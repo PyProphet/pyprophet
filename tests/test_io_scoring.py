@@ -310,3 +310,45 @@ def test_compare_readers(request, level, reader_fixture):
         ).reset_index(drop=True)[cols]
 
         compare_dataframes(df_primary_sorted, df_comp_sorted, cols)
+
+
+def test_osw_reader_run_filter_matches_single_run_subset():
+    reader = _create_osw_reader("ms1ms2")
+    full_df = reader.read()
+    run_id = int(full_df["run_id"].iloc[0])
+
+    infile = os.path.join(DATA_FOLDER, "test_data.osw")
+    outfile = os.path.join(DATA_FOLDER, "tmp_test_data.osw")
+    config = create_reader_config("ms1ms2", infile, outfile)
+    config.run_id_filter = run_id
+
+    filtered_df = OSWReader(config).read()
+    expected_df = full_df[full_df["run_id"] == run_id].reset_index(drop=True)
+    actual_df = filtered_df.reset_index(drop=True)
+
+    pd.testing.assert_frame_equal(
+        actual_df.sort_values(by=["feature_id"]).reset_index(drop=True),
+        expected_df.sort_values(by=["feature_id"]).reset_index(drop=True),
+        check_dtype=False,
+    )
+
+
+def test_osw_reader_run_filter_matches_multi_run_subset():
+    reader = _create_osw_reader("ms1ms2")
+    full_df = reader.read()
+    run_ids = tuple(int(run_id) for run_id in full_df["run_id"].drop_duplicates().iloc[:2])
+
+    infile = os.path.join(DATA_FOLDER, "test_data.osw")
+    outfile = os.path.join(DATA_FOLDER, "tmp_test_data.osw")
+    config = create_reader_config("ms1ms2", infile, outfile)
+    config.run_id_filter = run_ids
+
+    filtered_df = OSWReader(config).read()
+    expected_df = full_df[full_df["run_id"].isin(run_ids)].reset_index(drop=True)
+    actual_df = filtered_df.reset_index(drop=True)
+
+    pd.testing.assert_frame_equal(
+        actual_df.sort_values(by=["run_id", "feature_id"]).reset_index(drop=True),
+        expected_df.sort_values(by=["run_id", "feature_id"]).reset_index(drop=True),
+        check_dtype=False,
+    )

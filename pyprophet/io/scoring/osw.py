@@ -2,11 +2,12 @@ import os
 import pickle
 from shutil import copyfile
 import sqlite3
+import zlib
 import duckdb
 import pandas as pd
 import click
 from loguru import logger
-from ..util import check_sqlite_table, check_duckdb_table
+from ..util import check_sqlite_table, check_duckdb_table, get_table_columns
 from .._base import BaseOSWReader, BaseOSWWriter
 from ..._config import RunnerIOConfig
 
@@ -41,6 +42,12 @@ class OSWReader(BaseOSWReader):
         pd.DataFrame: The data read from the file.
         """
         self._create_indexes()
+        if getattr(self.config, "run_id_filter", None) is not None:
+            logger.info(
+                "Using SQLite read path for run-scoped OSW access."
+            )
+            con = sqlite3.connect(self.infile)
+            return self._read_using_sqlite(con)
         try:
             con = duckdb.connect()
             con.execute("INSTALL sqlite_scanner;")
@@ -66,11 +73,15 @@ class OSWReader(BaseOSWReader):
             index_statements = [
                 "CREATE INDEX IF NOT EXISTS idx_precursor_id ON PRECURSOR (ID);",
                 "CREATE INDEX IF NOT EXISTS idx_feature_precursor_id ON FEATURE (PRECURSOR_ID);",
+                "CREATE INDEX IF NOT EXISTS idx_feature_run_id ON FEATURE (RUN_ID);",
+                "CREATE INDEX IF NOT EXISTS idx_feature_run_id_feature_id ON FEATURE (RUN_ID, ID);",
                 "CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);",
                 "CREATE INDEX IF NOT EXISTS idx_feature_ms1_feature_id ON FEATURE_MS1 (FEATURE_ID);",
                 "CREATE INDEX IF NOT EXISTS idx_feature_ms2_feature_id ON FEATURE_MS2 (FEATURE_ID);",
                 "CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);",
+                "CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id_rank_pep ON SCORE_MS2 (FEATURE_ID, RANK, PEP);",
                 "CREATE INDEX IF NOT EXISTS idx_feature_transition_feature_id ON FEATURE_TRANSITION (FEATURE_ID);",
+                "CREATE INDEX IF NOT EXISTS idx_feature_transition_feature_id_transition_id ON FEATURE_TRANSITION (FEATURE_ID, TRANSITION_ID);",
                 "CREATE INDEX IF NOT EXISTS idx_feature_transition_transition_id ON FEATURE_TRANSITION (TRANSITION_ID);",
                 "CREATE INDEX IF NOT EXISTS idx_transition_id ON TRANSITION (ID);",
             ]
@@ -159,6 +170,37 @@ class OSWReader(BaseOSWReader):
             return " AND f.PRECURSOR_ID IN (SELECT PRECURSOR_ID FROM sampled_precursor_ids)"
         return ""
 
+    def _get_run_filter_clause(self, alias="f"):
+        run_filter = getattr(self.config, "run_id_filter", None)
+        if run_filter is None:
+            return ""
+
+        if isinstance(run_filter, (list, tuple, set)):
+            try:
+                run_ids = tuple(int(run_id) for run_id in run_filter)
+            except (TypeError, ValueError) as exc:
+                raise click.ClickException(
+                    f"Invalid run_id_filter value: {run_filter}"
+                ) from exc
+            if not run_ids:
+                return ""
+            if len(run_ids) == 1:
+                return f" AND {alias}.RUN_ID = {run_ids[0]}"
+            return (
+                f" AND {alias}.RUN_ID IN ("
+                + ",".join(str(run_id) for run_id in run_ids)
+                + ")"
+            )
+
+        try:
+            run_id = int(run_filter)
+        except (TypeError, ValueError) as exc:
+            raise click.ClickException(
+                f"Invalid run_id_filter value: {run_filter}"
+            ) from exc
+
+        return f" AND {alias}.RUN_ID = {run_id}"
+
     def _fetch_ms2_features_duckdb(self, con):
         if not check_duckdb_table(con, "main", "FEATURE_MS2"):
             raise click.ClickException(
@@ -166,6 +208,7 @@ class OSWReader(BaseOSWReader):
             )
 
         filter_clause = self._get_precursor_filter_clause()
+        run_filter_clause = self._get_run_filter_clause("f")
 
         if self.glyco:
             con.execute(
@@ -202,7 +245,7 @@ class OSWReader(BaseOSWReader):
                     WHERE t.DETECTING = 1
                     GROUP BY tpm.PRECURSOR_ID
                 ) ts ON f.PRECURSOR_ID = ts.PRECURSOR_ID
-                WHERE 1=1{filter_clause}
+                WHERE 1=1{filter_clause}{run_filter_clause}
                 """
             )
         else:
@@ -230,7 +273,7 @@ class OSWReader(BaseOSWReader):
                     WHERE t.DETECTING = 1
                     GROUP BY tpm.PRECURSOR_ID
                 ) ts ON f.PRECURSOR_ID = ts.PRECURSOR_ID
-                WHERE 1=1{filter_clause}
+                WHERE 1=1{filter_clause}{run_filter_clause}
                 """
             )
 
@@ -239,7 +282,14 @@ class OSWReader(BaseOSWReader):
         ).fetchdf()
 
         if self.level == "ms1ms2":
-            ms1_df = con.execute("SELECT * FROM osw.FEATURE_MS1").fetchdf()
+            ms1_df = con.execute(
+                f"""
+                SELECT fm1.*
+                FROM osw.FEATURE_MS1 fm1
+                INNER JOIN osw.FEATURE f ON fm1.FEATURE_ID = f.ID
+                WHERE 1=1{filter_clause}{run_filter_clause}
+                """
+            ).fetchdf()
             ms1_scores = [c for c in ms1_df.columns if c.startswith("VAR_")]
             ms1_df = ms1_df[["FEATURE_ID"] + ms1_scores]
             ms1_df.columns = ["FEATURE_ID"] + [
@@ -259,6 +309,7 @@ class OSWReader(BaseOSWReader):
         glyco = rc.glyco
         ipf_max_rank = rc.ipf_max_peakgroup_rank
         filter_clause = self._get_precursor_filter_clause()
+        run_filter_clause = self._get_run_filter_clause("f")
 
         if not glyco:
             con.execute(
@@ -270,7 +321,7 @@ class OSWReader(BaseOSWReader):
                 FROM osw.FEATURE_MS1 fm
                 INNER JOIN osw.FEATURE f ON fm.FEATURE_ID = f.ID
                 INNER JOIN osw.PRECURSOR p ON f.PRECURSOR_ID = p.ID
-                WHERE 1=1{filter_clause}
+                WHERE 1=1{filter_clause}{run_filter_clause}
                 ORDER BY f.RUN_ID, p.ID, f.EXP_RT
                 """
             )
@@ -298,7 +349,7 @@ class OSWReader(BaseOSWReader):
                     FROM osw.PRECURSOR_GLYCOPEPTIDE_MAPPING pgm
                     INNER JOIN osw.GLYCOPEPTIDE gp ON pgm.GLYCOPEPTIDE_ID = gp.ID
                 ) g ON f.PRECURSOR_ID = g.PRECURSOR_ID
-                WHERE s.RANK <= {ipf_max_rank}{filter_clause}
+                WHERE s.RANK <= {ipf_max_rank}{filter_clause}{run_filter_clause}
                 ORDER BY f.RUN_ID, p.ID, f.EXP_RT
                 """
             )
@@ -321,28 +372,79 @@ class OSWReader(BaseOSWReader):
 
         rc = self.config.runner
         filter_clause = self._get_precursor_filter_clause()
+        run_filter_clause = self._get_run_filter_clause("f")
+        include_mapping_cardinality = rc.transition_score_use_mapping_cardinality
+        include_unique_mapping = rc.transition_score_use_unique_mapping
+        include_phospho_loss = rc.transition_score_use_phospho_loss
+        need_training_unique = rc.transition_training_require_unique_mapping
+        need_training_phospho_loss = rc.transition_training_require_phospho_loss
+        need_mapping_counts = (
+            include_mapping_cardinality
+            or include_unique_mapping
+            or need_training_unique
+        )
+        transition_cols = set(get_table_columns(self.infile, "TRANSITION"))
+        extra_select_parts = []
+        if include_mapping_cardinality:
+            extra_select_parts.append(
+                "COALESCE(tmc.N_MAPPED_PEPTIDES, 0) AS VAR_MAPPING_CARDINALITY"
+            )
+        if include_unique_mapping:
+            extra_select_parts.append(
+                """CASE
+                    WHEN COALESCE(tmc.N_MAPPED_PEPTIDES, 0) = 1 THEN 1.0
+                    ELSE 0.0
+                END AS VAR_IS_UNIQUE_MAPPING"""
+            )
+        if need_training_unique:
+            extra_select_parts.append(
+                """CASE
+                    WHEN COALESCE(tmc.N_MAPPED_PEPTIDES, 0) = 1 THEN 1.0
+                    ELSE 0.0
+                END AS meta_is_unique_mapping"""
+            )
+        if include_phospho_loss or need_training_phospho_loss:
+            if "ANNOTATION" in transition_cols:
+                extra_select_parts.append("tr.ANNOTATION AS TRANSITION_ANNOTATION")
+            else:
+                extra_select_parts.append("NULL AS TRANSITION_ANNOTATION")
+        extra_select_sql = ""
+        if extra_select_parts:
+            extra_select_sql = ",\n                " + ",\n                ".join(extra_select_parts)
+        mapping_join_sql = ""
+        if need_mapping_counts:
+            mapping_join_sql = """
+            LEFT JOIN (
+                SELECT
+                    TRANSITION_ID,
+                    COUNT(DISTINCT PEPTIDE_ID) AS N_MAPPED_PEPTIDES
+                FROM osw.TRANSITION_PEPTIDE_MAPPING
+                GROUP BY TRANSITION_ID
+            ) tmc ON ft.TRANSITION_ID = tmc.TRANSITION_ID
+            """
         con.execute(
             f"""
             CREATE OR REPLACE VIEW transition_table AS
             SELECT 
-                ft.*,
-                t.DECOY AS DECOY,
+                ft.*{extra_select_sql},
+                tr.DECOY AS DECOY,
                 f.RUN_ID,
                 f.PRECURSOR_ID,
                 f.EXP_RT,
                 p.CHARGE AS PRECURSOR_CHARGE,
-                t.CHARGE AS PRODUCT_CHARGE,
+                tr.CHARGE AS PRODUCT_CHARGE,
                 f.RUN_ID || '_' || ft.FEATURE_ID || '_' || f.PRECURSOR_ID || '_' || ft.TRANSITION_ID AS GROUP_ID
             FROM osw.FEATURE_TRANSITION ft
             INNER JOIN osw.FEATURE f ON ft.FEATURE_ID = f.ID
             INNER JOIN osw.SCORE_MS2 s ON f.ID = s.FEATURE_ID
             INNER JOIN osw.PRECURSOR p ON f.PRECURSOR_ID = p.ID
-            INNER JOIN osw.TRANSITION t ON ft.TRANSITION_ID = t.ID
+            INNER JOIN osw.TRANSITION tr ON ft.TRANSITION_ID = tr.ID
+            {mapping_join_sql}
             WHERE s.RANK <= {rc.ipf_max_peakgroup_rank}
             AND s.PEP <= {rc.ipf_max_peakgroup_pep}
             AND ft.VAR_ISOTOPE_OVERLAP_SCORE <= {rc.ipf_max_transition_isotope_overlap}
             AND ft.VAR_LOG_SN_SCORE > {rc.ipf_min_transition_sn}
-            AND p.DECOY = 0{filter_clause}
+            AND p.DECOY = 0{filter_clause}{run_filter_clause}
             """
         )
         df = con.execute(
@@ -352,6 +454,19 @@ class OSWReader(BaseOSWReader):
             ORDER BY RUN_ID, FEATURE_ID, PRECURSOR_ID, EXP_RT, TRANSITION_ID
             """
         ).fetchdf()
+        if include_phospho_loss or need_training_phospho_loss:
+            transition_annotation = df["TRANSITION_ANNOTATION"].astype("string")
+            phospho_loss = (
+                transition_annotation
+                .fillna("")
+                .str.contains("-H3O4P1", regex=False)
+                .astype(float)
+            )
+            if include_phospho_loss:
+                df["VAR_HAS_PHOSPHO_LOSS"] = phospho_loss
+            if need_training_phospho_loss:
+                df["meta_has_phospho_loss"] = phospho_loss
+            df = df.drop(columns=["TRANSITION_ANNOTATION"])
 
         return self._finalize_feature_table(df, self.config.runner.ss_main_score)
 
@@ -362,6 +477,7 @@ class OSWReader(BaseOSWReader):
             )
         
         filter_clause = self._get_precursor_filter_clause()
+        run_filter_clause = self._get_run_filter_clause("fa")
         con.execute(
             f"""
             CREATE OR REPLACE VIEW alignment_table AS
@@ -379,7 +495,7 @@ class OSWReader(BaseOSWReader):
                 fa.PEAK_INTENSITY_RATIO AS VAR_PEAK_INTENSITY_RATIO,
                 fa.ALIGNED_FEATURE_ID || '_' || fa.PRECURSOR_ID AS GROUP_ID
             FROM osw.FEATURE_MS2_ALIGNMENT fa
-            WHERE 1=1{filter_clause}
+            WHERE 1=1{filter_clause}{run_filter_clause}
             ORDER BY fa.RUN_ID, fa.PRECURSOR_ID, fa.REFERENCE_RT
         """
         )
@@ -395,8 +511,10 @@ class OSWReader(BaseOSWReader):
         if not check_sqlite_table(con, "FEATURE_MS2"):
             raise click.ClickException("MS2-level feature table not present in file.")
 
+        run_filter_clause = self._get_run_filter_clause("f")
+
         if not self.glyco:
-            query = """
+            query = f"""
                 SELECT fm.*,
                     f.RUN_ID,
                     f.PRECURSOR_ID,
@@ -416,10 +534,11 @@ class OSWReader(BaseOSWReader):
                     WHERE t.DETECTING = 1
                     GROUP BY tpm.PRECURSOR_ID
                 ) ts ON f.PRECURSOR_ID = ts.PRECURSOR_ID
+                WHERE 1=1{run_filter_clause}
                 ORDER BY f.RUN_ID, p.ID, f.EXP_RT
             """
         else:
-            query = """
+            query = f"""
                 SELECT fm.*,
                     f.RUN_ID,
                     f.PRECURSOR_ID,
@@ -448,13 +567,22 @@ class OSWReader(BaseOSWReader):
                     WHERE t.DETECTING = 1
                     GROUP BY tpm.PRECURSOR_ID
                 ) ts ON f.PRECURSOR_ID = ts.PRECURSOR_ID
+                WHERE 1=1{run_filter_clause}
                 ORDER BY f.RUN_ID, p.ID, f.EXP_RT
             """
 
         df = pd.read_sql_query(query, con)
 
         if self.level == "ms1ms2":
-            ms1_df = pd.read_sql_query("SELECT * FROM FEATURE_MS1", con)
+            ms1_df = pd.read_sql_query(
+                f"""
+                SELECT fm1.*
+                FROM FEATURE_MS1 fm1
+                INNER JOIN FEATURE f ON fm1.FEATURE_ID = f.ID
+                WHERE 1=1{run_filter_clause}
+                """,
+                con,
+            )
             ms1_scores = [c for c in ms1_df.columns if c.startswith("VAR_")]
             ms1_df = ms1_df[["FEATURE_ID"] + ms1_scores]
             ms1_df.columns = ["FEATURE_ID"] + [
@@ -472,14 +600,17 @@ class OSWReader(BaseOSWReader):
         if not check_sqlite_table(con, "FEATURE_MS1"):
             raise click.ClickException("MS1-level feature table not present in file.")
 
+        run_filter_clause = self._get_run_filter_clause("f")
+
         if not glyco:
-            query = """
+            query = f"""
                 SELECT fm.*, f.RUN_ID, f.PRECURSOR_ID, f.EXP_RT,
                     p.CHARGE AS PRECURSOR_CHARGE, p.DECOY,
                     f.RUN_ID || '_' || f.PRECURSOR_ID AS GROUP_ID
                 FROM FEATURE_MS1 fm
                 INNER JOIN FEATURE f ON fm.FEATURE_ID = f.ID
                 INNER JOIN PRECURSOR p ON f.PRECURSOR_ID = p.ID
+                WHERE 1=1{run_filter_clause}
                 ORDER BY f.RUN_ID, p.ID, f.EXP_RT
             """
         else:
@@ -504,7 +635,7 @@ class OSWReader(BaseOSWReader):
                     FROM PRECURSOR_GLYCOPEPTIDE_MAPPING pgm
                     INNER JOIN GLYCOPEPTIDE gp ON pgm.GLYCOPEPTIDE_ID = gp.ID
                 ) g ON f.PRECURSOR_ID = g.PRECURSOR_ID
-                WHERE s.RANK <= {ipf_max_rank}
+                WHERE s.RANK <= {ipf_max_rank}{run_filter_clause}
                 ORDER BY f.RUN_ID, p.ID, f.EXP_RT
             """
 
@@ -524,29 +655,137 @@ class OSWReader(BaseOSWReader):
                 "Transition-level feature table not present in file."
             )
 
-        query = f"""
-            SELECT 
-                ft.*,
-                t.DECOY AS DECOY,
-                f.RUN_ID,
-                f.PRECURSOR_ID,
-                f.EXP_RT,
-                p.CHARGE AS PRECURSOR_CHARGE,
-                t.CHARGE AS PRODUCT_CHARGE,
-                f.RUN_ID || '_' || ft.FEATURE_ID || '_' || f.PRECURSOR_ID || '_' || ft.TRANSITION_ID AS GROUP_ID
-            FROM FEATURE_TRANSITION ft
-            INNER JOIN FEATURE f ON ft.FEATURE_ID = f.ID
-            INNER JOIN SCORE_MS2 s ON f.ID = s.FEATURE_ID
-            INNER JOIN PRECURSOR p ON f.PRECURSOR_ID = p.ID
-            INNER JOIN TRANSITION t ON ft.TRANSITION_ID = t.ID
-            WHERE s.RANK <= {rc.ipf_max_peakgroup_rank}
-            AND s.PEP <= {rc.ipf_max_peakgroup_pep}
-            AND ft.VAR_ISOTOPE_OVERLAP_SCORE <= {rc.ipf_max_transition_isotope_overlap}
-            AND ft.VAR_LOG_SN_SCORE > {rc.ipf_min_transition_sn}
-            AND p.DECOY = 0
-            ORDER BY f.RUN_ID, f.PRECURSOR_ID, f.EXP_RT, ft.TRANSITION_ID
-        """
+        run_filter_clause = self._get_run_filter_clause("f")
+        include_mapping_cardinality = rc.transition_score_use_mapping_cardinality
+        include_unique_mapping = rc.transition_score_use_unique_mapping
+        include_phospho_loss = rc.transition_score_use_phospho_loss
+        need_training_unique = rc.transition_training_require_unique_mapping
+        need_training_phospho_loss = rc.transition_training_require_phospho_loss
+        need_mapping_counts = (
+            include_mapping_cardinality
+            or include_unique_mapping
+            or need_training_unique
+        )
+        transition_cols = set(get_table_columns(self.infile, "TRANSITION"))
+        extra_select_parts = []
+        if include_mapping_cardinality:
+            extra_select_parts.append(
+                "COALESCE(tmc.N_MAPPED_PEPTIDES, 0) AS VAR_MAPPING_CARDINALITY"
+            )
+        if include_unique_mapping:
+            extra_select_parts.append(
+                """CASE
+                        WHEN COALESCE(tmc.N_MAPPED_PEPTIDES, 0) = 1 THEN 1.0
+                        ELSE 0.0
+                    END AS VAR_IS_UNIQUE_MAPPING"""
+            )
+        if need_training_unique:
+            extra_select_parts.append(
+                """CASE
+                        WHEN COALESCE(tmc.N_MAPPED_PEPTIDES, 0) = 1 THEN 1.0
+                        ELSE 0.0
+                    END AS meta_is_unique_mapping"""
+            )
+        if include_phospho_loss or need_training_phospho_loss:
+            if "ANNOTATION" in transition_cols:
+                extra_select_parts.append("tr.ANNOTATION AS TRANSITION_ANNOTATION")
+            else:
+                extra_select_parts.append("NULL AS TRANSITION_ANNOTATION")
+        extra_select_sql = ""
+        if extra_select_parts:
+            extra_select_sql = ",\n                    " + ",\n                    ".join(extra_select_parts)
+        mapping_join_sql = ""
+        if need_mapping_counts:
+            mapping_join_sql = """
+                LEFT JOIN (
+                    SELECT
+                        TRANSITION_ID,
+                        COUNT(DISTINCT PEPTIDE_ID) AS N_MAPPED_PEPTIDES
+                    FROM TRANSITION_PEPTIDE_MAPPING
+                    GROUP BY TRANSITION_ID
+                ) tmc ON ft.TRANSITION_ID = tmc.TRANSITION_ID
+            """
+        if getattr(self.config, "run_id_filter", None) is not None:
+            con.execute("DROP TABLE IF EXISTS temp_run_features")
+            con.execute(
+                f"""
+                CREATE TEMP TABLE temp_run_features AS
+                SELECT
+                    f.ID AS FEATURE_ID,
+                    f.RUN_ID,
+                    f.PRECURSOR_ID,
+                    f.EXP_RT,
+                    p.CHARGE AS PRECURSOR_CHARGE
+                FROM FEATURE f
+                INNER JOIN SCORE_MS2 s ON f.ID = s.FEATURE_ID
+                INNER JOIN PRECURSOR p ON f.PRECURSOR_ID = p.ID
+                WHERE s.RANK <= {rc.ipf_max_peakgroup_rank}
+                AND s.PEP <= {rc.ipf_max_peakgroup_pep}
+                AND p.DECOY = 0{run_filter_clause}
+                """
+            )
+            con.execute(
+                "CREATE INDEX IF NOT EXISTS idx_temp_run_features_feature_id ON temp_run_features (FEATURE_ID)"
+            )
+            con.execute(
+                "CREATE INDEX IF NOT EXISTS idx_temp_run_features_run_precursor ON temp_run_features (RUN_ID, PRECURSOR_ID)"
+            )
+            query = f"""
+                SELECT
+                    ft.*{extra_select_sql},
+                    tr.DECOY AS DECOY,
+                    rf.RUN_ID,
+                    rf.PRECURSOR_ID,
+                    rf.EXP_RT,
+                    rf.PRECURSOR_CHARGE,
+                    tr.CHARGE AS PRODUCT_CHARGE,
+                    rf.RUN_ID || '_' || ft.FEATURE_ID || '_' || rf.PRECURSOR_ID || '_' || ft.TRANSITION_ID AS GROUP_ID
+                FROM temp_run_features rf
+                INNER JOIN FEATURE_TRANSITION ft ON ft.FEATURE_ID = rf.FEATURE_ID
+                INNER JOIN TRANSITION tr ON ft.TRANSITION_ID = tr.ID
+                {mapping_join_sql}
+                WHERE ft.VAR_ISOTOPE_OVERLAP_SCORE <= {rc.ipf_max_transition_isotope_overlap}
+                AND ft.VAR_LOG_SN_SCORE > {rc.ipf_min_transition_sn}
+                ORDER BY rf.RUN_ID, rf.PRECURSOR_ID, rf.EXP_RT, ft.TRANSITION_ID
+            """
+        else:
+            query = f"""
+                SELECT
+                    ft.*{extra_select_sql},
+                    tr.DECOY AS DECOY,
+                    f.RUN_ID,
+                    f.PRECURSOR_ID,
+                    f.EXP_RT,
+                    p.CHARGE AS PRECURSOR_CHARGE,
+                    tr.CHARGE AS PRODUCT_CHARGE,
+                    f.RUN_ID || '_' || ft.FEATURE_ID || '_' || f.PRECURSOR_ID || '_' || ft.TRANSITION_ID AS GROUP_ID
+                FROM FEATURE_TRANSITION ft
+                INNER JOIN FEATURE f ON ft.FEATURE_ID = f.ID
+                INNER JOIN SCORE_MS2 s ON f.ID = s.FEATURE_ID
+                INNER JOIN PRECURSOR p ON f.PRECURSOR_ID = p.ID
+                INNER JOIN TRANSITION tr ON ft.TRANSITION_ID = tr.ID
+                {mapping_join_sql}
+                WHERE s.RANK <= {rc.ipf_max_peakgroup_rank}
+                AND s.PEP <= {rc.ipf_max_peakgroup_pep}
+                AND ft.VAR_ISOTOPE_OVERLAP_SCORE <= {rc.ipf_max_transition_isotope_overlap}
+                AND ft.VAR_LOG_SN_SCORE > {rc.ipf_min_transition_sn}
+                AND p.DECOY = 0
+                ORDER BY f.RUN_ID, f.PRECURSOR_ID, f.EXP_RT, ft.TRANSITION_ID
+            """
         df = pd.read_sql_query(query, con)
+        if include_phospho_loss or need_training_phospho_loss:
+            transition_annotation = df["TRANSITION_ANNOTATION"].astype("string")
+            phospho_loss = (
+                transition_annotation
+                .fillna("")
+                .str.contains("-H3O4P1", regex=False)
+                .astype(float)
+            )
+            if include_phospho_loss:
+                df["VAR_HAS_PHOSPHO_LOSS"] = phospho_loss
+            if need_training_phospho_loss:
+                df["meta_has_phospho_loss"] = phospho_loss
+            df = df.drop(columns=["TRANSITION_ANNOTATION"])
         return self._finalize_feature_table(df, self.config.runner.ss_main_score)
 
     def _fetch_alignment_features_sqlite(self, con):
@@ -554,7 +793,8 @@ class OSWReader(BaseOSWReader):
             raise click.ClickException(
                 "MS2-level feature alignment table not present in file."
             )
-        query = """
+        run_filter_clause = self._get_run_filter_clause("fa")
+        query = f"""
             SELECT
                 fa.ALIGNMENT_ID AS ALIGNMENT_ID, fa.RUN_ID,
                 fa.PRECURSOR_ID, fa.ALIGNED_FEATURE_ID AS FEATURE_ID,
@@ -568,7 +808,8 @@ class OSWReader(BaseOSWReader):
                 fa.RETENTION_TIME_DEVIATION AS VAR_RETENTION_TIME_DEVIATION,
                 fa.PEAK_INTENSITY_RATIO AS VAR_PEAK_INTENSITY_RATIO,
                 fa.ALIGNED_FEATURE_ID || '_' || fa.PRECURSOR_ID AS GROUP_ID
-            FROM osw.FEATURE_MS2_ALIGNMENT fa
+            FROM FEATURE_MS2_ALIGNMENT fa
+            WHERE 1=1{run_filter_clause}
             ORDER BY fa.RUN_ID, fa.PRECURSOR_ID, fa.REFERENCE_RT
         """
         df = pd.read_sql_query(query, con)
@@ -595,6 +836,100 @@ class OSWWriter(BaseOSWWriter):
     def __init__(self, config: RunnerIOConfig):
         super().__init__(config)
 
+    def _get_output_tables(self):
+        if self.glyco and self.level in ("ms2", "ms1ms2"):
+            return ["SCORE_MS2", "SCORE_MS2_PART_PEPTIDE", "SCORE_MS2_PART_GLYCAN"]
+        if self.glyco and self.level == "ms1":
+            return ["SCORE_MS1", "SCORE_MS1_PART_PEPTIDE", "SCORE_MS1_PART_GLYCAN"]
+
+        table_name = {
+            "ms2": "SCORE_MS2",
+            "ms1ms2": "SCORE_MS2",
+            "ms1": "SCORE_MS1",
+            "transition": "SCORE_TRANSITION",
+            "alignment": "SCORE_ALIGNMENT",
+        }[self.level]
+        return [table_name]
+
+    def _drop_output_tables(self, con, tables):
+        cur = con.cursor()
+        for tbl in tables:
+            cur.execute(f"DROP TABLE IF EXISTS {tbl}")
+        con.commit()
+
+    def _write_scored_tables(self, df, con):
+        if self.glyco and self.level in ("ms2", "ms1ms2"):
+            df_main = df[
+                [
+                    "feature_id",
+                    "d_score_combined",
+                    "peak_group_rank",
+                    "q_value",
+                    "pep",
+                ]
+            ].copy()
+
+            if "h_score" in df.columns:
+                df_main["h_score"] = df["h_score"]
+                df_main["h0_score"] = df["h0_score"]
+
+            df_main.columns = [c.upper() for c in df_main.columns]
+            df_main = df_main.rename(
+                columns={"PEAK_GROUP_RANK": "RANK", "D_SCORE_COMBINED": "SCORE"}
+            )
+            df_main.to_sql("SCORE_MS2", con, index=False, if_exists="append")
+
+            for part in ["peptide", "glycan"]:
+                df_part = df[["feature_id", f"d_score_{part}", f"pep_{part}"]].copy()
+                df_part.columns = ["FEATURE_ID", "SCORE", "PEP"]
+                df_part.to_sql(
+                    f"SCORE_MS2_PART_{part.upper()}",
+                    con,
+                    index=False,
+                    if_exists="append",
+                )
+            return
+
+        if self.glyco and self.level == "ms1":
+            df_main = df[
+                [
+                    "feature_id",
+                    "d_score_combined",
+                    "peak_group_rank",
+                    "q_value",
+                    "pep",
+                ]
+            ].copy()
+
+            if "h_score" in df.columns:
+                df_main["h_score"] = df["h_score"]
+                df_main["h0_score"] = df["h0_score"]
+
+            df_main.columns = [c.upper() for c in df_main.columns]
+            df_main = df_main.rename(
+                columns={
+                    "PEAK_GROUP_RANK": "RANK",
+                    "D_SCORE_COMBINED": "SCORE",
+                    "QVALUE": "Q_VALUE",
+                }
+            )
+            df_main.to_sql("SCORE_MS1", con, index=False, if_exists="append")
+
+            for part in ["peptide", "glycan"]:
+                df_part = df[["feature_id", f"d_score_{part}", f"pep_{part}"]].copy()
+                df_part.columns = ["FEATURE_ID", "SCORE", "PEP"]
+                df_part.to_sql(
+                    f"SCORE_MS1_PART_{part.upper()}",
+                    con,
+                    index=False,
+                    if_exists="append",
+                )
+            return
+
+        table_name = self._get_output_tables()[0]
+        score_df = self._prepare_score_dataframe(df, self.level, table_name + "_")
+        score_df.to_sql(table_name, con, index=False, if_exists="append")
+
     def save_results(self, result, pi0):
         """
         Save the results to the output file based on the specified level and glyco flag.
@@ -610,105 +945,58 @@ class OSWWriter(BaseOSWWriter):
             copyfile(self.infile, self.outfile)
 
         df = result.scored_tables
-        level = self.level
-        glyco = self.glyco
-
-        # Determine output table(s)
-        if glyco and level in ("ms2", "ms1ms2"):
-            tables = ["SCORE_MS2", "SCORE_MS2_PART_PEPTIDE", "SCORE_MS2_PART_GLYCAN"]
-        elif glyco and level == "ms1":
-            tables = ["SCORE_MS1", "SCORE_MS1_PART_PEPTIDE", "SCORE_MS1_PART_GLYCAN"]
-        else:
-            tables = {
-                "ms2": "SCORE_MS2",
-                "ms1ms2": "SCORE_MS2",
-                "ms1": "SCORE_MS1",
-                "transition": "SCORE_TRANSITION",
-                "alignment": "SCORE_ALIGNMENT",
-            }[level]
-
-            if isinstance(tables, str):
-                tables = [tables]
+        tables = self._get_output_tables()
 
         # Drop existing tables
         with sqlite3.connect(self.config.outfile) as con:
-            cur = con.cursor()
-            for tbl in tables:
-                cur.execute(f"DROP TABLE IF EXISTS {tbl}")
-            con.commit()
-
-            # Prepare data for writing
-            if glyco and level in ("ms2", "ms1ms2"):
-                df_main = df[
-                    [
-                        "feature_id",
-                        "d_score_combined",
-                        "peak_group_rank",
-                        "q_value",
-                        "pep",
-                    ]
-                ].copy()
-
-                if "h_score" in df.columns:
-                    df_main["h_score"] = df["h_score"]
-                    df_main["h0_score"] = df["h0_score"]
-
-                df_main.columns = [c.upper() for c in df_main.columns]
-                df_main = df_main.rename(
-                    columns={"PEAK_GROUP_RANK": "RANK", "D_SCORE_COMBINED": "SCORE"}
-                )
-                df_main.to_sql("SCORE_MS2", con, index=False)
-
-                # Write peptide/glycan part scores
-                for part in ["peptide", "glycan"]:
-                    df_part = df[
-                        ["feature_id", f"d_score_{part}", f"pep_{part}"]
-                    ].copy()
-                    df_part.columns = ["FEATURE_ID", "SCORE", "PEP"]
-                    df_part.to_sql(f"SCORE_MS2_PART_{part.upper()}", con, index=False)
-
-            elif glyco and level == "ms1":
-                df_main = df[
-                    [
-                        "feature_id",
-                        "d_score_combined",
-                        "peak_group_rank",
-                        "q_value",
-                        "pep",
-                    ]
-                ].copy()
-
-                if "h_score" in df.columns:
-                    df_main["h_score"] = df["h_score"]
-                    df_main["h0_score"] = df["h0_score"]
-
-                df_main.columns = [c.upper() for c in df_main.columns]
-                df_main = df_main.rename(
-                    columns={
-                        "PEAK_GROUP_RANK": "RANK",
-                        "D_SCORE_COMBINED": "SCORE",
-                        "QVALUE": "Q_VALUE",
-                    }
-                )
-                df_main.to_sql("SCORE_MS1", con, index=False)
-
-                for part in ["peptide", "glycan"]:
-                    df_part = df[
-                        ["feature_id", f"d_score_{part}", f"pep_{part}"]
-                    ].copy()
-                    df_part.columns = ["FEATURE_ID", "SCORE", "PEP"]
-                    df_part.to_sql(f"SCORE_MS1_PART_{part.upper()}", con, index=False)
-
-            else:
-                # Regular MS1, MS2, transition, or alignment
-                table_name = tables[0]
-                score_df = self._prepare_score_dataframe(df, level, table_name + "_")
-                score_df.to_sql(table_name, con, index=False)
+            self._drop_output_tables(con, tables)
+            self._write_scored_tables(df, con)
 
         logger.success(f"{self.outfile} written.")
 
         # Save report if statistics are present
         self._write_pdf_report(result, pi0)
+
+    def save_results_incremental(self, scored_table, reset=False):
+        if self.glyco:
+            raise click.ClickException(
+                "Incremental OSW score writing is not supported for glyco scoring."
+            )
+
+        if self.infile != self.outfile and reset and not os.path.exists(self.outfile):
+            copyfile(self.infile, self.outfile)
+
+        with sqlite3.connect(self.config.outfile) as con:
+            if reset:
+                self._drop_output_tables(con, self._get_output_tables())
+            self._write_scored_tables(scored_table, con)
+
+    def save_scorer(self, scorer):
+        if scorer is None:
+            return
+
+        raw_blob = pickle.dumps(scorer, protocol=pickle.HIGHEST_PROTOCOL)
+        blob = sqlite3.Binary(zlib.compress(raw_blob, level=1))
+        with sqlite3.connect(self.outfile) as con:
+            con.execute(
+                """
+                CREATE TABLE IF NOT EXISTS PYPROPHET_SCORER (
+                    LEVEL TEXT NOT NULL,
+                    CLASSIFIER TEXT NOT NULL,
+                    SCORER BLOB NOT NULL,
+                    PRIMARY KEY (LEVEL, CLASSIFIER)
+                )
+                """
+            )
+            con.execute(
+                "DELETE FROM PYPROPHET_SCORER WHERE LEVEL = ? AND CLASSIFIER = ?",
+                (self.level, self.classifier),
+            )
+            con.execute(
+                "INSERT INTO PYPROPHET_SCORER (LEVEL, CLASSIFIER, SCORER) VALUES (?, ?, ?)",
+                (self.level, self.classifier, blob),
+            )
+            con.commit()
 
     def save_weights(self, weights):
         """

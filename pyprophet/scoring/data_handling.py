@@ -83,6 +83,22 @@ def _to_writable_c_array(values, dtype):
     return np.require(arr, dtype=dtype, requirements=["C", "W"])
 
 
+def get_score_alias_columns(columns, include_classifier_score=False):
+    """
+    Return the canonical score-bearing columns used by semi-supervised learners.
+
+    Score columns are stored internally as `main_score` plus aliased `var_*`
+    feature columns. Optional `meta_*` columns may be present for diagnostics or
+    training-set filters, but they should not be treated as classifier features.
+    """
+    score_columns = [
+        col for col in columns if col == "main_score" or col.startswith("var_")
+    ]
+    if include_classifier_score and "classifier_score" in columns:
+        score_columns.append("classifier_score")
+    return score_columns
+
+
 @profile
 def cleanup_and_check(df):
     """
@@ -282,6 +298,10 @@ def prepare_data_table(
     data["classifier_score"] = empty_float_col
     column_names.append("classifier_score")
 
+    for meta_col in (col for col in header if col.startswith("meta_")):
+        data[meta_col] = table[meta_col].values
+        column_names.append(meta_col)
+
     # build data frame:
     df = pd.DataFrame(data, columns=column_names)
 
@@ -304,20 +324,8 @@ def update_chosen_main_score_in_table(train, score_columns, use_as_main_score):
     """
     # Get current main score column name
     old_main_score_column = [col for col in score_columns if "main" in col][0]
-    # Get tables aliased score variable name
-    df_column_score_alias = [
-        col
-        for col in train.df.columns
-        if col
-        not in [
-            "tg_id",
-            "tg_num_id",
-            "is_decoy",
-            "is_top_peak",
-            "is_train",
-            "classifier_score",
-        ]
-    ]
+    # Get table score alias names only; preserve any metadata columns untouched.
+    df_column_score_alias = get_score_alias_columns(train.df.columns)
     # Generate mapping to rename columns in table
     mapper = {
         alias_col: col for alias_col, col in zip(df_column_score_alias, score_columns)
@@ -382,7 +390,8 @@ class Experiment(object):
         logger.info("%d peak groups" % len(self.df))
         logger.info("%d group ids" % len(self.df.tg_id.unique()))
         logger.info(
-            "%d scores including main score" % (len(self.df.columns.values) - 6)
+            "%d scores including main score"
+            % len(get_score_alias_columns(self.df.columns))
         )
 
     def __getitem__(self, *args):
@@ -507,8 +516,10 @@ class Experiment(object):
         Returns:
             np.ndarray: The feature matrix.
         """
-        min_col = 5 if use_main_score else 6
-        return self.df.iloc[:, min_col:-1].values
+        score_columns = get_score_alias_columns(self.df.columns)
+        if not use_main_score:
+            score_columns = [col for col in score_columns if col != "main_score"]
+        return self.df.loc[:, score_columns].values
 
     def normalize_score_by_decoys(self, score_col_name):
         """

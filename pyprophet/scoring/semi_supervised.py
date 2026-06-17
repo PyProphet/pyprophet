@@ -14,13 +14,18 @@ Functions:
     - profile: A no-op decorator for profiling (used if no profiler is available).
 """
 
+import click
 import numpy as np
 from loguru import logger
 
 from .._config import RunnerIOConfig
 from ..stats import find_cutoff
 from .classifiers import AbstractLearner, SVMLearner, XGBLearner, HistGBCLearner
-from .data_handling import Experiment, update_chosen_main_score_in_table
+from .data_handling import (
+    Experiment,
+    get_score_alias_columns,
+    update_chosen_main_score_in_table,
+)
 
 try:
     profile
@@ -217,6 +222,10 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
         outfile,
         level,
         ss_use_dynamic_main_score,
+        transition_training_require_unique_mapping,
+        transition_training_require_phospho_loss,
+        transition_training_max_isotope_overlap,
+        transition_training_min_log_sn,
     ):
         assert isinstance(inner_learner, AbstractLearner)
         AbstractSemiSupervisedLearner.__init__(
@@ -238,6 +247,17 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
         self.outfile = outfile
         self.level = level
         self.ss_use_dynamic_main_score = ss_use_dynamic_main_score
+        self._current_score_columns = None
+        self.transition_training_require_unique_mapping = (
+            transition_training_require_unique_mapping
+        )
+        self.transition_training_require_phospho_loss = (
+            transition_training_require_phospho_loss
+        )
+        self.transition_training_max_isotope_overlap = (
+            transition_training_max_isotope_overlap
+        )
+        self.transition_training_min_log_sn = transition_training_min_log_sn
 
     @classmethod
     def from_config(cls, config: RunnerIOConfig, base_learner):
@@ -269,7 +289,101 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
             config.outfile,
             config.level,
             rc.ss_use_dynamic_main_score,
+            rc.transition_training_require_unique_mapping,
+            rc.transition_training_require_phospho_loss,
+            rc.transition_training_max_isotope_overlap,
+            rc.transition_training_min_log_sn,
         )
+
+    @staticmethod
+    def _resolve_score_alias(mapper, score_name):
+        if mapper is None:
+            return None
+        for alias, actual_name in mapper.items():
+            if actual_name == score_name:
+                return alias
+        return None
+
+    def cache_score_columns(self, score_columns):
+        self._current_score_columns = tuple(score_columns)
+
+    def _filter_transition_training_targets(self, tt_peaks, mapper):
+        if self.level != "transition":
+            return tt_peaks
+
+        apply_filter = any(
+            [
+                self.transition_training_require_unique_mapping,
+                self.transition_training_require_phospho_loss,
+                self.transition_training_max_isotope_overlap is not None,
+                self.transition_training_min_log_sn is not None,
+            ]
+        )
+        if not apply_filter:
+            return tt_peaks
+
+        df = tt_peaks.df
+        mask = np.ones(len(df), dtype=bool)
+        reasons = []
+
+        if self.transition_training_require_unique_mapping:
+            if "meta_is_unique_mapping" not in df.columns:
+                raise click.ClickException(
+                    "Transition training filter requires meta_is_unique_mapping, but the transition reader did not expose it."
+                )
+            mask &= df["meta_is_unique_mapping"].fillna(0.0).to_numpy() >= 0.5
+            reasons.append("unique-mapping only")
+
+        if self.transition_training_require_phospho_loss:
+            if "meta_has_phospho_loss" not in df.columns:
+                raise click.ClickException(
+                    "Transition training filter requires meta_has_phospho_loss, but the transition reader did not expose it."
+                )
+            mask &= df["meta_has_phospho_loss"].fillna(0.0).to_numpy() >= 0.5
+            reasons.append("phospho-loss only")
+
+        if self.transition_training_max_isotope_overlap is not None:
+            overlap_alias = self._resolve_score_alias(
+                mapper, "var_isotope_overlap_score"
+            )
+            if overlap_alias is None or overlap_alias not in df.columns:
+                raise click.ClickException(
+                    "Transition training filter could not find var_isotope_overlap_score in the transition scoring table."
+                )
+            mask &= (
+                df[overlap_alias].fillna(np.inf).to_numpy()
+                <= self.transition_training_max_isotope_overlap
+            )
+            reasons.append(
+                f"overlap<={self.transition_training_max_isotope_overlap:g}"
+            )
+
+        if self.transition_training_min_log_sn is not None:
+            log_sn_alias = self._resolve_score_alias(mapper, "var_log_sn_score")
+            if log_sn_alias is None or log_sn_alias not in df.columns:
+                raise click.ClickException(
+                    "Transition training filter could not find var_log_sn_score in the transition scoring table."
+                )
+            mask &= (
+                df[log_sn_alias].fillna(-np.inf).to_numpy()
+                >= self.transition_training_min_log_sn
+            )
+            reasons.append(f"log_sn>={self.transition_training_min_log_sn:g}")
+
+        kept = int(mask.sum())
+        total = int(len(mask))
+        logger.info(
+            "Transition training target filter kept {}/{} top target peaks ({})",
+            kept,
+            total,
+            ", ".join(reasons),
+        )
+        if kept == 0:
+            raise click.ClickException(
+                "Transition training target filter removed all top target peaks. Relax the transition-training filter settings."
+            )
+
+        return tt_peaks.filter_(mask)
 
     def select_train_peaks(
         self,
@@ -316,6 +430,7 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
         assert isinstance(cutoff_fdr, float)
 
         tt_peaks = train.get_top_target_peaks()
+        tt_peaks = self._filter_transition_training_targets(tt_peaks, mapper)
         tt_scores = tt_peaks[sel_column]
         td_peaks = train.get_top_decoy_peaks()
         td_scores = td_peaks[sel_column]
@@ -394,20 +509,9 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
         Returns:
             tuple: Model parameters, classifier scores, and selected main score column.
         """
+        self.cache_score_columns(score_columns)
         # Get tables aliased score variable name
-        df_column_score_alias = [
-            col
-            for col in train.df.columns
-            if col
-            not in [
-                "tg_id",
-                "tg_num_id",
-                "is_decoy",
-                "is_top_peak",
-                "is_train",
-                "classifier_score",
-            ]
-        ]
+        df_column_score_alias = get_score_alias_columns(train.df.columns)
         # Generate column alias name to score feature name
         mapper = {
             alias_col: col
@@ -463,12 +567,11 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
         Returns:
             tuple: Model parameters and classifier scores.
         """
+        self.cache_score_columns(score_columns)
         # Get tables aliased score variable name
-        df_column_score_alias = [
-            col
-            for col in train.df.columns
-            if col not in ["tg_id", "tg_num_id", "is_decoy", "is_top_peak", "is_train"]
-        ]
+        df_column_score_alias = get_score_alias_columns(
+            train.df.columns, include_classifier_score=True
+        )
         # Generate column alias name to score feature name
         mapper = {
             alias_col: col
@@ -508,6 +611,22 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
         Returns:
             tuple: Model parameters and classifier scores.
         """
+        if self._current_score_columns is None:
+            raise click.ClickException(
+                "Transition training filters require score-column metadata before final tuning, but no score columns were cached."
+            )
+
+        df_column_score_alias = get_score_alias_columns(
+            train.df.columns, include_classifier_score=True
+        )
+        mapper = {
+            alias_col: col
+            for alias_col, col in zip(
+                df_column_score_alias,
+                self._current_score_columns + ("classifier_score",),
+            )
+        }
+
         td_peaks, bt_peaks = self.select_train_peaks(
             train,
             "classifier_score",
@@ -518,6 +637,7 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
             self.pi0_method,
             self.pi0_smooth_df,
             self.pi0_smooth_log_pi0,
+            mapper=mapper,
         )
 
         if isinstance(self.inner_learner, XGBLearner) and self.inner_learner.autotune:

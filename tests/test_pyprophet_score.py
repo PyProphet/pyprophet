@@ -1,11 +1,13 @@
 from __future__ import print_function
 
 import os
+import pickle
 import subprocess
 import shutil
 import sys
 import sqlite3
 import math
+import zlib
 from decimal import Decimal, ROUND_DOWN
 
 import pandas as pd
@@ -106,6 +108,11 @@ class TestRunner:
 
     def run_command(self, cmdline):
         """Execute a shell command and return output"""
+        pyprophet_cli = shutil.which("pyprophet") or os.path.join(
+            os.path.dirname(sys.executable), "pyprophet"
+        )
+        if cmdline.startswith("pyprophet "):
+            cmdline = cmdline.replace("pyprophet ", f"{pyprophet_cli} ", 1)
         try:
             output = subprocess.check_output(
                 cmdline, shell=True, stderr=subprocess.STDOUT
@@ -967,6 +974,43 @@ def test_osw_subsample_apply_weights(test_runner, test_config, regtest):
     run_generic_test_apply_weights(
         test_runner, test_config, OSWTestStrategy, regtest
     )
+
+
+def test_osw_subsample_streaming_apply_main_report(test_runner, test_config):
+    input_file = test_runner.copy_test_file("test_data.osw")
+    pyprophet_cli = shutil.which("pyprophet") or os.path.join(
+        os.path.dirname(sys.executable), "pyprophet"
+    )
+    output = test_runner.run_command(
+        f"{pyprophet_cli} score --level ms2 --pi0_method=smoother --pi0_lambda 0 0 0 "
+        f"--in={input_file} --test --ss_iteration_fdr=0.02 --subsample_ratio=0.5 --report_mode=main"
+    )
+
+    assert "Applying persisted scorer across" in output
+
+    with sqlite3.connect(input_file) as conn:
+        scorer_tables = conn.execute(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='PYPROPHET_SCORER'"
+        ).fetchone()[0]
+        score_rows = conn.execute("SELECT COUNT(*) FROM SCORE_MS2").fetchone()[0]
+        scorer_blob = conn.execute(
+            "SELECT SCORER FROM PYPROPHET_SCORER LIMIT 1"
+        ).fetchone()[0]
+
+    assert scorer_tables == 1
+    assert score_rows > 0
+    try:
+        scorer_blob = zlib.decompress(scorer_blob)
+    except zlib.error:
+        pass
+    scorer = pickle.loads(scorer_blob)
+    final_stats, summary_stats = scorer.get_error_stats()
+    assert not hasattr(scorer, "target_scores")
+    assert not hasattr(scorer, "decoy_scores")
+    assert not hasattr(scorer, "dvals")
+    assert not final_stats.empty
+    assert not summary_stats.empty
+    assert os.path.exists("test_data_ms2_report.pdf")
 
 
 # Parquet Tests

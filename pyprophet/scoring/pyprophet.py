@@ -35,6 +35,7 @@ from .._config import ErrorEstimationConfig, RunnerIOConfig
 from ..stats import (
     error_statistics,
     final_err_table,
+    find_nearest_matches,
     lookup_values_from_error_table,
     mean_and_std_dev,
     posterior_chromatogram_hypotheses_fast,
@@ -201,6 +202,26 @@ class Scorer(object):
         self.target_scores = experiment.get_top_target_peaks().df["d_score"]
         self.decoy_scores = experiment.get_top_decoy_peaks().df["d_score"]
 
+    def _lookup_error_statistics(self, scores):
+        if isinstance(getattr(self, "error_stat", None), pd.DataFrame):
+            return lookup_values_from_error_table(scores, self.error_stat)
+
+        lookup = getattr(self, "_error_stat_lookup", None)
+        if lookup is None:
+            raise click.ClickException(
+                "Persisted scorer is missing error statistic lookup data."
+            )
+
+        cutoff_array = np.asarray(lookup["cutoff"], dtype=np.float32)
+        scores_array = np.asarray(scores, dtype=np.float32)
+        ix = find_nearest_matches(cutoff_array, scores_array)
+        return (
+            lookup["pvalue"][ix],
+            lookup["svalue"][ix],
+            lookup["pep"][ix],
+            lookup["qvalue"][ix],
+        )
+
     def score(self, table):
         """
         Scores the given table using the trained classifier.
@@ -226,8 +247,8 @@ class Scorer(object):
         texp["r_score"] = score
         texp["d_score"] = (score - self.mu) / self.nu
 
-        p_values, s_values, peps, q_values = lookup_values_from_error_table(
-            texp["d_score"].values, self.error_stat
+        p_values, s_values, peps, q_values = self._lookup_error_statistics(
+            texp["d_score"].values
         )
 
         texp["pep"] = peps
@@ -280,26 +301,53 @@ class Scorer(object):
         Returns:
             tuple: Final error table and summary error table.
         """
-        return final_err_table(self.error_stat), summary_err_table(self.error_stat)
+        if isinstance(getattr(self, "error_stat", None), pd.DataFrame):
+            return final_err_table(self.error_stat), summary_err_table(self.error_stat)
+
+        if hasattr(self, "_final_statistics") and hasattr(self, "_summary_statistics"):
+            return (
+                self._final_statistics.copy(),
+                self._summary_statistics.copy(),
+            )
+
+        raise click.ClickException(
+            "Persisted scorer is missing report statistics."
+        )
 
     def minimal_error_stat(self):
         """
-        Creates a minimal error statistics object for serialization.
+        Creates a compact error statistics representation for serialization.
 
         Returns:
-            ErrorStatistics: The minimal error statistics object.
+            dict: Compact lookup arrays for persisted scoring.
         """
-        minimal_err_stat = ErrorStatistics(
-            self.error_stat.df.loc[:, ["svalue", "qvalue", "pvalue", "pep", "cutoff"]],
-            self.error_stat.num_null,
-            self.error_stat.num_total,
-        )
-        return minimal_err_stat
+        if not isinstance(getattr(self, "error_stat", None), pd.DataFrame):
+            return getattr(self, "_error_stat_lookup", None)
+
+        return {
+            column: np.asarray(self.error_stat[column].values, dtype=np.float32)
+            for column in ("cutoff", "pvalue", "qvalue", "svalue", "pep")
+        }
 
     def __getstate__(self):
         """when pickling"""
-        data = vars(self)
-        data["error_stat"] = self.minimal_error_stat()
+        data = {
+            "classifier": self.classifier,
+            "score_columns": self.score_columns,
+            "mu": self.mu,
+            "nu": self.nu,
+            "group_id": self.group_id,
+            "error_estimation_config": self.error_estimation_config,
+            "tric_chromprob": self.tric_chromprob,
+            "ss_score_filter": self.ss_score_filter,
+            "ss_scale_features": self.ss_scale_features,
+            "color_palette": self.color_palette,
+            "level": self.level,
+            "pi0": self.pi0,
+            "_error_stat_lookup": self.minimal_error_stat(),
+            "_final_statistics": self.get_error_stats()[0],
+            "_summary_statistics": self.get_error_stats()[1],
+        }
         return data
 
     def __setstate__(self, data):
@@ -516,6 +564,7 @@ class PyProphet:
         integrated_scores = pd.concat([ttt_avg, ttd_avg], axis=0)
         experiment.set_and_rerank("classifier_score", integrated_scores)
 
+        learner.cache_score_columns(score_columns)
         model = learner.learn_final(experiment)
         return learner.set_learner(model)
 
