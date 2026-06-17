@@ -714,6 +714,7 @@ class ExportIOConfig(BaseIOConfig):
     split_transition_data: bool = True
     split_runs: bool = False
     include_transition_data: bool = True  # Whether to include transition data in parquet export
+    exclude_feature_var: bool = False  # Whether to exclude FEATURE_MS1/MS2 variance (VAR_*) columns
 
     # SqMass: Export to parquet
     pqp_file: Optional[str] = None  # Path to PQP file for precursor/transition mapping

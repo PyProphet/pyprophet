@@ -11,6 +11,8 @@ dist/
 tests/
 notebooks/
 data/
+!tools/osw_to_parquet_rust/data/
+!tools/osw_to_parquet_rust/data/unimod.xml
 examples/
 .tmp/
 .DS_Store
