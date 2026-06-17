@@ -15,24 +15,54 @@ from pyprophet.ipf import (
 from .pepmass import GlycoPeptideMassCalculator
 
 
-def get_feature_mapping_across_runs(infile, ipf_max_alignment_pep=1):
+def get_feature_mapping_across_runs(infile, min_confidence=0.5):
     click.echo("Info: Reading Across Run Feature Alignment Mapping ... ", nl=False)
     start = time.time()
 
     con = sqlite3.connect(infile)
 
+    query = """
+        SELECT
+            DENSE_RANK() OVER (ORDER BY PRECURSOR_ID, ALIGNMENT_ID) AS ALIGNMENT_GROUP_ID,
+            ALIGNMENT_ID,
+            FEATURE_ID,
+            PRECURSOR_ID,
+            FEATURE_TYPE
+        FROM (
+            SELECT DISTINCT
+                ALIGNMENT_ID,
+                PRECURSOR_ID,
+                REFERENCE_FEATURE_ID AS FEATURE_ID,
+                'REFERENCE' AS FEATURE_TYPE
+            FROM FEATURE_MS2_ALIGNMENT_CANDIDATE
+            WHERE SELECTED = 1
+            AND MAPPING_CONFIDENCE >= ?
+            AND REFERENCE_FEATURE_ID != ALIGNED_FEATURE_ID
+            AND ALIGNED_FEATURE_ID != -1
+
+            UNION
+
+            SELECT DISTINCT
+                ALIGNMENT_ID,
+                PRECURSOR_ID,
+                ALIGNED_FEATURE_ID AS FEATURE_ID,
+                'QUERY' AS FEATURE_TYPE
+            FROM FEATURE_MS2_ALIGNMENT_CANDIDATE
+            WHERE SELECTED = 1
+            AND MAPPING_CONFIDENCE >= ?
+            AND REFERENCE_FEATURE_ID != ALIGNED_FEATURE_ID
+            AND ALIGNED_FEATURE_ID != -1
+        ) AS feature_list
+        ORDER BY
+            ALIGNMENT_GROUP_ID,
+            CASE FEATURE_TYPE
+                WHEN 'REFERENCE' THEN 0
+                WHEN 'QUERY' THEN 1
+            END
+    """
+
     data = pd.read_sql_query(
-        f"""SELECT  
-                DENSE_RANK() OVER (ORDER BY PRECURSOR_ID, ALIGNMENT_ID) AS ALIGNMENT_GROUP_ID,
-                ALIGNED_FEATURE_ID AS FEATURE_ID 
-                FROM (SELECT DISTINCT * FROM FEATURE_MS2_ALIGNMENT) AS FEATURE_MS2_ALIGNMENT
-                INNER JOIN 
-                (SELECT DISTINCT *, MIN(QVALUE) FROM SCORE_ALIGNMENT GROUP BY FEATURE_ID) AS SCORE_ALIGNMENT 
-                ON SCORE_ALIGNMENT.FEATURE_ID = FEATURE_MS2_ALIGNMENT.ALIGNED_FEATURE_ID
-                WHERE LABEL = 1
-                AND SCORE_ALIGNMENT.PEP < {ipf_max_alignment_pep}
-                ORDER BY ALIGNMENT_GROUP_ID""",
-        con,
+        query, con, params=[min_confidence, min_confidence]
     )
 
     data.columns = [col.lower() for col in data.columns]

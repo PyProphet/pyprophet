@@ -63,6 +63,7 @@ class SplitParquetReader(BaseSplitParquetReader):
         ipf_ms1 = cfg.ipf_ms1_scoring
         ipf_ms2 = cfg.ipf_ms2_scoring
         pep_threshold = cfg.ipf_max_peakgroup_pep
+        add_intensity = cfg.ipf_min_peakgroup_intensity > 0
 
         logger.info("Reading precursor-level data ...")
 
@@ -81,6 +82,16 @@ class SplitParquetReader(BaseSplitParquetReader):
 
         all_precursor_cols = get_parquet_column_names(precursor_files[0])
         all_transition_cols = get_parquet_column_names(transition_files[0])
+        intensity_select = (
+            ",\n                p.FEATURE_MS2_AREA_INTENSITY AS FEATURE_MS2_INTENSITY"
+            if add_intensity
+            else ""
+        )
+
+        if add_intensity and "FEATURE_MS2_AREA_INTENSITY" not in all_precursor_cols:
+            raise click.ClickException(
+                "FEATURE_MS2_AREA_INTENSITY is required for peakgroup-intensity IPF filtering."
+            )
 
         # con.execute(
         #     f"CREATE VIEW precursors AS SELECT * FROM read_parquet({precursor_files})"
@@ -98,7 +109,7 @@ class SplitParquetReader(BaseSplitParquetReader):
                 raise click.ClickException("Apply MS2 + transition scoring before IPF.")
             query = f"""
             SELECT p.FEATURE_ID, p.SCORE_MS2_PEP AS MS2_PEAKGROUP_PEP,
-                NULL AS MS1_PRECURSOR_PEP, t.SCORE_TRANSITION_PEP AS MS2_PRECURSOR_PEP
+                NULL AS MS1_PRECURSOR_PEP, t.SCORE_TRANSITION_PEP AS MS2_PRECURSOR_PEP{intensity_select}
             FROM precursors p
             INNER JOIN (
                 SELECT FEATURE_ID, SCORE_TRANSITION_PEP
@@ -115,7 +126,7 @@ class SplitParquetReader(BaseSplitParquetReader):
                 raise click.ClickException("Apply MS1 + MS2 scoring before IPF.")
             query = f"""
             SELECT p.FEATURE_ID, p.SCORE_MS2_PEP AS MS2_PEAKGROUP_PEP,
-                p.SCORE_MS1_PEP AS MS1_PRECURSOR_PEP, NULL AS MS2_PRECURSOR_PEP
+                p.SCORE_MS1_PEP AS MS1_PRECURSOR_PEP, NULL AS MS2_PRECURSOR_PEP{intensity_select}
             FROM precursors p
             WHERE p.PRECURSOR_DECOY = 0 AND p.SCORE_MS2_PEP < {pep_threshold};
             """
@@ -133,7 +144,7 @@ class SplitParquetReader(BaseSplitParquetReader):
                 )
             query = f"""
             SELECT p.FEATURE_ID, p.SCORE_MS2_PEP AS MS2_PEAKGROUP_PEP,
-                p.SCORE_MS1_PEP AS MS1_PRECURSOR_PEP, t.SCORE_TRANSITION_PEP AS MS2_PRECURSOR_PEP
+                p.SCORE_MS1_PEP AS MS1_PRECURSOR_PEP, t.SCORE_TRANSITION_PEP AS MS2_PRECURSOR_PEP{intensity_select}
             FROM precursors p
             INNER JOIN (
                 SELECT FEATURE_ID, SCORE_TRANSITION_PEP
@@ -152,7 +163,7 @@ class SplitParquetReader(BaseSplitParquetReader):
                 raise click.ClickException("Apply MS2 + transition scoring before IPF.")
             query = f"""
             SELECT p.FEATURE_ID, p.SCORE_MS2_PEP AS MS2_PEAKGROUP_PEP,
-                NULL AS MS1_PRECURSOR_PEP, NULL AS MS2_PRECURSOR_PEP
+                NULL AS MS1_PRECURSOR_PEP, NULL AS MS2_PRECURSOR_PEP{intensity_select}
             FROM precursors p
             WHERE p.PRECURSOR_DECOY = 0 AND p.SCORE_MS2_PEP < {pep_threshold};
             """
@@ -165,6 +176,11 @@ class SplitParquetReader(BaseSplitParquetReader):
         cfg = self.config
         ipf_h0 = cfg.ipf_h0
         pep_threshold = cfg.ipf_max_transition_pep
+        require_phospho_loss = (
+            cfg.ipf_grouped_fdr
+            and cfg.ipf_grouped_fdr_strategy == "support_phospho_loss"
+        )
+        require_overlap = False
 
         logger.info("Reading peptidoform-level data ...")
 
@@ -188,6 +204,28 @@ class SplitParquetReader(BaseSplitParquetReader):
             raise click.ClickException(
                 "IPF_PEPTIDE_ID column is required in transition features."
             )
+        has_annotation = "ANNOTATION" in all_transition_cols
+        if require_phospho_loss and not has_annotation:
+            raise click.ClickException(
+                "ANNOTATION column is required for grouped FDR with strategy support_phospho_loss."
+            )
+        has_overlap_col = (
+            "FEATURE_TRANSITION_VAR_ISOTOPE_OVERLAP_SCORE" in all_transition_cols
+        )
+        if require_overlap and not has_overlap_col:
+            raise click.ClickException(
+                "FEATURE_TRANSITION_VAR_ISOTOPE_OVERLAP_SCORE is required for overlap-aware IPF score adjustment."
+            )
+        has_phospho_loss_sql = (
+            "MAX(CASE WHEN COALESCE(t.ANNOTATION, '') LIKE '%-H3O4P1%' THEN 1 ELSE 0 END) AS HAS_PHOSPHO_LOSS"
+            if has_annotation
+            else "0 AS HAS_PHOSPHO_LOSS"
+        )
+        overlap_select = (
+            ", t.FEATURE_TRANSITION_VAR_ISOTOPE_OVERLAP_SCORE AS ISOTOPE_OVERLAP_SCORE"
+            if has_overlap_col
+            else ""
+        )
 
         # Load all transition files into DuckDB view
         con.execute(
@@ -196,7 +234,7 @@ class SplitParquetReader(BaseSplitParquetReader):
 
         # Evidence table: transition-level PEPs
         query = f"""
-        SELECT t.FEATURE_ID, t.TRANSITION_ID, t.SCORE_TRANSITION_PEP AS PEP
+        SELECT t.FEATURE_ID, t.TRANSITION_ID, t.SCORE_TRANSITION_PEP AS PEP{overlap_select}
         FROM transition t
         WHERE t.TRANSITION_TYPE != ''
         AND t.TRANSITION_DECOY = 0
@@ -204,6 +242,20 @@ class SplitParquetReader(BaseSplitParquetReader):
         AND t.SCORE_TRANSITION_PEP < {pep_threshold}
         """
         evidence = con.execute(query).df().rename(columns=str.lower)
+
+        query = f"""
+        SELECT
+            t.TRANSITION_ID,
+            COUNT(DISTINCT t.IPF_PEPTIDE_ID) AS N_MAPPED_PEPTIDES,
+            {has_phospho_loss_sql}
+        FROM transition t
+        WHERE t.TRANSITION_TYPE != ''
+        AND t.TRANSITION_DECOY = 0
+        AND t.SCORE_TRANSITION_SCORE IS NOT NULL
+        AND t.IPF_PEPTIDE_ID IS NOT NULL
+        GROUP BY t.TRANSITION_ID
+        """
+        transition_meta = con.execute(query).df().rename(columns=str.lower)
 
         # Bitmask table: transition-peptidoform presence
         query = """
@@ -250,6 +302,7 @@ class SplitParquetReader(BaseSplitParquetReader):
 
         # Merge all parts into final dataframe
         trans_pf = pd.merge(evidence, peptidoforms, how="outer", on="feature_id")
+        trans_pf = pd.merge(trans_pf, transition_meta, how="left", on="transition_id")
         trans_pf_bm = pd.merge(
             trans_pf, bitmask, how="left", on=["transition_id", "peptide_id"]
         ).fillna(0)

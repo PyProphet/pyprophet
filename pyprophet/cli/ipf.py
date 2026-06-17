@@ -49,6 +49,13 @@ from ..glyco.glycoform import infer_glycoforms
     help="[Experimental] Compute grouped FDR instead of pooled FDR to better support data where peak groups are evaluated to originate from very heterogeneous numbers of peptidoforms.",
 )
 @click.option(
+    "--ipf_grouped_fdr_strategy",
+    default="num_peptidoforms",
+    show_default=True,
+    type=click.Choice(["num_peptidoforms", "support_phospho_loss"]),
+    help="Grouping strategy used when --ipf_grouped_fdr is enabled. 'num_peptidoforms' reproduces the legacy grouping. 'support_phospho_loss' groups by supporting-transition bin (<=1, 2, >=3) and presence of phospho-loss support.",
+)
+@click.option(
     "--ipf_max_precursor_pep",
     default=0.7,
     show_default=True,
@@ -75,6 +82,20 @@ from ..glyco.glycoform import infer_glycoforms
     show_default=True,
     type=float,
     help="Maximum PEP to consider scored transitions in IPF.",
+)
+@click.option(
+    "--ipf_min_supporting_transitions",
+    default=0,
+    show_default=True,
+    type=int,
+    help="Minimum number of supporting identifying transitions required to keep an inferred peptidoform result. Applied as a post-IPF filter; 0 disables the filter.",
+)
+@click.option(
+    "--ipf_min_peakgroup_intensity",
+    default=0.0,
+    show_default=True,
+    type=float,
+    help="Minimum FEATURE_MS2 area intensity required to keep an inferred peptidoform result. Applied as a post-IPF filter; 0 disables the filter.",
 )
 @click.option(
     "--propagate_signal_across_runs/--no-propagate_signal_across_runs",
@@ -120,10 +141,13 @@ def ipf(
     ipf_ms2_scoring,
     ipf_h0,
     ipf_grouped_fdr,
+    ipf_grouped_fdr_strategy,
     ipf_max_precursor_pep,
     ipf_max_peakgroup_pep,
     ipf_max_precursor_peakgroup_pep,
     ipf_max_transition_pep,
+    ipf_min_supporting_transitions,
+    ipf_min_peakgroup_intensity,
     propagate_signal_across_runs,
     ipf_max_alignment_pep,
     across_run_confidence_threshold,
@@ -155,10 +179,13 @@ def ipf(
         ipf_ms2_scoring,
         ipf_h0,
         ipf_grouped_fdr,
+        ipf_grouped_fdr_strategy,
         ipf_max_precursor_pep,
         ipf_max_peakgroup_pep,
         ipf_max_precursor_peakgroup_pep,
         ipf_max_transition_pep,
+        ipf_min_supporting_transitions,
+        ipf_min_peakgroup_intensity,
         propagate_signal_across_runs,
         ipf_max_alignment_pep,
         across_run_confidence_threshold,
