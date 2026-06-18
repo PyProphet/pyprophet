@@ -132,7 +132,7 @@ def validate_output(
     for id_col in ["feature_id", "transition_id", "peptide_id"]:
         if id_col in transition_data.columns:
             transition_data[id_col] = transition_data[id_col].astype("Int64")
-    sort_cols = [
+    core_transition_cols = [
         "feature_id",
         "transition_id",
         "pep",
@@ -140,9 +140,12 @@ def validate_output(
         "bmask",
         "num_peptidoforms",
     ]
+    transition_data = transition_data[core_transition_cols]
     print("Transition Data:", file=regtest)
     print(
-        transition_data.sort_values(sort_cols).reset_index(drop=True).head(100),
+        transition_data.sort_values(core_transition_cols)
+        .reset_index(drop=True)
+        .head(100),
         file=regtest,
     )
 
