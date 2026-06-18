@@ -71,10 +71,21 @@ class ParquetReader(BaseParquetReader):
         ipf_ms1 = cfg.ipf_ms1_scoring
         ipf_ms2 = cfg.ipf_ms2_scoring
         pep_threshold = cfg.ipf_max_peakgroup_pep
+        add_intensity = cfg.ipf_min_peakgroup_intensity > 0
 
         logger.info("Reading precursor-level data ...")
 
         all_cols = get_parquet_column_names(self.infile)
+        intensity_select = (
+            ",\n                FEATURE_MS2_AREA_INTENSITY AS FEATURE_MS2_INTENSITY"
+            if add_intensity
+            else ""
+        )
+
+        if add_intensity and "FEATURE_MS2_AREA_INTENSITY" not in all_cols:
+            raise click.ClickException(
+                "FEATURE_MS2_AREA_INTENSITY is required for peakgroup-intensity IPF filtering."
+            )
 
         if not ipf_ms1 and ipf_ms2:
             if not any(c.startswith("SCORE_MS2_") for c in all_cols) or not any(
@@ -85,7 +96,7 @@ class ParquetReader(BaseParquetReader):
             SELECT FEATURE_ID,
                 SCORE_MS2_PEP AS MS2_PEAKGROUP_PEP,
                 NULL AS MS1_PRECURSOR_PEP,
-                SCORE_TRANSITION_PEP AS MS2_PRECURSOR_PEP
+                SCORE_TRANSITION_PEP AS MS2_PRECURSOR_PEP{intensity_select}
             FROM data
             WHERE PRECURSOR_DECOY = 0
             AND TRANSITION_TYPE = ''
@@ -102,7 +113,7 @@ class ParquetReader(BaseParquetReader):
             SELECT FEATURE_ID,
                 SCORE_MS2_PEP AS MS2_PEAKGROUP_PEP,
                 SCORE_MS1_PEP AS MS1_PRECURSOR_PEP,
-                NULL AS MS2_PRECURSOR_PEP
+                NULL AS MS2_PRECURSOR_PEP{intensity_select}
             FROM data
             WHERE PRECURSOR_DECOY = 0
             AND SCORE_MS2_PEP < {pep_threshold}
@@ -123,7 +134,7 @@ class ParquetReader(BaseParquetReader):
             SELECT FEATURE_ID,
                 SCORE_MS2_PEP AS MS2_PEAKGROUP_PEP,
                 SCORE_MS1_PEP AS MS1_PRECURSOR_PEP,
-                SCORE_TRANSITION_PEP AS MS2_PRECURSOR_PEP
+                SCORE_TRANSITION_PEP AS MS2_PRECURSOR_PEP{intensity_select}
             FROM data
             WHERE PRECURSOR_DECOY = 0
             AND TRANSITION_TYPE = ''
@@ -140,7 +151,7 @@ class ParquetReader(BaseParquetReader):
             SELECT FEATURE_ID,
                 SCORE_MS2_PEP AS MS2_PEAKGROUP_PEP,
                 NULL AS MS1_PRECURSOR_PEP,
-                NULL AS MS2_PRECURSOR_PEP
+                NULL AS MS2_PRECURSOR_PEP{intensity_select}
             FROM data
             WHERE PRECURSOR_DECOY = 0
             AND SCORE_MS2_PEP < {pep_threshold}
@@ -162,12 +173,24 @@ class ParquetReader(BaseParquetReader):
             raise click.ClickException(
                 "IPF_PEPTIDE_ID column is required in transition features."
             )
+        has_annotation = "ANNOTATION" in all_cols
+        has_overlap_col = "FEATURE_TRANSITION_VAR_ISOTOPE_OVERLAP_SCORE" in all_cols
+        has_phospho_loss_sql = (
+            "MAX(CASE WHEN COALESCE(ANNOTATION, '') LIKE '%-H3O4P1%' THEN 1 ELSE 0 END) AS HAS_PHOSPHO_LOSS"
+            if has_annotation
+            else "0 AS HAS_PHOSPHO_LOSS"
+        )
+        overlap_select = (
+            ", FEATURE_TRANSITION_VAR_ISOTOPE_OVERLAP_SCORE AS ISOTOPE_OVERLAP_SCORE"
+            if has_overlap_col
+            else ""
+        )
 
         # Use DuckDB view `data` created in _init_duckdb_views()
 
         # Evidence table: transition-level PEPs
         query = f"""
-        SELECT FEATURE_ID, TRANSITION_ID, SCORE_TRANSITION_PEP AS PEP
+        SELECT FEATURE_ID, TRANSITION_ID, SCORE_TRANSITION_PEP AS PEP{overlap_select}
         FROM data
         WHERE TRANSITION_TYPE != ''
         AND TRANSITION_DECOY = 0
@@ -175,6 +198,20 @@ class ParquetReader(BaseParquetReader):
         AND SCORE_TRANSITION_PEP < {pep_threshold}
         """
         evidence = con.execute(query).df().rename(columns=str.lower)
+
+        query = f"""
+        SELECT
+            TRANSITION_ID,
+            COUNT(DISTINCT IPF_PEPTIDE_ID) AS N_MAPPED_PEPTIDES,
+            {has_phospho_loss_sql}
+        FROM data
+        WHERE TRANSITION_TYPE != ''
+        AND TRANSITION_DECOY = 0
+        AND SCORE_TRANSITION_SCORE IS NOT NULL
+        AND IPF_PEPTIDE_ID IS NOT NULL
+        GROUP BY TRANSITION_ID
+        """
+        transition_meta = con.execute(query).df().rename(columns=str.lower)
 
         # Bitmask table: transition-peptidoform presence
         query = """
@@ -223,6 +260,7 @@ class ParquetReader(BaseParquetReader):
 
         # Merge all parts into final dataframe
         trans_pf = pd.merge(evidence, peptidoforms, how="outer", on="feature_id")
+        trans_pf = pd.merge(trans_pf, transition_meta, how="left", on="transition_id")
         trans_pf_bm = pd.merge(
             trans_pf, bitmask, how="left", on=["transition_id", "peptide_id"]
         ).fillna(0)

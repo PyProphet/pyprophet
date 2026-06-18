@@ -785,9 +785,9 @@ class OSWReader(BaseOSWReader):
         if check_sqlite_table(con, "SCORE_TRANSITION"):
             transition_query = f"""
                 SELECT FEATURE_TRANSITION.FEATURE_ID AS id,
-                      GROUP_CONCAT(AREA_INTENSITY,';') AS aggr_Peak_Area,
-                      GROUP_CONCAT(APEX_INTENSITY,';') AS aggr_Peak_Apex,
-                      GROUP_CONCAT(TRANSITION.ID || "_" || TRANSITION.TYPE || TRANSITION.ORDINAL || "_" || TRANSITION.CHARGE,';') AS aggr_Fragment_Annotation
+                      GROUP_CONCAT(AREA_INTENSITY,';' ORDER BY TRANSITION.ID) AS aggr_Peak_Area,
+                      GROUP_CONCAT(APEX_INTENSITY,';' ORDER BY TRANSITION.ID) AS aggr_Peak_Apex,
+                      GROUP_CONCAT(TRANSITION.ID || "_" || TRANSITION.TYPE || TRANSITION.ORDINAL || "_" || TRANSITION.CHARGE,';' ORDER BY TRANSITION.ID) AS aggr_Fragment_Annotation
                 FROM FEATURE_TRANSITION
                 INNER JOIN TRANSITION ON FEATURE_TRANSITION.TRANSITION_ID = TRANSITION.ID
                 INNER JOIN SCORE_TRANSITION ON FEATURE_TRANSITION.TRANSITION_ID = SCORE_TRANSITION.TRANSITION_ID AND FEATURE_TRANSITION.FEATURE_ID = SCORE_TRANSITION.FEATURE_ID
@@ -797,9 +797,9 @@ class OSWReader(BaseOSWReader):
         else:
             transition_query = """
                 SELECT FEATURE_ID AS id,
-                      GROUP_CONCAT(AREA_INTENSITY,';') AS aggr_Peak_Area,
-                      GROUP_CONCAT(APEX_INTENSITY,';') AS aggr_Peak_Apex,
-                      GROUP_CONCAT(TRANSITION.ID || "_" || TRANSITION.TYPE || TRANSITION.ORDINAL || "_" || TRANSITION.CHARGE,';') AS aggr_Fragment_Annotation
+                      GROUP_CONCAT(AREA_INTENSITY,';' ORDER BY TRANSITION.ID) AS aggr_Peak_Area,
+                      GROUP_CONCAT(APEX_INTENSITY,';' ORDER BY TRANSITION.ID) AS aggr_Peak_Apex,
+                      GROUP_CONCAT(TRANSITION.ID || "_" || TRANSITION.TYPE || TRANSITION.ORDINAL || "_" || TRANSITION.CHARGE,';' ORDER BY TRANSITION.ID) AS aggr_Fragment_Annotation
                 FROM FEATURE_TRANSITION
                 INNER JOIN TRANSITION ON FEATURE_TRANSITION.TRANSITION_ID = TRANSITION.ID
                 GROUP BY FEATURE_ID

@@ -114,6 +114,8 @@ class RunnerConfig:
         ipf_max_peakgroup_pep (float): Max PEP for peak group consideration in IPF.
         ipf_max_transition_isotope_overlap (float): Max isotope overlap for transition selection in IPF.
         ipf_min_transition_sn (float): Min log S/N for transition selection in IPF.
+        transition_training_require_unique_mapping (bool): Whether to restrict transition semi-supervised target training peaks to uniquely mapped transitions.
+        transition_training_require_phospho_loss (bool): Whether to restrict transition semi-supervised target training peaks to phospho-loss transitions.
 
         glyco (bool): Whether glycopeptide-specific scoring is enabled.
         density_estimator (str): Score density estimation method ('kde' or 'gmm').
@@ -124,6 +126,8 @@ class RunnerConfig:
         threads (int): Number of CPU threads to use; -1 means all CPUs.
         test (bool): Whether to enable test mode with deterministic behavior.
         color_palette (str): Color palette used in PDF report rendering.
+        report_mode (str): PDF report scope: 'full', 'main', or 'none'.
+        apply_weights_run_batch_size (int): Number of runs to score together per streamed OSW apply batch. `0` means auto.
     """
 
     # Scoring / classifier options
@@ -160,6 +164,8 @@ class RunnerConfig:
     ipf_max_peakgroup_pep: float = 0.7
     ipf_max_transition_isotope_overlap: float = 0.5
     ipf_min_transition_sn: float = 0.0
+    transition_training_require_unique_mapping: bool = False
+    transition_training_require_phospho_loss: bool = False
 
     # Glyco options
     glyco: bool = False
@@ -172,6 +178,8 @@ class RunnerConfig:
     threads: int = 1
     test: bool = False
     color_palette: str = "normal"
+    report_mode: Literal["full", "main", "none"] = "full"
+    apply_weights_run_batch_size: int = 0
 
     def __post_init__(self):
         # Check for auto main score selection
@@ -215,6 +223,8 @@ class RunnerConfig:
                 f"  ipf_max_peakgroup_pep={self.ipf_max_peakgroup_pep}",
                 f"  ipf_max_transition_isotope_overlap={self.ipf_max_transition_isotope_overlap}",
                 f"  ipf_min_transition_sn={self.ipf_min_transition_sn}",
+                f"  transition_training_require_unique_mapping={self.transition_training_require_unique_mapping}",
+                f"  transition_training_require_phospho_loss={self.transition_training_require_phospho_loss}",
             ]
         )
 
@@ -235,6 +245,8 @@ class RunnerConfig:
                 f"  threads={self.threads}",
                 f"  test={self.test}",
                 f"  color_palette='{self.color_palette}'",
+                f"  report_mode='{self.report_mode}'",
+                f"  apply_weights_run_batch_size={self.apply_weights_run_batch_size}",
                 ")",
             ]
         )
@@ -247,7 +259,11 @@ class RunnerConfig:
             f"ss_main_score='{self.ss_main_score}', xeval_fraction={self.xeval_fraction}, "
             f"xeval_num_iter={self.xeval_num_iter}, ss_initial_fdr={self.ss_initial_fdr}, "
             f"ss_iteration_fdr={self.ss_iteration_fdr}, ss_num_iter={self.ss_num_iter}, "
-            f"group_id='{self.group_id}', glyco={self.glyco}, threads={self.threads})"
+            f"group_id='{self.group_id}', glyco={self.glyco}, threads={self.threads}, "
+            f"transition_training_require_unique_mapping={self.transition_training_require_unique_mapping}, "
+            f"transition_training_require_phospho_loss={self.transition_training_require_phospho_loss}, "
+            f"report_mode='{self.report_mode}', "
+            f"apply_weights_run_batch_size={self.apply_weights_run_batch_size})"
         )
 
 
@@ -267,6 +283,7 @@ class RunnerIOConfig(BaseIOConfig):
     """
 
     runner: RunnerConfig
+    run_id_filter: Optional[Union[int, List[int], tuple]] = None
     extra_writes: dict = field(init=False)
 
     def __post_init__(self):
@@ -294,6 +311,7 @@ class RunnerIOConfig(BaseIOConfig):
             "subsample_ratio": self.subsample_ratio,
             "level": self.level,
             "prefix": self.prefix,
+            "run_id_filter": self.run_id_filter,
             **vars(self.runner),
         }
 
@@ -331,6 +349,8 @@ class RunnerIOConfig(BaseIOConfig):
         ipf_max_peakgroup_pep,
         ipf_max_transition_isotope_overlap,
         ipf_min_transition_sn,
+        transition_training_require_unique_mapping,
+        transition_training_require_phospho_loss,
         add_alignment_features,
         glyco,
         density_estimator,
@@ -340,6 +360,8 @@ class RunnerIOConfig(BaseIOConfig):
         test,
         color_palette,
         main_score_selection_report,
+        report_mode,
+        apply_weights_run_batch_size,
     ):
         """
         Creates a configuration object from command-line arguments.
@@ -399,6 +421,8 @@ class RunnerIOConfig(BaseIOConfig):
             ipf_max_peakgroup_pep=ipf_max_peakgroup_pep,
             ipf_max_transition_isotope_overlap=ipf_max_transition_isotope_overlap,
             ipf_min_transition_sn=ipf_min_transition_sn,
+            transition_training_require_unique_mapping=transition_training_require_unique_mapping,
+            transition_training_require_phospho_loss=transition_training_require_phospho_loss,
             add_alignment_features=add_alignment_features,
             glyco=glyco,
             density_estimator=density_estimator,
@@ -407,6 +431,8 @@ class RunnerIOConfig(BaseIOConfig):
             threads=threads,
             test=test,
             color_palette=color_palette,
+            report_mode=report_mode,
+            apply_weights_run_batch_size=apply_weights_run_batch_size,
         )
 
         return cls(
@@ -456,10 +482,13 @@ class IPFIOConfig(BaseIOConfig):
         ipf_ms2_scoring (bool): Use MS2 precursor data for IPF.
         ipf_h0 (bool): Include possibility that peak groups are not covered by the peptidoform space (null hypothesis H0).
         ipf_grouped_fdr (bool): [Experimental] Compute grouped FDR instead of pooled FDR to support heterogeneous peptidoform counts per peak group.
+        ipf_grouped_fdr_strategy (Literal["num_peptidoforms"]): Grouping strategy used when grouped FDR is enabled.
         ipf_max_precursor_pep (float): Maximum PEP to consider scored precursors in IPF.
         ipf_max_peakgroup_pep (float): Maximum PEP to consider scored peak groups in IPF.
         ipf_max_precursor_peakgroup_pep (float): Maximum BHM layer 1 integrated precursor-peakgroup PEP to consider in IPF.
         ipf_max_transition_pep (float): Maximum PEP to consider scored transitions in IPF.
+        ipf_min_supporting_transitions (int): Minimum number of supporting transitions required to keep an inferred peptidoform result.
+        ipf_min_peakgroup_intensity (float): Minimum MS2 peakgroup area intensity required to keep an inferred peptidoform result.
         propagate_signal_across_runs (bool): Propagate signal across runs (requires alignment step).
         ipf_max_alignment_pep (float): Maximum PEP to consider for good alignments.
         across_run_confidence_threshold (float): Maximum PEP threshold for propagating signal across runs for aligned features.
@@ -471,10 +500,13 @@ class IPFIOConfig(BaseIOConfig):
     ipf_ms2_scoring: bool = True
     ipf_h0: bool = True
     ipf_grouped_fdr: bool = False
+    ipf_grouped_fdr_strategy: Literal["num_peptidoforms"] = "num_peptidoforms"
     ipf_max_precursor_pep: float = 0.7
     ipf_max_peakgroup_pep: float = 0.7
     ipf_max_precursor_peakgroup_pep: float = 0.4
     ipf_max_transition_pep: float = 0.6
+    ipf_min_supporting_transitions: int = 0
+    ipf_min_peakgroup_intensity: float = 0.0
     propagate_signal_across_runs: bool = False
     ipf_max_alignment_pep: float = 0.7
     across_run_confidence_threshold: float = 0.5
@@ -493,10 +525,13 @@ class IPFIOConfig(BaseIOConfig):
         ipf_ms2_scoring,
         ipf_h0,
         ipf_grouped_fdr,
+        ipf_grouped_fdr_strategy,
         ipf_max_precursor_pep,
         ipf_max_peakgroup_pep,
         ipf_max_precursor_peakgroup_pep,
         ipf_max_transition_pep,
+        ipf_min_supporting_transitions,
+        ipf_min_peakgroup_intensity,
         propagate_signal_across_runs,
         ipf_max_alignment_pep,
         across_run_confidence_threshold,
@@ -516,10 +551,13 @@ class IPFIOConfig(BaseIOConfig):
             ipf_ms2_scoring=ipf_ms2_scoring,
             ipf_h0=ipf_h0,
             ipf_grouped_fdr=ipf_grouped_fdr,
+            ipf_grouped_fdr_strategy=ipf_grouped_fdr_strategy,
             ipf_max_precursor_pep=ipf_max_precursor_pep,
             ipf_max_peakgroup_pep=ipf_max_peakgroup_pep,
             ipf_max_precursor_peakgroup_pep=ipf_max_precursor_peakgroup_pep,
             ipf_max_transition_pep=ipf_max_transition_pep,
+            ipf_min_supporting_transitions=ipf_min_supporting_transitions,
+            ipf_min_peakgroup_intensity=ipf_min_peakgroup_intensity,
             propagate_signal_across_runs=propagate_signal_across_runs,
             ipf_max_alignment_pep=ipf_max_alignment_pep,
             across_run_confidence_threshold=across_run_confidence_threshold,

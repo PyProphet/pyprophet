@@ -725,8 +725,19 @@ def save_report(
     color_palette="normal",
     level=None,
     df=None,
+    report_mode="full",
 ):
     """Main function to generate and save the report."""
+
+    if report_mode == "none":
+        logger.info("Skipping PDF report generation (report_mode=none).")
+        return
+
+    if report_mode not in {"full", "main"}:
+        logger.warning(
+            f"Unknown report_mode '{report_mode}'. Falling back to full report generation."
+        )
+        report_mode = "full"
 
     plotter = PlotGenerator(color_palette)
 
@@ -754,6 +765,12 @@ def save_report(
             ax.set_title("Report Generation Error")
             pdf.savefig(fig)
             plt.close(fig)
+
+        if report_mode == "main":
+            logger.info(
+                "Skipping downstream identification/quantification report pages (report_mode=main)."
+            )
+            return
 
         if df is not None and level != "alignment":
             if df[(df.q_value <= 0.05) & (df.decoy == 0)].empty:
