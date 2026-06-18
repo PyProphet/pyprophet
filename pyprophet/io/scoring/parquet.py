@@ -157,36 +157,18 @@ class ParquetReader(BaseParquetReader):
         cols_sql = ", ".join([f"t.{col}" for col in feature_cols])
         cols_sql_inner = ", ".join([f"{col}" for col in feature_cols])
         rc = self.config.runner
-        include_mapping_cardinality = rc.transition_score_use_mapping_cardinality
-        include_unique_mapping = rc.transition_score_use_unique_mapping
-        include_phospho_loss = rc.transition_score_use_phospho_loss
         need_training_unique = rc.transition_training_require_unique_mapping
         need_training_phospho_loss = rc.transition_training_require_phospho_loss
-        need_mapping_counts = (
-            include_mapping_cardinality
-            or include_unique_mapping
-            or need_training_unique
-        )
+        need_mapping_counts = need_training_unique
         all_cols = get_parquet_column_names(self.infile)
         annotation_inner = ""
-        if include_phospho_loss or need_training_phospho_loss:
+        if need_training_phospho_loss:
             annotation_inner = (
                 "ANNOTATION AS T_ANNOTATION,"
                 if "ANNOTATION" in all_cols
                 else "NULL AS T_ANNOTATION,"
             )
         extra_select_parts = []
-        if include_mapping_cardinality:
-            extra_select_parts.append(
-                "COALESCE(tmc.N_MAPPED_PEPTIDES, 0) AS VAR_MAPPING_CARDINALITY"
-            )
-        if include_unique_mapping:
-            extra_select_parts.append(
-                """CASE
-                            WHEN COALESCE(tmc.N_MAPPED_PEPTIDES, 0) = 1 THEN 1.0
-                            ELSE 0.0
-                        END AS VAR_IS_UNIQUE_MAPPING"""
-            )
         if need_training_unique:
             extra_select_parts.append(
                 """CASE
@@ -194,7 +176,7 @@ class ParquetReader(BaseParquetReader):
                             ELSE 0.0
                         END AS meta_is_unique_mapping"""
             )
-        if include_phospho_loss or need_training_phospho_loss:
+        if need_training_phospho_loss:
             extra_select_parts.append(
                 """CASE
                             WHEN STRPOS(COALESCE(t.T_ANNOTATION, ''), '-H3O4P1') > 0 THEN 1.0
@@ -261,15 +243,7 @@ class ParquetReader(BaseParquetReader):
             # Convert DECOY to 0 and 1
             .with_columns(pl.col("DECOY").cast(pl.Int8).alias("DECOY"))
         )
-        if include_phospho_loss and need_training_phospho_loss:
-            df = df.rename(
-                {
-                    "__PHOSPHO_LOSS_FLAG": "VAR_HAS_PHOSPHO_LOSS",
-                }
-            ).with_columns(pl.col("VAR_HAS_PHOSPHO_LOSS").alias("meta_has_phospho_loss"))
-        elif include_phospho_loss:
-            df = df.rename({"__PHOSPHO_LOSS_FLAG": "VAR_HAS_PHOSPHO_LOSS"})
-        elif need_training_phospho_loss:
+        if need_training_phospho_loss:
             df = df.rename({"__PHOSPHO_LOSS_FLAG": "meta_has_phospho_loss"})
         df = self._collapse_ipf_peptide_ids(df)
         return df.to_pandas()

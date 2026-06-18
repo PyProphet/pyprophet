@@ -179,24 +179,6 @@ LARGE_RUN_MAIN_REPORT_THRESHOLD = 50
     hidden=True,
 )
 @click.option(
-    "--transition_score_use_mapping_cardinality/--no-transition_score_use_mapping_cardinality",
-    default=False,
-    show_default=True,
-    help="Experimental: expose transition-peptide mapping cardinality as a transition-scoring feature.",
-)
-@click.option(
-    "--transition_score_use_unique_mapping/--no-transition_score_use_unique_mapping",
-    default=False,
-    show_default=True,
-    help="Experimental: expose a unique-mapping indicator as a transition-scoring feature.",
-)
-@click.option(
-    "--transition_score_use_phospho_loss/--no-transition_score_use_phospho_loss",
-    default=False,
-    show_default=True,
-    help="Experimental: expose phospho-loss annotation as a transition-scoring feature.",
-)
-@click.option(
     "--transition_training_require_unique_mapping/--no-transition_training_require_unique_mapping",
     default=False,
     show_default=True,
@@ -207,18 +189,6 @@ LARGE_RUN_MAIN_REPORT_THRESHOLD = 50
     default=False,
     show_default=True,
     help="Experimental: when learning transition scores, restrict target training peaks to phospho-loss transitions.",
-)
-@click.option(
-    "--transition_training_max_isotope_overlap",
-    default=None,
-    type=float,
-    help="Experimental: optional stricter isotope-overlap ceiling applied only when selecting target transition training peaks.",
-)
-@click.option(
-    "--transition_training_min_log_sn",
-    default=None,
-    type=float,
-    help="Experimental: optional stricter minimum log S/N applied only when selecting target transition training peaks.",
 )
 # Glyco/GproDIA Options
 @click.option(
@@ -341,13 +311,8 @@ def score(
     ipf_max_peakgroup_pep,
     ipf_max_transition_isotope_overlap,
     ipf_min_transition_sn,
-    transition_score_use_mapping_cardinality,
-    transition_score_use_unique_mapping,
-    transition_score_use_phospho_loss,
     transition_training_require_unique_mapping,
     transition_training_require_phospho_loss,
-    transition_training_max_isotope_overlap,
-    transition_training_min_log_sn,
     glyco,
     density_estimator,
     grid_size,
@@ -424,13 +389,8 @@ def score(
         ipf_max_peakgroup_pep,
         ipf_max_transition_isotope_overlap,
         ipf_min_transition_sn,
-        transition_score_use_mapping_cardinality,
-        transition_score_use_unique_mapping,
-        transition_score_use_phospho_loss,
         transition_training_require_unique_mapping,
         transition_training_require_phospho_loss,
-        transition_training_max_isotope_overlap,
-        transition_training_min_log_sn,
         add_alignment_features,
         glyco,
         density_estimator,

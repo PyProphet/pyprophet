@@ -379,59 +379,58 @@ class PyProphetWeightApplier(PyProphetRunner):
                 with open(apply_weights, "rb") as file:
                     self.persisted_weights = pickle.load(file)
         elif self.config.file_type == "osw":
-            con = sqlite3.connect(apply_weights)
-            if self.classifier in ("LDA", "SVM"):
-                try:
-                    if not check_sqlite_table(con, "PYPROPHET_WEIGHTS"):
-                        raise click.ClickException(
-                            "PYPROPHET_WEIGHTS table is not present in file, cannot apply weights for %s classifier! Make sure you have run the scoring on a subset of the data first, or that you supplied the right `--classifier` parameter." % self.classifier
-                        )
-                    data = pd.read_sql_query(
-                        "SELECT * FROM PYPROPHET_WEIGHTS WHERE LEVEL=='%s'"
-                        % self.level,
-                        con,
-                    )
-                    data.columns = [col.lower() for col in data.columns]
-                    self.persisted_weights = data
-                    if self.level != self.persisted_weights["level"].unique()[0]:
-                        raise click.ClickException("Weights file has wrong level.")
-                except Exception:
-                    import traceback
-
-                    traceback.print_exc()
-                    raise
-            elif self.classifier in ("XGBoost", "HistGradientBoosting"):
-                try:
-                    if not check_sqlite_table(con, "PYPROPHET_XGB"):
-                        raise click.ClickException(
-                            "PYPROPHET_XGB table is not present in file, cannot apply weights for XGBoost/HistGradientBoosting classifier! Make sure you have run the scoring on a subset of the data first, or that you supplied the right `--classifier` parameter."
-                        )
-                    data = con.execute(
-                        "SELECT xgb FROM PYPROPHET_XGB WHERE LEVEL=='%s'" % self.level
-                    ).fetchone()
-                    self.persisted_weights = pickle.loads(data[0])
-                except Exception:
-                    import traceback
-
-                    traceback.print_exc()
-                    raise
-            if check_sqlite_table(con, "PYPROPHET_SCORER"):
-                scorer_row = con.execute(
-                    """
-                    SELECT SCORER
-                    FROM PYPROPHET_SCORER
-                    WHERE LEVEL = ? AND CLASSIFIER = ?
-                    """,
-                    (self.level, self.classifier),
-                ).fetchone()
-                if scorer_row is not None:
-                    scorer_blob = scorer_row[0]
+            with sqlite3.connect(apply_weights) as con:
+                if self.classifier in ("LDA", "SVM"):
                     try:
-                        scorer_blob = zlib.decompress(scorer_blob)
-                    except zlib.error:
-                        pass
-                    self.persisted_scorer = pickle.loads(scorer_blob)
-            con.close()
+                        if not check_sqlite_table(con, "PYPROPHET_WEIGHTS"):
+                            raise click.ClickException(
+                                "PYPROPHET_WEIGHTS table is not present in file, cannot apply weights for %s classifier! Make sure you have run the scoring on a subset of the data first, or that you supplied the right `--classifier` parameter." % self.classifier
+                            )
+                        data = pd.read_sql_query(
+                            "SELECT * FROM PYPROPHET_WEIGHTS WHERE LEVEL=='%s'"
+                            % self.level,
+                            con,
+                        )
+                        data.columns = [col.lower() for col in data.columns]
+                        self.persisted_weights = data
+                        if self.level != self.persisted_weights["level"].unique()[0]:
+                            raise click.ClickException("Weights file has wrong level.")
+                    except Exception:
+                        import traceback
+
+                        traceback.print_exc()
+                        raise
+                elif self.classifier in ("XGBoost", "HistGradientBoosting"):
+                    try:
+                        if not check_sqlite_table(con, "PYPROPHET_XGB"):
+                            raise click.ClickException(
+                                "PYPROPHET_XGB table is not present in file, cannot apply weights for XGBoost/HistGradientBoosting classifier! Make sure you have run the scoring on a subset of the data first, or that you supplied the right `--classifier` parameter."
+                            )
+                        data = con.execute(
+                            "SELECT xgb FROM PYPROPHET_XGB WHERE LEVEL=='%s'" % self.level
+                        ).fetchone()
+                        self.persisted_weights = pickle.loads(data[0])
+                    except Exception:
+                        import traceback
+
+                        traceback.print_exc()
+                        raise
+                if check_sqlite_table(con, "PYPROPHET_SCORER"):
+                    scorer_row = con.execute(
+                        """
+                        SELECT SCORER
+                        FROM PYPROPHET_SCORER
+                        WHERE LEVEL = ? AND CLASSIFIER = ?
+                        """,
+                        (self.level, self.classifier),
+                    ).fetchone()
+                    if scorer_row is not None:
+                        scorer_blob = scorer_row[0]
+                        try:
+                            scorer_blob = zlib.decompress(scorer_blob)
+                        except zlib.error:
+                            pass
+                        self.persisted_scorer = pickle.loads(scorer_blob)
 
     def run(self):
         if self._should_stream_apply():

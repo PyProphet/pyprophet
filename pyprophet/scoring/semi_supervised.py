@@ -224,8 +224,6 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
         ss_use_dynamic_main_score,
         transition_training_require_unique_mapping,
         transition_training_require_phospho_loss,
-        transition_training_max_isotope_overlap,
-        transition_training_min_log_sn,
     ):
         assert isinstance(inner_learner, AbstractLearner)
         AbstractSemiSupervisedLearner.__init__(
@@ -254,10 +252,6 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
         self.transition_training_require_phospho_loss = (
             transition_training_require_phospho_loss
         )
-        self.transition_training_max_isotope_overlap = (
-            transition_training_max_isotope_overlap
-        )
-        self.transition_training_min_log_sn = transition_training_min_log_sn
 
     @classmethod
     def from_config(cls, config: RunnerIOConfig, base_learner):
@@ -291,8 +285,6 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
             rc.ss_use_dynamic_main_score,
             rc.transition_training_require_unique_mapping,
             rc.transition_training_require_phospho_loss,
-            rc.transition_training_max_isotope_overlap,
-            rc.transition_training_min_log_sn,
         )
 
     @staticmethod
@@ -315,8 +307,6 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
             [
                 self.transition_training_require_unique_mapping,
                 self.transition_training_require_phospho_loss,
-                self.transition_training_max_isotope_overlap is not None,
-                self.transition_training_min_log_sn is not None,
             ]
         )
         if not apply_filter:
@@ -341,34 +331,6 @@ class StandardSemiSupervisedLearner(AbstractSemiSupervisedLearner):
                 )
             mask &= df["meta_has_phospho_loss"].fillna(0.0).to_numpy() >= 0.5
             reasons.append("phospho-loss only")
-
-        if self.transition_training_max_isotope_overlap is not None:
-            overlap_alias = self._resolve_score_alias(
-                mapper, "var_isotope_overlap_score"
-            )
-            if overlap_alias is None or overlap_alias not in df.columns:
-                raise click.ClickException(
-                    "Transition training filter could not find var_isotope_overlap_score in the transition scoring table."
-                )
-            mask &= (
-                df[overlap_alias].fillna(np.inf).to_numpy()
-                <= self.transition_training_max_isotope_overlap
-            )
-            reasons.append(
-                f"overlap<={self.transition_training_max_isotope_overlap:g}"
-            )
-
-        if self.transition_training_min_log_sn is not None:
-            log_sn_alias = self._resolve_score_alias(mapper, "var_log_sn_score")
-            if log_sn_alias is None or log_sn_alias not in df.columns:
-                raise click.ClickException(
-                    "Transition training filter could not find var_log_sn_score in the transition scoring table."
-                )
-            mask &= (
-                df[log_sn_alias].fillna(-np.inf).to_numpy()
-                >= self.transition_training_min_log_sn
-            )
-            reasons.append(f"log_sn>={self.transition_training_min_log_sn:g}")
 
         kept = int(mask.sum())
         total = int(len(mask))

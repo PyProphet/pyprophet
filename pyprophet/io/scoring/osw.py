@@ -46,8 +46,8 @@ class OSWReader(BaseOSWReader):
             logger.info(
                 "Using SQLite read path for run-scoped OSW access."
             )
-            con = sqlite3.connect(self.infile)
-            return self._read_using_sqlite(con)
+            with sqlite3.connect(self.infile) as con:
+                return self._read_using_sqlite(con)
         try:
             con = duckdb.connect()
             con.execute("INSTALL sqlite_scanner;")
@@ -59,8 +59,8 @@ class OSWReader(BaseOSWReader):
             logger.warning(
                 f"Warn: DuckDB sqlite_scanner failed, falling back to SQLite. Reason: {e}"
             )
-            con = sqlite3.connect(self.infile)
-            return self._read_using_sqlite(con)
+            with sqlite3.connect(self.infile) as con:
+                return self._read_using_sqlite(con)
 
     def _create_indexes(self):
         """
@@ -68,32 +68,30 @@ class OSWReader(BaseOSWReader):
         since DuckDB doesn't seem to currently support creating indexes on attached SQLite databases.
         """
         try:
-            sqlite_con = sqlite3.connect(self.infile)
+            with sqlite3.connect(self.infile) as sqlite_con:
+                index_statements = [
+                    "CREATE INDEX IF NOT EXISTS idx_precursor_id ON PRECURSOR (ID);",
+                    "CREATE INDEX IF NOT EXISTS idx_feature_precursor_id ON FEATURE (PRECURSOR_ID);",
+                    "CREATE INDEX IF NOT EXISTS idx_feature_run_id ON FEATURE (RUN_ID);",
+                    "CREATE INDEX IF NOT EXISTS idx_feature_run_id_feature_id ON FEATURE (RUN_ID, ID);",
+                    "CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);",
+                    "CREATE INDEX IF NOT EXISTS idx_feature_ms1_feature_id ON FEATURE_MS1 (FEATURE_ID);",
+                    "CREATE INDEX IF NOT EXISTS idx_feature_ms2_feature_id ON FEATURE_MS2 (FEATURE_ID);",
+                    "CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);",
+                    "CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id_rank_pep ON SCORE_MS2 (FEATURE_ID, RANK, PEP);",
+                    "CREATE INDEX IF NOT EXISTS idx_feature_transition_feature_id ON FEATURE_TRANSITION (FEATURE_ID);",
+                    "CREATE INDEX IF NOT EXISTS idx_feature_transition_feature_id_transition_id ON FEATURE_TRANSITION (FEATURE_ID, TRANSITION_ID);",
+                    "CREATE INDEX IF NOT EXISTS idx_feature_transition_transition_id ON FEATURE_TRANSITION (TRANSITION_ID);",
+                    "CREATE INDEX IF NOT EXISTS idx_transition_id ON TRANSITION (ID);",
+                ]
 
-            index_statements = [
-                "CREATE INDEX IF NOT EXISTS idx_precursor_id ON PRECURSOR (ID);",
-                "CREATE INDEX IF NOT EXISTS idx_feature_precursor_id ON FEATURE (PRECURSOR_ID);",
-                "CREATE INDEX IF NOT EXISTS idx_feature_run_id ON FEATURE (RUN_ID);",
-                "CREATE INDEX IF NOT EXISTS idx_feature_run_id_feature_id ON FEATURE (RUN_ID, ID);",
-                "CREATE INDEX IF NOT EXISTS idx_feature_feature_id ON FEATURE (ID);",
-                "CREATE INDEX IF NOT EXISTS idx_feature_ms1_feature_id ON FEATURE_MS1 (FEATURE_ID);",
-                "CREATE INDEX IF NOT EXISTS idx_feature_ms2_feature_id ON FEATURE_MS2 (FEATURE_ID);",
-                "CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id ON SCORE_MS2 (FEATURE_ID);",
-                "CREATE INDEX IF NOT EXISTS idx_score_ms2_feature_id_rank_pep ON SCORE_MS2 (FEATURE_ID, RANK, PEP);",
-                "CREATE INDEX IF NOT EXISTS idx_feature_transition_feature_id ON FEATURE_TRANSITION (FEATURE_ID);",
-                "CREATE INDEX IF NOT EXISTS idx_feature_transition_feature_id_transition_id ON FEATURE_TRANSITION (FEATURE_ID, TRANSITION_ID);",
-                "CREATE INDEX IF NOT EXISTS idx_feature_transition_transition_id ON FEATURE_TRANSITION (TRANSITION_ID);",
-                "CREATE INDEX IF NOT EXISTS idx_transition_id ON TRANSITION (ID);",
-            ]
+                for stmt in index_statements:
+                    try:
+                        sqlite_con.execute(stmt)
+                    except sqlite3.OperationalError as e:
+                        logger.warning(f"Warn: SQLite index creation failed: {e}")
 
-            for stmt in index_statements:
-                try:
-                    sqlite_con.execute(stmt)
-                except sqlite3.OperationalError as e:
-                    logger.warning(f"Warn: SQLite index creation failed: {e}")
-
-            sqlite_con.commit()
-            sqlite_con.close()
+                sqlite_con.commit()
 
         except Exception as e:
             raise click.ClickException(
@@ -373,29 +371,11 @@ class OSWReader(BaseOSWReader):
         rc = self.config.runner
         filter_clause = self._get_precursor_filter_clause()
         run_filter_clause = self._get_run_filter_clause("f")
-        include_mapping_cardinality = rc.transition_score_use_mapping_cardinality
-        include_unique_mapping = rc.transition_score_use_unique_mapping
-        include_phospho_loss = rc.transition_score_use_phospho_loss
         need_training_unique = rc.transition_training_require_unique_mapping
         need_training_phospho_loss = rc.transition_training_require_phospho_loss
-        need_mapping_counts = (
-            include_mapping_cardinality
-            or include_unique_mapping
-            or need_training_unique
-        )
+        need_mapping_counts = need_training_unique
         transition_cols = set(get_table_columns(self.infile, "TRANSITION"))
         extra_select_parts = []
-        if include_mapping_cardinality:
-            extra_select_parts.append(
-                "COALESCE(tmc.N_MAPPED_PEPTIDES, 0) AS VAR_MAPPING_CARDINALITY"
-            )
-        if include_unique_mapping:
-            extra_select_parts.append(
-                """CASE
-                    WHEN COALESCE(tmc.N_MAPPED_PEPTIDES, 0) = 1 THEN 1.0
-                    ELSE 0.0
-                END AS VAR_IS_UNIQUE_MAPPING"""
-            )
         if need_training_unique:
             extra_select_parts.append(
                 """CASE
@@ -403,7 +383,7 @@ class OSWReader(BaseOSWReader):
                     ELSE 0.0
                 END AS meta_is_unique_mapping"""
             )
-        if include_phospho_loss or need_training_phospho_loss:
+        if need_training_phospho_loss:
             if "ANNOTATION" in transition_cols:
                 extra_select_parts.append("tr.ANNOTATION AS TRANSITION_ANNOTATION")
             else:
@@ -454,7 +434,7 @@ class OSWReader(BaseOSWReader):
             ORDER BY RUN_ID, FEATURE_ID, PRECURSOR_ID, EXP_RT, TRANSITION_ID
             """
         ).fetchdf()
-        if include_phospho_loss or need_training_phospho_loss:
+        if need_training_phospho_loss:
             transition_annotation = df["TRANSITION_ANNOTATION"].astype("string")
             phospho_loss = (
                 transition_annotation
@@ -462,10 +442,7 @@ class OSWReader(BaseOSWReader):
                 .str.contains("-H3O4P1", regex=False)
                 .astype(float)
             )
-            if include_phospho_loss:
-                df["VAR_HAS_PHOSPHO_LOSS"] = phospho_loss
-            if need_training_phospho_loss:
-                df["meta_has_phospho_loss"] = phospho_loss
+            df["meta_has_phospho_loss"] = phospho_loss
             df = df.drop(columns=["TRANSITION_ANNOTATION"])
 
         return self._finalize_feature_table(df, self.config.runner.ss_main_score)
@@ -656,29 +633,11 @@ class OSWReader(BaseOSWReader):
             )
 
         run_filter_clause = self._get_run_filter_clause("f")
-        include_mapping_cardinality = rc.transition_score_use_mapping_cardinality
-        include_unique_mapping = rc.transition_score_use_unique_mapping
-        include_phospho_loss = rc.transition_score_use_phospho_loss
         need_training_unique = rc.transition_training_require_unique_mapping
         need_training_phospho_loss = rc.transition_training_require_phospho_loss
-        need_mapping_counts = (
-            include_mapping_cardinality
-            or include_unique_mapping
-            or need_training_unique
-        )
+        need_mapping_counts = need_training_unique
         transition_cols = set(get_table_columns(self.infile, "TRANSITION"))
         extra_select_parts = []
-        if include_mapping_cardinality:
-            extra_select_parts.append(
-                "COALESCE(tmc.N_MAPPED_PEPTIDES, 0) AS VAR_MAPPING_CARDINALITY"
-            )
-        if include_unique_mapping:
-            extra_select_parts.append(
-                """CASE
-                        WHEN COALESCE(tmc.N_MAPPED_PEPTIDES, 0) = 1 THEN 1.0
-                        ELSE 0.0
-                    END AS VAR_IS_UNIQUE_MAPPING"""
-            )
         if need_training_unique:
             extra_select_parts.append(
                 """CASE
@@ -686,7 +645,7 @@ class OSWReader(BaseOSWReader):
                         ELSE 0.0
                     END AS meta_is_unique_mapping"""
             )
-        if include_phospho_loss or need_training_phospho_loss:
+        if need_training_phospho_loss:
             if "ANNOTATION" in transition_cols:
                 extra_select_parts.append("tr.ANNOTATION AS TRANSITION_ANNOTATION")
             else:
@@ -773,7 +732,7 @@ class OSWReader(BaseOSWReader):
                 ORDER BY f.RUN_ID, f.PRECURSOR_ID, f.EXP_RT, ft.TRANSITION_ID
             """
         df = pd.read_sql_query(query, con)
-        if include_phospho_loss or need_training_phospho_loss:
+        if need_training_phospho_loss:
             transition_annotation = df["TRANSITION_ANNOTATION"].astype("string")
             phospho_loss = (
                 transition_annotation
@@ -781,10 +740,7 @@ class OSWReader(BaseOSWReader):
                 .str.contains("-H3O4P1", regex=False)
                 .astype(float)
             )
-            if include_phospho_loss:
-                df["VAR_HAS_PHOSPHO_LOSS"] = phospho_loss
-            if need_training_phospho_loss:
-                df["meta_has_phospho_loss"] = phospho_loss
+            df["meta_has_phospho_loss"] = phospho_loss
             df = df.drop(columns=["TRANSITION_ANNOTATION"])
         return self._finalize_feature_table(df, self.config.runner.ss_main_score)
 
