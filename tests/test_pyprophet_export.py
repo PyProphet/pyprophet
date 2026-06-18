@@ -367,7 +367,7 @@ def test_parquet_export_scored_osw(test_data_osw, temp_folder, regtest):
     df = sort_parquet_export_frame(df)
     print(f"Exported {len(df)} rows with {len(df.columns)} columns", file=regtest)
     print(f"Score columns found: {sorted(score_columns)}", file=regtest)
-    print(df.head(10).sort_index(axis=1), file=regtest)
+    print(_normalize_regtest_frame(df, head=10), file=regtest)
 
 
 def test_parquet_export_no_transition_data(test_data_osw, temp_folder, regtest):
@@ -412,7 +412,7 @@ def test_parquet_export_no_transition_data(test_data_osw, temp_folder, regtest):
         file=regtest,
     )
     print(f"Score columns found: {sorted(score_columns)}", file=regtest)
-    print(df.head(10).sort_index(axis=1), file=regtest)
+    print(_normalize_regtest_frame(df, head=10), file=regtest)
 
 
 def test_parquet_export_split_format(test_data_osw, temp_folder, regtest):
@@ -513,11 +513,17 @@ def test_parquet_export_with_ipf(test_data_osw, temp_folder, regtest):
     expected_ipf_columns = ['SCORE_IPF_PRECURSOR_PEAKGROUP_PEP', 'SCORE_IPF_PEP', 'SCORE_IPF_QVALUE']
     for col in expected_ipf_columns:
         assert col in df.columns, f"Expected column {col} not found in exported parquet"
+
+    df = sort_parquet_export_frame(df)
+    ipf_sample = df.loc[
+        df[ipf_columns].notna().any(axis=1),
+        ['FEATURE_ID'] + ipf_columns,
+    ]
     
     print(f"Exported {len(df)} rows with {len(df.columns)} columns", file=regtest)
     print(f"SCORE_IPF columns found: {sorted(ipf_columns)}", file=regtest)
     print("Sample data with IPF scores:", file=regtest)
-    print(df[['FEATURE_ID'] + ipf_columns].head(10).sort_index(axis=1), file=regtest)
+    print(_normalize_regtest_frame(ipf_sample, head=10), file=regtest)
 
 
 # ================== FEATURE SCORES EXPORT TESTS ==================

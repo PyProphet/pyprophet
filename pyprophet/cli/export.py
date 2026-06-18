@@ -617,6 +617,13 @@ def export_library(
     show_default=True,
     help="Include transition data in the exported parquet file(s). When disabled, only precursor-level data is exported.",
 )
+@click.option(
+    "--exclude_feature_var/--no-exclude_feature_var",
+    "exclude_feature_var",
+    default=False,
+    show_default=True,
+    help="Exclude feature variance columns (VAR_*) from FEATURE_MS1 and FEATURE_MS2 tables. Significantly speeds up export and reduces file size.",
+)
 @measure_memory_usage_and_time
 def export_parquet(
     infile,
@@ -630,6 +637,7 @@ def export_parquet(
     compression,
     compression_level,
     include_transition_data,
+    exclude_feature_var,
 ):
     """
     Export OSW or sqMass to parquet format
@@ -666,6 +674,7 @@ def export_parquet(
             compression_method=compression,
             compression_level=compression_level,
             include_transition_data=include_transition_data,
+            exclude_feature_var=exclude_feature_var,
         )
 
         writer = WriterDispatcher.get_writer(config)

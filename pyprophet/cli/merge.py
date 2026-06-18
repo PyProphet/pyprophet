@@ -59,8 +59,13 @@ def create_merge_group():
     is_flag=True,
     help="Merge OSW output files that have already been scored.",
 )
+@click.option(
+    "--fresh",
+    is_flag=True,
+    help="Start from scratch, ignoring any existing merged.osw file. If enabled, removes existing output file before starting.",
+)
 @measure_memory_usage_and_time
-def merge_osw(infiles, outfile, same_run, templatefile, merged_post_scored_runs):
+def merge_osw(infiles, outfile, same_run, templatefile, merged_post_scored_runs, fresh):
     """
     Merge multiple OSW files and (for large experiments, it is recommended to subsample first).
     """
@@ -70,7 +75,7 @@ def merge_osw(infiles, outfile, same_run, templatefile, merged_post_scored_runs)
             "At least one PyProphet input file needs to be provided."
         )
 
-    _merge_osw(infiles, outfile, templatefile, same_run, merged_post_scored_runs)
+    _merge_osw(infiles, outfile, templatefile, same_run, merged_post_scored_runs, fresh)
 
 
 @click.command(name="parquet", cls=AdvancedHelpCommand)

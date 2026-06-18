@@ -384,18 +384,41 @@ def is_valid_multi_split_parquet_dir(path):
 def load_sqlite_scanner(conn: duckdb.DuckDBPyConnection):
     """
     Ensures the `sqlite_scanner` extension is installed and loaded in DuckDB.
+    Handles cases where the extension cannot be downloaded (e.g., in containers without internet).
     """
     try:
         conn.execute("LOAD sqlite_scanner")
     except Exception as e:
-        if "Extension 'sqlite_scanner' not found" in str(e):
+        error_msg = str(e)
+        
+        # Check if it's a network/download error (e.g., in containers)
+        if ("Failed to download extension" in error_msg or 
+            "Connection timed out" in error_msg or
+            "Network unreachable" in error_msg):
+            from loguru import logger
+            logger.warning(
+                f"Cannot download sqlite_scanner extension (likely in container without internet). "
+                f"Attempting to load from local cache or using fallback method.\n"
+                f"To fix: Set DUCKDB_EXTENSION_DIRECTORY environment variable to a directory with pre-downloaded extensions.\n"
+                f"Details: {error_msg}"
+            )
+            # Try to load from local cache
+            try:
+                conn.execute("LOAD sqlite_scanner")
+            except Exception:
+                # If it still fails, the export will fall back to direct sqlite3 if available
+                logger.error(
+                    "Could not load sqlite_scanner. Export may use slower fallback method. "
+                    "For better performance, pre-download extensions: "
+                    "python3 -c 'import duckdb; duckdb.connect(\":memory:\").execute(\"LOAD sqlite_scanner\")'"
+                )
+        
+        elif "Extension 'sqlite_scanner' not found" in error_msg:
             try:
                 conn.execute("INSTALL sqlite_scanner")
                 conn.execute("LOAD sqlite_scanner")
             except Exception as install_error:
-                if "already installed but the origin is different" in str(
-                    install_error
-                ):
+                if "already installed but the origin is different" in str(install_error):
                     conn.execute("FORCE INSTALL sqlite_scanner")
                     conn.execute("LOAD sqlite_scanner")
                 else:
