@@ -456,10 +456,13 @@ class IPFIOConfig(BaseIOConfig):
         ipf_ms2_scoring (bool): Use MS2 precursor data for IPF.
         ipf_h0 (bool): Include possibility that peak groups are not covered by the peptidoform space (null hypothesis H0).
         ipf_grouped_fdr (bool): [Experimental] Compute grouped FDR instead of pooled FDR to support heterogeneous peptidoform counts per peak group.
+        ipf_grouped_fdr_strategy (Literal["num_peptidoforms"]): Grouping strategy used when grouped FDR is enabled.
         ipf_max_precursor_pep (float): Maximum PEP to consider scored precursors in IPF.
         ipf_max_peakgroup_pep (float): Maximum PEP to consider scored peak groups in IPF.
         ipf_max_precursor_peakgroup_pep (float): Maximum BHM layer 1 integrated precursor-peakgroup PEP to consider in IPF.
         ipf_max_transition_pep (float): Maximum PEP to consider scored transitions in IPF.
+        ipf_min_supporting_transitions (int): Minimum number of supporting transitions required to keep an inferred peptidoform result.
+        ipf_min_peakgroup_intensity (float): Minimum MS2 peakgroup area intensity required to keep an inferred peptidoform result.
         propagate_signal_across_runs (bool): Propagate signal across runs (requires alignment step).
         ipf_max_alignment_pep (float): Maximum PEP to consider for good alignments.
         across_run_confidence_threshold (float): Maximum PEP threshold for propagating signal across runs for aligned features.
@@ -471,10 +474,13 @@ class IPFIOConfig(BaseIOConfig):
     ipf_ms2_scoring: bool = True
     ipf_h0: bool = True
     ipf_grouped_fdr: bool = False
+    ipf_grouped_fdr_strategy: Literal["num_peptidoforms"] = "num_peptidoforms"
     ipf_max_precursor_pep: float = 0.7
     ipf_max_peakgroup_pep: float = 0.7
     ipf_max_precursor_peakgroup_pep: float = 0.4
     ipf_max_transition_pep: float = 0.6
+    ipf_min_supporting_transitions: int = 0
+    ipf_min_peakgroup_intensity: float = 0.0
     propagate_signal_across_runs: bool = False
     ipf_max_alignment_pep: float = 0.7
     across_run_confidence_threshold: float = 0.5
@@ -493,10 +499,13 @@ class IPFIOConfig(BaseIOConfig):
         ipf_ms2_scoring,
         ipf_h0,
         ipf_grouped_fdr,
+        ipf_grouped_fdr_strategy,
         ipf_max_precursor_pep,
         ipf_max_peakgroup_pep,
         ipf_max_precursor_peakgroup_pep,
         ipf_max_transition_pep,
+        ipf_min_supporting_transitions,
+        ipf_min_peakgroup_intensity,
         propagate_signal_across_runs,
         ipf_max_alignment_pep,
         across_run_confidence_threshold,
@@ -516,10 +525,13 @@ class IPFIOConfig(BaseIOConfig):
             ipf_ms2_scoring=ipf_ms2_scoring,
             ipf_h0=ipf_h0,
             ipf_grouped_fdr=ipf_grouped_fdr,
+            ipf_grouped_fdr_strategy=ipf_grouped_fdr_strategy,
             ipf_max_precursor_pep=ipf_max_precursor_pep,
             ipf_max_peakgroup_pep=ipf_max_peakgroup_pep,
             ipf_max_precursor_peakgroup_pep=ipf_max_precursor_peakgroup_pep,
             ipf_max_transition_pep=ipf_max_transition_pep,
+            ipf_min_supporting_transitions=ipf_min_supporting_transitions,
+            ipf_min_peakgroup_intensity=ipf_min_peakgroup_intensity,
             propagate_signal_across_runs=propagate_signal_across_runs,
             ipf_max_alignment_pep=ipf_max_alignment_pep,
             across_run_confidence_threshold=across_run_confidence_threshold,

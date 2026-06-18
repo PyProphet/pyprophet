@@ -7,7 +7,7 @@ import duckdb
 import pandas as pd
 import click
 from loguru import logger
-from ..util import check_sqlite_table, check_duckdb_table
+from ..util import check_sqlite_table, check_duckdb_table, get_table_columns
 from .._base import BaseOSWReader, BaseOSWWriter
 from ..._config import IPFIOConfig
 
@@ -121,9 +121,25 @@ class OSWReader(BaseOSWReader):
         ipf_ms1 = cfg.ipf_ms1_scoring
         ipf_ms2 = cfg.ipf_ms2_scoring
         pep_threshold = cfg.ipf_max_peakgroup_pep
+        add_intensity = cfg.ipf_min_peakgroup_intensity > 0
+        intensity_select = (
+            ",\n                    FEATURE_MS2.AREA_INTENSITY AS FEATURE_MS2_INTENSITY"
+            if add_intensity
+            else ""
+        )
+        feature_ms2_join = (
+            "\n                INNER JOIN osw.FEATURE_MS2 ON FEATURE.ID = FEATURE_MS2.FEATURE_ID"
+            if add_intensity
+            else ""
+        )
 
         # precursors are restricted according to ipf_max_peakgroup_pep to exclude very poor peak groups
         logger.info("Reading precursor-level data ...")
+
+        if add_intensity and not check_duckdb_table(con, "main", "FEATURE_MS2"):
+            raise click.ClickException(
+                "FEATURE_MS2 is required for peakgroup-intensity IPF filtering."
+            )
 
         if not ipf_ms1 and ipf_ms2:  # only use MS2 precursors
             if not check_duckdb_table(
@@ -136,9 +152,10 @@ class OSWReader(BaseOSWReader):
                 SELECT FEATURE.ID AS FEATURE_ID,
                     SCORE_MS2.PEP AS MS2_PEAKGROUP_PEP,
                     NULL AS MS1_PRECURSOR_PEP,
-                    SCORE_TRANSITION.PEP AS MS2_PRECURSOR_PEP
+                    SCORE_TRANSITION.PEP AS MS2_PRECURSOR_PEP{intensity_select}
                 FROM osw.PRECURSOR
                 INNER JOIN osw.FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID
+                {feature_ms2_join}
                 INNER JOIN osw.SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
                 INNER JOIN (
                     SELECT FEATURE_ID, PEP
@@ -161,9 +178,10 @@ class OSWReader(BaseOSWReader):
                 SELECT FEATURE.ID AS FEATURE_ID,
                     SCORE_MS2.PEP AS MS2_PEAKGROUP_PEP,
                     SCORE_MS1.PEP AS MS1_PRECURSOR_PEP,
-                    NULL AS MS2_PRECURSOR_PEP
+                    NULL AS MS2_PRECURSOR_PEP{intensity_select}
                 FROM osw.PRECURSOR
                 INNER JOIN osw.FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID
+                {feature_ms2_join}
                 INNER JOIN osw.SCORE_MS1 ON FEATURE.ID = SCORE_MS1.FEATURE_ID
                 INNER JOIN osw.SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
                 WHERE PRECURSOR.DECOY=0 AND SCORE_MS2.PEP < {pep_threshold}
@@ -183,9 +201,10 @@ class OSWReader(BaseOSWReader):
                 SELECT FEATURE.ID AS FEATURE_ID,
                     SCORE_MS2.PEP AS MS2_PEAKGROUP_PEP,
                     SCORE_MS1.PEP AS MS1_PRECURSOR_PEP,
-                    SCORE_TRANSITION.PEP AS MS2_PRECURSOR_PEP
+                    SCORE_TRANSITION.PEP AS MS2_PRECURSOR_PEP{intensity_select}
                 FROM osw.PRECURSOR
                 INNER JOIN osw.FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID
+                {feature_ms2_join}
                 INNER JOIN osw.SCORE_MS1 ON FEATURE.ID = SCORE_MS1.FEATURE_ID
                 INNER JOIN osw.SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
                 INNER JOIN (
@@ -209,9 +228,10 @@ class OSWReader(BaseOSWReader):
                 SELECT FEATURE.ID AS FEATURE_ID,
                     SCORE_MS2.PEP AS MS2_PEAKGROUP_PEP,
                     NULL AS MS1_PRECURSOR_PEP,
-                    NULL AS MS2_PRECURSOR_PEP
+                    NULL AS MS2_PRECURSOR_PEP{intensity_select}
                 FROM osw.PRECURSOR
                 INNER JOIN osw.FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID
+                {feature_ms2_join}
                 INNER JOIN osw.SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
                 WHERE PRECURSOR.DECOY=0 AND SCORE_MS2.PEP < {pep_threshold}
             """
@@ -223,19 +243,42 @@ class OSWReader(BaseOSWReader):
         rc = self.config
         ipf_h0 = rc.ipf_h0
         pep_threshold = rc.ipf_max_transition_pep
+        has_annotation = "ANNOTATION" in get_table_columns(self.infile, "TRANSITION")
+        phospho_loss_expr = (
+            "CASE WHEN COALESCE(TRANSITION.ANNOTATION, '') LIKE '%-H3O4P1%' THEN 1 ELSE 0 END"
+            if has_annotation
+            else "0"
+        )
 
         # only the evidence is restricted to ipf_max_transition_pep, the peptidoform-space is complete
         logger.info("Info: Reading peptidoform-level data ...")
 
         queries = {
             "evidence": f"""
-                SELECT FEATURE_ID, TRANSITION_ID, PEP
+                SELECT SCORE_TRANSITION.FEATURE_ID, SCORE_TRANSITION.TRANSITION_ID, PEP
                 FROM osw.SCORE_TRANSITION
                 INNER JOIN osw.TRANSITION ON SCORE_TRANSITION.TRANSITION_ID = TRANSITION.ID
                 WHERE TRANSITION.TYPE != ''
                 AND TRANSITION.DECOY = 0
                 AND PEP < {pep_threshold}
             """,
+            "transition_meta": """
+                WITH mapped_counts AS (
+                    SELECT
+                        TRANSITION_ID,
+                        COUNT(DISTINCT PEPTIDE_ID) AS N_MAPPED_PEPTIDES
+                    FROM osw.TRANSITION_PEPTIDE_MAPPING
+                    GROUP BY TRANSITION_ID
+                )
+                SELECT DISTINCT
+                    TRANSITION.ID AS TRANSITION_ID,
+                    COALESCE(mapped_counts.N_MAPPED_PEPTIDES, 0) AS N_MAPPED_PEPTIDES,
+                    {phospho_loss_expr} AS HAS_PHOSPHO_LOSS
+                FROM osw.TRANSITION
+                LEFT JOIN mapped_counts ON TRANSITION.ID = mapped_counts.TRANSITION_ID
+                WHERE TRANSITION.TYPE != ''
+                AND TRANSITION.DECOY = 0
+            """.format(phospho_loss_expr=phospho_loss_expr),
             "bitmask": """
                 SELECT DISTINCT TRANSITION.ID AS TRANSITION_ID, PEPTIDE_ID, 1 AS BMASK
                 FROM osw.SCORE_TRANSITION
@@ -265,6 +308,9 @@ class OSWReader(BaseOSWReader):
 
         # Execute
         evidence = con.execute(queries["evidence"]).fetchdf().rename(columns=str.lower)
+        transition_meta = (
+            con.execute(queries["transition_meta"]).fetchdf().rename(columns=str.lower)
+        )
         bitmask = con.execute(queries["bitmask"]).fetchdf().rename(columns=str.lower)
         num_peptidoforms = (
             con.execute(queries["num_peptidoforms"]).fetchdf().rename(columns=str.lower)
@@ -290,6 +336,7 @@ class OSWReader(BaseOSWReader):
 
         # Merge
         trans_pf = pd.merge(evidence, peptidoforms, how="outer", on="feature_id")
+        trans_pf = pd.merge(trans_pf, transition_meta, how="left", on="transition_id")
         trans_pf_bm = pd.merge(
             trans_pf, bitmask, how="left", on=["transition_id", "peptide_id"]
         ).fillna(0)
@@ -420,6 +467,22 @@ class OSWReader(BaseOSWReader):
         ipf_ms1 = cfg.ipf_ms1_scoring
         ipf_ms2 = cfg.ipf_ms2_scoring
         pep_threshold = cfg.ipf_max_peakgroup_pep
+        add_intensity = cfg.ipf_min_peakgroup_intensity > 0
+        intensity_select = (
+            ",\n                    FEATURE_MS2.AREA_INTENSITY AS FEATURE_MS2_INTENSITY"
+            if add_intensity
+            else ""
+        )
+        feature_ms2_join = (
+            "\n                INNER JOIN FEATURE_MS2 ON FEATURE.ID = FEATURE_MS2.FEATURE_ID"
+            if add_intensity
+            else ""
+        )
+
+        if add_intensity and not check_sqlite_table(con, "FEATURE_MS2"):
+            raise click.ClickException(
+                "FEATURE_MS2 is required for peakgroup-intensity IPF filtering."
+            )
 
         if not ipf_ms1 and ipf_ms2:  # only use MS2 precursors
             if not check_sqlite_table(con, "SCORE_MS2") or not check_sqlite_table(
@@ -433,9 +496,10 @@ class OSWReader(BaseOSWReader):
                 SELECT FEATURE.ID AS FEATURE_ID,
                     SCORE_MS2.PEP AS MS2_PEAKGROUP_PEP,
                     NULL AS MS1_PRECURSOR_PEP,
-                    SCORE_TRANSITION.PEP AS MS2_PRECURSOR_PEP
+                    SCORE_TRANSITION.PEP AS MS2_PRECURSOR_PEP{intensity_select}
                 FROM PRECURSOR
                 INNER JOIN FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID
+                {feature_ms2_join}
                 INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
                 INNER JOIN (
                     SELECT FEATURE_ID, PEP
@@ -458,9 +522,10 @@ class OSWReader(BaseOSWReader):
                 SELECT FEATURE.ID AS FEATURE_ID,
                     SCORE_MS2.PEP AS MS2_PEAKGROUP_PEP,
                     SCORE_MS1.PEP AS MS1_PRECURSOR_PEP,
-                    NULL AS MS2_PRECURSOR_PEP
+                    NULL AS MS2_PRECURSOR_PEP{intensity_select}
                 FROM PRECURSOR
                 INNER JOIN FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID
+                {feature_ms2_join}
                 INNER JOIN SCORE_MS1 ON FEATURE.ID = SCORE_MS1.FEATURE_ID
                 INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
                 WHERE PRECURSOR.DECOY=0 AND SCORE_MS2.PEP < ?
@@ -479,9 +544,10 @@ class OSWReader(BaseOSWReader):
                 SELECT FEATURE.ID AS FEATURE_ID,
                     SCORE_MS2.PEP AS MS2_PEAKGROUP_PEP,
                     SCORE_MS1.PEP AS MS1_PRECURSOR_PEP,
-                    SCORE_TRANSITION.PEP AS MS2_PRECURSOR_PEP
+                    SCORE_TRANSITION.PEP AS MS2_PRECURSOR_PEP{intensity_select}
                 FROM PRECURSOR
                 INNER JOIN FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID
+                {feature_ms2_join}
                 INNER JOIN SCORE_MS1 ON FEATURE.ID = SCORE_MS1.FEATURE_ID
                 INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
                 INNER JOIN (
@@ -498,33 +564,63 @@ class OSWReader(BaseOSWReader):
                 SELECT FEATURE.ID AS FEATURE_ID,
                     SCORE_MS2.PEP AS MS2_PEAKGROUP_PEP,
                     NULL AS MS1_PRECURSOR_PEP,
-                    NULL AS MS2_PRECURSOR_PEP
+                    NULL AS MS2_PRECURSOR_PEP{intensity_select}
                 FROM PRECURSOR
                 INNER JOIN FEATURE ON PRECURSOR.ID = FEATURE.PRECURSOR_ID
+                {feature_ms2_join}
                 INNER JOIN SCORE_MS2 ON FEATURE.ID = SCORE_MS2.FEATURE_ID
                 WHERE PRECURSOR.DECOY=0 AND SCORE_MS2.PEP < ?
             """
 
-        df = pd.read_sql_query(query, con, params=[pep_threshold])
+        df = pd.read_sql_query(
+            query.format(
+                intensity_select=intensity_select, feature_ms2_join=feature_ms2_join
+            ),
+            con,
+            params=[pep_threshold],
+        )
         return df.rename(columns=str.lower)
 
     def _read_pyp_transition_sqlite(self, con):
         rc = self.config
         ipf_h0 = rc.ipf_h0
         pep_threshold = rc.ipf_max_transition_pep
+        has_annotation = "ANNOTATION" in get_table_columns(self.infile, "TRANSITION")
+        phospho_loss_expr = (
+            "CASE WHEN COALESCE(TRANSITION.ANNOTATION, '') LIKE '%-H3O4P1%' THEN 1 ELSE 0 END"
+            if has_annotation
+            else "0"
+        )
 
         # only the evidence is restricted to ipf_max_transition_pep, the peptidoform-space is complete
         logger.info("Info: Reading peptidoform-level data ...")
 
         queries = {
             "evidence": """
-                SELECT FEATURE_ID, TRANSITION_ID, PEP
+                SELECT SCORE_TRANSITION.FEATURE_ID, SCORE_TRANSITION.TRANSITION_ID, PEP
                 FROM SCORE_TRANSITION
                 INNER JOIN TRANSITION ON SCORE_TRANSITION.TRANSITION_ID = TRANSITION.ID
                 WHERE TRANSITION.TYPE != ''
                 AND TRANSITION.DECOY = 0
                 AND PEP < ?
             """,
+            "transition_meta": """
+                WITH mapped_counts AS (
+                    SELECT
+                        TRANSITION_ID,
+                        COUNT(DISTINCT PEPTIDE_ID) AS N_MAPPED_PEPTIDES
+                    FROM TRANSITION_PEPTIDE_MAPPING
+                    GROUP BY TRANSITION_ID
+                )
+                SELECT DISTINCT
+                    TRANSITION.ID AS TRANSITION_ID,
+                    COALESCE(mapped_counts.N_MAPPED_PEPTIDES, 0) AS N_MAPPED_PEPTIDES,
+                    {phospho_loss_expr} AS HAS_PHOSPHO_LOSS
+                FROM TRANSITION
+                LEFT JOIN mapped_counts ON TRANSITION.ID = mapped_counts.TRANSITION_ID
+                WHERE TRANSITION.TYPE != ''
+                AND TRANSITION.DECOY = 0
+            """.format(phospho_loss_expr=phospho_loss_expr),
             "bitmask": """
                 SELECT DISTINCT TRANSITION.ID AS TRANSITION_ID, PEPTIDE_ID, 1 AS BMASK
                 FROM SCORE_TRANSITION
@@ -554,7 +650,12 @@ class OSWReader(BaseOSWReader):
 
         # Execute
         evidence = pd.read_sql_query(
-            queries["evidence"], con, params=[pep_threshold]
+            queries["evidence"],
+            con,
+            params=[pep_threshold],
+        ).rename(columns=str.lower)
+        transition_meta = pd.read_sql_query(
+            queries["transition_meta"], con
         ).rename(columns=str.lower)
         bitmask = pd.read_sql_query(queries["bitmask"], con).rename(columns=str.lower)
         num_peptidoforms = pd.read_sql_query(queries["num_peptidoforms"], con).rename(
@@ -581,6 +682,7 @@ class OSWReader(BaseOSWReader):
 
         # Merge
         trans_pf = pd.merge(evidence, peptidoforms, how="outer", on="feature_id")
+        trans_pf = pd.merge(trans_pf, transition_meta, how="left", on="transition_id")
         trans_pf_bm = pd.merge(
             trans_pf, bitmask, how="left", on=["transition_id", "peptide_id"]
         ).fillna(0)
