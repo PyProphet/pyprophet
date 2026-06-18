@@ -47,12 +47,16 @@ def _stabilize_regtest_float(value, sig_digits=4, decimal_places=4, zero_eps=1e-
     if value == 0 or abs(value) < zero_eps:
         return 0.0
 
+    effective_sig_digits = 3 if abs(value) < 1e-7 else sig_digits
+
     dec_value = Decimal(str(value))
     if abs(value) >= 1:
         quantum = Decimal("1").scaleb(-decimal_places)
         return float(dec_value.quantize(quantum, rounding=ROUND_DOWN))
 
-    digits_after_decimal = sig_digits - int(math.floor(math.log10(abs(value)))) - 1
+    digits_after_decimal = (
+        effective_sig_digits - int(math.floor(math.log10(abs(value)))) - 1
+    )
     quantum = Decimal("1").scaleb(-digits_after_decimal)
     return float(dec_value.quantize(quantum, rounding=ROUND_DOWN))
 

@@ -5,6 +5,8 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+import math
+from decimal import Decimal, ROUND_DOWN
 
 import pandas as pd
 import pytest
@@ -16,6 +18,41 @@ pd.options.display.precision = 4
 pd.options.display.max_columns = None
 
 DATA_FOLDER = Path(__file__).parent / "data"
+
+
+def _stabilize_regtest_float(value, sig_digits=4, decimal_places=4, zero_eps=1e-12):
+    """
+    Make float rendering deterministic across Python/pandas/platform variants.
+
+    For values >= 1 we truncate to a fixed number of decimal places.
+    For values < 1 we truncate to a fixed number of significant digits.
+    Tiny near-zero values are snapped to 0.
+    """
+    if pd.isna(value):
+        return value
+
+    value = float(value)
+    if value == 0 or abs(value) < zero_eps:
+        return 0.0
+
+    dec_value = Decimal(str(value))
+    if abs(value) >= 1:
+        quantum = Decimal("1").scaleb(-decimal_places)
+        return float(dec_value.quantize(quantum, rounding=ROUND_DOWN))
+
+    digits_after_decimal = sig_digits - int(math.floor(math.log10(abs(value)))) - 1
+    quantum = Decimal("1").scaleb(-digits_after_decimal)
+    return float(dec_value.quantize(quantum, rounding=ROUND_DOWN))
+
+
+def _normalize_regtest_frame(df, head=100):
+    normalized = df.head(head).sort_index(axis=1).copy()
+    float_cols = normalized.select_dtypes(include=["floating"]).columns
+
+    for col in float_cols:
+        normalized[col] = normalized[col].map(_stabilize_regtest_float)
+
+    return normalized
 
 
 # ================== SHARED FIXTURES ==================
@@ -125,7 +162,7 @@ def validate_export_results(
 ):
     """Validate exported results"""
     df = pd.read_csv(output_file, sep="\t", nrows=100)
-    print(df.sort_index(axis=1), file=regtest)
+    print(_normalize_regtest_frame(df), file=regtest)
 
 
 # ================== TEST CASES ==================
