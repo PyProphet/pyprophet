@@ -41,3 +41,5 @@ nosetests.xml
 # docs
 docs/_build/*
 docs/api/generated/*
+
+tools/*
