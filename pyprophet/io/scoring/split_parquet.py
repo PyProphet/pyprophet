@@ -148,10 +148,48 @@ class SplitParquetReader(BaseSplitParquetReader):
     def _fetch_transition_features(self, con, feature_cols):
         cols_sql = ", ".join([f"t.{col}" for col in feature_cols])
         rc = self.config.runner
+        need_training_unique = rc.transition_training_require_unique_mapping
+        need_training_phospho_loss = rc.transition_training_require_phospho_loss
+        need_mapping_counts = need_training_unique
+        all_cols = self._get_columns_by_prefix("transition_features.parquet", "")
+        annotation_expr = "0.0"
+        if need_training_phospho_loss:
+            annotation_expr = (
+                "CASE WHEN STRPOS(COALESCE(t.ANNOTATION, ''), '-H3O4P1') > 0 THEN 1.0 ELSE 0.0 END"
+                if "ANNOTATION" in all_cols
+                else "0.0"
+            )
+        extra_select_parts = []
+        if need_training_unique:
+            extra_select_parts.append(
+                """CASE
+                            WHEN COALESCE(tmc.N_MAPPED_PEPTIDES, 0) = 1 THEN 1.0
+                            ELSE 0.0
+                        END AS meta_is_unique_mapping"""
+            )
+        if need_training_phospho_loss:
+            extra_select_parts.append(f"{annotation_expr} AS __PHOSPHO_LOSS_FLAG")
+        extra_select_sql = ""
+        if extra_select_parts:
+            extra_select_sql = ",\n                        " + ",\n                        ".join(extra_select_parts)
+        mapping_join_sql = ""
+        if need_mapping_counts:
+            mapping_join_sql = """
+                    LEFT JOIN (
+                        SELECT
+                            TRANSITION_ID,
+                            COUNT(DISTINCT IPF_PEPTIDE_ID) AS N_MAPPED_PEPTIDES
+                        FROM transition
+                        WHERE IPF_PEPTIDE_ID IS NOT NULL
+                        GROUP BY TRANSITION_ID
+                    ) tmc ON t.TRANSITION_ID = tmc.TRANSITION_ID
+            """
         query = f"""SELECT t.TRANSITION_DECOY AS DECOY, t.RUN_ID, t.FEATURE_ID, t.IPF_PEPTIDE_ID, t.TRANSITION_ID, t.FEATURE_TRANSITION_AREA_INTENSITY AS AREA_INTENSITY,
-                        {cols_sql}, p.PRECURSOR_CHARGE, t.TRANSITION_CHARGE,
+                        {cols_sql}{extra_select_sql},
+                        p.PRECURSOR_CHARGE, t.TRANSITION_CHARGE,
                         p.RUN_ID || '_' || t.FEATURE_ID || '_' || t.PRECURSOR_ID || '_' || t.TRANSITION_ID AS GROUP_ID
                     FROM transition t
+                    {mapping_join_sql}
                     INNER JOIN precursors p ON t.PRECURSOR_ID = p.PRECURSOR_ID AND t.FEATURE_ID = p.FEATURE_ID
                     WHERE p.SCORE_MS2_PEAK_GROUP_RANK <= {rc.ipf_max_peakgroup_rank}
                         AND p.SCORE_MS2_PEP <= {rc.ipf_max_peakgroup_pep}
@@ -167,6 +205,8 @@ class SplitParquetReader(BaseSplitParquetReader):
                 {col: col.replace("FEATURE_TRANSITION_", "") for col in feature_cols}
             )
         )
+        if need_training_phospho_loss:
+            df = df.rename({"__PHOSPHO_LOSS_FLAG": "meta_has_phospho_loss"})
         df = self._collapse_ipf_peptide_ids(df)
         return df.to_pandas()
 

@@ -157,8 +157,51 @@ class ParquetReader(BaseParquetReader):
         cols_sql = ", ".join([f"t.{col}" for col in feature_cols])
         cols_sql_inner = ", ".join([f"{col}" for col in feature_cols])
         rc = self.config.runner
+        need_training_unique = rc.transition_training_require_unique_mapping
+        need_training_phospho_loss = rc.transition_training_require_phospho_loss
+        need_mapping_counts = need_training_unique
+        all_cols = get_parquet_column_names(self.infile)
+        annotation_inner = ""
+        if need_training_phospho_loss:
+            annotation_inner = (
+                "ANNOTATION AS T_ANNOTATION,"
+                if "ANNOTATION" in all_cols
+                else "NULL AS T_ANNOTATION,"
+            )
+        extra_select_parts = []
+        if need_training_unique:
+            extra_select_parts.append(
+                """CASE
+                            WHEN COALESCE(tmc.N_MAPPED_PEPTIDES, 0) = 1 THEN 1.0
+                            ELSE 0.0
+                        END AS meta_is_unique_mapping"""
+            )
+        if need_training_phospho_loss:
+            extra_select_parts.append(
+                """CASE
+                            WHEN STRPOS(COALESCE(t.T_ANNOTATION, ''), '-H3O4P1') > 0 THEN 1.0
+                            ELSE 0.0
+                        END AS __PHOSPHO_LOSS_FLAG"""
+            )
+        extra_select_sql = ""
+        if extra_select_parts:
+            extra_select_sql = ",\n                        " + ",\n                        ".join(extra_select_parts)
+        mapping_join_sql = ""
+        if need_mapping_counts:
+            mapping_join_sql = """
+                    LEFT JOIN (
+                        SELECT
+                            TRANSITION_ID,
+                            COUNT(DISTINCT IPF_PEPTIDE_ID) AS N_MAPPED_PEPTIDES
+                        FROM data
+                        WHERE MODIFIED_SEQUENCE IS NULL
+                        AND IPF_PEPTIDE_ID IS NOT NULL
+                        GROUP BY TRANSITION_ID
+                    ) AS tmc ON t.TRANSITION_ID = tmc.TRANSITION_ID
+            """
         query = f"""SELECT t.TRANSITION_DECOY AS DECOY, t.RUN_ID, t.FEATURE_ID, t.IPF_PEPTIDE_ID, t.TRANSITION_ID,
-                        {cols_sql}, p.PRECURSOR_CHARGE, t.TRANSITION_CHARGE,
+                        {cols_sql}{extra_select_sql},
+                        p.PRECURSOR_CHARGE, t.TRANSITION_CHARGE,
                         p.RUN_ID || '_' || t.FEATURE_ID || '_' || t.PRECURSOR_ID || '_' || t.TRANSITION_ID AS GROUP_ID
                     FROM (
                         SELECT
@@ -169,10 +212,12 @@ class ParquetReader(BaseParquetReader):
                             TRANSITION_DECOY,
                             FEATURE_ID,
                             TRANSITION_CHARGE,
+                            {annotation_inner}
                             {cols_sql_inner}
                         FROM data
                         WHERE MODIFIED_SEQUENCE IS NULL
                     ) AS t
+                    {mapping_join_sql}
                     LEFT JOIN (
                         SELECT PRECURSOR_ID, PRECURSOR_CHARGE, PRECURSOR_DECOY, RUN_ID, FEATURE_ID, EXP_RT, SCORE_MS2_PEP, SCORE_MS2_PEAK_GROUP_RANK
                         FROM (
@@ -198,6 +243,8 @@ class ParquetReader(BaseParquetReader):
             # Convert DECOY to 0 and 1
             .with_columns(pl.col("DECOY").cast(pl.Int8).alias("DECOY"))
         )
+        if need_training_phospho_loss:
+            df = df.rename({"__PHOSPHO_LOSS_FLAG": "meta_has_phospho_loss"})
         df = self._collapse_ipf_peptide_ids(df)
         return df.to_pandas()
 

@@ -16,6 +16,8 @@ from ..io.util import get_num_runs
 # Defer import of runner to avoid premature sklearn import before OMP_NUM_THREADS is set
 # from ..scoring.runner import PyProphetLearner, PyProphetWeightApplier
 
+LARGE_RUN_MAIN_REPORT_THRESHOLD = 50
+
 
 # PyProphet semi-supervised learning and scoring
 @click.command(name="score", cls=AdvancedHelpCommand)
@@ -176,6 +178,18 @@ from ..io.util import get_num_runs
     help="Minimum log signal-to-noise level to consider transitions in IPF. Set -1 to disable this filter.",
     hidden=True,
 )
+@click.option(
+    "--transition_training_require_unique_mapping/--no-transition_training_require_unique_mapping",
+    default=False,
+    show_default=True,
+    help="Experimental: when learning transition scores, restrict target training peaks to uniquely mapped transitions.",
+)
+@click.option(
+    "--transition_training_require_phospho_loss/--no-transition_training_require_phospho_loss",
+    default=False,
+    show_default=True,
+    help="Experimental: when learning transition scores, restrict target training peaks to phospho-loss transitions.",
+)
 # Glyco/GproDIA Options
 @click.option(
     "--glyco/--no-glyco",
@@ -223,6 +237,20 @@ from ..io.util import get_num_runs
     show_default=True,
     help="Generate a report for main score selection process.",
     hidden=True,
+)
+@click.option(
+    "--report_mode",
+    default="auto",
+    show_default=True,
+    type=click.Choice(["auto", "full", "main", "none"]),
+    help="PDF report scope: 'full' writes all report pages, 'main' writes only the core score diagnostics, and 'none' disables report generation.",
+)
+@click.option(
+    "--apply_weights_run_batch_size",
+    default=0,
+    show_default=True,
+    type=int,
+    help="When streamed OSW weight application is used, score this many runs per batch. Use 0 for automatic batching and 1 to force one run at a time.",
 )
 # Processing
 @click.option(
@@ -283,12 +311,16 @@ def score(
     ipf_max_peakgroup_pep,
     ipf_max_transition_isotope_overlap,
     ipf_min_transition_sn,
+    transition_training_require_unique_mapping,
+    transition_training_require_phospho_loss,
     glyco,
     density_estimator,
     grid_size,
     tric_chromprob,
     color_palette,
     main_score_selection_report,
+    report_mode,
+    apply_weights_run_batch_size,
     threads,
     test,
     profile,  # NOQA: F841 unused variable, but used in decorator
@@ -357,6 +389,8 @@ def score(
         ipf_max_peakgroup_pep,
         ipf_max_transition_isotope_overlap,
         ipf_min_transition_sn,
+        transition_training_require_unique_mapping,
+        transition_training_require_phospho_loss,
         add_alignment_features,
         glyco,
         density_estimator,
@@ -366,6 +400,8 @@ def score(
         test,
         color_palette,
         main_score_selection_report,
+        report_mode,
+        apply_weights_run_batch_size,
     )
 
     write_logfile(
@@ -374,10 +410,13 @@ def score(
         ctx.obj["LOG_HEADER"],
     )
 
+    num_runs = None
+    if subsample_ratio == 1.0 or report_mode == "auto":
+        num_runs = get_num_runs(infile, config.file_type)
+
     # Auto-subsample based on number of runs if applicable
     if subsample_ratio == 1.0:
         # Check if we should auto-subsample
-        num_runs = get_num_runs(infile, config.file_type)
         if num_runs > 20:
             config.subsample_ratio = 1.0 / num_runs
             logger.info(
@@ -392,6 +431,19 @@ def score(
             "Auto-subsampling disabled (subsample_ratio set to -1.0). "
             "Using full dataset for semi-supervised learning."
         )
+
+    if report_mode == "auto":
+        if num_runs and num_runs > LARGE_RUN_MAIN_REPORT_THRESHOLD:
+            config.runner.report_mode = "main"
+            logger.info(
+                f"Large experiment detected ({num_runs} runs). "
+                "Switching report_mode to 'main' to skip expensive identification/quantification report pages. "
+                "Use --report_mode full to force the complete report."
+            )
+        else:
+            config.runner.report_mode = "full"
+    else:
+        config.runner.report_mode = report_mode
 
     # Validate file type and subsample ratio. OSW, parquet, parquet_split, and parquet_split_multi all support subsampling
     if (

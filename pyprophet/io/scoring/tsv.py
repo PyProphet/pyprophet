@@ -72,7 +72,8 @@ class TSVWriter(BaseWriter):
             result.scored_tables.to_csv(output_path, sep="\t", index=False)
             logger.success("%s written." % output_path)
 
-        if result.final_statistics is not None:
+        report_mode = getattr(self.config.runner, "report_mode", "full")
+        if result.final_statistics is not None and report_mode != "none":
             cutoffs = result.final_statistics["cutoff"].values
             svalues = result.final_statistics["svalue"].values
             qvalues = result.final_statistics["qvalue"].values
@@ -101,5 +102,8 @@ class TSVWriter(BaseWriter):
                 pvalues,
                 pi0,
                 self.config.runner.color_palette,
+                level=self.level,
+                df=result.scored_tables,
+                report_mode=report_mode,
             )
             logger.success("%s written." % self.config.extra_writes.get("report_path"))

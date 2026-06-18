@@ -351,6 +351,14 @@ class BaseWriter(ABC):
                 f"Classifier {self.classifier} not supported for saving weights."
             )
 
+    def save_scorer(self, scorer):
+        """
+        Persist a scorer object when the backend supports it.
+
+        The default implementation is a no-op.
+        """
+        return None
+
     def _prepare_score_dataframe(
         self, df: pd.DataFrame, level: str, prefix: str
     ) -> pd.DataFrame:
@@ -446,6 +454,11 @@ class BaseWriter(ABC):
         Write a PDF report if the scoring results contain final statistics.
         """
 
+        report_mode = getattr(self.config.runner, "report_mode", "full")
+        if report_mode == "none":
+            logger.info("Skipping PDF report generation (report_mode=none).")
+            return
+
         if result.final_statistics is None:
             return
 
@@ -503,6 +516,7 @@ class BaseWriter(ABC):
             self.config.runner.color_palette,
             self.level,
             df=df,
+            report_mode=report_mode,
         )
         logger.success(f"{pdf_path} written.")
 
