@@ -30,7 +30,7 @@ Classes:
 import numpy as np
 import pandas as pd
 from loguru import logger
-from scipy.special import expit, logsumexp
+from scipy.special import logsumexp
 from scipy.stats import rankdata
 
 from ._config import IPFIOConfig
@@ -95,21 +95,28 @@ def compute_grouped_model_fdr(data_in, group_keys, log_prefix="Grouped FDR"):
     return qvalues
 
 
-def compute_ipf_qvalues(pf_pp_data, grouped_fdr=False):
+def compute_ipf_qvalues(
+    pf_pp_data, grouped_fdr=False, grouped_fdr_strategy="num_peptidoforms"
+):
     """
     Compute IPF q-values using pooled or grouped model-based FDR.
 
-    Grouped FDR groups rows by the per-feature peptidoform count.
+    Grouped FDR groups rows according to ``grouped_fdr_strategy``.
     """
     if not grouped_fdr:
         return compute_model_fdr(pf_pp_data["pep"])
 
-    if "num_peptidoforms" not in pf_pp_data.columns:
-        raise ValueError("num_peptidoforms is required for grouped FDR.")
-    return compute_grouped_model_fdr(
-        pf_pp_data["pep"],
-        pf_pp_data["num_peptidoforms"].fillna(-1).astype(int),
-        log_prefix="Grouped FDR by num_peptidoforms",
+    if grouped_fdr_strategy == "num_peptidoforms":
+        if "num_peptidoforms" not in pf_pp_data.columns:
+            raise ValueError("num_peptidoforms is required for grouped FDR.")
+        return compute_grouped_model_fdr(
+            pf_pp_data["pep"],
+            pf_pp_data["num_peptidoforms"].fillna(-1).astype(int),
+            log_prefix="Grouped FDR by num_peptidoforms",
+        )
+
+    raise ValueError(
+        f"Unsupported grouped FDR strategy: {grouped_fdr_strategy!r}"
     )
 
 
@@ -897,6 +904,7 @@ def peptidoform_inference(
     transition_table,
     precursor_data,
     ipf_grouped_fdr,
+    ipf_grouped_fdr_strategy,
     propagate_signal_across_runs,
     across_run_confidence_threshold,
 ):
@@ -907,6 +915,7 @@ def peptidoform_inference(
         transition_table (pd.DataFrame): Input data containing transition-level information.
         precursor_data (pd.DataFrame): Precursor-level probabilities.
         ipf_grouped_fdr (bool): Whether to use grouped FDR estimation.
+        ipf_grouped_fdr_strategy (str): Grouping strategy used when grouped FDR is enabled.
         propagate_signal_across_runs (bool): Whether to propagate signal across runs.
         across_run_confidence_threshold (float): Confidence threshold for propagation.
 
@@ -936,6 +945,7 @@ def peptidoform_inference(
     pf_pp_data["qvalue"] = compute_ipf_qvalues(
         pf_pp_data,
         grouped_fdr=ipf_grouped_fdr,
+        grouped_fdr_strategy=ipf_grouped_fdr_strategy,
     )
 
     # merge precursor-level data with UIS data
@@ -1009,6 +1019,7 @@ def infer_peptidoforms(config: IPFIOConfig):
         peptidoform_table,
         precursor_data,
         config.ipf_grouped_fdr,
+        config.ipf_grouped_fdr_strategy,
         config.propagate_signal_across_runs,
         config.across_run_confidence_threshold,
     )
