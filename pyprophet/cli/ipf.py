@@ -52,8 +52,8 @@ from ..glyco.glycoform import infer_glycoforms
     "--ipf_grouped_fdr_strategy",
     default="num_peptidoforms",
     show_default=True,
-    type=click.Choice(["num_peptidoforms", "support_phospho_loss"]),
-    help="Grouping strategy used when --ipf_grouped_fdr is enabled. 'num_peptidoforms' reproduces the legacy grouping. 'support_phospho_loss' groups by supporting-transition bin (<=1, 2, >=3) and presence of phospho-loss support.",
+    type=click.Choice(["num_peptidoforms"]),
+    help="Grouping strategy used when --ipf_grouped_fdr is enabled.",
 )
 @click.option(
     "--ipf_max_precursor_pep",

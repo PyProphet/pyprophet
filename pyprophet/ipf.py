@@ -95,101 +95,21 @@ def compute_grouped_model_fdr(data_in, group_keys, log_prefix="Grouped FDR"):
     return qvalues
 
 
-def _support_phospho_loss_group_keys(metrics):
-    """
-    Build coarse FDR strata from support strength and phospho-loss support.
-
-    Support is grouped into <=1, 2, and >=3 supporting transitions. Each support
-    stratum is then split by whether at least one phospho-loss supporting
-    transition is present.
-    """
-    supporting = metrics["supporting_transitions"].fillna(0).astype(int).to_numpy()
-    phospho_loss = (
-        metrics["phospho_loss_supporting_transitions"].fillna(0).astype(int).to_numpy()
-    )
-
-    support_labels = np.where(
-        supporting <= 1,
-        "support_le1",
-        np.where(supporting == 2, "support_eq2", "support_ge3"),
-    )
-    phospho_labels = np.where(phospho_loss > 0, "phloss", "no_phloss")
-    return pd.Series(
-        support_labels + "__" + phospho_labels,
-        index=metrics.index,
-        dtype="object",
-    )
-
-
-def compute_ipf_qvalues(
-    pf_pp_data,
-    grouped_fdr=False,
-    grouped_fdr_strategy="num_peptidoforms",
-    grouping_metrics=None,
-):
+def compute_ipf_qvalues(pf_pp_data, grouped_fdr=False):
     """
     Compute IPF q-values using pooled or grouped model-based FDR.
 
-    Grouped FDR currently supports:
-    - ``num_peptidoforms``: the legacy grouping by per-feature peptidoform count
-    - ``support_phospho_loss``: grouping by supporting-transition bin and
-      phospho-loss support
+    Grouped FDR groups rows by the per-feature peptidoform count.
     """
     if not grouped_fdr:
         return compute_model_fdr(pf_pp_data["pep"])
 
-    if grouped_fdr_strategy == "num_peptidoforms":
-        if "num_peptidoforms" not in pf_pp_data.columns:
-            raise ValueError(
-                "num_peptidoforms is required for grouped FDR with strategy 'num_peptidoforms'."
-            )
-        return compute_grouped_model_fdr(
-            pf_pp_data["pep"],
-            pf_pp_data["num_peptidoforms"].fillna(-1).astype(int),
-            log_prefix="Grouped FDR by num_peptidoforms",
-        )
-
-    if grouped_fdr_strategy == "support_phospho_loss":
-        if grouping_metrics is None:
-            raise ValueError(
-                "grouping_metrics is required for grouped FDR with strategy 'support_phospho_loss'."
-            )
-        required_cols = {
-            "feature_id",
-            "peptide_id",
-            "supporting_transitions",
-            "phospho_loss_supporting_transitions",
-        }
-        missing = required_cols - set(grouping_metrics.columns)
-        if missing:
-            raise ValueError(
-                "grouping_metrics is missing required columns for grouped FDR "
-                f"strategy 'support_phospho_loss': {sorted(missing)}"
-            )
-
-        merged = pf_pp_data.merge(
-            grouping_metrics[
-                [
-                    "feature_id",
-                    "peptide_id",
-                    "supporting_transitions",
-                    "phospho_loss_supporting_transitions",
-                ]
-            ].drop_duplicates(),
-            left_on=["feature_id", "hypothesis"],
-            right_on=["feature_id", "peptide_id"],
-            how="left",
-        )
-        group_keys = _support_phospho_loss_group_keys(merged)
-        return compute_grouped_model_fdr(
-            merged["pep"],
-            group_keys,
-            log_prefix="Grouped FDR by support/phospho-loss",
-        )
-
-    raise ValueError(
-        "Unsupported ipf_grouped_fdr_strategy: "
-        f"{grouped_fdr_strategy!r}. Expected 'num_peptidoforms' or 'support_phospho_loss'."
+    if "num_peptidoforms" not in pf_pp_data.columns:
+        raise ValueError("num_peptidoforms is required for grouped FDR.")
+    return compute_grouped_model_fdr(
+        pf_pp_data["pep"],
+        pf_pp_data["num_peptidoforms"].fillna(-1).astype(int),
+        log_prefix="Grouped FDR by num_peptidoforms",
     )
 
 
@@ -410,300 +330,6 @@ def _ipf_filters_active(
     )
 
 
-def _ipf_score_adjustment_active(
-    score_support_log_weight=0.0,
-    score_unique_support_log_weight=0.0,
-    score_log_intensity_weight=0.0,
-    score_phospho_loss_bonus=0.0,
-    score_overlap_penalty_weight=0.0,
-):
-    return (
-        score_support_log_weight != 0.0
-        or score_unique_support_log_weight != 0.0
-        or score_log_intensity_weight != 0.0
-        or score_phospho_loss_bonus != 0.0
-        or score_overlap_penalty_weight != 0.0
-    )
-
-
-def _transition_evidence_adjustment_active(
-    transition_evidence_nonunique_logit_scale=1.0,
-    transition_evidence_no_phospho_loss_logit_scale=1.0,
-    transition_evidence_overlap_logit_scale_weight=0.0,
-    transition_evidence_max_isotope_overlap=0.0,
-):
-    return (
-        transition_evidence_nonunique_logit_scale != 1.0
-        or transition_evidence_no_phospho_loss_logit_scale != 1.0
-        or transition_evidence_overlap_logit_scale_weight != 0.0
-        or transition_evidence_max_isotope_overlap > 0.0
-    )
-
-
-def apply_transition_evidence_adjustment(
-    transition_table,
-    transition_evidence_nonunique_logit_scale=1.0,
-    transition_evidence_no_phospho_loss_logit_scale=1.0,
-    transition_evidence_overlap_logit_scale_weight=0.0,
-    transition_evidence_overlap_reference=0.02,
-    transition_evidence_max_isotope_overlap=0.0,
-):
-    """
-    Adjust transition-level PEPs before BM so weak/non-informative identifying transitions
-    contribute less extreme evidence.
-
-    The adjustment shrinks the transition PEP logit toward zero, which weakens both supporting
-    and opposing evidence symmetrically once the BM evidence is constructed from PEP and BMASK.
-    Optionally, high-overlap transitions can be removed entirely before BM.
-    """
-    if not _transition_evidence_adjustment_active(
-        transition_evidence_nonunique_logit_scale=transition_evidence_nonunique_logit_scale,
-        transition_evidence_no_phospho_loss_logit_scale=transition_evidence_no_phospho_loss_logit_scale,
-        transition_evidence_overlap_logit_scale_weight=transition_evidence_overlap_logit_scale_weight,
-        transition_evidence_max_isotope_overlap=transition_evidence_max_isotope_overlap,
-    ):
-        return transition_table
-
-    if transition_evidence_nonunique_logit_scale <= 0:
-        raise ValueError("transition_evidence_nonunique_logit_scale must be > 0.")
-    if transition_evidence_no_phospho_loss_logit_scale <= 0:
-        raise ValueError(
-            "transition_evidence_no_phospho_loss_logit_scale must be > 0."
-        )
-    if transition_evidence_overlap_logit_scale_weight < 0:
-        raise ValueError(
-            "transition_evidence_overlap_logit_scale_weight must be >= 0."
-        )
-    if transition_evidence_overlap_reference < 0:
-        raise ValueError("transition_evidence_overlap_reference must be >= 0.")
-    if transition_evidence_max_isotope_overlap < 0:
-        raise ValueError("transition_evidence_max_isotope_overlap must be >= 0.")
-
-    adjusted = transition_table.copy()
-
-    if transition_evidence_max_isotope_overlap > 0:
-        if "isotope_overlap_score" not in adjusted.columns:
-            raise ValueError(
-                "isotope_overlap_score is required for transition_evidence_max_isotope_overlap filtering."
-            )
-        before = len(adjusted)
-        adjusted = adjusted[
-            adjusted["isotope_overlap_score"].fillna(transition_evidence_overlap_reference)
-            <= transition_evidence_max_isotope_overlap
-        ].copy()
-        logger.info(
-            "Applied pre-BM transition overlap filter: "
-            f"kept {len(adjusted)}/{before} transition rows with isotope_overlap_score <= "
-            f"{transition_evidence_max_isotope_overlap}."
-        )
-
-    if "pep" not in adjusted.columns:
-        raise ValueError("Transition table must contain pep for evidence adjustment.")
-
-    scales = np.ones(len(adjusted), dtype=float)
-
-    if transition_evidence_nonunique_logit_scale != 1.0:
-        if "n_mapped_peptides" not in adjusted.columns:
-            raise ValueError(
-                "n_mapped_peptides is required for transition_evidence_nonunique_logit_scale."
-            )
-        scales *= np.where(
-            adjusted["n_mapped_peptides"].fillna(0).astype(int).to_numpy() > 1,
-            transition_evidence_nonunique_logit_scale,
-            1.0,
-        )
-
-    if transition_evidence_no_phospho_loss_logit_scale != 1.0:
-        if "has_phospho_loss" not in adjusted.columns:
-            raise ValueError(
-                "has_phospho_loss is required for transition_evidence_no_phospho_loss_logit_scale."
-            )
-        scales *= np.where(
-            adjusted["has_phospho_loss"].fillna(0).astype(int).to_numpy() > 0,
-            1.0,
-            transition_evidence_no_phospho_loss_logit_scale,
-        )
-
-    if transition_evidence_overlap_logit_scale_weight != 0.0:
-        if "isotope_overlap_score" not in adjusted.columns:
-            raise ValueError(
-                "isotope_overlap_score is required for transition_evidence_overlap_logit_scale_weight."
-            )
-        overlap = (
-            adjusted["isotope_overlap_score"]
-            .fillna(transition_evidence_overlap_reference)
-            .astype(float)
-            .clip(lower=0.0)
-            .to_numpy()
-        )
-        scales *= np.exp(
-            -transition_evidence_overlap_logit_scale_weight
-            * np.maximum(0.0, overlap - transition_evidence_overlap_reference)
-        )
-
-    eps = np.finfo(float).eps
-    pep = adjusted["pep"].astype(float).clip(lower=eps, upper=1 - eps).to_numpy()
-    pep_logit = np.log(pep / (1 - pep))
-    adjusted["pep"] = expit(pep_logit * scales)
-
-    logger.info(
-        "Applied pre-BM transition evidence shaping: "
-        f"nonunique_logit_scale={transition_evidence_nonunique_logit_scale}, "
-        f"no_phospho_loss_logit_scale={transition_evidence_no_phospho_loss_logit_scale}, "
-        f"overlap_logit_scale_weight={transition_evidence_overlap_logit_scale_weight}, "
-        f"overlap_reference={transition_evidence_overlap_reference}, "
-        f"max_isotope_overlap={transition_evidence_max_isotope_overlap}. "
-        f"Adjusted {len(adjusted)} transition rows."
-    )
-
-    return adjusted
-
-
-def apply_ipf_score_adjustment(
-    result,
-    score_metrics,
-    ipf_grouped_fdr=False,
-    score_support_log_weight=0.0,
-    score_unique_support_log_weight=0.0,
-    score_log_intensity_weight=0.0,
-    score_phospho_loss_bonus=0.0,
-    score_intensity_reference=10000.0,
-    score_overlap_penalty_weight=0.0,
-    score_overlap_reference=0.02,
-    score_adjust_max_supporting_transitions=0,
-    score_adjust_no_phospho_loss_only=False,
-):
-    """
-    Experimentally re-rank IPF peptidoform hypotheses by adjusting the PEP in logit space
-    using support-count and feature-intensity signals, then recomputing q-values.
-
-    Positive weights improve hypotheses with stronger support / higher intensity. When
-    score_adjust_max_supporting_transitions is set, the adjustment only applies to weak-
-    support hypotheses at or below that threshold. When score_adjust_no_phospho_loss_only
-    is enabled, only hypotheses without phospho-loss support are adjusted.
-    """
-    if not _ipf_score_adjustment_active(
-        score_support_log_weight=score_support_log_weight,
-        score_unique_support_log_weight=score_unique_support_log_weight,
-        score_log_intensity_weight=score_log_intensity_weight,
-        score_phospho_loss_bonus=score_phospho_loss_bonus,
-        score_overlap_penalty_weight=score_overlap_penalty_weight,
-    ):
-        return result
-
-    if score_intensity_reference <= 0:
-        raise ValueError("score_intensity_reference must be > 0.")
-    if score_overlap_reference < 0:
-        raise ValueError("score_overlap_reference must be >= 0.")
-
-    merged = result.merge(
-        score_metrics,
-        left_on=["feature_id", "hypothesis"],
-        right_on=["feature_id", "peptide_id"],
-        how="left",
-    )
-
-    for metric_col in [
-        "supporting_transitions",
-        "unique_supporting_transitions",
-        "phospho_loss_supporting_transitions",
-    ]:
-        if metric_col not in merged.columns:
-            merged[metric_col] = 0
-        merged[metric_col] = merged[metric_col].fillna(0).astype(int)
-
-    if score_log_intensity_weight != 0.0 and "feature_ms2_intensity" not in merged.columns:
-        raise ValueError(
-            "feature_ms2_intensity is required for support/intensity-aware IPF score adjustment."
-        )
-    if score_overlap_penalty_weight != 0.0 and "median_supporting_isotope_overlap" not in merged.columns:
-        raise ValueError(
-            "median_supporting_isotope_overlap is required for overlap-aware IPF score adjustment."
-        )
-
-    apply_mask = merged["hypothesis"] != -1
-    if score_adjust_max_supporting_transitions > 0:
-        apply_mask &= (
-            merged["supporting_transitions"] <= score_adjust_max_supporting_transitions
-        )
-    if score_adjust_no_phospho_loss_only:
-        apply_mask &= merged["phospho_loss_supporting_transitions"] == 0
-
-    score_bonus = np.zeros(len(merged), dtype=float)
-    if score_support_log_weight != 0.0:
-        score_bonus += score_support_log_weight * np.log1p(
-            merged["supporting_transitions"].astype(float).to_numpy()
-        )
-    if score_unique_support_log_weight != 0.0:
-        score_bonus += score_unique_support_log_weight * np.log1p(
-            merged["unique_supporting_transitions"].astype(float).to_numpy()
-        )
-    if score_log_intensity_weight != 0.0:
-        intensity = (
-            merged["feature_ms2_intensity"]
-            .fillna(0.0)
-            .astype(float)
-            .clip(lower=1.0)
-            .to_numpy()
-        )
-        score_bonus += score_log_intensity_weight * (
-            np.log10(intensity) - np.log10(score_intensity_reference)
-        )
-    if score_phospho_loss_bonus != 0.0:
-        score_bonus += score_phospho_loss_bonus * (
-            merged["phospho_loss_supporting_transitions"].astype(float).to_numpy() > 0
-        )
-    if score_overlap_penalty_weight != 0.0:
-        overlap = (
-            merged["median_supporting_isotope_overlap"]
-            .fillna(score_overlap_reference)
-            .astype(float)
-            .clip(lower=0.0)
-            .to_numpy()
-        )
-        score_bonus -= score_overlap_penalty_weight * np.maximum(
-            0.0, overlap - score_overlap_reference
-        )
-
-    score_bonus = np.where(apply_mask.to_numpy(), score_bonus, 0.0)
-
-    eps = np.finfo(float).eps
-    pep = merged["pep"].astype(float).clip(lower=eps, upper=1 - eps).to_numpy()
-    pep_logit = np.log(pep / (1 - pep))
-    adjusted_pep = expit(pep_logit - score_bonus)
-    adjusted_pep = np.clip(adjusted_pep, eps, 1 - eps)
-
-    adjusted = merged.copy()
-    adjusted["pep"] = adjusted_pep
-
-    if ipf_grouped_fdr:
-        if "num_peptidoforms" not in adjusted.columns:
-            raise ValueError(
-                "num_peptidoforms is required for grouped FDR after IPF score adjustment."
-            )
-        adjusted["qvalue"] = adjusted.groupby("num_peptidoforms")["pep"].transform(
-            compute_model_fdr
-        )
-    else:
-        adjusted["qvalue"] = compute_model_fdr(adjusted["pep"])
-
-    logger.info(
-        "Applied support/intensity-aware IPF score adjustment: "
-        f"support_log_weight={score_support_log_weight}, "
-        f"unique_support_log_weight={score_unique_support_log_weight}, "
-        f"log_intensity_weight={score_log_intensity_weight}, "
-        f"phospho_loss_bonus={score_phospho_loss_bonus}, "
-        f"intensity_reference={score_intensity_reference}, "
-        f"overlap_penalty_weight={score_overlap_penalty_weight}, "
-        f"overlap_reference={score_overlap_reference}, "
-        f"max_supporting_transitions={score_adjust_max_supporting_transitions}, "
-        f"no_phospho_loss_only={score_adjust_no_phospho_loss_only}. "
-        f"Adjusted {int(apply_mask.sum())}/{len(adjusted)} hypothesis rows."
-    )
-
-    return adjusted
-
-
 def _apply_ipf_filter_thresholds(
     metrics,
     min_supporting_transitions=0,
@@ -816,100 +442,6 @@ def _apply_ipf_filter_thresholds(
                 else "."
             )
         )
-
-    return filtered
-
-
-def apply_pre_bm_hypothesis_filters(
-    transition_table,
-    precursor_table,
-    propagate_signal_across_runs=False,
-    across_run_confidence_threshold=0.5,
-    min_supporting_transitions=0,
-    min_unique_supporting_transitions=0,
-    require_phospho_loss_below_support=0,
-    min_peakgroup_intensity=0.0,
-    conditional_min_peakgroup_intensity=0.0,
-    conditional_min_peakgroup_intensity_max_supporting_transitions=0,
-    conditional_min_peakgroup_intensity_no_phospho_loss_only=False,
-):
-    """
-    Applies optional structural hypothesis filters before transition-level Bayesian modeling.
-
-    The same feature/peptidoform metrics used for post-IPF filtering are computed on the
-    current evidence state and used to prune weak hypotheses before posterior inference.
-    Retained rows have their num_peptidoforms recomputed so priors remain coherent.
-
-    Args:
-        transition_table (pd.DataFrame): Transition-level peptidoform table.
-        precursor_table (pd.DataFrame): Peakgroup / precursor-level table.
-        propagate_signal_across_runs (bool): Whether IPF propagates evidence across runs.
-        across_run_confidence_threshold (float): Confidence threshold for signal propagation.
-        min_supporting_transitions (int): Minimum supporting transitions required.
-        min_unique_supporting_transitions (int): Minimum uniquely supporting transitions required.
-        require_phospho_loss_below_support (int): Require at least one phospho-loss supporting
-            transition when supporting_transitions is below this threshold.
-        min_peakgroup_intensity (float): Minimum MS2 feature intensity required.
-
-    Returns:
-        pd.DataFrame: Filtered transition table ready for peptidoform inference.
-    """
-    if not _ipf_filters_active(
-        min_supporting_transitions=min_supporting_transitions,
-        min_unique_supporting_transitions=min_unique_supporting_transitions,
-        require_phospho_loss_below_support=require_phospho_loss_below_support,
-        min_peakgroup_intensity=min_peakgroup_intensity,
-        conditional_min_peakgroup_intensity=conditional_min_peakgroup_intensity,
-    ):
-        return transition_table
-
-    filter_metrics = prepare_post_ipf_filter_metrics(
-        transition_table,
-        precursor_table,
-        propagate_signal_across_runs=propagate_signal_across_runs,
-        across_run_confidence_threshold=across_run_confidence_threshold,
-    )
-    kept_hypotheses = _apply_ipf_filter_thresholds(
-        filter_metrics,
-        min_supporting_transitions=min_supporting_transitions,
-        min_unique_supporting_transitions=min_unique_supporting_transitions,
-        require_phospho_loss_below_support=require_phospho_loss_below_support,
-        min_peakgroup_intensity=min_peakgroup_intensity,
-        conditional_min_peakgroup_intensity=conditional_min_peakgroup_intensity,
-        conditional_min_peakgroup_intensity_max_supporting_transitions=conditional_min_peakgroup_intensity_max_supporting_transitions,
-        conditional_min_peakgroup_intensity_no_phospho_loss_only=conditional_min_peakgroup_intensity_no_phospho_loss_only,
-        log_prefix="Applied pre-BM",
-    )[["feature_id", "peptide_id"]].drop_duplicates()
-
-    filtered = transition_table.merge(
-        kept_hypotheses.assign(_keep_hypothesis=True),
-        on=["feature_id", "peptide_id"],
-        how="left",
-    )
-    filtered = filtered[
-        (filtered["peptide_id"] == -1) | (filtered["_keep_hypothesis"] == True)
-    ].copy()
-    filtered = filtered.drop(columns=["_keep_hypothesis"])
-
-    num_peptidoforms = (
-        filtered.loc[filtered["peptide_id"] != -1]
-        .groupby("feature_id")["peptide_id"]
-        .nunique()
-        .rename("num_peptidoforms")
-    )
-    filtered = filtered.drop(columns=["num_peptidoforms"], errors="ignore").merge(
-        num_peptidoforms,
-        on="feature_id",
-        how="left",
-    )
-    filtered["num_peptidoforms"] = filtered["num_peptidoforms"].fillna(0).astype(int)
-
-    logger.info(
-        "Applied pre-BM hypothesis filtering: "
-        f"kept {len(filtered)} transition rows spanning "
-        f"{filtered.loc[filtered['peptide_id'] != -1, ['feature_id', 'peptide_id']].drop_duplicates().shape[0]} "
-        "non-H0 feature-hypothesis candidates."
-    )
 
     return filtered
 
@@ -1365,10 +897,8 @@ def peptidoform_inference(
     transition_table,
     precursor_data,
     ipf_grouped_fdr,
-    ipf_grouped_fdr_strategy,
     propagate_signal_across_runs,
     across_run_confidence_threshold,
-    grouping_metrics=None,
 ):
     """
     Conducts peptidoform-level inference.
@@ -1377,11 +907,8 @@ def peptidoform_inference(
         transition_table (pd.DataFrame): Input data containing transition-level information.
         precursor_data (pd.DataFrame): Precursor-level probabilities.
         ipf_grouped_fdr (bool): Whether to use grouped FDR estimation.
-        ipf_grouped_fdr_strategy (str): Grouping strategy when grouped FDR is enabled.
         propagate_signal_across_runs (bool): Whether to propagate signal across runs.
         across_run_confidence_threshold (float): Confidence threshold for propagation.
-        grouping_metrics (pd.DataFrame | None): Optional per-feature/per-hypothesis
-            metrics required by grouped FDR strategies beyond ``num_peptidoforms``.
 
     Returns:
         pd.DataFrame: Inferred peptidoform probabilities and FDR estimates.
@@ -1409,8 +936,6 @@ def peptidoform_inference(
     pf_pp_data["qvalue"] = compute_ipf_qvalues(
         pf_pp_data,
         grouped_fdr=ipf_grouped_fdr,
-        grouped_fdr_strategy=ipf_grouped_fdr_strategy,
-        grouping_metrics=grouping_metrics,
     )
 
     # merge precursor-level data with UIS data
@@ -1471,10 +996,6 @@ def infer_peptidoforms(config: IPFIOConfig):
     need_transition_score_metrics = (
         config.ipf_min_supporting_transitions > 0
         or config.ipf_min_peakgroup_intensity > 0
-        or (
-            config.ipf_grouped_fdr
-            and config.ipf_grouped_fdr_strategy == "support_phospho_loss"
-        )
     )
     if need_transition_score_metrics:
         transition_score_metrics = prepare_post_ipf_filter_metrics(
@@ -1488,10 +1009,8 @@ def infer_peptidoforms(config: IPFIOConfig):
         peptidoform_table,
         precursor_data,
         config.ipf_grouped_fdr,
-        config.ipf_grouped_fdr_strategy,
         config.propagate_signal_across_runs,
         config.across_run_confidence_threshold,
-        grouping_metrics=transition_score_metrics,
     )
 
     # finalize results and write to table

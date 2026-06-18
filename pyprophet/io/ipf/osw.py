@@ -243,17 +243,7 @@ class OSWReader(BaseOSWReader):
         rc = self.config
         ipf_h0 = rc.ipf_h0
         pep_threshold = rc.ipf_max_transition_pep
-        require_overlap = False
-        require_phospho_loss = (
-            rc.ipf_grouped_fdr
-            and rc.ipf_grouped_fdr_strategy == "support_phospho_loss"
-        )
         has_annotation = "ANNOTATION" in get_table_columns(self.infile, "TRANSITION")
-
-        if require_phospho_loss and not has_annotation:
-            raise click.ClickException(
-                "ANNOTATION column is required for grouped FDR with strategy support_phospho_loss."
-            )
         phospho_loss_expr = (
             "CASE WHEN COALESCE(TRANSITION.ANNOTATION, '') LIKE '%-H3O4P1%' THEN 1 ELSE 0 END"
             if has_annotation
@@ -263,28 +253,11 @@ class OSWReader(BaseOSWReader):
         # only the evidence is restricted to ipf_max_transition_pep, the peptidoform-space is complete
         logger.info("Info: Reading peptidoform-level data ...")
 
-        overlap_join = ""
-        overlap_select = ""
-        if require_overlap:
-            if not check_duckdb_table(con, "main", "FEATURE_TRANSITION"):
-                raise click.ClickException(
-                    "FEATURE_TRANSITION is required for overlap-aware IPF score adjustment."
-                )
-            overlap_join = (
-                "INNER JOIN osw.FEATURE_TRANSITION "
-                "ON SCORE_TRANSITION.FEATURE_ID = FEATURE_TRANSITION.FEATURE_ID "
-                "AND SCORE_TRANSITION.TRANSITION_ID = FEATURE_TRANSITION.TRANSITION_ID"
-            )
-            overlap_select = (
-                ", FEATURE_TRANSITION.VAR_ISOTOPE_OVERLAP_SCORE AS ISOTOPE_OVERLAP_SCORE"
-            )
-
         queries = {
             "evidence": f"""
-                SELECT SCORE_TRANSITION.FEATURE_ID, SCORE_TRANSITION.TRANSITION_ID, PEP{overlap_select}
+                SELECT SCORE_TRANSITION.FEATURE_ID, SCORE_TRANSITION.TRANSITION_ID, PEP
                 FROM osw.SCORE_TRANSITION
                 INNER JOIN osw.TRANSITION ON SCORE_TRANSITION.TRANSITION_ID = TRANSITION.ID
-                {overlap_join}
                 WHERE TRANSITION.TYPE != ''
                 AND TRANSITION.DECOY = 0
                 AND PEP < {pep_threshold}
@@ -612,17 +585,7 @@ class OSWReader(BaseOSWReader):
         rc = self.config
         ipf_h0 = rc.ipf_h0
         pep_threshold = rc.ipf_max_transition_pep
-        require_overlap = False
-        require_phospho_loss = (
-            rc.ipf_grouped_fdr
-            and rc.ipf_grouped_fdr_strategy == "support_phospho_loss"
-        )
         has_annotation = "ANNOTATION" in get_table_columns(self.infile, "TRANSITION")
-
-        if require_phospho_loss and not has_annotation:
-            raise click.ClickException(
-                "ANNOTATION column is required for grouped FDR with strategy support_phospho_loss."
-            )
         phospho_loss_expr = (
             "CASE WHEN COALESCE(TRANSITION.ANNOTATION, '') LIKE '%-H3O4P1%' THEN 1 ELSE 0 END"
             if has_annotation
@@ -632,28 +595,11 @@ class OSWReader(BaseOSWReader):
         # only the evidence is restricted to ipf_max_transition_pep, the peptidoform-space is complete
         logger.info("Info: Reading peptidoform-level data ...")
 
-        overlap_join = ""
-        overlap_select = ""
-        if require_overlap:
-            if not check_sqlite_table(con, "FEATURE_TRANSITION"):
-                raise click.ClickException(
-                    "FEATURE_TRANSITION is required for overlap-aware IPF score adjustment."
-                )
-            overlap_join = (
-                "INNER JOIN FEATURE_TRANSITION "
-                "ON SCORE_TRANSITION.FEATURE_ID = FEATURE_TRANSITION.FEATURE_ID "
-                "AND SCORE_TRANSITION.TRANSITION_ID = FEATURE_TRANSITION.TRANSITION_ID"
-            )
-            overlap_select = (
-                ", FEATURE_TRANSITION.VAR_ISOTOPE_OVERLAP_SCORE AS ISOTOPE_OVERLAP_SCORE"
-            )
-
         queries = {
             "evidence": """
-                SELECT SCORE_TRANSITION.FEATURE_ID, SCORE_TRANSITION.TRANSITION_ID, PEP{overlap_select}
+                SELECT SCORE_TRANSITION.FEATURE_ID, SCORE_TRANSITION.TRANSITION_ID, PEP
                 FROM SCORE_TRANSITION
                 INNER JOIN TRANSITION ON SCORE_TRANSITION.TRANSITION_ID = TRANSITION.ID
-                {overlap_join}
                 WHERE TRANSITION.TYPE != ''
                 AND TRANSITION.DECOY = 0
                 AND PEP < ?
@@ -704,9 +650,7 @@ class OSWReader(BaseOSWReader):
 
         # Execute
         evidence = pd.read_sql_query(
-            queries["evidence"].format(
-                overlap_select=overlap_select, overlap_join=overlap_join
-            ),
+            queries["evidence"],
             con,
             params=[pep_threshold],
         ).rename(columns=str.lower)

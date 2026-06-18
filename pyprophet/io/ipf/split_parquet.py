@@ -176,11 +176,6 @@ class SplitParquetReader(BaseSplitParquetReader):
         cfg = self.config
         ipf_h0 = cfg.ipf_h0
         pep_threshold = cfg.ipf_max_transition_pep
-        require_phospho_loss = (
-            cfg.ipf_grouped_fdr
-            and cfg.ipf_grouped_fdr_strategy == "support_phospho_loss"
-        )
-        require_overlap = False
 
         logger.info("Reading peptidoform-level data ...")
 
@@ -205,17 +200,9 @@ class SplitParquetReader(BaseSplitParquetReader):
                 "IPF_PEPTIDE_ID column is required in transition features."
             )
         has_annotation = "ANNOTATION" in all_transition_cols
-        if require_phospho_loss and not has_annotation:
-            raise click.ClickException(
-                "ANNOTATION column is required for grouped FDR with strategy support_phospho_loss."
-            )
         has_overlap_col = (
             "FEATURE_TRANSITION_VAR_ISOTOPE_OVERLAP_SCORE" in all_transition_cols
         )
-        if require_overlap and not has_overlap_col:
-            raise click.ClickException(
-                "FEATURE_TRANSITION_VAR_ISOTOPE_OVERLAP_SCORE is required for overlap-aware IPF score adjustment."
-            )
         has_phospho_loss_sql = (
             "MAX(CASE WHEN COALESCE(t.ANNOTATION, '') LIKE '%-H3O4P1%' THEN 1 ELSE 0 END) AS HAS_PHOSPHO_LOSS"
             if has_annotation

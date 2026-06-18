@@ -456,7 +456,7 @@ class IPFIOConfig(BaseIOConfig):
         ipf_ms2_scoring (bool): Use MS2 precursor data for IPF.
         ipf_h0 (bool): Include possibility that peak groups are not covered by the peptidoform space (null hypothesis H0).
         ipf_grouped_fdr (bool): [Experimental] Compute grouped FDR instead of pooled FDR to support heterogeneous peptidoform counts per peak group.
-        ipf_grouped_fdr_strategy (Literal["num_peptidoforms", "support_phospho_loss"]): Grouping strategy used when grouped FDR is enabled.
+        ipf_grouped_fdr_strategy (Literal["num_peptidoforms"]): Grouping strategy used when grouped FDR is enabled.
         ipf_max_precursor_pep (float): Maximum PEP to consider scored precursors in IPF.
         ipf_max_peakgroup_pep (float): Maximum PEP to consider scored peak groups in IPF.
         ipf_max_precursor_peakgroup_pep (float): Maximum BHM layer 1 integrated precursor-peakgroup PEP to consider in IPF.
@@ -474,9 +474,7 @@ class IPFIOConfig(BaseIOConfig):
     ipf_ms2_scoring: bool = True
     ipf_h0: bool = True
     ipf_grouped_fdr: bool = False
-    ipf_grouped_fdr_strategy: Literal[
-        "num_peptidoforms", "support_phospho_loss"
-    ] = "num_peptidoforms"
+    ipf_grouped_fdr_strategy: Literal["num_peptidoforms"] = "num_peptidoforms"
     ipf_max_precursor_pep: float = 0.7
     ipf_max_peakgroup_pep: float = 0.7
     ipf_max_precursor_peakgroup_pep: float = 0.4
